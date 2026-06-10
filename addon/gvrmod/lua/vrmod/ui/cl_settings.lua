@@ -276,8 +276,6 @@ function VRUtilOpenMenu()
 
 		AddCB("Enable engine postprocessing", "vrmod_postprocess", y)
 		y = y + 20
-		AddCB("Auto offset (disable if having rendering issues)", "vrmod_renderoffset", y)
-		y = y + 20
 		AddCB("3D Skybox (disable for more FPS)", "vrmod_skybox", y)
 		do
 			local s = vgui.Create("DNumSlider", t)
@@ -367,101 +365,20 @@ function VRUtilOpenMenu()
 			y = y + 35
 		end
 
-		--
-		do
-			local s = vgui.Create("DNumSlider", t)
-			s:SetPos(20, y + 10)
-			s:SetSize(370, 25)
-			s:SetDark(true)
-			s:SetText("Eye distance offset")
-			s:SetMin(0.0)
-			s:SetMax(1.0)
-			s:SetDecimals(2)
-			s:SetConVar("vrmod_eyescale")
-			y = y + 40
-		end
-
-		do
-			local label = vgui.Create("DLabel", t)
-			label:SetPos(20, y + 5)
-			label:SetSize(370, 30)
-			label:SetDark(true)
-			label:SetText("Changing this will visually affect your POV")
-			label:SetWrap(true)
-			label:SetAutoStretchVertical(true)
-			label:SetFont("BoldSliderFont")
-			y = y + 35
-		end
-
-		do
-			local label = vgui.Create("DLabel", t)
-			label:SetPos(20, y + 5)
-			label:SetSize(370, 30)
-			label:SetDark(true)
-			label:SetText("Adjust parameters below if you see borders, start with small values like 0.01")
-			label:SetWrap(true)
-			label:SetAutoStretchVertical(true)
-			y = y + 35
-		end
-
-		do
-			local s = vgui.Create("DNumSlider", t)
-			s:SetPos(20, y + 10)
-			s:SetSize(370, 25)
-			s:SetDark(true)
-			s:SetText("Scale Factor")
-			s:SetMin(0.1)
-			s:SetMax(2.0)
-			s:SetDecimals(2)
-			s:SetConVar("vrmod_scalefactor")
-			y = y + 40
-		end
-
-		do
-			local s = vgui.Create("DNumSlider", t)
-			s:SetPos(20, y + 10)
-			s:SetSize(370, 25)
-			s:SetDark(true)
-			s:SetText("Vertical offset")
-			s:SetMin(-1.0)
-			s:SetMax(1.0)
-			s:SetDecimals(2)
-			s:SetConVar("vrmod_verticaloffset")
-			y = y + 40
-		end
-
-		do
-			local s = vgui.Create("DNumSlider", t)
-			s:SetPos(20, y + 10)
-			s:SetSize(370, 25)
-			s:SetDark(true)
-			s:SetText("Horizontal offset")
-			s:SetMin(-1.0)
-			s:SetMax(1.0)
-			s:SetDecimals(2)
-			s:SetConVar("vrmod_horizontaloffset")
-			y = y + 40
-		end
-
+		-- Reset button for rendering settings (headset-driven; no debug tunables remain)
 		local reset = vgui.Create("DButton", t)
-		reset:SetPos(20, y + 10)
-		reset:SetSize(200, 30)
-		reset:SetText("Reset")
+		reset:SetPos(20, y + 5)
+		reset:SetSize(200, 28)
+		reset:SetText("Reset rendering settings")
 		reset.DoClick = function()
 			RunConsoleCommand("vrmod_postprocess", "0")
 			RunConsoleCommand("vrmod_skybox", "0")
-			RunConsoleCommand("vrmod_renderoffset", "1")
 			RunConsoleCommand("vrmod_viewscale", "1.0")
 			RunConsoleCommand("vrmod_fovscale_x", "1.0")
 			RunConsoleCommand("vrmod_fovscale_y", "1.0")
 			RunConsoleCommand("vrmod_znear", "1.0")
-			RunConsoleCommand("vrmod_eyescale", "0.5")
-			RunConsoleCommand("vrmod_scalefactor", "1.0")
-			RunConsoleCommand("vrmod_verticaloffset", "0")
-			RunConsoleCommand("vrmod_horizontaloffset", "0")
 		end
-
-		y = y + 50
+		y = y + 45
 	end
 
 	-- ─────────────── Shared PropertySheet ───────────────

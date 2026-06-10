@@ -51,17 +51,18 @@ if CLIENT then
     vrmod.AddCallbackedConvar("vrmod_desktopview", nil, "3")
     vrmod.AddCallbackedConvar("vrmod_laserpointer", nil, "0")
     vrmod.AddCallbackedConvar("vrmod_znear", nil, "1")
-    vrmod.AddCallbackedConvar("vrmod_renderoffset", nil, "1")
     vrmod.AddCallbackedConvar("vrmod_viewscale", nil, "1.0")
     vrmod.AddCallbackedConvar("vrmod_fovscale_x", nil, "1")
     vrmod.AddCallbackedConvar("vrmod_fovscale_y", nil, "1")
-    vrmod.AddCallbackedConvar("vrmod_scalefactor", nil, "1")
-    vrmod.AddCallbackedConvar("vrmod_eyescale", nil, "0.5")
-    vrmod.AddCallbackedConvar("vrmod_verticaloffset", nil, "0")
-    vrmod.AddCallbackedConvar("vrmod_horizontaloffset", nil, "0")
+    -- Note: vrmod_eyescale (and the old IPD offset hacks) have been removed.
+    -- We now use the exact eye offsets and IPD directly from OpenXR with no extra multiplier.
+    -- Note: vrmod_renderoffset / scalefactor / verticaloffset / horizontaloffset were removed earlier.
+    -- They compensated for side-by-side RT packing + asymmetric frustum UV hacks.
+    -- With proper per-eye RTs the projection asymmetry is handled by rendering each eye
+    -- to its own RT with the correct OpenXR-derived projection; no more submit UV offsets needed.
     vrmod.AddCallbackedConvar("vrmod_oldcharacteryaw", nil, "0")
     vrmod.AddCallbackedConvar("vrmod_postprocess", nil, "0", nil, nil, nil, nil, tobool, function(val) if g_VR.view then g_VR.view.dopostprocess = val end end)
-    vrmod.AddCallbackedConvar("vrmod_skybox", nil, "0", nil, nil, nil, nil, tobool, function(val) RunConsoleCommand("r_3dsky", val and "1" or "0") end)
+    vrmod.AddCallbackedConvar("vrmod_skybox", nil, "1", nil, nil, nil, nil, tobool, function(val) RunConsoleCommand("r_3dsky", val and "1" or "0") end)
     vrmod.AddCallbackedConvar("vrmod_controlleroffset_x", nil, "-15")
     vrmod.AddCallbackedConvar("vrmod_controlleroffset_y", nil, "-1")
     vrmod.AddCallbackedConvar("vrmod_controlleroffset_z", nil, "5")

@@ -4,6 +4,10 @@ if CLIENT then
 	g_VR.scale = 0
 	g_VR.origin = Vector(0, 0, 0)
 	g_VR.rtWidth, g_VR.rtHeight = nil, nil
+	g_VR.rtLeft = nil
+	g_VR.rtRight = nil
+	g_VR.rtLeftMaterial = nil
+	g_VR.rtRightMaterial = nil
 	g_VR.originAngle = Angle(0, 0, 0)
 	g_VR.viewModel = nil
 	g_VR.viewModelMuzzle = nil
@@ -19,13 +23,7 @@ if CLIENT then
 	g_VR.moduleVersion = 0
 	local hfovLeft, hfovRight
 	local aspectLeft, aspectRight
-	local leftCalc, rightCalc
-	local ipd, eyez
-	local cropVerticalMargin, cropHorizontalOffset
 	local lastPosePos = {}
-	local eyeOffset = nil
-	local forwardOffset = nil
-	local convarOverrides = {}
 	local moduleFile
 	local COLLISION_FRAME_INTERVAL = 1 -- 1 = every frame (90 Hz), 2 = every other frame (~60 Hz effective)
 	local frameCounter = 0
@@ -98,21 +96,24 @@ if CLIENT then
 		local viewscale = convars.vrmod_viewscale:GetFloat()
 		local fovX, fovY = convars.vrmod_fovscale_x:GetFloat(), convars.vrmod_fovscale_y:GetFloat()
 		local di = VRMOD_GetDisplayInfo(1, 10)
-		local rawW, rawH = di.RecommendedWidth * 2, di.RecommendedHeight
-		-- preserve your variables exactly
+		-- Per-eye sizes (proper separate RT per eye). No more side-by-side packing.
+		local rawW, rawH = di.RecommendedWidth, di.RecommendedHeight
 		local leftProj = vrmod.utils.AdjustFOV(di.ProjectionLeft, fovX, fovY)
 		local rightProj = vrmod.utils.AdjustFOV(di.ProjectionRight, fovX, fovY)
 		local leftCalc = vrmod.utils.CalculateProjectionParams(leftProj, viewscale)
 		local rightCalc = vrmod.utils.CalculateProjectionParams(rightProj, viewscale)
-		-- clamp on Linux exactly as before
-		if system.IsLinux() then
-			local maxW, maxH = 4096, 4096
-			local cw, ch = math.min(maxW, rawW), math.min(maxH, rawH)
-			rawW, rawH = cw, ch
-		end
+		-- clamp on Linux
+		-- if system.IsLinux() then
+		-- 	local maxW, maxH = 4096, 4096
+		-- 	rawW = math.min(maxW, rawW)
+		-- 	rawH = math.min(maxH, rawH)
+		-- end
 
-		local ipd = di.TransformRight[1][4] * 2
-		local eyez = di.TransformRight[3][4]
+		-- Simple IPD for any legacy use; real eye poses now come directly from OpenXR via tracking.eye_left/right
+		local leftX = di.TransformLeft and di.TransformLeft[1] and di.TransformLeft[1][4] or 0
+		local rightX = di.TransformRight and di.TransformRight[1] and di.TransformRight[1][4] or 0
+		local ipd = math.abs(rightX - leftX)
+
 		return {
 			rtW = rawW,
 			rtH = rawH,
@@ -122,8 +123,7 @@ if CLIENT then
 			hfovR = rightCalc.HorizontalFOV,
 			aspL = leftCalc.AspectRatio,
 			aspR = rightCalc.AspectRatio,
-			ipd = ipd,
-			eyez = eyez
+			ipd = ipd
 		}
 	end
 
@@ -283,66 +283,164 @@ if CLIENT then
 	end
 
 	local function PerformRenderViews()
-		local eyeScale = convars.vrmod_eyescale:GetFloat()
-		-- cache angles once per frame
-		local ang = g_VR.view.angles
-		local fwd = ang:Forward()
-		local right = ang:Right()
-		local up = ang:Up()
-		-- only recompute offsets when needed
-		eyeOffset = ipd * g_VR.scale -- scalar, can stay here
-		forwardOffset = fwd * -(eyez * g_VR.scale)
-		verticalOffset = up * -2.1
-		-- compute eye positions
-		g_VR.eyePosLeft = g_VR.view.origin + forwardOffset + right * -eyeOffset * eyeScale + verticalOffset
-		g_VR.eyePosRight = g_VR.view.origin + forwardOffset + right * eyeOffset * eyeScale + verticalOffset
-		render.PushRenderTarget(g_VR.rt)
-		if DrawErrorOverlay() then
-			render.PopRenderTarget()
-			vrmod.logger.Warn("Render skipped due to error overlay.")
-			return
+		-- Head orientation from the HMD pose. We use headset eye *positions* for stereo
+		-- separation and head orientation + the small per-eye yaw_offset (from OpenXR
+		-- asymmetric fov centers) for camera angles. This keeps roll consistent and
+		-- lets OpenXR fully define the optical axes.
+		local headAng = g_VR.view.angles
+
+		local eyeL = g_VR.tracking.eye_left
+		local eyeR = g_VR.tracking.eye_right
+
+		local eyePosL = (eyeL and eyeL.pos) or g_VR.view.origin
+		local eyePosR = (eyeR and eyeR.pos) or g_VR.view.origin
+		local eyeAngL = (eyeL and eyeL.ang) or headAng
+		local eyeAngR = (eyeR and eyeR.ang) or headAng
+
+		g_VR.eyePosLeft = eyePosL
+		g_VR.eyePosRight = eyePosR
+
+		-- Apply the small per-eye yaw/pitch offsets reported by OpenXR (optical axis from fov
+		-- center angles). We rotate the head forward around head-local Up (yaw) and Right (pitch)
+		-- so the RenderView camera points along each eye's true optical axis while preserving roll.
+		-- The signs of yaw_offset/pitch_offset are corrected on the native side so positive values
+		-- produce the rotation direction that aligns content with the compositor's expectation for
+		-- that view's pose + fov. This fixes double vision (mis-centered frustums) and the
+		-- roll-induced vertical disparity (left eye "looking up" on left head tilt) caused by
+		-- the horizontal offset error coupling through roll.
+		local function RotateVectorAroundAxis(v, axis, rad)
+			local c = math.cos(rad)
+			local s = math.sin(rad)
+			local dot = v:Dot(axis)
+			local cross = axis:Cross(v)
+			return v * c + cross * s + axis * dot * (1 - c)
+		end
+		if eyeL then
+			local yawRad = math.rad(eyeL.yaw_offset or 0)
+			local pitchRad = math.rad(eyeL.pitch_offset or 0)
+			local f = headAng:Forward()
+			local up = headAng:Up()
+			local rt = headAng:Right()
+			f = RotateVectorAroundAxis(f, up, yawRad)
+			f = RotateVectorAroundAxis(f, rt, pitchRad)
+			local newAng = f:Angle()
+			newAng.r = headAng.r
+			eyeAngL = newAng
+		end
+		if eyeR then
+			local yawRad = math.rad(eyeR.yaw_offset or 0)
+			local pitchRad = math.rad(eyeR.pitch_offset or 0)
+			local f = headAng:Forward()
+			local up = headAng:Up()
+			local rt = headAng:Right()
+			f = RotateVectorAroundAxis(f, up, yawRad)
+			f = RotateVectorAroundAxis(f, rt, pitchRad)
+			local newAng = f:Angle()
+			newAng.r = headAng.r
+			eyeAngR = newAng
 		end
 
-		render.Clear(0, 0, 0, 255, true, true)
-		-- cache common values
-		local rtHalfW = g_VR.rtWidth / 2
-		local rtH = g_VR.rtHeight
-		-- left eye
-		g_VR.view.origin = g_VR.eyePosLeft
-		g_VR.view.fov = hfovLeft
-		g_VR.view.aspectratio = aspectLeft
-		g_VR.view.x = 0
-		g_VR.view.y = 0
-		g_VR.view.w = rtHalfW
-		g_VR.view.h = rtH
-		hook.Call("VRMod_PreRender", nil, "left")
-		render.RenderView(g_VR.view)
-		-- right eye
-		g_VR.view.origin = g_VR.eyePosRight
-		g_VR.view.fov = hfovRight
-		g_VR.view.aspectratio = aspectRight
-		g_VR.view.x = rtHalfW
-		g_VR.view.y = 0
-		g_VR.view.w = rtHalfW
-		g_VR.view.h = rtH
-		hook.Call("VRMod_PreRender", nil, "right")
-		render.RenderView(g_VR.view)
-		-- death animation
+		-- Fixed tiny inset for submit bounds (prevents sampling extreme RT edges).
+		-- All scaling and per-eye offsets now come directly from the headset via OpenXR.
+		local ins = 0.001
+
+		local function setup_and_render_eye(eye_data, fallback_fov, fallback_asp, pos, ang, is_left, rt_push)
+			render.PushRenderTarget(rt_push)
+			if DrawErrorOverlay() then
+				render.PopRenderTarget()
+				vrmod.logger.Warn("Render skipped due to error overlay.")
+				return nil
+			end
+			render.Clear(0, 0, 0, 255, true, true)
+
+			local fov = (eye_data and eye_data.fov) or fallback_fov
+			local asp = (eye_data and eye_data.aspectratio) or fallback_asp
+
+			-- Fit sub-viewport inside RT so its pixels have the exact aspect we tell the engine.
+			local rw = g_VR.rtWidth
+			local rh = g_VR.rtHeight
+			local target_asp = asp
+			local vw, vh
+			local rt_asp = rw / rh
+			if target_asp > rt_asp then
+				vw = rw
+				vh = vw / target_asp
+			else
+				vh = rh
+				vw = vh * target_asp
+			end
+			local vx = (rw - vw) * 0.5
+			local vy = (rh - vh) * 0.5
+
+			g_VR.view.origin = pos
+			g_VR.view.angles = ang
+			g_VR.view.fov = fov
+			g_VR.view.aspectratio = target_asp
+			g_VR.view.x = vx
+			g_VR.view.y = vy
+			g_VR.view.w = vw
+			g_VR.view.h = vh
+
+			hook.Call("VRMod_PreRender", nil, is_left and "left" or "right")
+			render.RenderView(g_VR.view)
+
+			-- UV rect of the content we actually rendered (for exact submit mapping)
+			local u0 = vx / rw + ins
+			local u1 = (vx + vw) / rw - ins
+			local v0 = vy / rh + ins
+			local v1 = (vy + vh) / rh - ins
+
+			render.PopRenderTarget()
+			return {u0, v0, u1, v1}
+		end
+
+		local left_bounds = setup_and_render_eye(eyeL, hfovLeft, aspectLeft, eyePosL, eyeAngL, true, g_VR.rtLeft)
+		if not left_bounds then return end
+
+		local right_bounds = setup_and_render_eye(eyeR, hfovRight, aspectRight, eyePosR, eyeAngR, false, g_VR.rtRight)
+		if not right_bounds then return end
+
+		-- Death overlay (draw on full RTs after the main content)
 		local ply = LocalPlayer()
 		if ply and not ply:Alive() then
+			render.PushRenderTarget(g_VR.rtLeft)
 			vrmod.utils.DrawDeathAnimation(g_VR.rtWidth, g_VR.rtHeight)
+			render.PopRenderTarget()
+			render.PushRenderTarget(g_VR.rtRight)
+			vrmod.utils.DrawDeathAnimation(g_VR.rtWidth, g_VR.rtHeight)
+			render.PopRenderTarget()
 			vrmod.logger.Debug("Player is dead, drawing death animation.")
 		else
 			g_VR.deathTime = nil
 		end
 
-		render.PopRenderTarget()
-		-- desktop view remains untouched
+		-- Submit the exact content sub-rects we rendered (with a small fixed inset).
+		-- This ensures the final eye images sent to OpenXR have correct undistorted mapping
+		-- and correct stereo from the headset eye poses.
+		VRMOD_SetSubmitTextureBounds(
+			left_bounds[1], left_bounds[2], left_bounds[3], left_bounds[4],
+			right_bounds[1], right_bounds[2], right_bounds[3], right_bounds[4]
+		)
+
+		-- Desktop preview: show one eye (letterboxed). We compute a simple aspect-preserving crop.
 		if g_VR.desktopView > 1 then
+			local useLeft = (g_VR.desktopView == 2)
+			local mat = useLeft and g_VR.rtLeftMaterial or g_VR.rtRightMaterial
+			-- Simple aspect fit (source is per-eye recommended aspect).
+			local srcAspect = g_VR.rtWidth / math.max(1, g_VR.rtHeight)
+			local dstAspect = ScrW() / math.max(1, ScrH())
+			local vmargin = 0
+			if dstAspect > srcAspect then
+				-- screen wider than src: vertical bars (letterbox top/bottom? actually pillar here)
+				-- For full-screen feel we just draw full UV; stretching is minor for preview.
+				vmargin = 0
+			else
+				vmargin = (1 - dstAspect / srcAspect) * 0.5
+			end
 			render.CullMode(1)
 			surface.SetDrawColor(255, 255, 255, 255)
-			surface.SetMaterial(g_VR.rtMaterial)
-			surface.DrawTexturedRectUV(-1, -1, 2, 2, cropHorizontalOffset, 1 - cropVerticalMargin, 0.5 + cropHorizontalOffset, cropVerticalMargin)
+			surface.SetMaterial(mat)
+			surface.DrawTexturedRectUV(-1, -1, 2, 2, 0, 1 - vmargin, 1, vmargin)
 			render.CullMode(0)
 			vrmod.logger.Debug("Desktop view rendered.")
 		end
@@ -373,10 +471,6 @@ if CLIENT then
 
 	-- 3) Display parameters & render target setup
 	local function SetupRenderTargets()
-		local hOffset = convars.vrmod_horizontaloffset:GetFloat()
-		local vOffset = convars.vrmod_verticaloffset:GetFloat()
-		local scaleFactor = convars.vrmod_scalefactor:GetFloat()
-		local renderOffset = convars.vrmod_renderoffset:GetBool()
 		g_VR.desktopView = convars.vrmod_desktopview:GetInt()
 		-- compute display params with fallback
 		local dp = ComputeDisplayParams() or {}
@@ -389,24 +483,42 @@ if CLIENT then
 		aspectLeft = dp.aspL or 1
 		aspectRight = dp.aspR or 1
 		ipd = dp.ipd or 0.064
-		eyez = dp.eyez or 0
-		cropVerticalMargin, cropHorizontalOffset = vrmod.utils.ComputeDesktopCrop(g_VR.desktopView, g_VR.rtWidth, g_VR.rtHeight)
+
+		-- Per-eye RTs: one full recommended rect per eye. The OpenXR projection asymmetry
+		-- is baked into the RenderView via fov/aspect + eye origin offset. No more UV packing hacks.
 		VRMOD_ShareTextureBegin()
-		local rtName = "vrmod_rt_" .. tostring(SysTime())
-		-- safe fallback for constants
+
+		-- Tell native submitter if the GL render targets need V flip (Linux).
+		-- This drives the correction that used to be hidden inside ComputeSubmitBounds.
+		-- Must be called before creating the RTs and before any submit.
+		if VRMOD_SetRTTextureFlip then
+			VRMOD_SetRTTextureFlip(not system.IsWindows())
+		end
+
+		local ts = tostring(SysTime())
 		local depthMode = MATERIAL_RT_DEPTH_SEPARATE or 0
 		local rtFlags = CREATERENDERTARGETFLAGS_UNFILTERABLE_OK or 0
 		local imgFormat = IMAGE_FORMAT_RGBA8888
-		g_VR.rt = GetRenderTargetEx(rtName, g_VR.rtWidth, g_VR.rtHeight, RT_SIZE_LITERAL or 0, depthMode, 0, rtFlags, imgFormat)
-		local matName = "vrmod_rt_mat_" .. tostring(SysTime())
-		g_VR.rtMaterial = CreateMaterial(matName, "UnlitGeneric", {
-			["$basetexture"] = g_VR.rt:GetName()
+
+		local leftName = "vrmod_rt_left_" .. ts
+		g_VR.rtLeft = GetRenderTargetEx(leftName, g_VR.rtWidth, g_VR.rtHeight, RT_SIZE_LITERAL or 0, depthMode, 0, rtFlags, imgFormat)
+		local leftMatName = "vrmod_rt_left_mat_" .. ts
+		g_VR.rtLeftMaterial = CreateMaterial(leftMatName, "UnlitGeneric", {
+			["$basetexture"] = g_VR.rtLeft:GetName()
+		})
+
+		local rightName = "vrmod_rt_right_" .. ts
+		g_VR.rtRight = GetRenderTargetEx(rightName, g_VR.rtWidth, g_VR.rtHeight, RT_SIZE_LITERAL or 0, depthMode, 0, rtFlags, imgFormat)
+		local rightMatName = "vrmod_rt_right_mat_" .. ts
+		g_VR.rtRightMaterial = CreateMaterial(rightMatName, "UnlitGeneric", {
+			["$basetexture"] = g_VR.rtRight:GetName()
 		})
 
 		VRMOD_ShareTextureFinish()
-		-- submit bounds
-		local bounds = {vrmod.utils.ComputeSubmitBounds(leftCalc, rightCalc, hOffset, vOffset, scaleFactor, renderOffset)}
-		VRMOD_SetSubmitTextureBounds(unpack(bounds))
+
+		-- Legacy single-rt aliases (point at left for any external code that peeked at g_VR.rt)
+		g_VR.rt = g_VR.rtLeft
+		g_VR.rtMaterial = g_VR.rtLeftMaterial
 	end
 
 	-- 4) Action manifest & input initialization
@@ -438,7 +550,7 @@ if CLIENT then
 		g_VR.view = {
 			x = 0,
 			y = 0,
-			w = g_VR.rtWidth / 2,
+			w = g_VR.rtWidth,
 			h = g_VR.rtHeight,
 			drawmonitors = true,
 			drawviewmodel = false,
@@ -578,12 +690,23 @@ if CLIENT then
 			g_VR.tracking = {}
 			g_VR.threePoints = false
 			g_VR.sixPoints = false
-			if g_VR.rt then
-				render.PushRenderTarget(g_VR.rt)
+			-- Clear and drop per-eye RTs
+			if g_VR.rtLeft then
+				render.PushRenderTarget(g_VR.rtLeft)
 				render.Clear(0, 0, 0, 255, true, true)
 				render.PopRenderTarget()
-				g_VR.rt = nil
+				g_VR.rtLeft = nil
 			end
+			if g_VR.rtRight then
+				render.PushRenderTarget(g_VR.rtRight)
+				render.Clear(0, 0, 0, 255, true, true)
+				render.PopRenderTarget()
+				g_VR.rtRight = nil
+			end
+			g_VR.rt = nil
+			g_VR.rtMaterial = nil
+			g_VR.rtLeftMaterial = nil
+			g_VR.rtRightMaterial = nil
 
 			g_VR.active = false
 			VRMOD_Shutdown()

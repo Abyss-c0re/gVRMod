@@ -348,22 +348,20 @@ bool XR_Init(char* errMsg, int errMsgLen) {
     uint32_t rawEyeW = vcViews[0].recommendedImageRectWidth;
     uint32_t rawEyeH = vcViews[0].recommendedImageRectHeight;
 
-    // Compute per-eye size with the 4096 total-width style clamp (for compatibility with existing Lua side-by-side RT handling).
+    // Per-eye recommended size. With the new proper per-eye RT path we no longer pack side-by-side in Lua.
+    // Clamp each eye independently to sane GPU limits (recommended images are usually ~1-2k).
     const uint32_t maxTexSize = 4096;
-    uint32_t totalWidth = rawEyeW * 2;
-    float wScale = (float)maxTexSize / totalWidth;
-    float hScale = (float)maxTexSize / rawEyeH;
+    float wScale = (float)maxTexSize / (float)rawEyeW;
+    float hScale = (float)maxTexSize / (float)rawEyeH;
     float scaleFactor = std::min(1.0f, std::min(wScale, hScale));
 
     uint32_t eyeW = (uint32_t)(rawEyeW * scaleFactor);
     uint32_t eyeH = (uint32_t)(rawEyeH * scaleFactor);
 
-    // g_xrRecommended* kept as per-eye (what ShareTextureBegin receives, and what *2 inside gl_hooks
-    // produces for the packed side-by-side RT). This preserves the existing Lua-side contract.
     g_xrRecommendedWidth = eyeW;
     g_xrRecommendedHeight = eyeH;
 
-    VRMOD_LOG_INFO("Per-eye render size: %u x %u (Lua will receive 2x wide RT size for side-by-side)", eyeW, eyeH);
+    VRMOD_LOG_INFO("Per-eye render size: %u x %u (Lua creates one RT per eye at this size)", eyeW, eyeH);
 
     // 4) Session creation with GL binding is *deferred* until we have a real render GLX context.
     // Creating the XrSession here (during early Lua VRMOD_Init / first GetDisplayInfo) often binds
@@ -629,16 +627,15 @@ bool XR_GetDisplayInfo(float nearZ, float farZ, XrDisplayInfo* out) {
             out->projRight[r*4+c] = projRightCM[c*4+r];
         }
 
-    // Eye-to-head transforms: the XrView pose is relative to the view space
-    // In VIEW space, the views give us head-to-eye. We want eye-to-head (same thing).
+    // Eye-to-head transforms: the XrView pose (when located in the VIEW reference space)
+    // directly gives the eye pose relative to the head. The translation part (column 4 in the
+    // 3x4) contains the eye offset used by Lua for stereo separation (IPD).
     PoseToMatrix34(views[0].pose, out->transformLeft);
     PoseToMatrix34(views[1].pose, out->transformRight);
 
-    // Return *packed* RT size (2x wide) to Lua so that:
-    // rt = (2*eyeW x eyeH), view.w = eyeW, RenderViews produce full per-eye res content.
-    // The C++ Share path still receives the per-eye g_xrRecommended* (kept above) and does the *2
-    // allocation inside the hook helper, producing a correctly sized side-by-side backing tex.
-    out->recommendedWidth  = g_xrRecommendedWidth * 2;
+    // Return per-eye recommended sizes (new proper per-eye RT path).
+    // Lua now allocates one RT per eye at this size and renders full viewport per eye.
+    out->recommendedWidth  = g_xrRecommendedWidth;
     out->recommendedHeight = g_xrRecommendedHeight;
 
     return true;

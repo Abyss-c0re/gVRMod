@@ -29,46 +29,24 @@ function vrmod.utils.CalculateProjectionParams(projMatrix, worldScale)
     }
 end
 
+-- Legacy desktop crop helper (was computing sub-rect + shift inside the side-by-side RT).
+-- With per-eye RTs the desktop preview just shows one eye's RT; a simple aspect fit is done inline.
 function vrmod.utils.ComputeDesktopCrop(desktopView, w, h)
-    local vmargin = (1 - ScrH() / ScrW() * w / 2 / h) / 2
-    local hoffset = desktopView == 3 and 0.5 or 0
-    return vmargin, hoffset
+    -- Return values that select "full" for the chosen eye RT when used with DrawTexturedRectUV on a per-eye material.
+    return 0, 0
 end
 
+-- Legacy: ComputeSubmitBounds was used to compute UV sub-rects when both eyes were packed
+-- side-by-side into a single *2-wide RT, with extra offsets to compensate for asymmetric
+-- frustums. With proper per-eye RTs + per-eye submission we render each eye to its own
+-- full-size RT using its exact projection; submit uses (near) full UV per eye.
+-- This function is kept only for backward compat / debug tools; it now returns a simple
+-- full-rect mapping (no packing).
 function vrmod.utils.ComputeSubmitBounds(leftCalc, rightCalc, hOffset, vOffset, scaleFactor, renderOffset)
-    local isWindows = system.IsWindows()
-    local hFactor, vFactor = 0, 0
-    if renderOffset then
-        local wAvg = (leftCalc.Width + rightCalc.Width) * 0.5
-        local hAvg = (leftCalc.Height + rightCalc.Height) * 0.5
-        hFactor = 0.5 / wAvg
-        vFactor = 1.0 / hAvg
-    else
-        hFactor = 0.25
-        vFactor = 0.5
-    end
-
-    hFactor = hFactor * scaleFactor
-    vFactor = vFactor * scaleFactor
     local TEXTURE_INSET = 0.003
-    local vMin, vMax = isWindows and 0 or 1, isWindows and 1 or 0
-    local function calcVMinMax(offset)
-        local adj = offset * vFactor
-        if isWindows then
-            return (vMin + TEXTURE_INSET) - adj, (vMax - TEXTURE_INSET) - adj
-        else
-            return (vMin - TEXTURE_INSET) - adj, (vMax + TEXTURE_INSET) - adj
-        end
-    end
-
-    -- U: outer only
-    local uMinLeft = 0.0 + TEXTURE_INSET + (leftCalc.HorizontalOffset + hOffset) * hFactor
-    local uMaxLeft = 0.5 + (leftCalc.HorizontalOffset + hOffset) * hFactor -- inner untouched
-    local uMinRight = 0.5 + (rightCalc.HorizontalOffset + hOffset) * hFactor -- inner untouched
-    local uMaxRight = 1.0 - TEXTURE_INSET + (rightCalc.HorizontalOffset + hOffset) * hFactor
-    -- V: symmetric top/bottom
-    local vMinLeft, vMaxLeft = calcVMinMax(leftCalc.VerticalOffset + vOffset)
-    local vMinRight, vMaxRight = calcVMinMax(rightCalc.VerticalOffset + vOffset)
+    -- Full rects for each eye (left and right halves of a fictional packed buffer are ignored).
+    local uMinLeft, vMinLeft, uMaxLeft, vMaxLeft = TEXTURE_INSET, TEXTURE_INSET, 1 - TEXTURE_INSET, 1 - TEXTURE_INSET
+    local uMinRight, vMinRight, uMaxRight, vMaxRight = TEXTURE_INSET, TEXTURE_INSET, 1 - TEXTURE_INSET, 1 - TEXTURE_INSET
     return uMinLeft, vMinLeft, uMaxLeft, vMaxLeft, uMinRight, vMinRight, uMaxRight, vMaxRight
 end
 
