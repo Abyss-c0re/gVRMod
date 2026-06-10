@@ -1,0 +1,667 @@
+local requiredModuleVersion = nil
+if system.IsLinux() then
+    requiredModuleVersion = 23
+else
+    requiredModuleVersion = 21
+end
+
+local latestModuleVersion = 23
+g_VR = g_VR or {}
+vrmod = vrmod or {}
+local convars = vrmod.GetConvars()
+local EmptyHandsWeapons = {
+    ["weapon_vrmod_empty"] = true,
+    ["vr_spooderman"] = true,
+}
+
+if CLIENT then
+    g_VR.net = g_VR.net or {}
+    g_VR.viewModelInfo = g_VR.viewModelInfo or {}
+    g_VR.locomotionOptions = g_VR.locomotionOptions or {}
+    g_VR.menuItems = g_VR.menuItems or {}
+    -- Helper to get player VR data
+    local function getPlayerVRData(ply)
+        local sid = ply and ply:SteamID() or LocalPlayer():SteamID()
+        return g_VR.net[sid]
+    end
+
+    -- smoothing helper
+    local function SmoothValue(oldVal, newVal, factor)
+        if not oldVal then return newVal end
+        if not factor or factor <= 0 then return newVal end
+        if oldVal.Lerp then
+            -- Vector or Angle
+            return LerpVector(factor, oldVal, newVal)
+        else
+            -- Fallback for numbers
+            return Lerp(factor, oldVal, newVal)
+        end
+    end
+
+    vrmod.cachedHeadPose = {
+        pos = Vector(0, 0, 0),
+        ang = Angle(0, 0, 0),
+        vel = Vector(0, 0, 0),
+        angvel = Angle(0, 0, 0),
+        lastUpdate = 0
+    }
+
+    local function UpdateHeadVelocitiesFromPose()
+        if not g_VR.tracking or not g_VR.tracking.hmd then return end
+        local hmd = g_VR.tracking.hmd
+        vrmod.cachedHeadPose.pos = hmd.pos or Vector(0, 0, 0)
+        vrmod.cachedHeadPose.ang = hmd.ang or Angle(0, 0, 0)
+        vrmod.cachedHeadPose.lastUpdate = CurTime()
+        -- vel / angvel are set in UpdateTracking() from raw pose delta
+    end
+
+    hook.Add("Think", "VRMod_HeadPoseVelocityCache", function() UpdateHeadVelocitiesFromPose() end)
+    function vrmod.GetStartupError()
+        local error = nil
+        local moduleFile = nil
+        local requiredVersion, latestVersion
+        if system.IsLinux() then
+            requiredVersion = 23
+            latestVersion = 23
+            moduleFile = "lua/bin/gmcl_vrmod_linux64.dll"
+        else
+            requiredVersion = 21
+            latestVersion = 21
+            moduleFile = "lua/bin/gmcl_vrmod_win64.dll"
+        end
+
+        g_VR.moduleVersion = g_VR.moduleVersion or 0
+        if g_VR.moduleVersion == 0 then
+            if not file.Exists(moduleFile, "GAME") then
+                error = "Module not installed.\nPlease follow the workshop instructions to install the module."
+            elseif g_VR.errorText and g_VR.errorText ~= "" then
+                -- Prefer the detailed error we captured during the require pcall (includes real dlopen reason).
+                error = g_VR.errorText
+            else
+                error = "Failed to load module.\nModule file exists but could not be loaded.\n\nCheck console output and garrysmod/vrmod_debug.log.\nCommon Linux causes: libopenxr_loader.so not loadable by the Steam runtime, missing X11/GL libs, or no OpenXR runtime configured."
+            end
+        elseif g_VR.moduleVersion < requiredVersion then
+            error = "Module update required.\nRun the installer or re-download from the workshop.\n\nInstalled: v" .. g_VR.moduleVersion .. "\nRequired: v" .. requiredVersion
+        elseif g_VR.moduleVersion > latestVersion then
+            print("[VRMOD] Warning: Module version is newer than tested. Installed: v" .. g_VR.moduleVersion .. " | Required: v" .. requiredVersion .. " | Addon version: " .. vrmod.GetVersion() .. " | Most features should work, but some bugs may exist.")
+        elseif VRMOD_IsHMDPresent and not VRMOD_IsHMDPresent() then
+            -- For dev testing the OpenXR render path on machines without a live runtime attached,
+            -- we allow proceeding (the C++ XR_Init will still fail gracefully at xrGetSystem with
+            -- a clear "No HMD" error that gets shown in the overlay and vrmod_debug.log).
+            -- On a real Quest/ALVR machine this check will pass and we get a full init.
+            -- error = "VR headset not detected."
+            vrmod.logger.Info("GetStartupError: no HMD detected in this env (dev bypass for testing init path)")
+        end
+        return error
+    end
+
+    function vrmod.GetModuleVersion()
+        return g_VR.moduleVersion, requiredModuleVersion, latestModuleVersion
+    end
+
+    function vrmod.IsPlayerInVR(ply)
+        return getPlayerVRData(ply) ~= nil
+    end
+
+    function vrmod.UsingEmptyHands(ply)
+        local wep = ply and ply:GetActiveWeapon() or LocalPlayer():GetActiveWeapon()
+        if not IsValid(wep) then return false end
+        return EmptyHandsWeapons[wep:GetClass()] or false
+    end
+
+    function vrmod.GetHeldEntity(ply, hand)
+        if not IsValid(ply) then return nil end
+        if hand ~= "left" and hand ~= "right" then return nil end
+        if hand == "left" then
+            return g_VR.heldEntityLeft
+        else
+            return g_VR.heldEntityRight
+        end
+        return nil
+    end
+
+    function vrmod.GetHMDPos(ply)
+        return g_VR.tracking.hmd.pos or Vector()
+    end
+
+    function vrmod.GetHMDAng(ply)
+        return g_VR.tracking.hmd.ang or Angle()
+    end
+
+    function vrmod.GetHMDPose(ply)
+        return g_VR.tracking.hmd.pos or Vector(), g_VR.tracking.hmd.ang or Angle()
+    end
+
+    function vrmod.GetHMDVelocity()
+        return vrmod.cachedHeadPose.vel or Vector()
+    end
+
+    function vrmod.GetHMDAngularVelocity()
+        return vrmod.cachedHeadPose.angvel or Angle()
+    end
+
+    function vrmod.GetHMDVelocityRelative()
+        if not g_VR.threePoints then return Vector() end
+        local vel = vrmod.cachedHeadPose.vel or Vector()
+        local ply = LocalPlayer()
+        if IsValid(ply) then vel = vel - ply:GetVelocity() end
+        return vel
+    end
+
+    function vrmod.GetHMDVelocities()
+        if g_VR.threePoints then return vrmod.cachedHeadPose.vel or Vector(), vrmod.cachedHeadPose.angvel or Angle() end
+        return Vector(), Angle()
+    end
+
+    function vrmod.GetLeftHandPos(ply)
+        return g_VR.tracking.pose_lefthand.pos or Vector()
+    end
+
+    function vrmod.GetLeftHandAng(ply)
+        return g_VR.tracking.pose_lefthand.ang or Angle()
+    end
+
+    function vrmod.GetLeftHandPose(ply)
+        return g_VR.tracking.pose_lefthand.pos or Vector(), g_VR.tracking.pose_lefthand.ang or Angle()
+    end
+
+    function vrmod.GetLeftHandVelocity()
+        return g_VR.tracking.pose_lefthand.vel or Vector()
+    end
+
+    function vrmod.GetLeftHandAngularVelocity()
+        return g_VR.tracking.pose_lefthand.angvel or Angle()
+    end
+
+    function vrmod.GetLeftHandVelocityRelative()
+        if not g_VR.threePoints or not g_VR.tracking or not g_VR.tracking.pose_lefthand or not g_VR.tracking.hmd then return Vector() end
+        return (g_VR.tracking.pose_lefthand.vel or Vector()) - (g_VR.tracking.hmd.vel or Vector())
+    end
+
+    function vrmod.GetLeftHandVelocities()
+        if g_VR.threePoints and g_VR.tracking and g_VR.tracking.pose_lefthand then return g_VR.tracking.pose_lefthand.vel or Vector(), g_VR.tracking.pose_lefthand.angvel or Angle(), vrmod.GetLeftHandVelocityRelative() end
+        return Vector(), Angle(), Vector()
+    end
+
+    function vrmod.GetRightHandPos(ply)
+        return g_VR.tracking.pose_righthand.pos or Vector()
+    end
+
+    function vrmod.GetRightHandAng(ply)
+        return g_VR.tracking.pose_righthand.ang or Angle()
+    end
+
+    function vrmod.GetRightHandPose(ply)
+        return g_VR.tracking.pose_righthand.pos or Vector(), g_VR.tracking.pose_righthand.ang or Angle()
+    end
+
+    function vrmod.GetRightHandVelocity()
+        return g_VR.tracking.pose_righthand.vel or Vector()
+    end
+
+    function vrmod.GetRightHandAngularVelocity()
+        return g_VR.tracking.pose_righthand.angvel or Angle()
+    end
+
+    function vrmod.GetRightHandVelocityRelative()
+        if not g_VR.threePoints or not g_VR.tracking or not g_VR.tracking.pose_righthand or not g_VR.tracking.hmd then return Vector() end
+        return (g_VR.tracking.pose_righthand.vel or Vector()) - (g_VR.tracking.hmd.vel or Vector())
+    end
+
+    function vrmod.GetRightHandVelocities()
+        if g_VR.threePoints and g_VR.tracking and g_VR.tracking.pose_righthand then return g_VR.tracking.pose_righthand.vel or Vector(), g_VR.tracking.pose_righthand.angvel or Angle(), vrmod.GetRightHandVelocityRelative() end
+        return Vector(), Angle(), Vector()
+    end
+
+    -- Waist (often called "hip" in other VR contexts)
+    function vrmod.GetWaistPos(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_waist then return Vector() end
+        return g_VR.tracking.pose_waist.pos or Vector()
+    end
+
+    function vrmod.GetWaistAng(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_waist then return Angle() end
+        return g_VR.tracking.pose_waist.ang or Angle()
+    end
+
+    function vrmod.GetWaistPose(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_waist then return Vector(), Angle() end
+        return g_VR.tracking.pose_waist.pos or Vector(), g_VR.tracking.pose_waist.ang or Angle()
+    end
+
+    -- If velocities are provided on the waist pose (many FBT setups include them)
+    function vrmod.GetWaistVelocity()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_waist and g_VR.tracking.pose_waist.vel or Vector()
+    end
+
+    function vrmod.GetWaistAngularVelocity()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_waist and g_VR.tracking.pose_waist.angvel or Angle()
+    end
+
+    -- Optional relative (to HMD)
+    function vrmod.GetWaistVelocityRelative()
+        if not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_waist or not g_VR.tracking.hmd then return Vector() end
+        return (g_VR.tracking.pose_waist.vel or Vector()) - (g_VR.tracking.hmd.vel or Vector())
+    end
+
+    -- Left Foot
+    function vrmod.GetLeftFootPos(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_leftfoot then return Vector() end
+        return g_VR.tracking.pose_leftfoot.pos or Vector()
+    end
+
+    function vrmod.GetLeftFootAng(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_leftfoot then return Angle() end
+        return g_VR.tracking.pose_leftfoot.ang or Angle()
+    end
+
+    function vrmod.GetLeftFootPose(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_leftfoot then return Vector(), Angle() end
+        return g_VR.tracking.pose_leftfoot.pos or Vector(), g_VR.tracking.pose_leftfoot.ang or Angle()
+    end
+
+    function vrmod.GetLeftFootVelocity()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_leftfoot and g_VR.tracking.pose_leftfoot.vel or Vector()
+    end
+
+    function vrmod.GetLeftFootAngularVelocity()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_leftfoot and g_VR.tracking.pose_leftfoot.angvel or Angle()
+    end
+
+    function vrmod.GetLeftFootVelocityRelative()
+        if not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_leftfoot or not g_VR.tracking.hmd then return Vector() end
+        return (g_VR.tracking.pose_leftfoot.vel or Vector()) - (g_VR.tracking.hmd.vel or Vector())
+    end
+
+    function vrmod.GetLeftFootVelocities()
+        if g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_leftfoot then return g_VR.tracking.pose_leftfoot.vel or Vector(), g_VR.tracking.pose_leftfoot.angvel or Angle(), vrmod.GetLeftFootVelocityRelative() end
+        return Vector(), Angle(), Vector()
+    end
+
+    -- Right Foot (symmetric to left)
+    function vrmod.GetRightFootPos(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_rightfoot then return Vector() end
+        return g_VR.tracking.pose_rightfoot.pos or Vector()
+    end
+
+    function vrmod.GetRightFootAng(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_rightfoot then return Angle() end
+        return g_VR.tracking.pose_rightfoot.ang or Angle()
+    end
+
+    function vrmod.GetRightFootPose(ply)
+        local t = getPlayerVRData(ply)
+        if not t or not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_rightfoot then return Vector(), Angle() end
+        return g_VR.tracking.pose_rightfoot.pos or Vector(), g_VR.tracking.pose_rightfoot.ang or Angle()
+    end
+
+    function vrmod.GetRightFootVelocity()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_rightfoot and g_VR.tracking.pose_rightfoot.vel or Vector()
+    end
+
+    function vrmod.GetRightFootAngularVelocity()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_rightfoot and g_VR.tracking.pose_rightfoot.angvel or Angle()
+    end
+
+    function vrmod.GetRightFootVelocityRelative()
+        if not g_VR.fbtActive or not g_VR.tracking or not g_VR.tracking.pose_rightfoot or not g_VR.tracking.hmd then return Vector() end
+        return (g_VR.tracking.pose_rightfoot.vel or Vector()) - (g_VR.tracking.hmd.vel or Vector())
+    end
+
+    function vrmod.GetRightFootVelocities()
+        if g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_rightfoot then return g_VR.tracking.pose_rightfoot.vel or Vector(), g_VR.tracking.pose_rightfoot.angvel or Angle(), vrmod.GetRightFootVelocityRelative() end
+        return Vector(), Angle(), Vector()
+    end
+
+    function vrmod.SetLeftHandPose(pos, ang, smoothing)
+        local ply = LocalPlayer()
+        local netFrame = g_VR.net and g_VR.net[ply:SteamID()] and g_VR.net[ply:SteamID()].lerpedFrame
+        if not netFrame then return end
+        -- Apply smoothing
+        netFrame.lefthandPos = SmoothValue(netFrame.lefthandPos, pos, smoothing or 0)
+        netFrame.lefthandAng = SmoothValue(netFrame.lefthandAng, ang, smoothing or 0)
+    end
+
+    function vrmod.SetRightHandPose(pos, ang, smoothing)
+        local ply = LocalPlayer()
+        local netFrame = g_VR.net and g_VR.net[ply:SteamID()] and g_VR.net[ply:SteamID()].lerpedFrame
+        if not netFrame then return end
+        -- Apply smoothing
+        netFrame.righthandPos = SmoothValue(netFrame.righthandPos, pos, smoothing or 0)
+        netFrame.righthandAng = SmoothValue(netFrame.righthandAng, ang, smoothing or 0)
+        -- Call utils update if available
+        --if vrmod.utils then vrmod.utils.UpdateViewModelPos(netFrame.righthandPos, netFrame.righthandAng) end
+    end
+
+    local function HandleFingerAngles(mode, hand, state, tbl)
+        local isGetter = mode == "get"
+        local isDefault = mode == "get_default"
+        local sourceTable = isDefault and (state == "open" and g_VR.defaultOpenHandAngles or g_VR.defaultClosedHandAngles) or state == "open" and g_VR.openHandAngles or g_VR.closedHandAngles
+        local offset = hand == "right" and 15 or 0
+        if isGetter or isDefault then
+            local r = {}
+            for i = 1, 15 do
+                r[i] = sourceTable[i + offset]
+            end
+            return r
+        else -- Setter
+            local t = table.Copy(sourceTable)
+            for i = 1, 15 do
+                t[i + offset] = tbl[i]
+            end
+
+            if state == "open" then
+                g_VR.openHandAngles = t
+            else
+                g_VR.closedHandAngles = t
+            end
+        end
+    end
+
+    -- Getter functions
+    function vrmod.GetLeftHandOpenFingerAngles()
+        return HandleFingerAngles("get", "left", "open")
+    end
+
+    function vrmod.GetLeftHandClosedFingerAngles()
+        return HandleFingerAngles("get", "left", "closed")
+    end
+
+    function vrmod.GetRightHandOpenFingerAngles()
+        return HandleFingerAngles("get", "right", "open")
+    end
+
+    function vrmod.GetRightHandClosedFingerAngles()
+        return HandleFingerAngles("get", "right", "closed")
+    end
+
+    -- Setter functions
+    function vrmod.SetLeftHandOpenFingerAngles(tbl)
+        HandleFingerAngles("set", "left", "open", tbl)
+    end
+
+    function vrmod.SetLeftHandClosedFingerAngles(tbl)
+        HandleFingerAngles("set", "left", "closed", tbl)
+    end
+
+    function vrmod.SetRightHandOpenFingerAngles(tbl)
+        HandleFingerAngles("set", "right", "open", tbl)
+    end
+
+    function vrmod.SetRightHandClosedFingerAngles(tbl)
+        HandleFingerAngles("set", "right", "closed", tbl)
+    end
+
+    -- Default getter functions
+    function vrmod.GetDefaultLeftHandOpenFingerAngles()
+        return HandleFingerAngles("get_default", "left", "open")
+    end
+
+    function vrmod.GetDefaultLeftHandClosedFingerAngles()
+        return HandleFingerAngles("get_default", "left", "closed")
+    end
+
+    function vrmod.GetDefaultRightHandOpenFingerAngles()
+        return HandleFingerAngles("get_default", "right", "open")
+    end
+
+    function vrmod.GetDefaultRightHandClosedFingerAngles()
+        return HandleFingerAngles("get_default", "right", "closed")
+    end
+
+    local function GetFingerAnglesFromModel(modelName, sequenceNumber)
+        sequenceNumber = sequenceNumber or 0
+        local pm = convars.vrmod_floatinghands:GetBool() and "models/weapons/c_arms.mdl" or LocalPlayer():GetModel()
+        local pmdl = ClientsideModel(pm)
+        pmdl:SetupBones()
+        local tmdl = ClientsideModel(modelName)
+        tmdl:ResetSequence(sequenceNumber)
+        tmdl:SetupBones()
+        local tmp = {"0", "01", "02", "1", "11", "12", "2", "21", "22", "3", "31", "32", "4", "41", "42"}
+        local r = {}
+        for i = 1, 30 do
+            r[i] = Angle()
+            local fingerBoneName = "ValveBiped.Bip01_" .. (i < 16 and "L" or "R") .. "_Finger" .. tmp[i - (i < 16 and 0 or 15)]
+            local pfinger = pmdl:LookupBone(fingerBoneName) or -1
+            local tfinger = tmdl:LookupBone(fingerBoneName) or -1
+            if pmdl:GetBoneMatrix(pfinger) then
+                local _, pmoffset = WorldToLocal(Vector(0, 0, 0), pmdl:GetBoneMatrix(pfinger):GetAngles(), Vector(0, 0, 0), pmdl:GetBoneMatrix(pmdl:GetBoneParent(pfinger)):GetAngles())
+                if tfinger ~= -1 then
+                    local _, tmoffset = WorldToLocal(Vector(0, 0, 0), tmdl:GetBoneMatrix(tfinger):GetAngles(), Vector(0, 0, 0), tmdl:GetBoneMatrix(tmdl:GetBoneParent(tfinger)):GetAngles())
+                    r[i] = tmoffset - pmoffset
+                end
+            end
+        end
+
+        pmdl:Remove()
+        tmdl:Remove()
+        return r
+    end
+
+    function vrmod.GetLeftHandFingerAnglesFromModel(modelName, sequenceNumber)
+        local angles = GetFingerAnglesFromModel(modelName, sequenceNumber)
+        local r = {}
+        for i = 1, 15 do
+            r[i] = angles[i]
+        end
+        return r
+    end
+
+    function vrmod.GetRightHandFingerAnglesFromModel(modelName, sequenceNumber)
+        local angles = GetFingerAnglesFromModel(modelName, sequenceNumber)
+        local r = {}
+        for i = 1, 15 do
+            r[i] = angles[15 + i]
+        end
+        return r
+    end
+
+    local function GetRelativeBonePoseFromModel(modelName, sequenceNumber, boneName, refBoneName)
+        sequenceNumber = sequenceNumber or 0
+        local ent = ClientsideModel(modelName)
+        ent:ResetSequence(sequenceNumber)
+        ent:SetupBones()
+        local mtx, mtxRef = ent:GetBoneMatrix(ent:LookupBone(boneName)), ent:GetBoneMatrix(refBoneName and ent:LookupBone(refBoneName) or 0)
+        local relativePos, relativeAng = WorldToLocal(mtx:GetTranslation(), mtx:GetAngles(), mtxRef:GetTranslation(), mtxRef:GetAngles())
+        ent:Remove()
+        return relativePos, relativeAng
+    end
+
+    function vrmod.GetLeftHandPoseFromModel(modelName, sequenceNumber, refBoneName)
+        return GetRelativeBonePoseFromModel(modelName, sequenceNumber, "ValveBiped.Bip01_L_Hand", refBoneName)
+    end
+
+    function vrmod.GetRightHandPoseFromModel(modelName, sequenceNumber, refBoneName)
+        return GetRelativeBonePoseFromModel(modelName, sequenceNumber, "ValveBiped.Bip01_R_Hand", refBoneName)
+    end
+
+    function vrmod.GetLerpedFingerAngles(fraction, from, to)
+        local r = {}
+        for i = 1, 15 do
+            r[i] = LerpAngle(fraction, from[i], to[i])
+        end
+        return r
+    end
+
+    function vrmod.GetLerpedHandPose(fraction, fromPos, fromAng, toPos, toAng)
+        return LerpVector(fraction, fromPos, toPos), LerpAngle(fraction, fromAng, toAng)
+    end
+
+    function vrmod.GetInput(name)
+        return g_VR.input[name]
+    end
+
+    vrmod.MenuCreate = function() end
+    vrmod.MenuClose = function() end
+    vrmod.MenuExists = function() end
+    vrmod.MenuRenderStart = function() end
+    vrmod.MenuRenderEnd = function() end
+    vrmod.MenuCursorPos = function() return g_VR.menuCursorX, g_VR.menuCursorY end
+    vrmod.MenuFocused = function() return g_VR.menuFocus end
+    timer.Simple(0, function()
+        vrmod.MenuCreate = VRUtilMenuOpen
+        vrmod.MenuClose = VRUtilMenuClose
+        vrmod.MenuExists = VRUtilIsMenuOpen
+        vrmod.MenuRenderStart = VRUtilMenuRenderStart
+        vrmod.MenuRenderEnd = VRUtilMenuRenderEnd
+    end)
+
+    function vrmod.SetViewModelOffsetForWeaponClass(classname, pos, ang)
+        g_VR.viewModelInfo[classname] = g_VR.viewModelInfo[classname] or {}
+        g_VR.viewModelInfo[classname].offsetPos = pos
+        g_VR.viewModelInfo[classname].offsetAng = ang
+    end
+
+    function vrmod.SetViewModelFixMuzzle(classname, bool)
+        g_VR.viewModelInfo[classname] = g_VR.viewModelInfo[classname] or {}
+        g_VR.viewModelInfo[classname].wrongMuzzleAng = bool
+    end
+
+    function vrmod.SetViewModelNoLaser(classname, bool)
+        g_VR.viewModelInfo[classname] = g_VR.viewModelInfo[classname] or {}
+        g_VR.viewModelInfo[classname].noLaser = bool
+    end
+
+    function vrmod.SetViewModelUseWorldModel(classname, bool)
+        g_VR.viewModelInfo[classname] = g_VR.viewModelInfo[classname] or {}
+        g_VR.viewModelInfo[classname].useWorldModel = bool
+    end
+
+    vrmod.AddCallbackedConvar("vrmod_locomotion", nil, "1")
+    function vrmod.AddLocomotionOption(name, startfunc, stopfunc, buildcpanelfunc)
+        g_VR.locomotionOptions[#g_VR.locomotionOptions + 1] = {
+            name = name,
+            startfunc = startfunc,
+            stopfunc = stopfunc,
+            buildcpanelfunc = buildcpanelfunc
+        }
+    end
+
+    function vrmod.StartLocomotion()
+        local selectedOption = g_VR.locomotionOptions[convars.vrmod_locomotion:GetInt()]
+        if selectedOption then selectedOption.startfunc() end
+    end
+
+    function vrmod.StopLocomotion()
+        local selectedOption = g_VR.locomotionOptions[convars.vrmod_locomotion:GetInt()]
+        if selectedOption then selectedOption.stopfunc() end
+    end
+
+    function vrmod.GetOrigin()
+        return g_VR.origin, g_VR.originAngle
+    end
+
+    function vrmod.GetOriginPos()
+        return g_VR.origin
+    end
+
+    function vrmod.GetOriginAng()
+        return g_VR.originAngle
+    end
+
+    function vrmod.SetOrigin(pos, ang)
+        g_VR.origin = pos
+        g_VR.originAngle = ang
+    end
+
+    function vrmod.SetOriginPos(pos)
+        g_VR.origin = pos
+    end
+
+    function vrmod.SetOriginAng(ang)
+        g_VR.originAngle = ang
+    end
+
+    local function GetMenuItemID(name, func)
+        return name .. "_" .. tostring(func)
+    end
+
+    -- Add or restore a menu item
+    function vrmod.AddInGameMenuItem(name, slot, slotpos, func, forceSlot, hint)
+        g_VR.menuItems = g_VR.menuItems or {}
+        g_VR.menuBackup = g_VR.menuBackup or {}
+        -- Determine slot if not forced
+        if not forceSlot then
+            local occupied = {}
+            for _, item in ipairs(g_VR.menuItems) do
+                occupied[item.slot] = occupied[item.slot] or {}
+                occupied[item.slot][item.slotPos] = true
+            end
+
+            local found = false
+            for s = 0, 10 do
+                occupied[s] = occupied[s] or {}
+                for p = 0, 10 do
+                    if not occupied[s][p] then
+                        slot = s
+                        slotpos = p
+                        found = true
+                        break
+                    end
+                end
+
+                if found then break end
+            end
+        end
+
+        -- Avoid exact duplicates
+        for _, item in ipairs(g_VR.menuItems) do
+            if item.name == name and item.func == func then return end
+        end
+
+        table.insert(g_VR.menuItems, {
+            name = name,
+            slot = slot,
+            slotPos = slotpos,
+            func = func,
+            hint = hint
+        })
+
+        -- Store in backup with unique ID
+        local id = GetMenuItemID(name, func)
+        g_VR.menuBackup[id] = {
+            name = name,
+            slot = slot,
+            slotPos = slotpos,
+            func = func,
+            internal = forceSlot == true,
+            hint = hint
+        }
+    end
+
+    -- Remove menu item, optionally permanently
+    function vrmod.RemoveInGameMenuItem(name, func, permanent)
+        for i = #g_VR.menuItems, 1, -1 do
+            if g_VR.menuItems[i].name == name and (not func or g_VR.menuItems[i].func == func) then table.remove(g_VR.menuItems, i) end
+        end
+
+        if permanent then
+            local id = GetMenuItemID(name, func)
+            g_VR.menuBackup[id] = nil
+        end
+    end
+
+    function vrmod.GetLeftEyePos()
+        return g_VR.eyePosLeft or Vector()
+    end
+
+    function vrmod.GetRightEyePos()
+        return g_VR.eyePosRight or Vector()
+    end
+
+    function vrmod.GetEyePos()
+        return g_VR.view and g_VR.view.origin or Vector()
+    end
+
+    function vrmod.GetTrackedDeviceNames()
+        return g_VR.active and VRMOD_GetTrackedDeviceNames and VRMOD_GetTrackedDeviceNames() or {}
+    end
+end

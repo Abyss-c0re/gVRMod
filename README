@@ -1,0 +1,62 @@
+# gVRMod — OpenXR Migration (Work in Progress)
+
+Behold windows users!
+Leave your hopes behind.
+
+   .--.
+  |o_o |
+  |:_/ |
+ //   \ \
+(|     | )
+/'\_   _/`\
+\___)=(___/
+
+This is a Linux dev branch.
+The heresy has been purged. There is no windows support for this version.
+
+
+**Status: Not ready for use.**
+
+This repository is a work-in-progress port/migration of gVRMod from OpenVR to native OpenXR.
+
+### Current State
+- **Only Linux is supported.**
+- **Not ready for use **
+
+### What works
+- Submitting stolen texture from OpenGL to OpenXR VR compositor
+- head tracking
+
+### What doesn't
+- Rendering is messed up
+- Hand tracking not working
+- Input not working
+
+### Challenges
+
+- Heavy dependence on the SteamVR controls, especially chords.
+
+### What this repo contains
+- Native module source (C++) targeting OpenXR + Linux (GLX + togl)
+- Client-side addon under `addon/gvrmod/`
+- Build and install scripts
+
+### Installation
+See `./install.sh`. It will:
+- Build the native module
+- Install the module + OpenXR loader bundle
+- Delete any existing `gvrmod` folder under `garrysmod/addons/`
+- Install a fresh copy of the addon from `addon/gvrmod/`
+
+Run `./install.sh --help` for options.
+
+### Uninstall
+```bash
+./install.sh --uninstall
+```
+
+### Important Notes
+- You need a working OpenXR runtime (e.g. Monado + WiVRn).
+- The install script will attempt to bundle the OpenXR loader and its dependencies.
+- This is an experimental development branch.
+

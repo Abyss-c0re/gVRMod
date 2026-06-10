@@ -1,0 +1,41 @@
+gVRMod Custom Restricted Share-Alike License Agreement
+Copyright © 2024–2026 Abyss-c0re. All Rights Reserved.
+This License Agreement (the “Agreement”) governs the use, modification, distribution, and commercial exploitation of the gVRMod software project (the “Software”), including without limitation all source code, Lua scripts, binaries, models, materials, documentation, assets, and any other files contained in or distributed with this repository.
+1. Definitions
+
+“Software” means the gVRMod project and all its components.
+“Modification” or “Derivative Work” means any derivative work, fork, extension, addon, patch, adaptation, or any work that is based on, incorporates, or is derived from any portion of the Software.
+“Commercial Use” means any use, directly or indirectly, for profit, revenue generation, paid content creation, monetization (including but not limited to videos, streams, game servers, paid mods, or commissions), or any business/commercial purpose.
+“Non-Commercial Use” means strictly personal, educational, or non-monetized community use with zero profit or revenue.
+
+2. Limited Non-Commercial License Grant
+Subject to strict compliance with this Agreement, Abyss-c0re hereby grants you a revocable, non-exclusive, non-transferable, royalty-free license to:
+(a) use, copy, and study the Software;
+(b) create Modifications; and
+(c) distribute the Software or Modifications solely under the exact same terms of this Agreement.
+Strict Mandatory Conditions (Non-Commercial Use Only):
+
+All Modifications must be shared publicly. Any Modification you create or distribute must be made available in full source form (via public GitHub repository or equivalent) under this identical Agreement.
+You must retain this Agreement, all copyright notices, and attribution in every copy or substantial portion of the Software or any Modification.
+You may not remove, obscure, or alter any copyright, license, or legal notices.
+
+3. Commercial Use – Strictly Prohibited Without Separate License
+Any Commercial Use of the Software or any Modification (including, without limitation, content creation, custom forks, commissioned modifications, paid addons, monetized derivatives, or any revenue-generating activity) is expressly and strictly forbidden without a prior written commercial license from Abyss-c0re.
+Requests for a commercial license must be sent to info@abyss-core.com. Such a license may be granted free of charge at Abyss-c0re’s sole discretion if the proposed use generates no profit. Abyss-c0re reserves the absolute right to refuse any commercial license request for any reason.
+4. Ownership and Reservations
+Abyss-c0re retains all right, title, and interest in the Software and all intellectual property rights therein. This Agreement does not transfer any ownership rights. Any unauthorized use constitutes copyright infringement under applicable law.
+5. Termination and Enforcement
+This license automatically terminates upon any breach of this Agreement. Upon termination, you must immediately cease all use, distribution, and possession of the Software and all Modifications.
+Violations will be aggressively enforced. Any breach (including but not limited to failure to publicly share Modifications, unauthorized commercial use, or removal of notices) will result in:
+
+Immediate revocation of all rights granted hereunder;
+DMCA takedown notices filed on GitHub, Steam Workshop, YouTube, Discord, or any other platform hosting the infringing content;
+Pursuit of all available legal remedies, including injunctive relief, damages, profits, attorney’s fees, and costs, to the fullest extent permitted under United States copyright law and international treaties.
+
+6. No Warranty / Disclaimer
+THE SOFTWARE IS PROVIDED “AS IS” WITHOUT ANY WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. Abyss-c0re SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING FROM THE USE OR INABILITY TO USE THE SOFTWARE.
+7. Governing Law
+This Agreement shall be governed by the laws of the United States and the State of California, without regard to conflict of laws principles. Any disputes shall be resolved exclusively in the courts located in California.
+8. Severability
+If any provision of this Agreement is held unenforceable, the remaining provisions shall continue in full force and effect.
+By using, modifying, or distributing the Software, you acknowledge that you have read, understood, and agree to be bound by this Agreement.

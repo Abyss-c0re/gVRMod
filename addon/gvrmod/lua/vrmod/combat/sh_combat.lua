@@ -1,0 +1,411 @@
+----------------------------------------
+-- VRMod Melee System (Trace-Based)
+----------------------------------------
+-- CONVARS -----------------------------
+local cl_vrmod_melee = CreateClientConVar("cl_vrmod_melee", "1", true, FCVAR_CLIENTCMD_CAN_EXECUTE + FCVAR_ARCHIVE)
+local sv_vrmod_melee = CreateConVar("sv_vrmod_melee", "1", FCVAR_CLIENTCMD_CAN_EXECUTE + FCVAR_ARCHIVE, "Enable or disable VRMod melee system")
+local cv_meleeVelThreshold = CreateConVar("vrmod_melee_velthreshold", "1.5", FCVAR_REPLICATED + FCVAR_ARCHIVE)
+local cv_meleeDamage = CreateConVar("vrmod_melee_damage", "3", FCVAR_REPLICATED + FCVAR_ARCHIVE)
+local cv_meleeDelay = CreateConVar("vrmod_melee_delay", "0.45", FCVAR_REPLICATED + FCVAR_ARCHIVE)
+local cv_meleeSpeedScale = CreateConVar("vrmod_melee_speedscale", "0.05", FCVAR_REPLICATED + FCVAR_ARCHIVE, "Multiplier for relative speed in melee damage calculation")
+-- Updated impactSounds with verified sound paths + head punch sounds (fist-like)
+local impactSounds = {
+    fist = {"physics/body/body_medium_impact_hard1.wav", "physics/body/body_medium_impact_hard2.wav", "physics/body/body_medium_impact_hard3.wav", "physics/body/body_medium_impact_soft1.wav"},
+    head = {"physics/body/body_medium_impact_hard1.wav", "physics/body/body_medium_impact_hard2.wav", "physics/body/body_medium_impact_hard3.wav", "physics/body/body_medium_impact_soft1.wav"},
+    blunt = {"physics/metal/metal_box_impact_hard1.wav", "physics/metal/metal_box_impact_hard2.wav", "physics/metal/metal_box_impact_hard3.wav"},
+    stunstick = {"weapons/stunstick/stunstick_impact1.wav", "weapons/stunstick/stunstick_impact2.wav", "weapons/stunstick/stunstick_fleshhit1.wav", "weapons/stunstick/stunstick_fleshhit2.wav"},
+    sharp = {"physics/flesh/flesh_squishy_impact_hard1.wav", "physics/flesh/flesh_squishy_impact_hard2.wav", "weapons/knife/knife_hit1.wav", "weapons/knife/knife_hit2.wav"},
+    piercing = {"physics/flesh/flesh_bloody_impact_hard1.wav", "physics/flesh/flesh_bloody_impact_hard2.wav", "weapons/crossbow/hitbod1.wav", "weapons/crossbow/hitbod2.wav"},
+    heavy = {"physics/metal/metal_barrel_impact_hard1.wav", "physics/metal/metal_barrel_impact_hard2.wav", "physics/concrete/concrete_impact_hard1.wav", "physics/concrete/concrete_impact_hard2.wav"},
+    energy = {"weapons/physcannon/energy_bounce1.wav", "weapons/physcannon/energy_bounce2.wav", "weapons/physcannon/energy_sing_flyby1.wav", "weapons/physcannon/energy_sing_flyby2.wav"},
+    explosive = {"weapons/explode3.wav", "weapons/explode4.wav", "ambient/explosions/explode_1.wav", "ambient/explosions/explode_2.wav"}
+}
+
+-- CLIENTSIDE --------------------------
+if CLIENT then
+    local NextMeleeTime = 0
+    local PrecomputedMelee = {}
+    local function SendMeleeAttack(src, dir, radius, reach, mins, maxs, angles, impactType, hand)
+        net.Start("VRMod_MeleeAttack")
+        net.WriteVector(src)
+        net.WriteVector(dir)
+        net.WriteFloat(radius)
+        net.WriteFloat(reach)
+        net.WriteVector(mins or Vector(0, 0, 0))
+        net.WriteVector(maxs or Vector(0, 0, 0))
+        net.WriteAngle(angles or Angle(0, 0, 0))
+        net.WriteString(impactType)
+        net.WriteString(hand)
+        net.SendToServer()
+    end
+
+    local function TryMelee(params, hand)
+        local ply = LocalPlayer()
+        if NextMeleeTime > CurTime() then return end
+        -- Determine if we're using a weapon and valid
+        local useWeapon = params.useWeapon and IsValid(params.weapon) and vrmod.utils.IsValidWep(params.weapon)
+        local isMelee = params.isMelee
+        -- Compute hit source position, adjust if weapon or melee
+        local src = params.pos
+        if hand == "right" and (useWeapon or isMelee) then src = vrmod.utils.AdjustCollisionsBox(src, params.ang, isMelee) end
+        -- Compute direction
+        local dir = params.dir
+        -- Trace setup
+        local traceData = {
+            start = src,
+            endpos = src + dir * params.reach,
+            radius = params.radius,
+            mins = params.mins,
+            maxs = params.maxs,
+            filter = function(ent) return vrmod.utils.MeleeFilter(ent, ply, hand) end,
+            mask = MASK_SHOT
+        }
+
+        local tr = vrmod.utils.TraceBoxOrSphere(traceData)
+        if tr.Hit then
+            if IsValid(tr.Entity) and tr.Entity == g_VR.vehicle.current then return end
+            NextMeleeTime = CurTime() + cv_meleeDelay:GetFloat()
+            -- Play swing sound only for right-hand weapon
+            if hand == "right" and useWeapon then
+                local swingSound
+                local wepClass = params.weapon:GetClass()
+                if wepClass == "weapon_crowbar" or wepClass == "arcticvr_hl2_crowbar" then swingSound = "Weapon_Crowbar.Single" end
+                local swingData = {
+                    Player = ply,
+                    Weapon = params.weapon,
+                    Hand = hand,
+                    Position = params.pos
+                }
+
+                hook.Run("VRMod_MeleeSwing", swingData, function(soundPath) swingSound = soundPath end)
+                if swingSound then sound.Play(swingSound, params.pos, 75, 100, 1) end
+            end
+
+            -- Determine impact type AFTER everything else
+            local impactType = "fist"
+            if hand == "right" and useWeapon then
+                impactType = "blunt"
+            elseif hand == "head" then
+                impactType = "head"
+            end
+
+            -- **Finally** send the melee attack
+            SendMeleeAttack(tr.HitPos, dir, params.radius, params.reach, params.mins, params.maxs, params.ang, impactType, hand)
+        end
+    end
+
+    hook.Add("VRMod_Tracking", "VRMeleeTrace", function()
+        if not cl_vrmod_melee:GetBool() then return end
+        local ply = LocalPlayer()
+        if not IsValid(ply) or not ply:Alive() or not vrmod.IsPlayerInVR(ply) then return end
+        -- Precompute left hand (always fist)
+        local leftAng = vrmod.GetLeftHandAng(ply)
+        local leftPos = vrmod.GetLeftHandPos(ply) + leftAng:Forward() * 5
+        local leftRadius, leftReach, leftMins, leftMaxs, leftAngParam = vrmod.utils.GetWeaponMeleeParams(nil, ply, "left")
+        PrecomputedMelee.left = {
+            radius = leftRadius,
+            reach = leftReach,
+            mins = leftMins,
+            maxs = leftMaxs,
+            ang = leftAngParam,
+            dir = leftAng:Forward(),
+            useWeapon = false,
+            pos = leftPos
+        }
+
+        -- Precompute right hand (may have weapon)
+        local rightAng = vrmod.GetRightHandAng(ply)
+        local rightPos = vrmod.GetRightHandPos(ply) + rightAng:Forward() * 5
+        local rightWep = ply:GetActiveWeapon()
+        local useWeapon = IsValid(rightWep) and vrmod.utils.IsValidWep(rightWep)
+        local rightRadius, rightReach, rightMins, rightMaxs, rightAngParam, rightIsMelee = vrmod.utils.GetWeaponMeleeParams(useWeapon and rightWep or nil, ply, "right")
+        PrecomputedMelee.right = {
+            radius = rightRadius,
+            reach = rightReach,
+            mins = rightMins,
+            maxs = rightMaxs,
+            ang = rightAngParam,
+            dir = rightAng:Forward(),
+            useWeapon = useWeapon,
+            weapon = rightWep,
+            isMelee = rightIsMelee, -- only for collision adjustment
+            pos = rightPos
+        }
+
+        -- Precompute head (headbutt / head punch) - short reach, small radius, forward from HMD
+        local headAng = vrmod.GetHMDAng(ply)
+        local headPos = vrmod.GetHMDPos(ply) + headAng:Forward() * 5
+        local headRadius = 6
+        local headReach = 6
+        local headMins = Vector(-headRadius, -headRadius, -headRadius)
+        local headMaxs = Vector(headRadius, headRadius, headRadius)
+        PrecomputedMelee.head = {
+            radius = headRadius,
+            reach = headReach,
+            mins = headMins,
+            maxs = headMaxs,
+            ang = headAng,
+            dir = headAng:Forward(),
+            useWeapon = false,
+            pos = headPos
+        }
+
+        -- Threshold check (velocity-based) happens **after** precomputation
+        local leftVel = vrmod.GetLeftHandVelocityRelative()
+        local rightVel = vrmod.GetRightHandVelocityRelative()
+        local headVel = vrmod.GetHMDVelocity()
+        local threshold = cv_meleeVelThreshold:GetFloat() * 50
+        local headForwardSpeed = headVel:Length()
+        local headThreshold = threshold * 0.5 -- higher threshold so normal head bobbing / small movements don't cause constant punching when standing still
+        if leftVel:Length() < threshold and rightVel:Length() < threshold and headForwardSpeed < headThreshold then return end
+        -- Try melee for both hands + head
+        if not g_VR.cooldownLeft then TryMelee(PrecomputedMelee.left, "left") end
+        if not g_VR.cooldownRight then TryMelee(PrecomputedMelee.right, "right") end
+        if not g_VR.cooldownHead then TryMelee(PrecomputedMelee.head, "head") end
+    end)
+end
+
+-- SERVERSIDE --------------------------
+if SERVER then
+    util.AddNetworkString("VRMod_MeleeAttack")
+    net.Receive("VRMod_MeleeAttack", function(_, ply)
+        if not sv_vrmod_melee:GetBool() then return end
+        if not IsValid(ply) or not ply:Alive() then return end
+        local src = net.ReadVector()
+        local dir = net.ReadVector()
+        local radius = net.ReadFloat()
+        local reach = net.ReadFloat()
+        local mins = net.ReadVector()
+        local maxs = net.ReadVector()
+        local angles = net.ReadAngle()
+        local impactType = net.ReadString()
+        local hand = net.ReadString()
+        local swingSpeed
+        if hand == "left" then
+            swingSpeed = vrmod.GetLeftHandVelocityRelative(ply)
+        elseif hand == "right" then
+            swingSpeed = vrmod.GetRightHandVelocityRelative(ply)
+        elseif hand == "head" then
+            swingSpeed = vrmod.GetHMDVelocity(ply)
+        else
+            swingSpeed = Vector(0, 0, 0)
+        end
+
+        if swingSpeed then swingSpeed = swingSpeed:Length() end
+        local traceData = {
+            start = src,
+            endpos = src + dir * reach,
+            radius = radius,
+            mins = mins,
+            max = maxs,
+            filter = function(ent) return vrmod.utils.MeleeFilter(ent, ply, hand) end,
+            mask = MASK_SHOT
+        }
+
+        local tr = vrmod.utils.TraceBoxOrSphere(traceData)
+        if not tr.Hit then return end
+        local decalName = "Impact.Concrete"
+        local matType = tr.MatType
+        if matType == MAT_METAL then
+            decalName = "Impact.Metal"
+        elseif matType == MAT_WOOD then
+            decalName = "Impact.Wood"
+        elseif matType == MAT_FLESH then
+            decalName = "Impact.Flesh"
+        elseif matType == MAT_DIRT then
+            decalName = "Impact.Dust"
+        elseif matType == MAT_SAND then
+            decalName = "Impact.Dust"
+        elseif matType == MAT_GLASS then
+            decalName = "GlassBreak"
+        elseif matType == MAT_TILE then
+            decalName = "Impact.Concrete"
+        end
+
+        local base = cv_meleeDamage:GetFloat()
+        -- Fetch the active weapon once; reused for both damage and hit sound overrides
+        local activeWep = hand == "right" and ply:GetActiveWeapon() or nil
+        if IsValid(activeWep) then if activeWep.Primary and isnumber(activeWep.Primary.Damage) and activeWep.Primary.Damage > 0 then base = activeWep.Primary.Damage end end
+        local targetVel = tr.Entity.GetVelocity and tr.Entity:GetVelocity() or Vector(0, 0, 0)
+        local relativeSpeed = math.max(0, swingSpeed)
+        local speedScale = cv_meleeSpeedScale:GetFloat()
+        local damageMultiplier = 1.0
+        local damageType = DMG_CLUB
+        if impactType == "blunt" then
+            damageMultiplier = 1.25
+        elseif impactType == "stunstick" then
+            damageMultiplier = 1.1
+            damageType = bit.bor(DMG_CLUB, DMG_SHOCK)
+        elseif impactType == "sharp" then
+            damageMultiplier = 1.5
+            damageType = DMG_SLASH
+        elseif impactType == "piercing" then
+            damageMultiplier = 1.3
+            damageType = DMG_BULLET
+        elseif impactType == "heavy" then
+            damageMultiplier = 2.0
+            damageType = bit.bor(DMG_CLUB, DMG_CRUSH)
+        elseif impactType == "energy" then
+            damageMultiplier = 1.4
+            damageType = bit.bor(DMG_ENERGYBEAM, DMG_SHOCK)
+        elseif impactType == "explosive" then
+            damageMultiplier = 2.5
+            damageType = bit.bor(DMG_BLAST, DMG_CLUB)
+        elseif impactType == "head" then
+            damageMultiplier = 1.15
+            damageType = DMG_CLUB
+        end
+
+        local speedFactor = math.min(5.0, 1.0 + relativeSpeed * speedScale)
+        local dmgAmt = base * speedFactor * damageMultiplier
+        local customSound = nil
+        local customDecal = decalName
+        local customDamage = dmgAmt
+        local customDamageMultiplier = damageMultiplier
+        local customDamageType = damageType
+        local customReach = reach
+        local customRadius = radius
+        local customImpactType = impactType
+        local damageExplicitlySet = false
+        local hitData = {
+            Attacker = ply,
+            HitEntity = tr.Entity,
+            HitPos = tr.HitPos,
+            Damage = dmgAmt,
+            ImpactType = impactType,
+            Hand = hand,
+            RelativeSpeed = relativeSpeed,
+            MaterialType = matType,
+            DecalName = decalName,
+            DamageMultiplier = damageMultiplier,
+            DamageType = damageType,
+            Reach = reach,
+            Radius = radius
+        }
+
+        hook.Run("VRMod_MeleeHit", hitData, function(soundPath, newDecal, newDamage, newDamageMultiplier, newDamageType, newReach, newRadius, newImpactType)
+            if hand == "left" then return end
+            if soundPath then customSound = soundPath end
+            if newDecal then customDecal = newDecal end
+            if newDamage then
+                customDamage = newDamage
+                damageExplicitlySet = true
+            end
+
+            if newDamageMultiplier then customDamageMultiplier = newDamageMultiplier end
+            if newDamageType then customDamageType = newDamageType end
+            if newReach then customReach = newReach end
+            if newRadius then customRadius = newRadius end
+            if newImpactType then customImpactType = newImpactType end
+        end)
+
+        if not customDamageType and customImpactType then
+            if customImpactType == "blunt" then
+                customDamageMultiplier = customDamageMultiplier or 1.25
+                customDamageType = DMG_CLUB
+            elseif customImpactType == "stunstick" then
+                customDamageMultiplier = customDamageMultiplier or 1.1
+                customDamageType = bit.bor(DMG_CLUB, DMG_SHOCK)
+            elseif customImpactType == "sharp" then
+                customDamageMultiplier = customDamageMultiplier or 1.5
+                customDamageType = DMG_SLASH
+            elseif customImpactType == "piercing" then
+                customDamageMultiplier = customDamageMultiplier or 1.3
+                customDamageType = DMG_BULLET
+            elseif customImpactType == "heavy" then
+                customDamageMultiplier = customDamageMultiplier or 2.0
+                customDamageType = bit.bor(DMG_CLUB, DMG_CRUSH)
+            elseif customImpactType == "energy" then
+                customDamageMultiplier = customDamageMultiplier or 1.4
+                customDamageType = bit.bor(DMG_ENERGYBEAM, DMG_SHOCK)
+            elseif customImpactType == "explosive" then
+                customDamageMultiplier = customDamageMultiplier or 2.5
+                customDamageType = bit.bor(DMG_BLAST, DMG_CLUB)
+            elseif customImpactType == "head" then
+                customDamageMultiplier = customDamageMultiplier or 1.5
+                customDamageType = DMG_CLUB
+            else
+                customDamageMultiplier = customDamageMultiplier or 1.0
+                customDamageType = DMG_CLUB
+            end
+        end
+
+        -- Recalculate damage only if not explicitly overridden by the VRMod_MeleeHit hook
+        if not damageExplicitlySet then customDamage = base * speedFactor * (customDamageMultiplier or 1.0) end
+        if IsValid(tr.Entity) and tr.Entity:GetClass() == "func_breakable_surf" then
+            customDamageType = bit.bor(customDamageType, DMG_BLAST)
+        elseif matType == MAT_GLASS then
+            customDamageType = bit.bor(customDamageType, DMG_BLAST)
+        end
+
+        local dmgInfo = DamageInfo()
+        dmgInfo:SetAttacker(ply)
+        dmgInfo:SetInflictor(ply)
+        dmgInfo:SetDamage(customDamage)
+        dmgInfo:SetDamageType(customDamageType)
+        dmgInfo:SetDamagePosition(tr.HitPos)
+        tr.Entity:TakeDamageInfo(dmgInfo)
+        local phys = tr.Entity:GetPhysicsObject()
+        if IsValid(phys) then phys:ApplyForceCenter(dir * customDamage * 10) end
+        -- Resolve hit sound from the weapon's SWEP definition if available.
+        -- SWEPs store hit sounds in various table fields (already Sound()-resolved at definition time).
+        -- Fall back to a hard-coded map for base HL2/HL1 weapons that use script names.
+        local knownWeaponHitSounds = {
+            weapon_crowbar = {
+                world = {"Weapon_Crowbar.Melee_Hit"},
+                flesh = {"Weapon_Crowbar.Melee_HitNPC"}
+            },
+            arcticvr_hl2_crowbar = {
+                world = {"Weapon_Crowbar.Melee_Hit"},
+                flesh = {"Weapon_Crowbar.Melee_HitNPC"}
+            },
+        }
+
+        local wepHitSound = nil
+        if IsValid(activeWep) then
+            local wepClass = activeWep:GetClass()
+            local wepDef = weapons.GetStored(wepClass)
+            local isFlesh = IsValid(tr.Entity) and (tr.Entity:IsPlayer() or tr.Entity:IsNPC() or tr.Entity:IsNextBot())
+            if wepDef then
+                -- Most melee SWEPs (like the HL1 crowbar above) use these table fields
+                local pool = isFlesh and (wepDef.PrimaryHitBodSounds or wepDef.PrimaryHitFleshSounds) or wepDef.PrimaryHitSounds or wepDef.HitSounds
+                if istable(pool) and #pool > 0 then
+                    wepHitSound = pool[math.random(#pool)]
+                else
+                    -- Scalar string fallbacks
+                    local raw = isFlesh and (wepDef.HitFleshSound or wepDef.HitBodySound) or wepDef.HitSound
+                    if isstring(raw) and raw ~= "" then wepHitSound = Sound(raw) end
+                end
+            end
+
+            -- Hard-coded known weapons (HL2 base, etc.)
+            if not wepHitSound then
+                local known = knownWeaponHitSounds[wepClass]
+                if known then
+                    local pool = isFlesh and known.flesh or known.world
+                    if pool then wepHitSound = Sound(pool[math.random(#pool)]) end
+                end
+            end
+        end
+
+        local snd
+        if customSound then
+            snd = customSound
+        elseif wepHitSound then
+            snd = wepHitSound
+        else
+            local list = impactSounds[customImpactType]
+            if not list then
+                list = impactSounds.fist
+                vrmod.logger.Warn("[Melee] Invalid impactType '" .. tostring(customImpactType) .. "', falling back to 'fist'")
+            end
+
+            snd = list[math.random(#list)]
+        end
+
+        sound.Play(snd, tr.HitPos, 75, 100, 1)
+        util.Decal(customDecal, tr.HitPos + tr.HitNormal * 2, tr.HitPos - tr.HitNormal * 2)
+        if IsValid(tr.Entity) and tr.Entity ~= game.GetWorld() then util.Decal(customDecal, tr.HitPos + tr.HitNormal * 2, tr.HitPos - tr.HitNormal * 2, tr.Entity) end
+        vrmod.logger.Debug(string.format("%s smashed %s for %.1f damage (impact: %s, multiplier: %.2f, type: %d, reach: %.2f, radius: %.2f, mins: %s, maxs: %s, angles: %s, swingSpeed: %.1f, targetVelDot: %.1f, relativeSpeed: %.1f, speedFactor: %.2f, sound: %s)!", ply:Nick() or "Unknown", IsValid(tr.Entity) and (tr.Entity:GetName() ~= "" and tr.Entity:GetName() or tr.Entity:GetClass()) or "World", customDamage, customImpactType, customDamageMultiplier, customDamageType, customReach, customRadius, tostring(mins or Vector(0, 0, 0)), tostring(maxs or Vector(0, 0, 0)), tostring(angles or Angle(0, 0, 0)), swingSpeed, targetVel:Dot(dir), relativeSpeed, speedFactor, snd or "none"))
+    end)
+end
