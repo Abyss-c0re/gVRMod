@@ -12,10 +12,8 @@ bool XR_CreateSwapchains(char* errMsg, int errMsgLen);
 void XR_DestroySwapchains();
 
 // ── Texture submission with buffering ──
-// Blit the (per-eye) stolen GL texture(s) into the OpenXR swapchains and submit.
-// When per-eye textures (g_leftEyeTexture / g_rightEyeTexture from gl_hooks) are populated,
-// each eye is submitted full-rect from its own RT (asymmetric frustum is already rendered in).
-// textureBounds is only used for the legacy side-by-side packed path.
+// Blit the stolen GL texture into the OpenXR swapchain and submit.
+// textureBounds: [leftUMin, leftVMin, leftUMax, leftVMax, rightUMin, rightVMin, rightUMax, rightVMax]
 struct XrSubmitResult {
     bool ok;
     int errCode;      // 0 = success

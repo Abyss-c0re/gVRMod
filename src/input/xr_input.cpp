@@ -35,29 +35,35 @@ static void QuatToRotMat(const XrQuaternionf& q, float m[3][3]) {
 // ── Convert pose using the same matrix extraction and basis change as the prior implementation.
 // (pos mapping: -z, -x, +y). This preserves the HMD tracking behavior the Lua side expects.
 static void ConvertRotToSourceAng(const float m[3][3], float ang[3]) {
-    // Use the *exact same* angle extraction formulas as the original OpenVR
-    // ConvertPose (see vr_input.cpp). The preceding M * Rxr * M^T (plus the
-    // identical position remap) makes the 3x3 'm' here equivalent in layout to
-    // the old HmdMatrix34 rotation part that the rest of the mod (and Lua
-    // tracking, RenderViews, etc.) was written and tuned against.
-    //
-    // This avoids ad-hoc cycling of p/y/r and extra sign flips that were
-    // introduced during early OpenXR bring-up and that left roll→pitch leakage
-    // (physical head tilt left making the left-eye image act as if the head
-    // was also pitched up). Matching the old extraction ensures that a pure
-    // physical roll only affects game roll (ang[2]), with no pollution of
-    // game pitch (ang[0]) that would be especially visible for the left eye
-    // because of its vertical displacement on roll + explicit per-eye camera
-    // placement.
-    ang[0] =  asinf(m[1][2]) * (180.0f / PI_F);
-    ang[1] =  atan2f(m[0][2], m[2][2]) * (180.0f / PI_F);
-    ang[2] =  atan2f(-m[1][0], m[1][1]) * (180.0f / PI_F);
+    // Same extraction as the prior ConvertPose using the transformed rot matrix
+    // (m[row][col] layout matching the previous HmdMatrix34 rot part).
+    // The M * Rxr * M^T reorients the XR rotation into the Source basis.
+    // Because of the 90-degree axis permutation in M, the meaning of the three
+    // extracted values (p/y/r) gets cycled relative to Source pitch/yaw/roll.
+    float p = asinf(m[1][2]) * (180.0f / PI_F);
+    float y = atan2f(m[0][2], m[2][2]) * (180.0f / PI_F);
+    float r = atan2f(-m[1][0], m[1][1]) * (180.0f / PI_F);
 
-    // Diagnostic log (now shows final game angles directly).
+    // From symptoms:
+    //   Previous cycle fixed the axis slots (tilt now on roll, not mixed into yaw/pitch).
+    //   Current problem: directions are reversed on the main axes.
+    //     "look up it looks down"  → pitch sign inverted
+    //     "look left it looks right" → yaw sign inverted
+    //   Tilting (roll) reported as fine.
+    // Cycle (from prior step) + sign flips for direction:
+    //   ex_y (phys pitch) → game pitch (ang[0]) with sign flipped to +y
+    //   ex_r (phys yaw)   → game yaw   (ang[1]) with sign flipped to -r
+    //   ex_p (phys roll)  → game roll  (ang[2])
+    ang[0] =  y;   // pitch (flipped from -y; look up should now produce positive pitch in the expected Source sense)
+    ang[1] = -r;   // yaw   (flipped from +r; turn left should now produce correct yaw direction)
+    ang[2] = -p;   // roll  (kept; tilting was reported ok)
+
+    // Extra diagnostic: shows the raw extracted p/y/r so we can see exactly which one
+    // changes when you perform a specific head motion. Look for "ROT EX" lines in the log.
     static int s_exLog = 0;
     if ((++s_exLog % 3) == 0) {
-        VRMOD_LOG_INFO("ROT EX: game ang[0/pitch]=%.1f ang[1/yaw]=%.1f ang[2/roll]=%.1f",
-            ang[0], ang[1], ang[2]);
+        VRMOD_LOG_INFO("ROT EX: p=%.1f y=%.1f r=%.1f  →  game ang[0/pitch]=%.1f ang[1/yaw]=%.1f ang[2/roll]=%.1f",
+            p, y, r, ang[0], ang[1], ang[2]);
     }
 }
 
