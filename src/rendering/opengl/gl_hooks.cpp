@@ -14,6 +14,19 @@ COpenGLEntryPoints* g_GL = NULL;
 bool                g_glIsPatched = false;
 bool                g_captureStealActive = false;
 
+// Per-eye support (proper separate RT per eye, no more side-by-side packing hacks).
+GLuint              g_leftEyeTexture = 0;
+GLuint              g_rightEyeTexture = 0;
+GLuint              g_leftEyeFBO = 0;
+GLuint              g_leftEyeColorTex = 0;
+GLuint              g_rightEyeFBO = 0;
+GLuint              g_rightEyeColorTex = 0;
+static int          g_eyeStealIndex = 0; // 0 -> left, 1 -> right during share window
+
+// Set from Lua based on system.IsWindows(). True on Linux so the submit path
+// can flip V when reading from the engine's GL render targets.
+bool                g_rtTextureNeedsVFlip = false;
+
 // Framebuffer attachment observation (used to discover the actual color texture backing
 // the VR RT created by GetRenderTargetEx, which may bypass the glGenTextures vtable slot).
 char                g_framebufferTexOrigBytes[14];
@@ -46,14 +59,22 @@ void BuildCreateTextureHookPatch(void* CreateTextureHook, uint8_t outPatch[HOOK_
 void CreateTextureHook(GLsizei n, GLuint *textures) {
     memcpy((void*)g_createTexture, (void*)g_createTextureOrigBytes, 14);
     ((glGenTextures_t)g_createTexture)(n, textures);
-    // Preserve the "main" stolen ID for the addon's primary VR RT (the one targeted
-    // directly by PerformRenderViews + the two RenderView calls). Only clobber it
-    // for the main shared if capture steal is not active. Capture gets its own.
-    if (!g_captureStealActive) {
-        g_sharedTexture = textures[0];
-    }
+    // Capture mode for the old "clean capture RT" path.
     if (g_captureStealActive) {
         g_captureTexture = textures[0];
+        return;
+    }
+    // Per-eye steal: first engine RT gen after Begin -> left, second -> right.
+    // This supports the new proper per-eye RT path (two GetRenderTargetEx calls).
+    if (g_eyeStealIndex == 0) {
+        g_leftEyeTexture = textures[0];
+        g_eyeStealIndex = 1;
+    } else if (g_eyeStealIndex == 1) {
+        g_rightEyeTexture = textures[0];
+        g_eyeStealIndex = 2;
+    } else {
+        // Fallback for any extra gens during window: keep classic shared for debug/compat.
+        g_sharedTexture = textures[0];
     }
 }
 
@@ -72,7 +93,8 @@ void FramebufferTextureHook(GLenum target, GLenum attachment, GLenum textarget, 
     ((glFramebufferTexture2D_t)g_framebufferTexture2D)(target, attachment, textarget, texture, level);
 
     // While a share/capture steal window is active, a COLOR_ATTACHMENT0 with a real texture
-    // almost certainly belongs to the VR side-by-side RT being set up by GetRenderTargetEx.
+    // belongs to a VR RT (now per-eye). We record both the classic last-seen and the
+    // sequential per-eye slots so the new path has authoritative left/right backing textures.
     if (g_glIsPatched && attachment == GL_COLOR_ATTACHMENT0 && texture != 0) {
         g_vrRtColorTex = texture;
         GLint currentFBO = 0;
@@ -80,7 +102,20 @@ void FramebufferTextureHook(GLenum target, GLenum attachment, GLenum textarget, 
         if (currentFBO != 0) {
             g_vrRtFBO = (GLuint)currentFBO;
         }
-        VRMOD_LOG_INFO("Framebuffer attach observed: COLOR0 tex=%u fbo=%u (captureSteal=%d)", texture, (unsigned)currentFBO, (int)g_captureStealActive);
+
+        // Per-eye FBO/tex capture (first attach in window = left eye RT, second = right).
+        if (g_eyeStealIndex <= 1) {
+            // still expecting left or assigning left
+            g_leftEyeColorTex = texture;
+            g_leftEyeFBO = (GLuint)currentFBO;
+            VRMOD_LOG_INFO("Framebuffer attach observed (left eye): COLOR0 tex=%u fbo=%u", texture, (unsigned)currentFBO);
+        } else if (g_eyeStealIndex == 2) {
+            g_rightEyeColorTex = texture;
+            g_rightEyeFBO = (GLuint)currentFBO;
+            VRMOD_LOG_INFO("Framebuffer attach observed (right eye): COLOR0 tex=%u fbo=%u", texture, (unsigned)currentFBO);
+        } else {
+            VRMOD_LOG_INFO("Framebuffer attach observed: COLOR0 tex=%u fbo=%u (captureSteal=%d)", texture, (unsigned)currentFBO, (int)g_captureStealActive);
+        }
     }
 
     // Re-arm for the remainder of the short share window so later attachments (or color after depth) are also seen.
@@ -159,25 +194,33 @@ bool RemoveTexturePatch(ErrorFunc errFunc) {
 }
 
 int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) {
-    // Tear down previous
+    // Tear down previous shared (compat)
     if (glIsTexture(g_sharedTexture)) {
         glDeleteTextures(1, &g_sharedTexture);
         g_sharedTexture = 0;
         glFlush();
     }
 
-    // Generate & bind new texture
+    // Reset per-eye state for new proper per-eye RT path.
+    if (glIsTexture(g_leftEyeTexture)) { glDeleteTextures(1, &g_leftEyeTexture); g_leftEyeTexture = 0; }
+    if (glIsTexture(g_rightEyeTexture)) { glDeleteTextures(1, &g_rightEyeTexture); g_rightEyeTexture = 0; }
+    g_leftEyeFBO = g_rightEyeFBO = 0;
+    g_leftEyeColorTex = g_rightEyeColorTex = 0;
+    g_eyeStealIndex = 0;
+
+    // Pre-allocate a placeholder at per-eye size (the engine RTs will be captured via hook/FBO).
+    // We keep one g_sharedTexture at per-eye size for fallback paths.
     glGenTextures(1, &g_sharedTexture);
     glBindTexture(GL_TEXTURE_2D, g_sharedTexture);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
-    // Allocate storage (RGBA8) – contents undefined until we clear
+    // Allocate per-eye size now (no more *2 side-by-side assumption here).
     glTexImage2D(
         GL_TEXTURE_2D,
         0,
         GL_RGBA8,
-        texWidth * 2,
+        texWidth,
         texHeight,
         0,
         GL_RGBA,
@@ -225,11 +268,11 @@ int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) 
            HOOK_SIZE);
 
     g_glIsPatched = true;
-    VRMOD_LOG_INFO("Texture hook patch applied.");
+    VRMOD_LOG_INFO("Texture hook patch applied (per-eye mode armed).");
 
     // Arm framebuffer attachment observation in the same window. This is the key to reliably
     // capturing the texture that GetRenderTargetEx actually wires up as the color target for
-    // the VR RT (the glGenTextures vtable slot at +50 can be bypassed by togl's RT paths).
+    // the per-eye VR RTs (the glGenTextures vtable slot at +50 can be bypassed by togl's RT paths).
     if (!g_fbIsPatched) {
         if (!g_framebufferTexture2D) {
             g_framebufferTexture2D = (void*)glXGetProcAddress((const GLubyte*)"glFramebufferTexture2D");

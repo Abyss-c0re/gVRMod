@@ -88,7 +88,6 @@ if CLIENT then
 
 		g_VR = g_VR or {}
 		g_VR.characterYaw = 0
-		local convars, convarValues = vrmod.GetConvars()
 		if not g_VR.threePoints or VRUtilIsMenuOpen("heightmenu") then return end
 		--create mirror
 		rt_mirror = GetRenderTarget("rt_vrmod_heightcalmirror", 2048, 2048)

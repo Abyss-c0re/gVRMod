@@ -28,10 +28,11 @@ typedef void (*glGenTextures_t)(GLsizei n, GLuint *textures);
 extern char            g_createTextureOrigBytes[14];
 extern void*           g_createTexture;
 extern GLuint          g_sharedTexture;
+// Per-eye textures for proper separate RT per eye (new path).
+extern GLuint          g_leftEyeTexture;
+extern GLuint          g_rightEyeTexture;
 extern COpenGLEntryPoints* g_GL;
 extern bool            g_glIsPatched;
-extern bool            g_captureStealActive;
-extern bool            g_fbIsPatched;
 
 // ── Error callback for rendering functions that need to report errors ──
 typedef void (*ErrorFunc)(const char* msg);
@@ -58,6 +59,18 @@ extern GLuint g_captureTexture;
 // (togl / GetRenderTargetEx) allocates RT backing stores through internal paths.
 extern GLuint g_vrRtFBO;
 extern GLuint g_vrRtColorTex;
+
+// Per-eye FBO/color tex observed during share (for robust per-eye RT discovery).
+extern GLuint g_leftEyeFBO;
+extern GLuint g_leftEyeColorTex;
+extern GLuint g_rightEyeFBO;
+extern GLuint g_rightEyeColorTex;
+
+// Whether the engine RT textures need V flip when blitting to OpenXR swapchains.
+// On Linux/OpenGL the RTs from GetRenderTargetEx are Y-inverted relative to
+// the image orientation OpenXR expects, so we set this to true (from Lua using
+// system.IsWindows()).
+extern bool g_rtTextureNeedsVFlip;
 
 int ShareCaptureTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc);
 bool ShareCaptureTextureFinish(ErrorFunc errFunc);  // note: name collides with LUA wrapper in other TU; use :: when calling from Lua bridge

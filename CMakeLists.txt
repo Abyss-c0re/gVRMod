@@ -76,6 +76,7 @@ if(VRMOD_BUILD_TESTS)
         tests/test_main.cpp
         tests/test_input.cpp
         tests/test_lua.cpp
+        tests/test_distortion.cpp
     )
 
     # Only compile modules that are testable without real HW

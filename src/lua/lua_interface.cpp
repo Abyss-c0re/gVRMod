@@ -19,11 +19,29 @@
 static char g_errorString[MAX_STR_LEN];
 static int  g_luaRefs[LuaRefIndex_Max];
 static int  g_luaRefCount = 0;
+static bool g_IsPaused = false;
 static bool g_xrInitialized = false;
 static bool g_xrSwapchainsCreated = false;
 
-// ── Texture bounds (stored for Lua compatibility) ──
+// ── Texture bounds (stored for Lua compatibility; legacy side-by-side path only) ──
 static float g_texBounds[8] = {0}; // left uMin,vMin,uMax,vMax, right uMin,vMin,uMax,vMax
+
+// Forward decls from gl_hooks for per-eye exposure in submit
+extern GLuint g_leftEyeTexture;
+extern GLuint g_rightEyeTexture;
+extern GLuint g_leftEyeFBO;
+extern GLuint g_leftEyeColorTex;
+extern GLuint g_rightEyeFBO;
+extern GLuint g_rightEyeColorTex;
+
+extern bool g_rtTextureNeedsVFlip;
+
+// Eye poses from OpenXR (to let headset values drive the per-eye cameras in Lua with minimal manual math)
+extern PoseResult g_xrHMDPose;
+extern PoseResult ConvertXrPose(const XrSpaceLocation& loc);
+PoseResult g_xrEyePoses[2];
+bool g_xrEyePosesValid = false;
+XrFovf g_xrEyeFovs[2];
 
 // ── Action state ──
 static action    g_actions[MAX_ACTIONS];
@@ -81,8 +99,22 @@ LUA_FUNCTION(IsHMDPresent) {
 
 LUA_FUNCTION(Init) {
     if (g_xrInitialized) {
-        // Already fully initialized (e.g. double start). No-op; a prior Shutdown
-        // will have done a full teardown so the next Init always gets a fresh session.
+        if (g_IsPaused) {
+            LUA->CreateTable();
+            g_luaRefs[LuaRefIndex_PoseTable] = LUA->ReferenceCreate();
+
+            LUA->CreateTable();
+            g_luaRefs[LuaRefIndex_EmptyTable] = LUA->ReferenceCreate();
+
+            LUA->CreateTable();
+            g_luaRefs[LuaRefIndex_ActionTable] = LUA->ReferenceCreate();
+
+            LUA->CreateTable();
+            g_luaRefs[LuaRefIndex_HmdPose] = LUA->ReferenceCreate();
+            g_IsPaused = false;
+            VRMOD_LOG_INFO("Resumed from paused state.");
+            return 0;
+        }
         return 0;
     }
 
@@ -131,17 +163,6 @@ LUA_FUNCTION(Init) {
 
     g_GL = GetOpenGLEntryPoints(nullptr);
     dlclose(lib);
-
-    // Some GL drivers (and togl on Linux) can leave a pending error (commonly
-    // GL_INVALID_ENUM / 1280) after OpenXR session teardown, swapchain
-    // destruction, render target cleanup on vrmod_exit, or even inside
-    // GetOpenGLEntryPoints itself when called right after a previous VR run.
-    // We must drain before trusting the next glGetError, otherwise the first
-    // restart attempt after exit spuriously fails here and the user has to
-    // run vrmod_start a second time.
-    while (glGetError() != GL_NO_ERROR) {
-        /* drain stale errors */
-    }
 
     g_createTexture = *((void**)&g_GL->firstFunc + 50);
 
@@ -278,6 +299,32 @@ LUA_FUNCTION(UpdatePosesAndActions) {
     // Update HMD pose
     XR_UpdatePoses();
 
+    // Locate eye views early using predicted display time (in stage space, matching hmd pose space).
+    // This lets Lua use the exact headset-provided eye poses (position + orientation) for the
+    // per-eye RenderViews, so OpenXR drives the stereo camera placement directly with no
+    // additional manual offset/yaw/scale math in the render path.
+    if (g_xrSessionRunning && g_xrLocateViews) {
+      XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
+      vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+      vli.displayTime = g_xrFrameState.predictedDisplayTime;
+      vli.space = g_xrStageSpace;
+
+      XrViewState vs = {XR_TYPE_VIEW_STATE};
+      uint32_t vc = 0;
+      XrView ev[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+      if (g_xrLocateViews(g_xrSession, &vli, &vs, 2, &vc, ev) == XR_SUCCESS && vc >= 2) {
+        XrSpaceLocation tloc = {XR_TYPE_SPACE_LOCATION};
+        tloc.locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+        tloc.pose = ev[0].pose;
+        g_xrEyePoses[0] = ConvertXrPose(tloc);
+        tloc.pose = ev[1].pose;
+        g_xrEyePoses[1] = ConvertXrPose(tloc);
+        g_xrEyeFovs[0] = ev[0].fov;
+        g_xrEyeFovs[1] = ev[1].fov;
+        g_xrEyePosesValid = true;
+      }
+    }
+
     return 0;
 }
 
@@ -301,6 +348,60 @@ LUA_FUNCTION(GetPoses) {
         LUA->PushAngle(angvel);
         LUA->SetField(-2, "angvel");
         LUA->SetField(-2, "hmd");
+    }
+
+    // Eye poses directly from OpenXR (headset values for per-eye cameras)
+    if (g_xrEyePosesValid) {
+      for (int ei = 0; ei < 2; ei++) {
+        PoseResult pr = g_xrEyePoses[ei];
+        if (pr.valid) {
+          Vector pos; pos.x = pr.pos[0]; pos.y = pr.pos[1]; pos.z = pr.pos[2];
+          Vector vel; vel.x = 0; vel.y = 0; vel.z = 0;
+          QAngle ang; ang.x = pr.ang[0]; ang.y = pr.ang[1]; ang.z = pr.ang[2];
+          QAngle angvel; angvel.x = 0; angvel.y = 0; angvel.z = 0;
+          const char* ename = (ei == 0) ? "eye_left" : "eye_right";
+          LUA->CreateTable();
+          LUA->PushVector(pos); LUA->SetField(-2, "pos");
+          LUA->PushVector(vel); LUA->SetField(-2, "vel");
+          LUA->PushAngle(ang); LUA->SetField(-2, "ang");
+          LUA->PushAngle(angvel); LUA->SetField(-2, "angvel");
+
+          // Symmetric overrender FOV that fully encloses the asymmetric OpenXR frustum.
+          // Source engine's render.RenderView creates a symmetric frustum from fov + aspectratio.
+          // To handle the asymmetric OpenXR FOV correctly:
+          //  1. Overrender with symmetric FOV = 2*atan(max(|tanL|,|tanR|)) per axis
+          //  2. Submit UV bounds that select the correct asymmetric sub-rect
+          //  3. Both eyes use the same head orientation (no per-eye rotation)
+          // This matches the legacy OpenVR approach that produced correct results.
+          float tanL = tanf(g_xrEyeFovs[ei].angleLeft);
+          float tanR = tanf(g_xrEyeFovs[ei].angleRight);
+          float tanU = tanf(g_xrEyeFovs[ei].angleUp);
+          float tanD = tanf(g_xrEyeFovs[ei].angleDown);
+
+          float halfTanX = fmaxf(fabsf(tanL), fabsf(tanR));
+          float halfTanY = fmaxf(fabsf(tanU), fabsf(tanD));
+          float asp = halfTanX / halfTanY;
+          float h_fov = 2.0f * atanf(halfTanX) * (180.0f / 3.14159265358979323846f);
+
+          LUA->PushNumber(h_fov); LUA->SetField(-2, "fov");
+          LUA->PushNumber(asp); LUA->SetField(-2, "aspectratio");
+
+          // UV crop bounds for selecting the asymmetric frustum from the symmetric
+          // overrender. Convention: u0 < u1, v0 < v1 (D3D style: v0 = top of crop).
+          // The V-flip for OpenGL render targets is handled in xr_render.cpp.
+          float su0 = (tanL + halfTanX) / (2.0f * halfTanX);
+          float su1 = (tanR + halfTanX) / (2.0f * halfTanX);
+          float sv0 = (halfTanY - tanU) / (2.0f * halfTanY);
+          float sv1 = (halfTanY - tanD) / (2.0f * halfTanY);
+
+          LUA->PushNumber(su0); LUA->SetField(-2, "submit_u0");
+          LUA->PushNumber(su1); LUA->SetField(-2, "submit_u1");
+          LUA->PushNumber(sv0); LUA->SetField(-2, "submit_v0");
+          LUA->PushNumber(sv1); LUA->SetField(-2, "submit_v1");
+
+          LUA->SetField(-2, ename);
+        }
+      }
     }
 
     // Action poses
@@ -395,12 +496,7 @@ LUA_FUNCTION(ShareTextureBegin) {
         VRMOD_LOG_ERROR("%s", msg);
     };
 
-    // Drain any pending GL errors before we start creating textures and (re)installing
-    // the vtable hook. A stale error from prior shutdown / context work can otherwise
-    // cause the subsequent GL operations inside ShareTextureBegin or the engine's
-    // GetRenderTargetEx to misbehave.
-    while (glGetError() != GL_NO_ERROR) {}
-
+    // Per-eye sizes (new path). Lua now creates one RT per eye at recommended resolution.
     uint32_t texW = g_xrRecommendedWidth > 0 ? g_xrRecommendedWidth : 1024;
     uint32_t texH = g_xrRecommendedHeight > 0 ? g_xrRecommendedHeight : 1024;
 
@@ -441,11 +537,6 @@ LUA_FUNCTION(ShareTextureBegin) {
 }
 
 LUA_FUNCTION(ShareTextureFinish) {
-    if (g_sharedTexture == 0 || !glIsTexture(g_sharedTexture)) {
-        LUA->ThrowError("VRMOD: Failed to generate shared texture.");
-        return 0;
-    }
-
     auto errBridge = [](const char* msg) {
         VRMOD_LOG_ERROR("%s", msg);
     };
@@ -454,9 +545,21 @@ LUA_FUNCTION(ShareTextureFinish) {
         LUA->ThrowError("VRMOD: Failed to remove the texture patch.");
     }
 
-    // Promote a texture discovered via FBO COLOR_ATTACHMENT0 during the share window.
-    // The glGenTextures vtable hook can miss the RT backing store (togl internal allocation);
-    // seeing the engine attach a texture as the color target for the RT's FBO is authoritative.
+    // Promote per-eye textures discovered via FBO COLOR_ATTACHMENT0 (most authoritative for GetRenderTargetEx backing stores).
+    if (g_leftEyeColorTex != 0 && glIsTexture(g_leftEyeColorTex)) {
+        if (g_leftEyeTexture != g_leftEyeColorTex) {
+            VRMOD_LOG_INFO("Promoting left eye color tex from FBO: %u (was %u)", g_leftEyeColorTex, g_leftEyeTexture);
+            g_leftEyeTexture = g_leftEyeColorTex;
+        }
+    }
+    if (g_rightEyeColorTex != 0 && glIsTexture(g_rightEyeColorTex)) {
+        if (g_rightEyeTexture != g_rightEyeColorTex) {
+            VRMOD_LOG_INFO("Promoting right eye color tex from FBO: %u (was %u)", g_rightEyeColorTex, g_rightEyeTexture);
+            g_rightEyeTexture = g_rightEyeColorTex;
+        }
+    }
+
+    // Also keep legacy shared promotion for fallback paths.
     if (g_vrRtColorTex != 0 && glIsTexture(g_vrRtColorTex)) {
         if (g_sharedTexture != g_vrRtColorTex) {
             VRMOD_LOG_INFO("Promoting VR RT color texture from FBO attach: %u (was %u)", g_vrRtColorTex, g_sharedTexture);
@@ -464,7 +567,9 @@ LUA_FUNCTION(ShareTextureFinish) {
         }
     }
 
-    VRMOD_LOG_INFO("Shared texture ready: GL id=%u (fbo=%u)", g_sharedTexture, g_vrRtFBO);
+    // Log what we ended up with for the per-eye path.
+    VRMOD_LOG_INFO("Per-eye textures ready: L=%u (fbo=%u) R=%u (fbo=%u) | legacy shared=%u",
+        g_leftEyeTexture, g_leftEyeFBO, g_rightEyeTexture, g_rightEyeFBO, g_sharedTexture);
     return 0;
 }
 
@@ -472,9 +577,6 @@ LUA_FUNCTION(ShareCaptureTextureBegin) {
     auto errBridge = [](const char* msg) {
         VRMOD_LOG_ERROR("%s", msg);
     };
-
-    // Drain pending GL errors (same reason as ShareTextureBegin).
-    while (glGetError() != GL_NO_ERROR) {}
 
     // g_xrRecommended* is the per-eye value (keeps main Share *2 logic working).
     // Capture RT in Lua is allocated at the *packed* size (2x wide) so we pass 2x here.
@@ -521,29 +623,44 @@ LUA_FUNCTION(SetSubmitTextureBounds) {
     return 0;
 }
 
+LUA_FUNCTION(SetRTTextureFlip) {
+    // true = the engine RT textures need V flip when submitting (Linux/OpenGL case)
+    // Driven by Lua: VRMOD_SetRTTextureFlip( not system.IsWindows() )
+    if (LUA->GetType(1) == GarrysMod::Lua::Type::BOOL) {
+        g_rtTextureNeedsVFlip = LUA->GetBool(1);
+    } else {
+        // Fallback: on unknown, assume we need the flip (typical Linux/OpenGL case)
+        g_rtTextureNeedsVFlip = true;
+    }
+    return 0;
+}
+
 LUA_FUNCTION(SubmitSharedTexture) {
-    // Allow submit when we have either the classic stolen shared texture or a discovered
-    // RT FBO / color tex from framebuffer attachment observation. The submit path will
-    // resolve the best live srcTex from the FBO when available.
-    bool haveUsableSrc = (g_sharedTexture != 0) ||
-                         (g_vrRtColorTex != 0 && glIsTexture(g_vrRtColorTex)) ||
-                         (g_vrRtFBO != 0);
+    // Usable source: prefer per-eye textures (new path), fall back to legacy single shared/FBO.
+    bool haveLeft = (g_leftEyeTexture != 0 && glIsTexture(g_leftEyeTexture)) || (g_leftEyeColorTex != 0 && glIsTexture(g_leftEyeColorTex)) || (g_leftEyeFBO != 0);
+    bool haveRight = (g_rightEyeTexture != 0 && glIsTexture(g_rightEyeTexture)) || (g_rightEyeColorTex != 0 && glIsTexture(g_rightEyeColorTex)) || (g_rightEyeFBO != 0);
+    bool haveLegacy = (g_sharedTexture != 0) ||
+                      (g_vrRtColorTex != 0 && glIsTexture(g_vrRtColorTex)) ||
+                      (g_vrRtFBO != 0);
+    bool haveUsableSrc = haveLeft || haveRight || haveLegacy;
     if (!g_xrSwapchainsCreated || !haveUsableSrc) {
-        // Not ready yet, skip silently
         if (g_xrSessionRunning && !g_xrSwapchainsCreated) {
-            // Try to end the frame that was begun in UpdatePosesAndActions
             XR_EndFrame();
         }
         return 0;
     }
 
-    // Pass the best ID we have at the moment; XR_SubmitStolenTexture will re-resolve
-    // from the remembered FBO attachment if possible (more authoritative for the RT).
-    GLuint submitId = g_sharedTexture ? g_sharedTexture :
-                      (g_vrRtColorTex && glIsTexture(g_vrRtColorTex) ? g_vrRtColorTex : g_sharedTexture);
+    // We pass a best-effort single id (Submit will ignore it when per-eye globals are populated).
+    GLuint submitId = 0;
+    if (haveLeft || haveRight) {
+        submitId = g_leftEyeTexture ? g_leftEyeTexture : (g_leftEyeColorTex ? g_leftEyeColorTex : g_rightEyeTexture);
+    }
+    if (submitId == 0) {
+        submitId = g_sharedTexture ? g_sharedTexture :
+                   (g_vrRtColorTex && glIsTexture(g_vrRtColorTex) ? g_vrRtColorTex : g_sharedTexture);
+    }
     XrSubmitResult res = XR_SubmitStolenTexture(submitId, g_texBounds);
     if (!res.ok && res.errMsg[0]) {
-        // Only print to Lua on new errors (dedup happens in the log layer)
         LuaPrint(LUA, res.errMsg);
     }
     return 0;
@@ -552,37 +669,11 @@ LUA_FUNCTION(SubmitSharedTexture) {
 LUA_FUNCTION(Shutdown) {
     if (!g_xrInitialized)
         return 0;
+    if (g_IsPaused)
+        return 0;
 
     glFlush();
     glFinish();
-
-    // Force-remove any active texture creation patch / framebuffer observation
-    // that might have been left behind (e.g. if a prior start partially failed
-    // between ShareTextureBegin and ShareTextureFinish). This guarantees that
-    // on the next vrmod_start the real togl internal function head is pristine
-    // and our global patch state is clean. Also drop any stale RT texture/FBO
-    // names from the previous run so the next Share window can't accidentally
-    // latch onto dead resources.
-    {
-        auto errBridge = [](const char* msg) { VRMOD_LOG_ERROR("%s", msg); };
-        RemoveTexturePatch(errBridge);
-        // Force flags off in case RemoveTexturePatch saw them as already false
-        // or only partially succeeded. Guarantees clean slate for the next Init.
-        g_glIsPatched = false;
-        g_fbIsPatched = false;
-        g_captureStealActive = false;
-        g_vrRtFBO = 0;
-        g_vrRtColorTex = 0;
-        if (g_sharedTexture && glIsTexture(g_sharedTexture)) {
-            glDeleteTextures(1, &g_sharedTexture);
-            g_sharedTexture = 0;
-        }
-        if (g_captureTexture && glIsTexture(g_captureTexture)) {
-            glDeleteTextures(1, &g_captureTexture);
-            g_captureTexture = 0;
-        }
-        glFlush();
-    }
 
     // Free Lua references
     for (int i = 0; i < g_luaRefCount; i++) {
@@ -604,21 +695,15 @@ LUA_FUNCTION(Shutdown) {
     memset(g_actions, 0, sizeof(g_actions));
     g_actionSetCount = 0;
     g_activeActionSetCount = 0;
+    g_IsPaused = true;
 
-    // Destroy swapchains if we created them
+    // Destroy swapchains
     if (g_xrSwapchainsCreated) {
         XR_DestroySwapchains();
         g_xrSwapchainsCreated = false;
     }
 
-    // Full teardown (destroy session + instance + action objects).
-    // This ensures that vrmod_exit + vrmod_start (restart) gets a completely fresh
-    // OpenXR instance/session/swapchains and does not leave the compositor showing
-    // a black screen from stale session state or previous swapchain images.
-    XR_Shutdown();
-    g_xrInitialized = false;
-
-    VRMOD_LOG_INFO("VR shutdown (full).");
+    VRMOD_LOG_INFO("VR shutdown (paused).");
     return 0;
 }
 
@@ -691,6 +776,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "ShareCaptureTextureFinish");
     LUA->PushCFunction(SetSubmitTextureBounds);
     LUA->SetField(-2, "SetSubmitTextureBounds");
+    LUA->PushCFunction(SetRTTextureFlip);
+    LUA->SetField(-2, "SetRTTextureFlip");
     LUA->PushCFunction(SubmitSharedTexture);
     LUA->SetField(-2, "SubmitSharedTexture");
     LUA->PushCFunction(Shutdown);
@@ -708,7 +795,16 @@ GMOD_MODULE_OPEN() {
 GMOD_MODULE_CLOSE() {
     VRMOD_LOG_INFO("Module closing.");
 
-    if (g_xrInitialized) {
+    // Full shutdown if not paused
+    if (g_xrInitialized && !g_IsPaused) {
+        if (g_xrSwapchainsCreated) {
+            XR_DestroySwapchains();
+            g_xrSwapchainsCreated = false;
+        }
+        XR_Shutdown();
+        g_xrInitialized = false;
+    } else if (g_xrInitialized) {
+        // Was paused, do full shutdown now
         if (g_xrSwapchainsCreated) {
             XR_DestroySwapchains();
             g_xrSwapchainsCreated = false;
