@@ -539,16 +539,23 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                 }
 
                 // V-flip for OpenGL render targets (Linux).
-                // OpenGL RT textures have V=0 at the bottom, but OpenXR (and D3D)
-                // expect V=0 at the top. We mirror the V crop within the texture:
-                //   new_v0 = 1 - old_v1,  new_v1 = 1 - old_v0
-                // This correctly handles asymmetric crops (where v0 != 1-v1).
+                // OpenGL RT textures have V=0 at the bottom. The crop numbers from the
+                // eye fov math are in "logical/D3D" convention (low v = upper frustum).
+                // We mirror the V crop so we sample the correct part of the GL source.
                 if (g_rtTextureNeedsVFlip) {
                     float tmp0 = 1.0f - v1;
                     float tmp1 = 1.0f - v0;
                     v0 = tmp0;
                     v1 = tmp1;
                 }
+
+                // For the destination (swapchain image): we draw with a textured quad into
+                // a GL FBO attachment. Low viewport Y writes the low rows of the dest texture.
+                // Runtimes treat the first/low row of the submitted image as the top scanline.
+                // Therefore, when we needed source V compensation, also map higher v (upper content)
+                // to low Y so upper scene ends up in the "top" as seen by the compositor.
+                float vForLowY  = g_rtTextureNeedsVFlip ? v1 : v0;
+                float vForHighY = g_rtTextureNeedsVFlip ? v0 : v1;
 
                 glFinish();
 
@@ -607,10 +614,10 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                     glLoadIdentity();
 
                     glBegin(GL_QUADS);
-                        glTexCoord2f(u0, v0); glVertex2f(-1.0f, -1.0f);
-                        glTexCoord2f(u1, v0); glVertex2f( 1.0f, -1.0f);
-                        glTexCoord2f(u1, v1); glVertex2f( 1.0f,  1.0f);
-                        glTexCoord2f(u0, v1); glVertex2f(-1.0f,  1.0f);
+                        glTexCoord2f(u0, vForLowY); glVertex2f(-1.0f, -1.0f);
+                        glTexCoord2f(u1, vForLowY); glVertex2f( 1.0f, -1.0f);
+                        glTexCoord2f(u1, vForHighY); glVertex2f( 1.0f,  1.0f);
+                        glTexCoord2f(u0, vForHighY); glVertex2f(-1.0f,  1.0f);
                     glEnd();
 
                     glFinish();

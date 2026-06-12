@@ -32,23 +32,12 @@ static void QuatToRotMat(const XrQuaternionf& q, float m[3][3]) {
     m[2][2] = 1.0f - 2.0f * (xx + yy);
 }
 
-// ── Convert pose using the same matrix extraction and basis change as the prior implementation.
-// (pos mapping: -z, -x, +y). This preserves the HMD tracking behavior the Lua side expects.
+// ── Extract Source-engine pitch/yaw/roll from a rotation matrix using the
+// exact formulas from the legacy OpenVR ConvertPose. The rotation 3x3 from
+// OpenVR was used *raw* (only the translation column was remapped); we do the
+// same here. OpenXR quaternions are in the same axis convention as OpenVR, so
+// the raw matrix from the quat produces correct game angles with these extractors.
 static void ConvertRotToSourceAng(const float m[3][3], float ang[3]) {
-    // Use the *exact same* angle extraction formulas as the original OpenVR
-    // ConvertPose (see vr_input.cpp). The preceding M * Rxr * M^T (plus the
-    // identical position remap) makes the 3x3 'm' here equivalent in layout to
-    // the old HmdMatrix34 rotation part that the rest of the mod (and Lua
-    // tracking, RenderViews, etc.) was written and tuned against.
-    //
-    // This avoids ad-hoc cycling of p/y/r and extra sign flips that were
-    // introduced during early OpenXR bring-up and that left roll→pitch leakage
-    // (physical head tilt left making the left-eye image act as if the head
-    // was also pitched up). Matching the old extraction ensures that a pure
-    // physical roll only affects game roll (ang[2]), with no pollution of
-    // game pitch (ang[0]) that would be especially visible for the left eye
-    // because of its vertical displacement on roll + explicit per-eye camera
-    // placement.
     ang[0] =  asinf(m[1][2]) * (180.0f / PI_F);
     ang[1] =  atan2f(m[0][2], m[2][2]) * (180.0f / PI_F);
     ang[2] =  atan2f(-m[1][0], m[1][1]) * (180.0f / PI_F);
@@ -73,36 +62,18 @@ PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
 
     // OpenXR: x=right, y=up, z=back (towards user)
     // Source engine (GMod): x=forward, y=left, z=up
-    // Mapping (preserved from prior implementation): src_x = -xr_z, src_y = -xr_x, src_z = xr_y
+    // Position remap (and same for linear/angular velocity vectors). Matches legacy.
     r.pos[0] = -loc.pose.position.z;
     r.pos[1] = -loc.pose.position.x;
     r.pos[2] =  loc.pose.position.y;
 
-    // Convert orientation using basis change + the *exact same* angle extraction
-    // formulas as the prior implementation. This preserves correct rotation tracking.
+    // Orientation: build the raw rotation matrix from the OpenXR quat and
+    // feed it directly to the legacy angle extractor (exactly as OpenVR's
+    // HmdMatrix34 rotation 3x3 was used raw in the old ConvertPose).
+    // Only *position* (and linear/angular vel vectors) use the axis remap.
     float Rxr[3][3];
     QuatToRotMat(loc.pose.orientation, Rxr);
-
-    // Basis change matrix M (p_src = M * p_xr) matching the pos remap above.
-    // To transform the rotation: Rsrc = M * Rxr * M^T
-    float M[3][3] = {
-        { 0.0f,  0.0f, -1.0f },
-        {-1.0f,  0.0f,  0.0f },
-        { 0.0f,  1.0f,  0.0f }
-    };
-    float temp[3][3] = {{0}};
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            for (int k = 0; k < 3; ++k)
-                temp[i][j] += M[i][k] * Rxr[k][j];
-    float Rsrc[3][3] = {{0}};
-    // Rsrc = temp * M^T  (M^T access is M[j][k])
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            for (int k = 0; k < 3; ++k)
-                Rsrc[i][j] += temp[i][k] * M[j][k];
-
-    ConvertRotToSourceAng(Rsrc, r.ang);
+    ConvertRotToSourceAng(Rxr, r.ang);
 
     // Velocity from XrSpaceVelocity if available
     if (loc.locationFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) {
