@@ -475,6 +475,29 @@ bool XR_AttachActionSets() {
     return true;
 }
 
+void XR_CleanupActions() {
+    // Destroy action spaces (tied to session) first
+    for (int i = 0; i < g_xrActionSpaceCount; i++) {
+        if (g_xrActionSpaces[i].space != XR_NULL_HANDLE && g_xrDestroySpace) {
+            g_xrDestroySpace(g_xrActionSpaces[i].space);
+            g_xrActionSpaces[i].space = XR_NULL_HANDLE;
+        }
+    }
+    g_xrActionSpaceCount = 0;
+
+    // Destroy action sets (instance level). Contained actions are cleaned up implicitly.
+    for (int i = 0; i < g_xrActionSetCount; i++) {
+        if (g_xrActionSets[i] != XR_NULL_HANDLE && g_xrDestroyActionSet) {
+            g_xrDestroyActionSet(g_xrActionSets[i]);
+            g_xrActionSets[i] = XR_NULL_HANDLE;
+        }
+    }
+    g_xrActionSetCount = 0;
+
+    g_xrActionsAttached = false;
+    VRMOD_LOG_INFO("XR action state cleaned (sets/spaces)");
+}
+
 void XR_SyncActions(const actionSet* activeSets, int activeCount) {
     if (!g_xrActionsAttached || !g_xrSessionRunning) return;
 

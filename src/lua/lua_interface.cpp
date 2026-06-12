@@ -19,7 +19,6 @@
 static char g_errorString[MAX_STR_LEN];
 static int  g_luaRefs[LuaRefIndex_Max];
 static int  g_luaRefCount = 0;
-static bool g_IsPaused = false;
 static bool g_xrInitialized = false;
 static bool g_xrSwapchainsCreated = false;
 
@@ -82,22 +81,8 @@ LUA_FUNCTION(IsHMDPresent) {
 
 LUA_FUNCTION(Init) {
     if (g_xrInitialized) {
-        if (g_IsPaused) {
-            LUA->CreateTable();
-            g_luaRefs[LuaRefIndex_PoseTable] = LUA->ReferenceCreate();
-
-            LUA->CreateTable();
-            g_luaRefs[LuaRefIndex_EmptyTable] = LUA->ReferenceCreate();
-
-            LUA->CreateTable();
-            g_luaRefs[LuaRefIndex_ActionTable] = LUA->ReferenceCreate();
-
-            LUA->CreateTable();
-            g_luaRefs[LuaRefIndex_HmdPose] = LUA->ReferenceCreate();
-            g_IsPaused = false;
-            VRMOD_LOG_INFO("Resumed from paused state.");
-            return 0;
-        }
+        // Already fully initialized (e.g. double start). No-op; a prior Shutdown
+        // will have done a full teardown so the next Init always gets a fresh session.
         return 0;
     }
 
@@ -146,6 +131,17 @@ LUA_FUNCTION(Init) {
 
     g_GL = GetOpenGLEntryPoints(nullptr);
     dlclose(lib);
+
+    // Some GL drivers (and togl on Linux) can leave a pending error (commonly
+    // GL_INVALID_ENUM / 1280) after OpenXR session teardown, swapchain
+    // destruction, render target cleanup on vrmod_exit, or even inside
+    // GetOpenGLEntryPoints itself when called right after a previous VR run.
+    // We must drain before trusting the next glGetError, otherwise the first
+    // restart attempt after exit spuriously fails here and the user has to
+    // run vrmod_start a second time.
+    while (glGetError() != GL_NO_ERROR) {
+        /* drain stale errors */
+    }
 
     g_createTexture = *((void**)&g_GL->firstFunc + 50);
 
@@ -399,6 +395,12 @@ LUA_FUNCTION(ShareTextureBegin) {
         VRMOD_LOG_ERROR("%s", msg);
     };
 
+    // Drain any pending GL errors before we start creating textures and (re)installing
+    // the vtable hook. A stale error from prior shutdown / context work can otherwise
+    // cause the subsequent GL operations inside ShareTextureBegin or the engine's
+    // GetRenderTargetEx to misbehave.
+    while (glGetError() != GL_NO_ERROR) {}
+
     uint32_t texW = g_xrRecommendedWidth > 0 ? g_xrRecommendedWidth : 1024;
     uint32_t texH = g_xrRecommendedHeight > 0 ? g_xrRecommendedHeight : 1024;
 
@@ -470,6 +472,9 @@ LUA_FUNCTION(ShareCaptureTextureBegin) {
     auto errBridge = [](const char* msg) {
         VRMOD_LOG_ERROR("%s", msg);
     };
+
+    // Drain pending GL errors (same reason as ShareTextureBegin).
+    while (glGetError() != GL_NO_ERROR) {}
 
     // g_xrRecommended* is the per-eye value (keeps main Share *2 logic working).
     // Capture RT in Lua is allocated at the *packed* size (2x wide) so we pass 2x here.
@@ -547,11 +552,37 @@ LUA_FUNCTION(SubmitSharedTexture) {
 LUA_FUNCTION(Shutdown) {
     if (!g_xrInitialized)
         return 0;
-    if (g_IsPaused)
-        return 0;
 
     glFlush();
     glFinish();
+
+    // Force-remove any active texture creation patch / framebuffer observation
+    // that might have been left behind (e.g. if a prior start partially failed
+    // between ShareTextureBegin and ShareTextureFinish). This guarantees that
+    // on the next vrmod_start the real togl internal function head is pristine
+    // and our global patch state is clean. Also drop any stale RT texture/FBO
+    // names from the previous run so the next Share window can't accidentally
+    // latch onto dead resources.
+    {
+        auto errBridge = [](const char* msg) { VRMOD_LOG_ERROR("%s", msg); };
+        RemoveTexturePatch(errBridge);
+        // Force flags off in case RemoveTexturePatch saw them as already false
+        // or only partially succeeded. Guarantees clean slate for the next Init.
+        g_glIsPatched = false;
+        g_fbIsPatched = false;
+        g_captureStealActive = false;
+        g_vrRtFBO = 0;
+        g_vrRtColorTex = 0;
+        if (g_sharedTexture && glIsTexture(g_sharedTexture)) {
+            glDeleteTextures(1, &g_sharedTexture);
+            g_sharedTexture = 0;
+        }
+        if (g_captureTexture && glIsTexture(g_captureTexture)) {
+            glDeleteTextures(1, &g_captureTexture);
+            g_captureTexture = 0;
+        }
+        glFlush();
+    }
 
     // Free Lua references
     for (int i = 0; i < g_luaRefCount; i++) {
@@ -573,15 +604,21 @@ LUA_FUNCTION(Shutdown) {
     memset(g_actions, 0, sizeof(g_actions));
     g_actionSetCount = 0;
     g_activeActionSetCount = 0;
-    g_IsPaused = true;
 
-    // Destroy swapchains
+    // Destroy swapchains if we created them
     if (g_xrSwapchainsCreated) {
         XR_DestroySwapchains();
         g_xrSwapchainsCreated = false;
     }
 
-    VRMOD_LOG_INFO("VR shutdown (paused).");
+    // Full teardown (destroy session + instance + action objects).
+    // This ensures that vrmod_exit + vrmod_start (restart) gets a completely fresh
+    // OpenXR instance/session/swapchains and does not leave the compositor showing
+    // a black screen from stale session state or previous swapchain images.
+    XR_Shutdown();
+    g_xrInitialized = false;
+
+    VRMOD_LOG_INFO("VR shutdown (full).");
     return 0;
 }
 
@@ -671,16 +708,7 @@ GMOD_MODULE_OPEN() {
 GMOD_MODULE_CLOSE() {
     VRMOD_LOG_INFO("Module closing.");
 
-    // Full shutdown if not paused
-    if (g_xrInitialized && !g_IsPaused) {
-        if (g_xrSwapchainsCreated) {
-            XR_DestroySwapchains();
-            g_xrSwapchainsCreated = false;
-        }
-        XR_Shutdown();
-        g_xrInitialized = false;
-    } else if (g_xrInitialized) {
-        // Was paused, do full shutdown now
+    if (g_xrInitialized) {
         if (g_xrSwapchainsCreated) {
             XR_DestroySwapchains();
             g_xrSwapchainsCreated = false;

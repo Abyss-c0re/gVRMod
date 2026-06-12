@@ -1,5 +1,6 @@
 #include "xr_session.h"
 #include "core/vrmod_log.h"
+#include "input/xr_input.h"
 
 #include <dlfcn.h>
 #include <cstring>
@@ -646,6 +647,9 @@ bool XR_GetDisplayInfo(float nearZ, float farZ, XrDisplayInfo* out) {
 
 void XR_Shutdown() {
     VRMOD_LOG_INFO("Shutting down OpenXR...");
+
+    // Clean actions/actionsets/spaces before tearing down session (spaces) and instance (sets)
+    XR_CleanupActions();
 
     if (g_xrStageSpace != XR_NULL_HANDLE && g_xrDestroySpace) {
         g_xrDestroySpace(g_xrStageSpace);

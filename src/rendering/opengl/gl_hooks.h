@@ -30,6 +30,8 @@ extern void*           g_createTexture;
 extern GLuint          g_sharedTexture;
 extern COpenGLEntryPoints* g_GL;
 extern bool            g_glIsPatched;
+extern bool            g_captureStealActive;
+extern bool            g_fbIsPatched;
 
 // ── Error callback for rendering functions that need to report errors ──
 typedef void (*ErrorFunc)(const char* msg);

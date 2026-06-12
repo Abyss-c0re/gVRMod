@@ -52,6 +52,9 @@ VRActionHandle XR_FindActionHandleByName(const char* name, const action* actions
 // ── Attach action sets to session (must be done before first sync) ──
 bool XR_AttachActionSets();
 
+// ── Cleanup created action sets, actions and action spaces (for shutdown/restart) ──
+void XR_CleanupActions();
+
 // ── Update poses (HMD + action spaces) ──
 void XR_UpdatePoses();
 
