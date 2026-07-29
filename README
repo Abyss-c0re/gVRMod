@@ -25,16 +25,24 @@ This repository is a work-in-progress port/migration of gVRMod from OpenVR to na
 
 ### What works
 - Submitting stolen texture from OpenGL to OpenXR VR compositor
-- head tracking
+- Head tracking
+- Per-eye render targets (separate left/right RTs)
+- OpenXR interaction profile bindings (Oculus Touch / Index / KHR simple)
+- Analog→boolean threshold for triggers/grips (Quest has no trigger/click)
+- **In-game controller binding UI** (`vrmod_bindingeditor`) — SteamVR binding UI replacement
+  - Physical sources → logical actions, including **chords** (AND of multiple buttons)
+  - Saved to `garrysmod/data/vrmod/vrmod_openxr_bindings.json`
 
-### What doesn't
-- Rendering is messed up
-- Hand tracking not working
-- Input not working
+### What doesn't / WIP
+- Rendering still imperfect (stereo crop / orientation tuning ongoing)
+- Stick/vector rebinding not in the UI yet (walk/turn stay on OpenXR defaults)
+- Full body tracker poses untested
+- Driving action set shares short names with main (first-match binding)
 
 ### Challenges
 
-- Heavy dependence on the SteamVR controls, especially chords.
+- OpenXR has no SteamVR-style binding UI or chord API; rebinding is a Lua layer over fixed hardware sources.
+- SteamVR binding JSON is not consumed by OpenXR.
 
 ### What this repo contains
 - Native module source (C++) targeting OpenXR + Linux (GLX + togl)
@@ -60,3 +68,9 @@ Run `./install.sh --help` for options.
 - The install script will attempt to bundle the OpenXR loader and its dependencies.
 - This is an experimental development branch.
 
+### License
+
+**CUBECHAIN LICENSE** (ProjectNexus station law) — energy must flow. We no longer contain.
+
+See [LICENSE](LICENSE). Cubechain: https://github.com/Abyss-c0re/gVRMod  
+Station SoT: https://github.com/Abyss-c0re/ProjectNexus
