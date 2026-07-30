@@ -1,8 +1,13 @@
 if SERVER then return end
 local _, convarValues = vrmod.GetConvars()
 local seatedOffset, crouchOffset = Vector(), Vector()
+-- Exposed so locomotion can force IN_DUCK while button-crouched (see issue #10)
+g_VR = g_VR or {}
+g_VR.crouchOffsetZ = 0
+
 local function updateOffsetHook()
 	seatedOffset.z = convarValues.vrmod_seated and convarValues.vrmod_seatedoffset or 0
+	g_VR.crouchOffsetZ = crouchOffset.z
 	if seatedOffset.z == 0 and crouchOffset.z == 0 then
 		hook.Remove("VRMod_Tracking", "seatedmode")
 		return
@@ -31,14 +36,17 @@ hook.Add("VRMod_Input", "crouching", function(action, pressed)
 		local speed = (crouchTarget == 0 and 36 or -36) * 1 / LocalPlayer():GetDuckSpeed() --eye pos difference between standing and crouched gmod player is 36 units, this distance is travelled in GetDuckSpeed seconds
 		hook.Add("PreRender", "vrmod_crouch", function()
 			crouchOffset.z = crouchOffset.z + speed * FrameTime()
+			g_VR.crouchOffsetZ = crouchOffset.z
 			if crouchOffset.z > 0 or crouchTarget < 0 and crouchOffset.z < crouchTarget then
 				crouchOffset.z = crouchTarget
+				g_VR.crouchOffsetZ = crouchOffset.z
 				hook.Remove("PreRender", "vrmod_crouch")
 				updateOffsetHook()
 			end
 		end)
 
 		crouchOffset.z = crouchOffset.z + 0.01
+		g_VR.crouchOffsetZ = crouchOffset.z
 		updateOffsetHook()
 	end
 end)

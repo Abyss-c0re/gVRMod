@@ -98,6 +98,8 @@ if CLIENT then
         if not cl_vrmod_melee:GetBool() then return end
         local ply = LocalPlayer()
         if not IsValid(ply) or not ply:Alive() or not vrmod.IsPlayerInVR(ply) then return end
+        -- Need both hands in the public tracking table (same as pre-pipeline)
+        if not g_VR.tracking or not g_VR.tracking.pose_lefthand or not g_VR.tracking.pose_righthand then return end
         -- Precompute left hand (always fist)
         local leftAng = vrmod.GetLeftHandAng(ply)
         local leftPos = vrmod.GetLeftHandPos(ply) + leftAng:Forward() * 5
@@ -197,7 +199,7 @@ if SERVER then
             endpos = src + dir * reach,
             radius = radius,
             mins = mins,
-            max = maxs,
+            maxs = maxs,
             filter = function(ent) return vrmod.utils.MeleeFilter(ent, ply, hand) end,
             mask = MASK_SHOT
         }

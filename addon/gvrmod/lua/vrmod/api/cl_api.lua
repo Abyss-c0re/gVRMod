@@ -25,24 +25,34 @@ if CLIENT then
         return g_VR.net[sid]
     end
 
-    -- smoothing helper
+    -- smoothing helper (Angles must use LerpAngle — both Angle and Vector expose :Lerp)
     local function SmoothValue(oldVal, newVal, factor)
         if not oldVal then return newVal end
         if not factor or factor <= 0 then return newVal end
-        if oldVal.Lerp then
-            -- Vector or Angle
+        if isangle and isangle(oldVal) then
+            return LerpAngle(factor, oldVal, newVal)
+        end
+        if isvector and isvector(oldVal) then
             return LerpVector(factor, oldVal, newVal)
-        else
-            -- Fallback for numbers
+        end
+        -- Fallback without isangle/isvector: Angle uses p/y/r, Vector uses x/y/z
+        if oldVal.p ~= nil and oldVal.r ~= nil and oldVal.x == nil then
+            return LerpAngle(factor, oldVal, newVal)
+        end
+        if oldVal.x ~= nil and oldVal.z ~= nil and oldVal.p == nil then
+            return LerpVector(factor, oldVal, newVal)
+        end
+        if type(oldVal) == "number" and type(newVal) == "number" then
             return Lerp(factor, oldVal, newVal)
         end
+        return newVal
     end
 
     vrmod.cachedHeadPose = {
         pos = Vector(0, 0, 0),
         ang = Angle(0, 0, 0),
         vel = Vector(0, 0, 0),
-        angvel = Angle(0, 0, 0),
+        angvel = Vector(0, 0, 0), -- Cube's Law: angvel is Vector(p,y,r)
         lastUpdate = 0
     }
 
@@ -74,23 +84,15 @@ if CLIENT then
         if g_VR.moduleVersion == 0 then
             if not file.Exists(moduleFile, "GAME") then
                 error = "Module not installed.\nPlease follow the workshop instructions to install the module."
-            elseif g_VR.errorText and g_VR.errorText ~= "" then
-                -- Prefer the detailed error we captured during the require pcall (includes real dlopen reason).
-                error = g_VR.errorText
             else
-                error = "Failed to load module.\nModule file exists but could not be loaded.\n\nCheck console output and garrysmod/vrmod_debug.log.\nCommon Linux causes: libopenxr_loader.so not loadable by the Steam runtime, missing X11/GL libs, or no OpenXR runtime configured."
+                error = "Failed to load module.\nModule file exists but could not be loaded. Check antivirus or permissions."
             end
         elseif g_VR.moduleVersion < requiredVersion then
             error = "Module update required.\nRun the installer or re-download from the workshop.\n\nInstalled: v" .. g_VR.moduleVersion .. "\nRequired: v" .. requiredVersion
         elseif g_VR.moduleVersion > latestVersion then
             print("[VRMOD] Warning: Module version is newer than tested. Installed: v" .. g_VR.moduleVersion .. " | Required: v" .. requiredVersion .. " | Addon version: " .. vrmod.GetVersion() .. " | Most features should work, but some bugs may exist.")
         elseif VRMOD_IsHMDPresent and not VRMOD_IsHMDPresent() then
-            -- For dev testing the OpenXR render path on machines without a live runtime attached,
-            -- we allow proceeding (the C++ XR_Init will still fail gracefully at xrGetSystem with
-            -- a clear "No HMD" error that gets shown in the overlay and vrmod_debug.log).
-            -- On a real Quest/ALVR machine this check will pass and we get a full init.
-            -- error = "VR headset not detected."
-            vrmod.logger.Info("GetStartupError: no HMD detected in this env (dev bypass for testing init path)")
+            error = "VR headset not detected."
         end
         return error
     end
@@ -120,16 +122,26 @@ if CLIENT then
         return nil
     end
 
+    -- Safe pose table lookup: g_VR.tracking.* must never nil-index for callers.
+    local function trackPose(name)
+        local t = g_VR and g_VR.tracking
+        return t and t[name] or nil
+    end
+
     function vrmod.GetHMDPos(ply)
-        return g_VR.tracking.hmd.pos or Vector()
+        local p = trackPose("hmd")
+        return (p and p.pos) or Vector()
     end
 
     function vrmod.GetHMDAng(ply)
-        return g_VR.tracking.hmd.ang or Angle()
+        local p = trackPose("hmd")
+        return (p and p.ang) or Angle()
     end
 
     function vrmod.GetHMDPose(ply)
-        return g_VR.tracking.hmd.pos or Vector(), g_VR.tracking.hmd.ang or Angle()
+        local p = trackPose("hmd")
+        if not p then return Vector(), Angle() end
+        return p.pos or Vector(), p.ang or Angle()
     end
 
     function vrmod.GetHMDVelocity()
@@ -137,7 +149,7 @@ if CLIENT then
     end
 
     function vrmod.GetHMDAngularVelocity()
-        return vrmod.cachedHeadPose.angvel or Angle()
+        return vrmod.cachedHeadPose.angvel or Vector()
     end
 
     function vrmod.GetHMDVelocityRelative()
@@ -149,68 +161,90 @@ if CLIENT then
     end
 
     function vrmod.GetHMDVelocities()
-        if g_VR.threePoints then return vrmod.cachedHeadPose.vel or Vector(), vrmod.cachedHeadPose.angvel or Angle() end
-        return Vector(), Angle()
+        if g_VR.threePoints then return vrmod.cachedHeadPose.vel or Vector(), vrmod.cachedHeadPose.angvel or Vector() end
+        return Vector(), Vector()
     end
 
     function vrmod.GetLeftHandPos(ply)
-        return g_VR.tracking.pose_lefthand.pos or Vector()
+        local p = trackPose("pose_lefthand")
+        return (p and p.pos) or Vector()
     end
 
     function vrmod.GetLeftHandAng(ply)
-        return g_VR.tracking.pose_lefthand.ang or Angle()
+        local p = trackPose("pose_lefthand")
+        return (p and p.ang) or Angle()
     end
 
     function vrmod.GetLeftHandPose(ply)
-        return g_VR.tracking.pose_lefthand.pos or Vector(), g_VR.tracking.pose_lefthand.ang or Angle()
+        local p = trackPose("pose_lefthand")
+        if not p then return Vector(), Angle() end
+        return p.pos or Vector(), p.ang or Angle()
     end
 
     function vrmod.GetLeftHandVelocity()
-        return g_VR.tracking.pose_lefthand.vel or Vector()
+        local p = trackPose("pose_lefthand")
+        return (p and p.vel) or Vector()
     end
 
     function vrmod.GetLeftHandAngularVelocity()
-        return g_VR.tracking.pose_lefthand.angvel or Angle()
+        local p = trackPose("pose_lefthand")
+        return (p and p.angvel) or Vector()
     end
 
     function vrmod.GetLeftHandVelocityRelative()
-        if not g_VR.threePoints or not g_VR.tracking or not g_VR.tracking.pose_lefthand or not g_VR.tracking.hmd then return Vector() end
-        return (g_VR.tracking.pose_lefthand.vel or Vector()) - (g_VR.tracking.hmd.vel or Vector())
+        local hand = trackPose("pose_lefthand")
+        local hmd = trackPose("hmd")
+        if not g_VR.threePoints or not hand or not hmd then return Vector() end
+        return (hand.vel or Vector()) - (hmd.vel or Vector())
     end
 
     function vrmod.GetLeftHandVelocities()
-        if g_VR.threePoints and g_VR.tracking and g_VR.tracking.pose_lefthand then return g_VR.tracking.pose_lefthand.vel or Vector(), g_VR.tracking.pose_lefthand.angvel or Angle(), vrmod.GetLeftHandVelocityRelative() end
-        return Vector(), Angle(), Vector()
+        local p = trackPose("pose_lefthand")
+        if g_VR.threePoints and p then
+            return p.vel or Vector(), p.angvel or Vector(), vrmod.GetLeftHandVelocityRelative()
+        end
+        return Vector(), Vector(), Vector()
     end
 
     function vrmod.GetRightHandPos(ply)
-        return g_VR.tracking.pose_righthand.pos or Vector()
+        local p = trackPose("pose_righthand")
+        return (p and p.pos) or Vector()
     end
 
     function vrmod.GetRightHandAng(ply)
-        return g_VR.tracking.pose_righthand.ang or Angle()
+        local p = trackPose("pose_righthand")
+        return (p and p.ang) or Angle()
     end
 
     function vrmod.GetRightHandPose(ply)
-        return g_VR.tracking.pose_righthand.pos or Vector(), g_VR.tracking.pose_righthand.ang or Angle()
+        local p = trackPose("pose_righthand")
+        if not p then return Vector(), Angle() end
+        return p.pos or Vector(), p.ang or Angle()
     end
 
     function vrmod.GetRightHandVelocity()
-        return g_VR.tracking.pose_righthand.vel or Vector()
+        local p = trackPose("pose_righthand")
+        return (p and p.vel) or Vector()
     end
 
     function vrmod.GetRightHandAngularVelocity()
-        return g_VR.tracking.pose_righthand.angvel or Angle()
+        local p = trackPose("pose_righthand")
+        return (p and p.angvel) or Vector()
     end
 
     function vrmod.GetRightHandVelocityRelative()
-        if not g_VR.threePoints or not g_VR.tracking or not g_VR.tracking.pose_righthand or not g_VR.tracking.hmd then return Vector() end
-        return (g_VR.tracking.pose_righthand.vel or Vector()) - (g_VR.tracking.hmd.vel or Vector())
+        local hand = trackPose("pose_righthand")
+        local hmd = trackPose("hmd")
+        if not g_VR.threePoints or not hand or not hmd then return Vector() end
+        return (hand.vel or Vector()) - (hmd.vel or Vector())
     end
 
     function vrmod.GetRightHandVelocities()
-        if g_VR.threePoints and g_VR.tracking and g_VR.tracking.pose_righthand then return g_VR.tracking.pose_righthand.vel or Vector(), g_VR.tracking.pose_righthand.angvel or Angle(), vrmod.GetRightHandVelocityRelative() end
-        return Vector(), Angle(), Vector()
+        local p = trackPose("pose_righthand")
+        if g_VR.threePoints and p then
+            return p.vel or Vector(), p.angvel or Vector(), vrmod.GetRightHandVelocityRelative()
+        end
+        return Vector(), Vector(), Vector()
     end
 
     -- Waist (often called "hip" in other VR contexts)
@@ -238,7 +272,7 @@ if CLIENT then
     end
 
     function vrmod.GetWaistAngularVelocity()
-        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_waist and g_VR.tracking.pose_waist.angvel or Angle()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_waist and g_VR.tracking.pose_waist.angvel or Vector()
     end
 
     -- Optional relative (to HMD)
@@ -271,7 +305,7 @@ if CLIENT then
     end
 
     function vrmod.GetLeftFootAngularVelocity()
-        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_leftfoot and g_VR.tracking.pose_leftfoot.angvel or Angle()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_leftfoot and g_VR.tracking.pose_leftfoot.angvel or Vector()
     end
 
     function vrmod.GetLeftFootVelocityRelative()
@@ -280,8 +314,8 @@ if CLIENT then
     end
 
     function vrmod.GetLeftFootVelocities()
-        if g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_leftfoot then return g_VR.tracking.pose_leftfoot.vel or Vector(), g_VR.tracking.pose_leftfoot.angvel or Angle(), vrmod.GetLeftFootVelocityRelative() end
-        return Vector(), Angle(), Vector()
+        if g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_leftfoot then return g_VR.tracking.pose_leftfoot.vel or Vector(), g_VR.tracking.pose_leftfoot.angvel or Vector(), vrmod.GetLeftFootVelocityRelative() end
+        return Vector(), Vector(), Vector()
     end
 
     -- Right Foot (symmetric to left)
@@ -308,7 +342,7 @@ if CLIENT then
     end
 
     function vrmod.GetRightFootAngularVelocity()
-        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_rightfoot and g_VR.tracking.pose_rightfoot.angvel or Angle()
+        return g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_rightfoot and g_VR.tracking.pose_rightfoot.angvel or Vector()
     end
 
     function vrmod.GetRightFootVelocityRelative()
@@ -317,28 +351,59 @@ if CLIENT then
     end
 
     function vrmod.GetRightFootVelocities()
-        if g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_rightfoot then return g_VR.tracking.pose_rightfoot.vel or Vector(), g_VR.tracking.pose_rightfoot.angvel or Angle(), vrmod.GetRightFootVelocityRelative() end
-        return Vector(), Angle(), Vector()
+        if g_VR.fbtActive and g_VR.tracking and g_VR.tracking.pose_rightfoot then return g_VR.tracking.pose_rightfoot.vel or Vector(), g_VR.tracking.pose_rightfoot.angvel or Vector(), vrmod.GetRightFootVelocityRelative() end
+        return Vector(), Vector(), Vector()
     end
 
     function vrmod.SetLeftHandPose(pos, ang, smoothing)
         local ply = LocalPlayer()
+        -- Late override: write final tracking (what every local system reads)
+        if g_VR.tracking and g_VR.tracking.pose_lefthand and pos and ang then
+            g_VR.tracking.pose_lefthand.pos = SmoothValue(g_VR.tracking.pose_lefthand.pos, pos, smoothing or 0)
+            g_VR.tracking.pose_lefthand.ang = SmoothValue(g_VR.tracking.pose_lefthand.ang, ang, smoothing or 0)
+            pos = g_VR.tracking.pose_lefthand.pos
+            ang = g_VR.tracking.pose_lefthand.ang
+        end
         local netFrame = g_VR.net and g_VR.net[ply:SteamID()] and g_VR.net[ply:SteamID()].lerpedFrame
         if not netFrame then return end
-        -- Apply smoothing
         netFrame.lefthandPos = SmoothValue(netFrame.lefthandPos, pos, smoothing or 0)
         netFrame.lefthandAng = SmoothValue(netFrame.lefthandAng, ang, smoothing or 0)
     end
 
     function vrmod.SetRightHandPose(pos, ang, smoothing)
         local ply = LocalPlayer()
+        if g_VR.tracking and g_VR.tracking.pose_righthand and pos and ang then
+            g_VR.tracking.pose_righthand.pos = SmoothValue(g_VR.tracking.pose_righthand.pos, pos, smoothing or 0)
+            g_VR.tracking.pose_righthand.ang = SmoothValue(g_VR.tracking.pose_righthand.ang, ang, smoothing or 0)
+            pos = g_VR.tracking.pose_righthand.pos
+            ang = g_VR.tracking.pose_righthand.ang
+        end
         local netFrame = g_VR.net and g_VR.net[ply:SteamID()] and g_VR.net[ply:SteamID()].lerpedFrame
         if not netFrame then return end
-        -- Apply smoothing
         netFrame.righthandPos = SmoothValue(netFrame.righthandPos, pos, smoothing or 0)
         netFrame.righthandAng = SmoothValue(netFrame.righthandAng, ang, smoothing or 0)
-        -- Call utils update if available
-        --if vrmod.utils then vrmod.utils.UpdateViewModelPos(netFrame.righthandPos, netFrame.righthandAng) end
+        if vrmod.utils and vrmod.utils.UpdateViewModelPos then
+            vrmod.utils.UpdateViewModelPos(pos, ang, true)
+        end
+    end
+
+    --- Unmodified device poses (pre-collision / pre-UI). Safe for velocity & gestures.
+    function vrmod.GetRawLeftHandPose()
+        local p = g_VR.rawTracking and g_VR.rawTracking.pose_lefthand
+        if not p then return Vector(), Angle() end
+        return p.pos or Vector(), p.ang or Angle()
+    end
+
+    function vrmod.GetRawRightHandPose()
+        local p = g_VR.rawTracking and g_VR.rawTracking.pose_righthand
+        if not p then return Vector(), Angle() end
+        return p.pos or Vector(), p.ang or Angle()
+    end
+
+    function vrmod.GetRawHMDPose()
+        local p = g_VR.rawTracking and g_VR.rawTracking.hmd
+        if not p then return Vector(), Angle() end
+        return p.pos or Vector(), p.ang or Angle()
     end
 
     local function HandleFingerAngles(mode, hand, state, tbl)

@@ -4,10 +4,6 @@ if CLIENT then
 	g_VR.scale = 0
 	g_VR.origin = Vector(0, 0, 0)
 	g_VR.rtWidth, g_VR.rtHeight = nil, nil
-	g_VR.rtLeft = nil
-	g_VR.rtRight = nil
-	g_VR.rtLeftMaterial = nil
-	g_VR.rtRightMaterial = nil
 	g_VR.originAngle = Angle(0, 0, 0)
 	g_VR.viewModel = nil
 	g_VR.viewModelMuzzle = nil
@@ -23,13 +19,20 @@ if CLIENT then
 	g_VR.moduleVersion = 0
 	local hfovLeft, hfovRight
 	local aspectLeft, aspectRight
+	local leftCalc, rightCalc
+	local ipd, eyez
+	local cropVerticalMargin, cropHorizontalOffset
 	local lastPosePos = {}
+	local eyeOffset = nil
+	local forwardOffset = nil
 	local moduleFile
-	local COLLISION_FRAME_INTERVAL = 1 -- 1 = every frame (90 Hz), 2 = every other frame (~60 Hz effective)
 	local frameCounter = 0
 	local prevRawHeadPos = Vector(0, 0, 0)
 	local prevRawHeadTime = 0
-	local convarOverrides = {
+	-- Desired values applied while VR is active.
+	-- Do NOT include cvars on GMod's Blocked_ConCommands list (mat_reduceparticles,
+	-- r_shadowrendertotexture, etc.) — Lua cannot change them without console spam.
+	local PERFORMANCE_CONVARS = {
 		cl_threaded_bone_setup = "1",
 		gmod_mcore_test = "1",
 		mat_queue_mode = "1",
@@ -39,12 +42,12 @@ if CLIENT then
 		mat_disable_ps_patch = "1",
 		mat_motion_blur_enabled = "0",
 		mat_fastspecular = "0",
-		mat_reduceparticles = "1",
-		r_shadowrendertotexture = "0",
 		r_3dsky = tostring(convars.vrmod_skybox:GetBool() and 1 or 0),
 		r_threaded_particles = "1",
 		r_queued_ropes = "1",
 	}
+	-- Stores original convar values so we can restore them on VR exit
+	local convarOverrides = {}
 
 	local wasPaused = false
 	if system.IsLinux() then
@@ -76,19 +79,37 @@ if CLIENT then
 	end
 
 	-- 0) Helper functions
+	-- Only ConVar:SetString — never RunConsoleCommand (GMod blacklists many engine cvars
+	-- and prints "Command is blocked!" even when pcall'd).
+	local function setConvarValue(name, value)
+		local cv = GetConVar(name)
+		if not cv then return false end
+		value = tostring(value)
+		local ok = pcall(function()
+			cv:SetString(value)
+		end)
+		if not ok then
+			vrmod.logger.Debug("Could not set convar: " .. name)
+			return false
+		end
+		return true
+	end
+
 	local function overrideConvar(name, value)
 		local cv = GetConVar(name)
-		if cv then
-			convarOverrides[name] = cv:GetString()
-			RunConsoleCommand(name, value)
+		if not cv then return end
+		local previous = cv:GetString()
+		if not setConvarValue(name, value) then return end
+		-- Only remember originals for cvars we actually changed
+		if convarOverrides[name] == nil then
+			convarOverrides[name] = previous
 		end
 	end
 
 	local function restoreConvarOverrides()
 		for k, v in pairs(convarOverrides) do
-			RunConsoleCommand(k, v)
+			setConvarValue(k, v)
 		end
-
 		convarOverrides = {}
 	end
 
@@ -96,24 +117,21 @@ if CLIENT then
 		local viewscale = convars.vrmod_viewscale:GetFloat()
 		local fovX, fovY = convars.vrmod_fovscale_x:GetFloat(), convars.vrmod_fovscale_y:GetFloat()
 		local di = VRMOD_GetDisplayInfo(1, 10)
-		-- Per-eye sizes (proper separate RT per eye). No more side-by-side packing.
-		local rawW, rawH = di.RecommendedWidth, di.RecommendedHeight
+		local rawW, rawH = di.RecommendedWidth * 2, di.RecommendedHeight
+		-- preserve your variables exactly
 		local leftProj = vrmod.utils.AdjustFOV(di.ProjectionLeft, fovX, fovY)
 		local rightProj = vrmod.utils.AdjustFOV(di.ProjectionRight, fovX, fovY)
 		local leftCalc = vrmod.utils.CalculateProjectionParams(leftProj, viewscale)
 		local rightCalc = vrmod.utils.CalculateProjectionParams(rightProj, viewscale)
-		-- clamp on Linux
-		-- if system.IsLinux() then
-		-- 	local maxW, maxH = 4096, 4096
-		-- 	rawW = math.min(maxW, rawW)
-		-- 	rawH = math.min(maxH, rawH)
-		-- end
+		-- clamp on Linux exactly as before
+		if system.IsLinux() then
+			local maxW, maxH = 4096, 4096
+			local cw, ch = math.min(maxW, rawW), math.min(maxH, rawH)
+			rawW, rawH = cw, ch
+		end
 
-		-- Simple IPD for any legacy use; real eye poses now come directly from OpenXR via tracking.eye_left/right
-		local leftX = di.TransformLeft and di.TransformLeft[1] and di.TransformLeft[1][4] or 0
-		local rightX = di.TransformRight and di.TransformRight[1] and di.TransformRight[1][4] or 0
-		local ipd = math.abs(rightX - leftX)
-
+		local ipd = di.TransformRight[1][4] * 2
+		local eyez = di.TransformRight[3][4]
 		return {
 			rtW = rawW,
 			rtH = rawH,
@@ -123,8 +141,56 @@ if CLIENT then
 			hfovR = rightCalc.HorizontalFOV,
 			aspL = leftCalc.AspectRatio,
 			aspR = rightCalc.AspectRatio,
-			ipd = ipd
+			ipd = ipd,
+			eyez = eyez
 		}
+	end
+
+	-- Cube's Law — Truth Matrix pose flow (do not break the public surface of tracking):
+	--   rawTracking  = device energy (unfiltered sample; modifiers must not own this)
+	--   tracking     = Source of Truth for all consumers (same tables/fields as always)
+	--   VRMod_Tracking → early lawful modifiers (seated, crouch, sim hands…)
+	--   ApplyPoseModifiers → wall/weapon (write only into tracking hands)
+	--   viewmodel / net / character / melee → read tracking only
+	-- Integrity rules:
+	--   • Never nil-out hmd / pose_lefthand / pose_righthand mid-session
+	--   • Never let a modifier invent a second parallel gun/hand truth
+	--   • angvel is Vector(p,y,r); never Angle:Set(Vector)
+	local function AsVector(v)
+		if not v then return Vector() end
+		if v.x ~= nil then return Vector(v.x, v.y, v.z) end
+		-- Angle-like (p/y/r or pitch/yaw/roll)
+		return Vector(v.p or v.pitch or 0, v.y or v.yaw or 0, v.r or v.roll or 0)
+	end
+
+	local function AsAngle(a)
+		if not a then return Angle() end
+		if a.p ~= nil or a.pitch ~= nil then
+			return Angle(a.p or a.pitch or 0, a.y or a.yaw or 0, a.r or a.roll or 0)
+		end
+		-- Vector mistaken for angle
+		return Angle(a.x or 0, a.y or 0, a.z or 0)
+	end
+
+	local function CopyPoseFields(src, dst)
+		dst = dst or {}
+		dst.pos = AsVector(src.pos)
+		dst.ang = AsAngle(src.ang)
+		dst.vel = AsVector(src.vel)
+		dst.angvel = AsVector(src.angvel)
+		dst.simulatedPos = src.simulatedPos
+		return dst
+	end
+
+	local function CopyRawIntoTracking()
+		g_VR.rawTracking = g_VR.rawTracking or {}
+		g_VR.tracking = g_VR.tracking or {}
+		-- Only OVERWRITE keys present this frame. Never delete pose_lefthand /
+		-- pose_righthand / hmd when a sample is briefly missing — consumers
+		-- (melee, character, UI) assume those tables stay alive for the session.
+		for k, rawPose in pairs(g_VR.rawTracking) do
+			g_VR.tracking[k] = CopyPoseFields(rawPose, g_VR.tracking[k])
+		end
 	end
 
 	local function UpdateTracking()
@@ -132,6 +198,8 @@ if CLIENT then
 		local maxPosDeltaSqr = 100
 		VRMOD_UpdatePosesAndActions()
 		local rawPoses = VRMOD_GetPoses()
+		g_VR.rawTracking = g_VR.rawTracking or {}
+
 		for k, v in pairs(rawPoses) do
 			local lastPos = lastPosePos[k]
 			local currentPos = v.pos
@@ -147,18 +215,19 @@ if CLIENT then
 			end
 
 			lastPosePos[k] = currentPos
-			g_VR.tracking[k] = g_VR.tracking[k] or {}
-			local worldPose = g_VR.tracking[k]
+			g_VR.rawTracking[k] = g_VR.rawTracking[k] or {}
+			local rawPose = g_VR.rawTracking[k]
 			local pos, ang = LocalToWorld(currentPos * g_VR.scale, v.ang, g_VR.origin, g_VR.originAngle)
 			if k == "pose_righthand" or k == "pose_lefthand" then
-				worldPose.pos = worldPose.pos and vrmod.utils.SmoothVector(worldPose.pos, pos, smoothingFactor) or pos
-				worldPose.ang = worldPose.ang and vrmod.utils.SmoothAngle(worldPose.ang, ang, smoothingFactor) or ang
+				-- Smooth only the raw stream (tracking is re-copied each frame)
+				rawPose.pos = rawPose.pos and vrmod.utils.SmoothVector(rawPose.pos, pos, smoothingFactor) or pos
+				rawPose.ang = rawPose.ang and vrmod.utils.SmoothAngle(rawPose.ang, ang, smoothingFactor) or ang
 			else
-				worldPose.pos = pos
-				worldPose.ang = ang
+				rawPose.pos = pos
+				rawPose.ang = ang
 			end
 
-			-- === NEW: Head velocity from RAW pose (fixes gamepad locomotion bug) ===
+			-- Head velocity from RAW device sample (not post-modifier tracking)
 			if k == "hmd" then
 				local now = CurTime()
 				if prevRawHeadTime > 0 then
@@ -178,22 +247,48 @@ if CLIENT then
 				prevRawHeadTime = now
 			end
 
-			-- =====================================================================
-			worldPose.vel = LocalToWorld(v.vel, Angle(0, 0, 0), vector_origin, g_VR.originAngle) * g_VR.scale
-			worldPose.angvel = LocalToWorld(Vector(v.angvel.pitch, v.angvel.yaw, v.angvel.roll), Angle(0, 0, 0), vector_origin, g_VR.originAngle)
+			rawPose.vel = LocalToWorld(v.vel, Angle(0, 0, 0), vector_origin, g_VR.originAngle) * g_VR.scale
+			rawPose.angvel = LocalToWorld(Vector(v.angvel.pitch, v.angvel.yaw, v.angvel.roll), Angle(0, 0, 0), vector_origin, g_VR.originAngle)
 			local isRight = k == "pose_righthand"
 			local isLeft = k == "pose_lefthand"
 			if isRight or isLeft then
 				local offsetPos = (isRight and g_VR.rightControllerOffsetPos or g_VR.leftControllerOffsetPos) * 0.01 * g_VR.scale
 				local offsetAng = isRight and g_VR.rightControllerOffsetAng or g_VR.leftControllerOffsetAng
-				local offsetWorldPos, offsetWorldAng = LocalToWorld(offsetPos, offsetAng, vector_origin, worldPose.ang)
-				worldPose.pos = worldPose.pos + offsetWorldPos
-				worldPose.ang = offsetWorldAng
+				local offsetWorldPos, offsetWorldAng = LocalToWorld(offsetPos, offsetAng, vector_origin, rawPose.ang)
+				rawPose.pos = rawPose.pos + offsetWorldPos
+				rawPose.ang = offsetWorldAng
 			end
 		end
 
-		g_VR.sixPoints = g_VR.tracking.pose_waist and g_VR.tracking.pose_leftfoot and g_VR.tracking.pose_rightfoot
+		-- Reset public tracking from raw every frame, then run early modifiers
+		CopyRawIntoTracking()
+		g_VR.sixPoints = (g_VR.tracking.pose_waist and g_VR.tracking.pose_leftfoot and g_VR.tracking.pose_rightfoot) and true or false
+		-- Early modifiers (seated offset, crouch, hand simulation…) may edit g_VR.tracking
 		hook.Call("VRMod_Tracking")
+	end
+
+	--- Late pose modifiers: wall/weapon collisions write final g_VR.tracking hands.
+	local function ApplyPoseModifiers()
+		local left = g_VR.tracking and g_VR.tracking.pose_lefthand
+		local right = g_VR.tracking and g_VR.tracking.pose_righthand
+		if not (left and right and vrmod.utils and left.pos and right.pos and left.ang and right.ang) then return end
+		frameCounter = frameCounter + 1
+		-- Weapon broadphase for gun debug boxes / optional weapon sweeps
+		if vrmod.utils.CollisionsPreCheck then
+			vrmod.utils.CollisionsPreCheck(left.pos, right.pos)
+		end
+		local lp, la, rp, ra = vrmod.utils.UpdateHandCollisions(left.pos, left.ang, right.pos, right.ang)
+		-- Only write back real vectors (collision must not nil-out the SoT)
+		if lp then left.pos = lp end
+		if la then left.ang = la end
+		if rp then right.pos = rp end
+		if ra then right.ang = ra end
+		-- Optional extra modifiers
+		hook.Call("VRMod_TrackingModified", nil, g_VR.tracking, g_VR.rawTracking)
+		-- Viewmodel is a pure slave of final right-hand tracking (no independent push)
+		if g_VR.tracking.pose_righthand and vrmod.utils.UpdateViewModelPos then
+			vrmod.utils.UpdateViewModelPos(g_VR.tracking.pose_righthand.pos, g_VR.tracking.pose_righthand.ang)
+		end
 	end
 
 	local function HandleInput()
@@ -265,119 +360,69 @@ if CLIENT then
 		g_VR.view.angles = finalAng
 	end
 
-	local function UpdateCollisionsAndWepPos()
-		-- === ALWAYS update viewmodel when right hand exists ===
-		if g_VR.tracking.pose_righthand then vrmod.utils.UpdateViewModelPos(g_VR.tracking.pose_righthand.pos, g_VR.tracking.pose_righthand.ang) end
-		-- === Only do heavy collision work when both hands + utils are ready ===
-		if not (g_VR.tracking.pose_lefthand and g_VR.tracking.pose_righthand and vrmod.utils) then return end
-		frameCounter = frameCounter + 1
-		-- === PERFORMANCE WRAPPER ===
-		if frameCounter % COLLISION_FRAME_INTERVAL == 0 then
-			vrmod.utils.CollisionsPreCheck(g_VR.tracking.pose_lefthand.pos, g_VR.tracking.pose_righthand.pos)
-			local leftPos, leftAng, rightPos, rightAng = vrmod.utils.UpdateHandCollisions(g_VR.tracking.pose_lefthand.pos, g_VR.tracking.pose_lefthand.ang, g_VR.tracking.pose_righthand.pos, g_VR.tracking.pose_righthand.ang)
-			g_VR.tracking.pose_lefthand.pos = leftPos
-			g_VR.tracking.pose_lefthand.ang = leftAng
-			g_VR.tracking.pose_righthand.pos = rightPos
-			g_VR.tracking.pose_righthand.ang = rightAng
-		end
-	end
+
 
 	local function PerformRenderViews()
-		-- Both eyes use the same head orientation. Asymmetric frustum offsets are
-		-- handled via UV crop bounds (from the native side), not per-eye rotation.
-		-- This matches the legacy OpenVR approach: shared orientation avoids vertical
-		-- disparity under head roll while the overrender + crop correctly selects
-		-- each eye's asymmetric FOV sub-rect for submit.
-		local headAng = g_VR.view.angles
-
-		local eyeL = g_VR.tracking.eye_left
-		local eyeR = g_VR.tracking.eye_right
-
-		-- Eye positions come from OpenXR per-eye poses; angles always = head
-		local eyePosL = (eyeL and eyeL.pos) or g_VR.view.origin
-		local eyePosR = (eyeR and eyeR.pos) or g_VR.view.origin
-
-		g_VR.eyePosLeft = eyePosL
-		g_VR.eyePosRight = eyePosR
-
-		local function setup_and_render_eye(eye_data, fallback_fov, fallback_asp, pos, is_left, rt_push)
-			render.PushRenderTarget(rt_push)
-			if DrawErrorOverlay() then
-				render.PopRenderTarget()
-				vrmod.logger.Warn("Render skipped due to error overlay.")
-				return nil
-			end
-			render.Clear(0, 0, 0, 255, true, true)
-
-			-- Symmetric overrender FOV from C++ (encloses the asymmetric frustum).
-			local fov = (eye_data and eye_data.fov) or fallback_fov
-			local asp = (eye_data and eye_data.aspectratio) or fallback_asp
-
-			-- Render at full RT size; the symmetric FOV + aspect produces a symmetric frustum
-			-- that fully covers the asymmetric one. The UV crop bounds select the right sub-rect.
-			g_VR.view.origin = pos
-			g_VR.view.angles = headAng
-			g_VR.view.fov = fov
-			g_VR.view.aspectratio = asp
-			g_VR.view.x = 0
-			g_VR.view.y = 0
-			g_VR.view.w = g_VR.rtWidth
-			g_VR.view.h = g_VR.rtHeight
-
-			hook.Call("VRMod_PreRender", nil, is_left and "left" or "right")
-			render.RenderView(g_VR.view)
-
-			-- UV crop bounds from the native side select the asymmetric sub-rect
-			-- from the symmetric overrender. If not available, fall back to full RT.
-			local u0 = (eye_data and eye_data.submit_u0) or 0
-			local u1 = (eye_data and eye_data.submit_u1) or 1
-			local v0 = (eye_data and eye_data.submit_v0) or 0
-			local v1 = (eye_data and eye_data.submit_v1) or 1
-
+		local eyeScale = convars.vrmod_eyescale:GetFloat()
+		-- cache angles once per frame
+		local ang = g_VR.view.angles
+		local fwd = ang:Forward()
+		local right = ang:Right()
+		local up = ang:Up()
+		-- only recompute offsets when needed
+		eyeOffset = ipd * g_VR.scale -- scalar, can stay here
+		forwardOffset = fwd * -(eyez * g_VR.scale)
+		verticalOffset = up * -2.1
+		-- compute eye positions
+		g_VR.eyePosLeft = g_VR.view.origin + forwardOffset + right * -eyeOffset * eyeScale + verticalOffset
+		g_VR.eyePosRight = g_VR.view.origin + forwardOffset + right * eyeOffset * eyeScale + verticalOffset
+		render.PushRenderTarget(g_VR.rt)
+		if DrawErrorOverlay() then
 			render.PopRenderTarget()
-			return {u0, v0, u1, v1}
+			vrmod.logger.Warn("Render skipped due to error overlay.")
+			return
 		end
 
-		local left_bounds = setup_and_render_eye(eyeL, hfovLeft, aspectLeft, eyePosL, true, g_VR.rtLeft)
-		if not left_bounds then return end
-
-		local right_bounds = setup_and_render_eye(eyeR, hfovRight, aspectRight, eyePosR, false, g_VR.rtRight)
-		if not right_bounds then return end
-
-		-- Death overlay (draw on full RTs after the main content)
+		render.Clear(0, 0, 0, 255, true, true)
+		-- cache common values
+		local rtHalfW = g_VR.rtWidth / 2
+		local rtH = g_VR.rtHeight
+		-- left eye
+		g_VR.view.origin = g_VR.eyePosLeft
+		g_VR.view.fov = hfovLeft
+		g_VR.view.aspectratio = aspectLeft
+		g_VR.view.x = 0
+		g_VR.view.y = 0
+		g_VR.view.w = rtHalfW
+		g_VR.view.h = rtH
+		hook.Call("VRMod_PreRender", nil, "left")
+		render.RenderView(g_VR.view)
+		-- right eye
+		g_VR.view.origin = g_VR.eyePosRight
+		g_VR.view.fov = hfovRight
+		g_VR.view.aspectratio = aspectRight
+		g_VR.view.x = rtHalfW
+		g_VR.view.y = 0
+		g_VR.view.w = rtHalfW
+		g_VR.view.h = rtH
+		hook.Call("VRMod_PreRender", nil, "right")
+		render.RenderView(g_VR.view)
+		-- death animation
 		local ply = LocalPlayer()
 		if ply and not ply:Alive() then
-			render.PushRenderTarget(g_VR.rtLeft)
 			vrmod.utils.DrawDeathAnimation(g_VR.rtWidth, g_VR.rtHeight)
-			render.PopRenderTarget()
-			render.PushRenderTarget(g_VR.rtRight)
-			vrmod.utils.DrawDeathAnimation(g_VR.rtWidth, g_VR.rtHeight)
-			render.PopRenderTarget()
 			vrmod.logger.Debug("Player is dead, drawing death animation.")
 		else
 			g_VR.deathTime = nil
 		end
 
-		-- Submit the asymmetric crop bounds from the overrender.
-		VRMOD_SetSubmitTextureBounds(
-			left_bounds[1], left_bounds[2], left_bounds[3], left_bounds[4],
-			right_bounds[1], right_bounds[2], right_bounds[3], right_bounds[4]
-		)
-
-		-- Desktop preview: show one eye (letterboxed).
+		render.PopRenderTarget()
+		-- desktop view remains untouched
 		if g_VR.desktopView > 1 then
-			local useLeft = (g_VR.desktopView == 2)
-			local mat = useLeft and g_VR.rtLeftMaterial or g_VR.rtRightMaterial
-			local srcAspect = g_VR.rtWidth / math.max(1, g_VR.rtHeight)
-			local dstAspect = ScrW() / math.max(1, ScrH())
-			local vmargin = 0
-			if dstAspect < srcAspect then
-				vmargin = (1 - dstAspect / srcAspect) * 0.5
-			end
 			render.CullMode(1)
 			surface.SetDrawColor(255, 255, 255, 255)
-			surface.SetMaterial(mat)
-			surface.DrawTexturedRectUV(-1, -1, 2, 2, 0, 1 - vmargin, 1, vmargin)
+			surface.SetMaterial(g_VR.rtMaterial)
+			surface.DrawTexturedRectUV(-1, -1, 2, 2, cropHorizontalOffset, 1 - cropVerticalMargin, 0.5 + cropHorizontalOffset, cropVerticalMargin)
 			render.CullMode(0)
 			vrmod.logger.Debug("Desktop view rendered.")
 		end
@@ -401,13 +446,19 @@ if CLIENT then
 
 	-- 2) Convar overrides for performance
 	local function OverridePerformanceConvars()
-		for cvar, val in pairs(convarOverrides) do
+		-- Keep skybox flag in sync with current settings at start time
+		PERFORMANCE_CONVARS.r_3dsky = tostring(convars.vrmod_skybox:GetBool() and 1 or 0)
+		for cvar, val in pairs(PERFORMANCE_CONVARS) do
 			overrideConvar(cvar, val)
 		end
 	end
 
 	-- 3) Display parameters & render target setup
 	local function SetupRenderTargets()
+		local hOffset = convars.vrmod_horizontaloffset:GetFloat()
+		local vOffset = convars.vrmod_verticaloffset:GetFloat()
+		local scaleFactor = convars.vrmod_scalefactor:GetFloat()
+		local renderOffset = convars.vrmod_renderoffset:GetBool()
 		g_VR.desktopView = convars.vrmod_desktopview:GetInt()
 		-- compute display params with fallback
 		local dp = ComputeDisplayParams() or {}
@@ -420,42 +471,24 @@ if CLIENT then
 		aspectLeft = dp.aspL or 1
 		aspectRight = dp.aspR or 1
 		ipd = dp.ipd or 0.064
-
-		-- Per-eye RTs: one full recommended rect per eye. The OpenXR projection asymmetry
-		-- is baked into the RenderView via fov/aspect + eye origin offset. No more UV packing hacks.
+		eyez = dp.eyez or 0
+		cropVerticalMargin, cropHorizontalOffset = vrmod.utils.ComputeDesktopCrop(g_VR.desktopView, g_VR.rtWidth, g_VR.rtHeight)
 		VRMOD_ShareTextureBegin()
-
-		-- Tell native submitter if the GL render targets need V flip (Linux).
-		-- This drives the correction that used to be hidden inside ComputeSubmitBounds.
-		-- Must be called before creating the RTs and before any submit.
-		if VRMOD_SetRTTextureFlip then
-			VRMOD_SetRTTextureFlip(not system.IsWindows())
-		end
-
-		local ts = tostring(SysTime())
+		local rtName = "vrmod_rt_" .. tostring(SysTime())
+		-- safe fallback for constants
 		local depthMode = MATERIAL_RT_DEPTH_SEPARATE or 0
 		local rtFlags = CREATERENDERTARGETFLAGS_UNFILTERABLE_OK or 0
 		local imgFormat = IMAGE_FORMAT_RGBA8888
-
-		local leftName = "vrmod_rt_left_" .. ts
-		g_VR.rtLeft = GetRenderTargetEx(leftName, g_VR.rtWidth, g_VR.rtHeight, RT_SIZE_LITERAL or 0, depthMode, 0, rtFlags, imgFormat)
-		local leftMatName = "vrmod_rt_left_mat_" .. ts
-		g_VR.rtLeftMaterial = CreateMaterial(leftMatName, "UnlitGeneric", {
-			["$basetexture"] = g_VR.rtLeft:GetName()
-		})
-
-		local rightName = "vrmod_rt_right_" .. ts
-		g_VR.rtRight = GetRenderTargetEx(rightName, g_VR.rtWidth, g_VR.rtHeight, RT_SIZE_LITERAL or 0, depthMode, 0, rtFlags, imgFormat)
-		local rightMatName = "vrmod_rt_right_mat_" .. ts
-		g_VR.rtRightMaterial = CreateMaterial(rightMatName, "UnlitGeneric", {
-			["$basetexture"] = g_VR.rtRight:GetName()
+		g_VR.rt = GetRenderTargetEx(rtName, g_VR.rtWidth, g_VR.rtHeight, RT_SIZE_LITERAL or 0, depthMode, 0, rtFlags, imgFormat)
+		local matName = "vrmod_rt_mat_" .. tostring(SysTime())
+		g_VR.rtMaterial = CreateMaterial(matName, "UnlitGeneric", {
+			["$basetexture"] = g_VR.rt:GetName()
 		})
 
 		VRMOD_ShareTextureFinish()
-
-		-- Legacy single-rt aliases (point at left for any external code that peeked at g_VR.rt)
-		g_VR.rt = g_VR.rtLeft
-		g_VR.rtMaterial = g_VR.rtLeftMaterial
+		-- submit bounds
+		local bounds = {vrmod.utils.ComputeSubmitBounds(leftCalc, rightCalc, hOffset, vOffset, scaleFactor, renderOffset)}
+		VRMOD_SetSubmitTextureBounds(unpack(bounds))
 	end
 
 	-- 4) Action manifest & input initialization
@@ -487,7 +520,7 @@ if CLIENT then
 		g_VR.view = {
 			x = 0,
 			y = 0,
-			w = g_VR.rtWidth,
+			w = g_VR.rtWidth / 2,
 			h = g_VR.rtHeight,
 			drawmonitors = true,
 			drawviewmodel = false,
@@ -496,28 +529,30 @@ if CLIENT then
 		}
 	end
 
-	-- 8) Initial tracking state
+	-- 8) Initial tracking state — core pose tables always exist before first frame
+	-- angvel is Vector(p,y,r) per Cube's Law (never Angle)
+	local function EmptyPose(pos)
+		return {
+			pos = pos or Vector(),
+			ang = Angle(),
+			vel = Vector(),
+			angvel = Vector()
+		}
+	end
+
 	local function InitializeTracking()
 		lastPosePos = {}
+		local origin = LocalPlayer():GetPos()
 		g_VR.tracking = {
-			hmd = {
-				pos = LocalPlayer():GetPos() + Vector(0, 0, 66.8),
-				ang = Angle(),
-				vel = Vector(),
-				angvel = Angle()
-			},
-			pose_lefthand = {
-				pos = LocalPlayer():GetPos(),
-				ang = Angle(),
-				vel = Vector(),
-				angvel = Angle()
-			},
-			pose_righthand = {
-				pos = LocalPlayer():GetPos(),
-				ang = Angle(),
-				vel = Vector(),
-				angvel = Angle()
-			},
+			hmd = EmptyPose(origin + Vector(0, 0, 66.8)),
+			pose_lefthand = EmptyPose(origin),
+			pose_righthand = EmptyPose(origin),
+		}
+		-- Mirror seed into raw so early consumers / getters never see nil cores
+		g_VR.rawTracking = {
+			hmd = EmptyPose(g_VR.tracking.hmd.pos),
+			pose_lefthand = EmptyPose(origin),
+			pose_righthand = EmptyPose(origin),
 		}
 
 		g_VR.threePoints = true
@@ -558,8 +593,9 @@ if CLIENT then
 	local function BindRenderSceneHook()
 		hook.Add("RenderScene", "vrutil_hook_renderscene", function()
 			if DrawErrorOverlay() then return true end
+			-- raw → tracking → early modifiers → wall/weapon modifiers → viewmodel
 			UpdateTracking()
-			UpdateCollisionsAndWepPos()
+			ApplyPoseModifiers()
 			HandleInput()
 			VRUtilNetUpdateLocalPly()
 			UpdateViewFromEntity()
@@ -581,6 +617,15 @@ if CLIENT then
 			if IsValid(g_VR.viewModel) then
 				blockViewModelDraw = false
 				g_VR.viewModel:DrawModel()
+				-- ArcVR (and others) put mag/attachments in SWEP:PostDrawViewModel —
+				-- engine never runs that when we DrawModel() the VR viewmodel ourselves.
+				local wep = LocalPlayer():GetActiveWeapon()
+				if IsValid(wep) and isfunction(wep.PostDrawViewModel) then
+					local ok, err = pcall(wep.PostDrawViewModel, wep, g_VR.viewModel, LocalPlayer(), wep)
+					if not ok and vrmod.logger then
+						vrmod.logger.Debug("PostDrawViewModel error: %s", tostring(err))
+					end
+				end
 				blockViewModelDraw = true
 			end
 
@@ -615,8 +660,14 @@ if CLIENT then
 			if IsValid(g_VR.viewModel) and g_VR.viewModel:GetClass() == "class C_BaseFlex" then g_VR.viewModel:Remove() end
 			g_VR.viewModel = nil
 			g_VR.viewModelMuzzle = nil
-			LocalPlayer():GetViewModel().RenderOverride = nil
-			LocalPlayer():GetViewModel():RemoveEffects(EF_NODRAW)
+			local ply = LocalPlayer()
+			if IsValid(ply) then
+				local vm = ply:GetViewModel()
+				if IsValid(vm) then
+					vm.RenderOverride = nil
+					vm:RemoveEffects(EF_NODRAW)
+				end
+			end
 			hook.Remove("RenderScene", "vrutil_hook_renderscene")
 			hook.Remove("CalcViewModelView", "vrutil_hook_calcviewmodelview")
 			hook.Remove("PostDrawTranslucentRenderables", "vrutil_hook_drawplayerandviewmodel")
@@ -625,25 +676,15 @@ if CLIENT then
 			hook.Remove("ShouldDrawLocalPlayer", "vrutil_hook_shoulddrawlocalplayer")
 			hook.Remove("CalcView", "vrutil_hook_calcview")
 			g_VR.tracking = {}
+			g_VR.rawTracking = {}
 			g_VR.threePoints = false
 			g_VR.sixPoints = false
-			-- Clear and drop per-eye RTs
-			if g_VR.rtLeft then
-				render.PushRenderTarget(g_VR.rtLeft)
+			if g_VR.rt then
+				render.PushRenderTarget(g_VR.rt)
 				render.Clear(0, 0, 0, 255, true, true)
 				render.PopRenderTarget()
-				g_VR.rtLeft = nil
+				g_VR.rt = nil
 			end
-			if g_VR.rtRight then
-				render.PushRenderTarget(g_VR.rtRight)
-				render.Clear(0, 0, 0, 255, true, true)
-				render.PopRenderTarget()
-				g_VR.rtRight = nil
-			end
-			g_VR.rt = nil
-			g_VR.rtMaterial = nil
-			g_VR.rtLeftMaterial = nil
-			g_VR.rtRightMaterial = nil
 
 			g_VR.active = false
 			VRMOD_Shutdown()
