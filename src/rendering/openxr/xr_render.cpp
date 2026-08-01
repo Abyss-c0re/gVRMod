@@ -1,3 +1,5 @@
+#ifndef _WIN32
+
 #include "xr_render.h"
 #include "core/vrmod_log.h"
 
@@ -265,7 +267,7 @@ static int  s_lastSubmitErrCode = 0;
 static int  s_sameErrCount = 0;
 static bool s_lastSubmitOk = true;
 
-XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureBounds[8]) {
+XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float textureBounds[8]) {
     XrSubmitResult result;
     result.ok = false;
     result.errCode = 0;
@@ -720,3 +722,5 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
 
     return result;
 }
+
+#endif // !_WIN32

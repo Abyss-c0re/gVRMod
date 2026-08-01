@@ -1,20 +1,32 @@
 #include "xr_session.h"
 #include "core/vrmod_log.h"
 
-#include <dlfcn.h>
 #include <cstring>
 #include <cstdio>
 #include <cmath>
 #include <string>
-#include <cstdlib>   // setenv / unsetenv / getenv for LD_LIBRARY_PATH hack when bundling libs
-#include <unistd.h>  // usleep
+#include <cstdlib>
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#include <d3d11.h>
+#define XR_USE_GRAPHICS_API_D3D11
+#define XR_USE_PLATFORM_WIN32
+#include "rendering/d3d/d3d_hooks.h"
+#else
+#include <dlfcn.h>
+#include <unistd.h>
 // On Linux we use XR_KHR_opengl_enable for the OpenGL graphics binding
 #define XR_USE_GRAPHICS_API_OPENGL
 #define XR_USE_PLATFORM_XLIB
 #include <X11/Xlib.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
+#endif
+
 #include <openxr/openxr/openxr_platform.h>
 
 // ── Function pointer definitions ──
@@ -82,9 +94,13 @@ uint32_t         g_xrRecommendedHeight = 0;
 // before swapchain/session teardown (avoids GLX/worker races under mat_queue 2).
 static bool      g_xrSubmitEnabled = true;
 
+#ifdef _WIN32
+static HMODULE g_loaderLib = nullptr;
+#else
 static void* g_loaderLib = nullptr;
+#endif
 static char g_resultBuf[XR_MAX_RESULT_STRING_SIZE];
-static char g_loaderErrBuf[256]; // last dlopen failure reason for better error messages
+static char g_loaderErrBuf[256]; // last loader failure reason
 
 // Helper macro to load instance proc
 #define XR_LOAD(fn) do { \
@@ -99,10 +115,61 @@ bool XR_LoadLoader() {
     if (g_loaderLib) return true;
     g_loaderErrBuf[0] = '\0';
 
+#ifdef _WIN32
+    // Prefer openxr_loader.dll next to the module, then PATH / system.
+    char modulePath[MAX_PATH] = {0};
+    HMODULE self = nullptr;
+    if (GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCSTR)&XR_LoadLoader, &self) && self) {
+        GetModuleFileNameA(self, modulePath, MAX_PATH);
+    }
+    std::string moduleDir;
+    if (modulePath[0]) {
+        char* slash = strrchr(modulePath, '\\');
+        if (!slash) slash = strrchr(modulePath, '/');
+        if (slash) {
+            *slash = '\0';
+            moduleDir = modulePath;
+        }
+    }
+
+    const char* candidates[8];
+    int c = 0;
+    static char local1[MAX_PATH];
+    static char local2[MAX_PATH];
+    if (!moduleDir.empty()) {
+        snprintf(local1, sizeof(local1), "%s\\openxr_loader.dll", moduleDir.c_str());
+        candidates[c++] = local1;
+        snprintf(local2, sizeof(local2), "%s\\libopenxr_loader.dll", moduleDir.c_str());
+        candidates[c++] = local2;
+    }
+    candidates[c++] = "openxr_loader.dll";
+    candidates[c] = nullptr;
+
+    for (int i = 0; candidates[i]; ++i) {
+        g_loaderLib = LoadLibraryA(candidates[i]);
+        if (g_loaderLib) {
+            VRMOD_LOG_INFO("OpenXR loader loaded from: %s", candidates[i]);
+            break;
+        }
+    }
+    if (!g_loaderLib) {
+        VRMOD_LOG_ERROR("Failed to LoadLibrary openxr_loader.dll");
+        snprintf(g_loaderErrBuf, sizeof(g_loaderErrBuf),
+                 "openxr_loader.dll not found (place next to gmcl_vrmod_win64.dll or on PATH)");
+        return false;
+    }
+    g_xrGetInstanceProcAddr =
+        (PFN_xrGetInstanceProcAddr)GetProcAddress(g_loaderLib, "xrGetInstanceProcAddr");
+    if (!g_xrGetInstanceProcAddr) {
+        FreeLibrary(g_loaderLib);
+        g_loaderLib = nullptr;
+        snprintf(g_loaderErrBuf, sizeof(g_loaderErrBuf), "xrGetInstanceProcAddr missing");
+        return false;
+    }
+#else
     // Discover the directory containing our module (gmcl_vrmod_linux64.dll).
-    // This lets us prefer a local bundle of the OpenXR loader + its dependencies,
-    // which is the practical solution on Linux because Steam runs GMod inside its
-    // own container (pressure-vessel) where host system packages are often not visible.
     std::string moduleDir;
     Dl_info selfInfo{};
     if (dladdr((void*)&XR_LoadLoader, &selfInfo) && selfInfo.dli_fname) {
@@ -113,10 +180,6 @@ bool XR_LoadLoader() {
         }
     }
 
-    // Temporarily augment LD_LIBRARY_PATH with the module directory.
-    // This greatly increases the chance that the dynamic linker will resolve
-    // transitive dependencies (libjsoncpp.so.26, etc.) from a local bundle the
-    // user placed next to gmcl_vrmod_linux64.dll.
     const char* oldLdPath = getenv("LD_LIBRARY_PATH");
     std::string newLdPath;
     if (!moduleDir.empty()) {
@@ -130,12 +193,9 @@ bool XR_LoadLoader() {
         setenv("LD_LIBRARY_PATH", newLdPath.c_str(), 1);
     }
 
-    // Candidate list. Local full paths first (supports "copy all the libs into lua/bin").
     const char* candidates[32];
     int c = 0;
-
     if (!moduleDir.empty()) {
-        // Absolute paths inside the module dir (user-bundled libs)
         static char local1[512];
         static char local2[512];
         snprintf(local1, sizeof(local1), "%s/libopenxr_loader.so.1", moduleDir.c_str());
@@ -143,19 +203,14 @@ bool XR_LoadLoader() {
         candidates[c++] = local1;
         candidates[c++] = local2;
     }
-
-    // Bare sonames (let the normal search + the LD_LIBRARY_PATH we just set do the work)
     candidates[c++] = "libopenxr_loader.so.1";
     candidates[c++] = "libopenxr_loader.so";
-
-    // Last resort: well-known distro locations
     candidates[c++] = "/usr/lib/libopenxr_loader.so.1";
     candidates[c++] = "/usr/lib/libopenxr_loader.so";
     candidates[c++] = "/usr/lib64/libopenxr_loader.so.1";
     candidates[c++] = "/usr/lib64/libopenxr_loader.so";
     candidates[c++] = "/usr/lib/x86_64-linux-gnu/libopenxr_loader.so.1";
     candidates[c++] = "/usr/lib/x86_64-linux-gnu/libopenxr_loader.so";
-
     candidates[c] = nullptr;
 
     for (int i = 0; candidates[i] != nullptr; ++i) {
@@ -166,7 +221,6 @@ bool XR_LoadLoader() {
         }
     }
 
-    // Restore the original LD_LIBRARY_PATH (best effort)
     if (oldLdPath) {
         setenv("LD_LIBRARY_PATH", oldLdPath, 1);
     } else {
@@ -179,7 +233,7 @@ bool XR_LoadLoader() {
         if (derr) {
             snprintf(g_loaderErrBuf, sizeof(g_loaderErrBuf), "%s", derr);
         } else {
-            snprintf(g_loaderErrBuf, sizeof(g_loaderErrBuf), "libopenxr_loader.so not found (tried bundle dir + system paths)");
+            snprintf(g_loaderErrBuf, sizeof(g_loaderErrBuf), "libopenxr_loader.so not found");
         }
         return false;
     }
@@ -191,7 +245,8 @@ bool XR_LoadLoader() {
         snprintf(g_loaderErrBuf, sizeof(g_loaderErrBuf), "xrGetInstanceProcAddr not exported by loader");
         return false;
     }
-    // Load pre-instance functions
+#endif
+
     g_xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrEnumerateInstanceExtensionProperties",
         (PFN_xrVoidFunction*)&g_xrEnumerateInstanceExtensionProperties);
     g_xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrCreateInstance",
@@ -258,8 +313,12 @@ bool XR_Init(char* errMsg, int errMsgLen) {
         return false;
     }
 
-    // 1) Create instance with OpenGL extension
+    // 1) Create instance with graphics API extension (GLX Linux / D3D11 Windows)
+#ifdef _WIN32
+    const char* extensions[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+#else
     const char* extensions[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME };
+#endif
     XrInstanceCreateInfo ici = {XR_TYPE_INSTANCE_CREATE_INFO};
     strncpy(ici.applicationInfo.applicationName, "gVRMod", XR_MAX_APPLICATION_NAME_SIZE - 1);
     ici.applicationInfo.applicationVersion = 1;
@@ -368,30 +427,59 @@ bool XR_Init(char* errMsg, int errMsgLen) {
 
     VRMOD_LOG_INFO("Per-eye render size: %u x %u (Lua creates one RT per eye at this size)", eyeW, eyeH);
 
-    // 4) Session creation with GL binding is *deferred* until we have a real render GLX context.
-    // Creating the XrSession here (during early Lua VRMOD_Init / first GetDisplayInfo) often binds
-    // to a loading/menu GL context from togl. The textures stolen/captured during actual
-    // RenderScene (the RT backing the two RenderViews) live in the main world GL context.
-    // Without a shared context or the correct current one at xrCreateSession time, the FBO
-    // blits in xr_render produce black (or invalid texture) in the swapchain images.
-    // We create the session lazily from ShareTextureBegin (inside RenderScene) so glXGetCurrent*
-    // captures the context that actually owns g_sharedTexture / g_captureTexture.
-    VRMOD_LOG_INFO("OpenXR instance/system ready; GL session creation deferred to first render context (Share)");
+    // 4) Session deferred until graphics device is ready (GLX Linux / D3D11 Windows).
+#ifdef _WIN32
+    VRMOD_LOG_INFO("OpenXR instance/system ready; D3D11 session deferred until shared texture (flip=0)");
+#else
+    VRMOD_LOG_INFO("OpenXR instance/system ready; GL session deferred to first render context (Share)");
+#endif
     return true;
 }
 
-// Separated so we can create the XrSession + ref spaces while the *correct* GLX context
-// (the one used by GMod/togl for the VR RT and RenderViews) is current.
+// Create XrSession + spaces. Linux: current GLX. Windows: g_d3d11Device after ShareTextureFinish.
 bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
     if (g_xrSession) {
-        return true; // already have one
+        return true;
     }
     if (!g_xrInstance || g_xrSystemId == XR_NULL_SYSTEM_ID) {
         snprintf(errMsg, errMsgLen, "VRMOD OpenXR: Init not called or no system before session create");
         return false;
     }
 
-    // Get GL requirements (optional info)
+    XrResult res;
+
+#ifdef _WIN32
+    if (!g_d3d11Device) {
+        snprintf(errMsg, errMsgLen,
+            "VRMOD OpenXR: D3D11 device not ready (ShareTextureFinish first)");
+        return false;
+    }
+
+    PFN_xrGetD3D11GraphicsRequirementsKHR xrGetD3D11GraphicsRequirementsKHR = nullptr;
+    g_xrGetInstanceProcAddr(g_xrInstance, "xrGetD3D11GraphicsRequirementsKHR",
+        (PFN_xrVoidFunction*)&xrGetD3D11GraphicsRequirementsKHR);
+    if (xrGetD3D11GraphicsRequirementsKHR) {
+        XrGraphicsRequirementsD3D11KHR d3dReqs = {XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR};
+        xrGetD3D11GraphicsRequirementsKHR(g_xrInstance, g_xrSystemId, &d3dReqs);
+        VRMOD_LOG_INFO("OpenXR D3D11 requirements: minFeatureLevel=0x%x",
+                       (unsigned)d3dReqs.minFeatureLevel);
+    }
+
+    XrGraphicsBindingD3D11KHR d3dBinding = {XR_TYPE_GRAPHICS_BINDING_D3D11_KHR};
+    d3dBinding.device = g_d3d11Device;
+
+    XrSessionCreateInfo sci = {XR_TYPE_SESSION_CREATE_INFO};
+    sci.systemId = g_xrSystemId;
+    sci.next = &d3dBinding;
+
+    res = g_xrCreateSession(g_xrInstance, &sci, &g_xrSession);
+    if (res != XR_SUCCESS) {
+        snprintf(errMsg, errMsgLen, "VRMOD OpenXR: xrCreateSession (D3D11) failed (%s)",
+                 XR_ResultToString(res));
+        return false;
+    }
+    VRMOD_LOG_INFO("OpenXR session created (D3D11, flip=0)");
+#else
     PFN_xrGetOpenGLGraphicsRequirementsKHR xrGetOpenGLGraphicsRequirementsKHR = nullptr;
     g_xrGetInstanceProcAddr(g_xrInstance, "xrGetOpenGLGraphicsRequirementsKHR",
         (PFN_xrVoidFunction*)&xrGetOpenGLGraphicsRequirementsKHR);
@@ -403,7 +491,6 @@ bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
             (unsigned long long)glReqs.maxApiVersionSupported);
     }
 
-    // Capture the GLX state *right now* -- caller guarantees this is the main render context.
     Display* xDisplay = glXGetCurrentDisplay();
     GLXDrawable glxDrawable = glXGetCurrentDrawable();
     GLXContext glxContext = glXGetCurrentContext();
@@ -447,14 +534,14 @@ bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
     sci.systemId = g_xrSystemId;
     sci.next = &glBinding;
 
-    XrResult res = g_xrCreateSession(g_xrInstance, &sci, &g_xrSession);
+    res = g_xrCreateSession(g_xrInstance, &sci, &g_xrSession);
     if (res != XR_SUCCESS) {
         snprintf(errMsg, errMsgLen, "VRMOD OpenXR: xrCreateSession failed (%s)", XR_ResultToString(res));
         return false;
     }
     VRMOD_LOG_INFO("OpenXR session created (with current render GLX context)");
+#endif
 
-    // Reference spaces
     XrReferenceSpaceCreateInfo stageInfo = {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
     stageInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
     stageInfo.poseInReferenceSpace = {{0,0,0,1}, {0,0,0}};
@@ -475,7 +562,11 @@ bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
     viewInfo.poseInReferenceSpace = {{0,0,0,1}, {0,0,0}};
     g_xrCreateReferenceSpace(g_xrSession, &viewInfo, &g_xrViewSpace);
 
+#ifdef _WIN32
+    VRMOD_LOG_INFO("OpenXR D3D11 session + spaces ready");
+#else
     VRMOD_LOG_INFO("OpenXR GL session + spaces ready (deferred path)");
+#endif
     return true;
 }
 
@@ -500,6 +591,14 @@ bool XR_EnsureSessionAndInput(char* errMsg, int errMsgLen) {
     }
 
     if (!g_xrSession) {
+#ifdef _WIN32
+        if (!g_d3d11Device) {
+            if (errMsg && errMsgLen > 0)
+                snprintf(errMsg, errMsgLen,
+                    "VRMOD OpenXR: D3D11 device not ready (will retry after ShareTextureFinish)");
+            return false;
+        }
+#else
         Display* xDisplay = glXGetCurrentDisplay();
         GLXContext glxContext = glXGetCurrentContext();
         if (!xDisplay || !glxContext) {
@@ -508,6 +607,7 @@ bool XR_EnsureSessionAndInput(char* errMsg, int errMsgLen) {
                     "VRMOD OpenXR: No active GLX context (will retry on next render frame)");
             return false;
         }
+#endif
         if (!XR_CreateSessionWithCurrentGL(errMsg, errMsgLen)) {
             return false;
         }
@@ -723,10 +823,18 @@ void XR_Shutdown() {
     g_xrSessionReady = false;
     g_xrSessionState = XR_SESSION_STATE_UNKNOWN;
 
+#ifdef _WIN32
+    D3D_ShutdownShare();
+    if (g_loaderLib) {
+        FreeLibrary(g_loaderLib);
+        g_loaderLib = nullptr;
+    }
+#else
     if (g_loaderLib) {
         dlclose(g_loaderLib);
         g_loaderLib = nullptr;
     }
+#endif
     g_xrGetInstanceProcAddr = nullptr;
 
     VRMOD_LOG_INFO("OpenXR shutdown complete");

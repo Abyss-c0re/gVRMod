@@ -4,6 +4,12 @@
 #include <ctime>
 #include <mutex>
 #include <cstring>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#endif
 
 static FILE* g_logFile = nullptr;
 static std::mutex g_logMutex;
@@ -72,9 +78,13 @@ void vrmod_log_write(const char* level, const char* fmt, ...) {
 
     // Write to file
     if (g_logFile) {
+#ifdef _WIN32
+        fprintf(g_logFile, "[%lu] [%s] %s\n", (unsigned long)GetTickCount64(), level, buf);
+#else
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
         fprintf(g_logFile, "[%ld.%03ld] [%s] %s\n", (long)ts.tv_sec, ts.tv_nsec / 1000000, level, buf);
+#endif
         fflush(g_logFile);
     }
 

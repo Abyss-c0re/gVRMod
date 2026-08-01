@@ -1,76 +1,63 @@
-# gVRMod — OpenXR Migration (Work in Progress)
+# gVRMod — OpenXR for Garry's Mod
 
-Behold windows users!
-Leave your hopes behind.
+Native OpenXR module + client addon (`addon/gvrmod`).
 
-   .--.
-  |o_o |
-  |:_/ |
- //   \ \
-(|     | )
-/'\_   _/`\
-\___)=(___/
+| Platform | Graphics | Texture share | RT flip |
+|----------|----------|---------------|---------|
+| **Linux x64** | OpenGL (GLX / togl) | glGenTextures + FBO observation hooks | **1** (V flip) |
+| **Windows x64** | D3D11 (`XR_KHR_D3D11_enable`) | **D3D9 `CreateTexture` hook** from [vrmod-module-master **main**](https://github.com/Abyss-c0re/vrmod-module-master) | **0** (no flip) |
 
-This is a Linux dev branch.
-The heresy has been purged. There is no windows support for this version.
+Windows flip is **hard-forced to 0** in the module (`SetRTTextureFlip` cannot enable it). D3D and OpenXR both use top-left origin.
 
+### Windows texture hook (main branch)
 
-**Status: Not ready for use.**
+From `vrmod-module-master` `src/vrmod.cpp` (main):
 
-This repository is a work-in-progress port/migration of gVRMod from OpenVR to native OpenXR.
+1. Resolve `IDirect3DDevice9` via `shaderapidx9.dll` `CreateInterface("ShaderDevice001")`
+2. Hook vtable **[23]** `CreateTexture` with the 14-byte trampoline
+3. Force `D3DPOOL_DEFAULT` + NT **shared handle** on the next engine RT
+4. `D3D11CreateDevice` + `OpenSharedResource` → `ID3D11Texture2D` for OpenXR
 
-### Current State
-- **Only Linux is supported.**
-- **Not ready for use **
+### Build
 
-### What works
-- Submitting stolen texture from OpenGL to OpenXR VR compositor
-- Head tracking
-- Per-eye render targets (separate left/right RTs)
-- OpenXR interaction profile bindings (Oculus Touch / Index / KHR simple)
-- Analog→boolean threshold for triggers/grips (Quest has no trigger/click)
-- **In-game controller binding UI** (`vrmod_bindingeditor`) — SteamVR binding UI replacement
-  - Physical sources → logical actions, including **chords** (AND of multiple buttons)
-  - Saved to `garrysmod/data/vrmod/vrmod_openxr_bindings.json`
-
-### What doesn't / WIP
-- Rendering still imperfect (stereo crop / orientation tuning ongoing)
-- Stick/vector rebinding not in the UI yet (walk/turn stay on OpenXR defaults)
-- Full body tracker poses untested
-- Driving action set shares short names with main (first-match binding)
-
-### Challenges
-
-- OpenXR has no SteamVR-style binding UI or chord API; rebinding is a Lua layer over fixed hardware sources.
-- SteamVR binding JSON is not consumed by OpenXR.
-
-### What this repo contains
-- Native module source (C++) targeting OpenXR + Linux (GLX + togl)
-- Client-side addon under `addon/gvrmod/`
-- Build and install scripts
-
-### Installation
-See `./install.sh`. It will:
-- Build the native module
-- Install the module + OpenXR loader bundle
-- Delete any existing `gvrmod` folder under `garrysmod/addons/`
-- Install a fresh copy of the addon from `addon/gvrmod/`
-
-Run `./install.sh --help` for options.
-
-### Uninstall
+**Linux**
 ```bash
-./install.sh --uninstall
+./build.sh
+./install.sh
 ```
 
-### Important Notes
-- You need a working OpenXR runtime (e.g. Monado + WiVRn).
-- The install script will attempt to bundle the OpenXR loader and its dependencies.
-- This is an experimental development branch.
+**Windows** (Visual Studio 2019/2022 + MSVC x64)
+```bat
+build.bat
+```
+Output: `install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_win64.dll`
+
+Optional CMake (Windows or Linux):
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+### Runtime
+
+- Active OpenXR runtime (SteamVR OpenXR, Oculus, WMR, WiVRn/Monado on Linux, …)
+- Windows: `openxr_loader.dll` next to the module or on PATH
+- Linux: loader often bundled by `./install.sh` next to the module
+- Do **not** load `vrmod-x64` (OpenVR) at the same time
+
+### Addon
+
+Copy `addon/gvrmod` → `garrysmod/addons/gvrmod`.  
+Lua already selects `gmcl_vrmod_win64.dll` / `gmcl_vrmod_linux64.dll` and sets:
+
+```lua
+VRMOD_SetRTTextureFlip(not system.IsWindows())  -- flip=0 on Windows
+```
+
+### Module version
+
+**v25** — Windows OpenXR + master D3D9 share hook + flip=0.
 
 ### License
 
-**CUBECHAIN LICENSE** (ProjectNexus station law) — energy must flow. We no longer contain.
-
-See [LICENSE](LICENSE). Cubechain: https://github.com/Abyss-c0re/gVRMod  
-Station SoT: https://github.com/Abyss-c0re/ProjectNexus
+CUBECHAIN — see [LICENSE](LICENSE).

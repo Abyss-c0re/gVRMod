@@ -1,18 +1,30 @@
 #include <vector>
 #include <string>
 #include <cstring>
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#include <direct.h>
+#ifndef PATH_MAX
+#define PATH_MAX MAX_PATH
+#endif
+#define getcwd _getcwd
+#else
 #include <dlfcn.h>
 #include <unistd.h>
-
 #include <GL/gl.h>
 #include <GL/glx.h>
+#endif
 
 #include <gmod/Interface.h>
 
 #include "core/vrmod_common.h"
 #include "core/vrmod_log.h"
 #include "input/xr_input.h"
-#include "rendering/opengl/gl_hooks.h"
+#include "rendering/texture_hooks.h"
 #include "rendering/openxr/xr_session.h"
 #include "rendering/openxr/xr_render.h"
 
@@ -89,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v24: proper mat_queue 2 / async submit gate + non-blocking session ensure
-    LUA->PushNumber(24);
+    // v25: Windows OpenXR (D3D9 CreateTexture hook from master + D3D11, flip=0)
+    LUA->PushNumber(25);
     return 1;
 }
 
@@ -155,7 +167,21 @@ LUA_FUNCTION(Init) {
         g_luaRefCount++;
     }
 
-    // Get GL entry points for texture hook
+#ifdef _WIN32
+    // Windows: resolve D3D9 device + CreateTexture vtable (master main hook).
+    // flip=0 (D3D top-left matches OpenXR).
+    {
+        char derr[MAX_STR_LEN];
+        if (!D3D_InitDeviceHooks(derr, MAX_STR_LEN)) {
+            VRMOD_LOG_ERROR("%s", derr);
+            LUA->ThrowError(derr[0] ? derr : "VRMOD: D3D device init failed");
+            return 0;
+        }
+    }
+    g_rtTextureNeedsVFlip = false;
+    VRMOD_LOG_INFO("VR initialized successfully (OpenXR D3D11 Windows, flip=0).");
+#else
+    // Linux: Get GL entry points for texture hook (togl)
     void* lib = dlopen("libtogl_client.so", RTLD_NOW | RTLD_NOLOAD);
     if (!lib) LUA->ThrowError("VRMOD: dlopen failed");
 
@@ -176,6 +202,7 @@ LUA_FUNCTION(Init) {
     }
 
     VRMOD_LOG_INFO("VR initialized successfully (OpenXR).");
+#endif
     return 0;
 }
 
@@ -622,7 +649,11 @@ LUA_FUNCTION(ShareTextureBegin) {
 
     int rc = ::ShareTextureBegin(texW, texH, errBridge);
     if (rc != 0) {
+#ifdef _WIN32
+        LUA->ThrowError("VRMOD: ShareTextureBegin failed (D3D CreateTexture hook)");
+#else
         LUA->ThrowError("VRMOD: mprotect RWX failed");
+#endif
     }
 
     // Session/GL often not current at Lua startup ShareTexture. Soft-try; first
@@ -651,6 +682,29 @@ LUA_FUNCTION(ShareTextureFinish) {
         VRMOD_LOG_ERROR("%s", msg);
     };
 
+#ifdef _WIN32
+    // Master path: unpatch + OpenSharedResource as D3D11 texture.
+    if (!::ShareTextureFinish(errBridge)) {
+        LUA->ThrowError("VRMOD: ShareTextureFinish failed (D3D shared texture)");
+    }
+    // D3D11 device is now ready — create OpenXR session + swapchains.
+    {
+        char serr[MAX_STR_LEN];
+        if (XR_EnsureSessionAndInput(serr, MAX_STR_LEN)) {
+            if (!g_xrSwapchainsCreated && g_xrSessionRunning) {
+                char scerr[MAX_STR_LEN];
+                if (XR_CreateSwapchains(scerr, MAX_STR_LEN)) {
+                    g_xrSwapchainsCreated = true;
+                    VRMOD_LOG_INFO("D3D11 swapchains created after ShareTextureFinish");
+                } else {
+                    VRMOD_LOG_ERROR("Swapchain create: %s", scerr);
+                }
+            }
+        } else if (serr[0]) {
+            VRMOD_LOG_INFO("ShareTextureFinish: session pending (%s)", serr);
+        }
+    }
+#else
     if (!RemoveTexturePatch(errBridge)) {
         LUA->ThrowError("VRMOD: Failed to remove the texture patch.");
     }
@@ -679,9 +733,9 @@ LUA_FUNCTION(ShareTextureFinish) {
         VRMOD_MarkSharedTextureEngineOwned();
     }
 
-    // Log what we ended up with for the per-eye path.
     VRMOD_LOG_INFO("Per-eye textures ready: L=%u (fbo=%u) R=%u (fbo=%u) | legacy shared=%u",
         g_leftEyeTexture, g_leftEyeFBO, g_rightEyeTexture, g_rightEyeFBO, g_sharedTexture);
+#endif
     return 0;
 }
 
@@ -737,20 +791,30 @@ LUA_FUNCTION(SetSubmitTextureBounds) {
 }
 
 LUA_FUNCTION(SetRTTextureFlip) {
-    // true = the engine RT textures need V flip when submitting (Linux/OpenGL case)
+    // true  = Linux/OpenGL RTs need V flip into OpenXR
+    // false = Windows/D3D (flip=0) — top-left matches OpenXR; do not invert
     // Driven by Lua: VRMOD_SetRTTextureFlip( not system.IsWindows() )
     if (LUA->GetType(1) == GarrysMod::Lua::Type::BOOL) {
         g_rtTextureNeedsVFlip = LUA->GetBool(1);
     } else {
-        // Fallback: on unknown, assume we need the flip (typical Linux/OpenGL case)
+#ifdef _WIN32
+        g_rtTextureNeedsVFlip = false;
+#else
         g_rtTextureNeedsVFlip = true;
+#endif
     }
+#ifdef _WIN32
+    // Hard enforce flip=0 on Windows even if a bad Lua path passes true.
+    g_rtTextureNeedsVFlip = false;
+#endif
     return 0;
 }
 
 // Optional GPU drain (prefer not to call under mat_queue_mode 2 — races workers).
 LUA_FUNCTION(GLFinish) {
+#ifndef _WIN32
     glFinish();
+#endif
     return 0;
 }
 
@@ -844,10 +908,14 @@ LUA_FUNCTION(Shutdown) {
     XR_SetSubmitEnabled(false);
     g_IsPaused = true;
 
-    // 2) Soft GL drain only if a context is current. Never glFinish (mat workers die).
+    // 2) Soft GPU drain only if a context is current. Never glFinish (mat workers die).
+#ifdef _WIN32
+    // D3D11 has no glFlush; copies complete with the device context.
+#else
     if (glXGetCurrentContext()) {
         glFlush();
     }
+#endif
 
     // Free Lua references
     for (int i = 0; i < g_luaRefCount; i++) {
