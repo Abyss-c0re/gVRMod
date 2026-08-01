@@ -584,9 +584,17 @@ LUA_FUNCTION(ShareTextureBegin) {
         VRMOD_LOG_ERROR("%s", msg);
     };
 
-    // Per-eye sizes (new path). Lua now creates one RT per eye at recommended resolution.
+    // Optional Lua args: eyeW, eyeH (from SafeShareTextureBegin). Else HMD recommended.
     uint32_t texW = g_xrRecommendedWidth > 0 ? g_xrRecommendedWidth : 1024;
     uint32_t texH = g_xrRecommendedHeight > 0 ? g_xrRecommendedHeight : 1024;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) {
+        double w = LUA->GetNumber(1);
+        if (w >= 16.0) texW = (uint32_t)w;
+    }
+    if (LUA->IsType(2, GarrysMod::Lua::Type::NUMBER)) {
+        double h = LUA->GetNumber(2);
+        if (h >= 16.0) texH = (uint32_t)h;
+    }
 
     int rc = ::ShareTextureBegin(texW, texH, errBridge);
     if (rc != 0) {

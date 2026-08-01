@@ -72,5 +72,11 @@ extern GLuint g_rightEyeColorTex;
 // system.IsWindows()).
 extern bool g_rtTextureNeedsVFlip;
 
+// Last-known submit source size (SBS or single-eye). Under mat_queue_mode=2,
+// glGetTexLevelParameteriv often returns 0x0 for live engine RTs — use this.
+extern GLint g_knownSubmitSrcW;
+extern GLint g_knownSubmitSrcH;
+void VRMOD_SetKnownSubmitSize(uint32_t w, uint32_t h);
+
 int ShareCaptureTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc);
 bool ShareCaptureTextureFinish(ErrorFunc errFunc);  // note: name collides with LUA wrapper in other TU; use :: when calling from Lua bridge

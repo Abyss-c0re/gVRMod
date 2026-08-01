@@ -64,6 +64,9 @@ extern GLuint g_rightEyeFBO;
 extern GLuint g_rightEyeColorTex;
 
 extern bool g_rtTextureNeedsVFlip;
+extern GLint g_knownSubmitSrcW;
+extern GLint g_knownSubmitSrcH;
+void VRMOD_SetKnownSubmitSize(uint32_t w, uint32_t h);
 
 // FBO + authoritative color texture discovered by observing glFramebufferTexture2D during
 // the ShareTextureBegin/Finish window. Querying the attachment on this FBO at submit time
@@ -427,6 +430,8 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     }
 
     // Query dimensions from a usable texture (prefer any per-eye for safety, else legacy).
+    // Under mat_queue_mode=2, glGetTexLevelParameteriv often returns 0 for live engine
+    // RTs (workers still own storage) — fall back to size recorded at ShareTextureBegin.
     GLint srcWidth = 0, srcHeight = 0;
     GLuint dimProbe = (perEyeSrc[0] && glIsTexture(perEyeSrc[0])) ? perEyeSrc[0] : ((perEyeSrc[1] && glIsTexture(perEyeSrc[1])) ? perEyeSrc[1] : srcTex);
     if (dimProbe && glIsTexture(dimProbe)) {
@@ -434,12 +439,33 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &srcWidth);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &srcHeight);
         glBindTexture(GL_TEXTURE_2D, 0);
+        if (srcWidth > 0 && srcHeight > 0) {
+            VRMOD_SetKnownSubmitSize((uint32_t)srcWidth, (uint32_t)srcHeight);
+        }
     }
-    // Only hard-fail if we have literally nothing to submit and legacy path would be used.
-    if (!havePerEye && (srcWidth == 0 || srcHeight == 0)) {
+    if (srcWidth <= 0 || srcHeight <= 0) {
+        srcWidth = g_knownSubmitSrcW;
+        srcHeight = g_knownSubmitSrcH;
+    }
+    if (srcWidth <= 0 || srcHeight <= 0) {
+        // Last resort: recommended eye * 2 (SBS) from OpenXR HMD caps
+        if (g_xrRecommendedWidth > 0 && g_xrRecommendedHeight > 0) {
+            srcWidth = (GLint)(g_xrRecommendedWidth * 2);
+            srcHeight = (GLint)g_xrRecommendedHeight;
+        }
+    }
+    // Fail only when we still have no size after fallbacks, or no GL texture to blit.
+    // mat_queue 2 often returns 0 from glGetTexLevel* but the texture name is still valid.
+    static int s_zeroDimStreak = 0;
+    const bool haveSrcTex = (dimProbe != 0 && glIsTexture(dimProbe));
+    if (!havePerEye && (!haveSrcTex || srcWidth <= 0 || srcHeight <= 0)) {
+        s_zeroDimStreak++;
         result.errCode = -2;
-        snprintf(result.errMsg, sizeof(result.errMsg), "Source texture has zero dimensions (capture or stolen)");
-        if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
+        if (s_zeroDimStreak == 1 || (s_zeroDimStreak % 120) == 0) {
+            snprintf(result.errMsg, sizeof(result.errMsg),
+                "Source texture unavailable (tex=%u size=%dx%d known=%dx%d streak=%d)",
+                (unsigned)dimProbe, (int)srcWidth, (int)srcHeight,
+                g_knownSubmitSrcW, g_knownSubmitSrcH, s_zeroDimStreak);
             VRMOD_LOG_WARN("%s", result.errMsg);
             s_lastSubmitErrCode = result.errCode;
             s_lastSubmitOk = false;
@@ -447,6 +473,7 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         XR_EndFrame();
         return result;
     }
+    s_zeroDimStreak = 0;
 
     // Make sure the draw that touched the source (rtMaterial into captureRt or engine into main RT)
     // has completed before we attach it for the per-eye blits.

@@ -29,6 +29,17 @@ static int          g_eyeStealIndex = 0; // 0 -> left, 1 -> right during share w
 // Default true so we do not ship upside-down if Lua forgets the call after a tree mirror.
 bool                g_rtTextureNeedsVFlip = true;
 
+// SBS/engine RT size recorded at ShareTextureBegin (and refreshed on good GL queries).
+GLint               g_knownSubmitSrcW = 0;
+GLint               g_knownSubmitSrcH = 0;
+
+void VRMOD_SetKnownSubmitSize(uint32_t w, uint32_t h) {
+    if (w > 0 && h > 0) {
+        g_knownSubmitSrcW = (GLint)w;
+        g_knownSubmitSrcH = (GLint)h;
+    }
+}
+
 // Framebuffer attachment observation (used to discover the actual color texture backing
 // the VR RT created by GetRenderTargetEx, which may bypass the glGenTextures vtable slot).
 char                g_framebufferTexOrigBytes[14];
@@ -212,6 +223,12 @@ int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) 
     g_leftEyeFBO = g_rightEyeFBO = 0;
     g_leftEyeColorTex = g_rightEyeColorTex = 0;
     g_eyeStealIndex = 0;
+
+    // Lua builds an SBS RT (eyeW*2 × eyeH). texWidth/texHeight here are per-eye from
+    // ShareTextureBegin; record full SBS for submit fallback under mat_queue 2.
+    if (texWidth > 0 && texHeight > 0) {
+        VRMOD_SetKnownSubmitSize(texWidth * 2, texHeight);
+    }
 
     // Pre-allocate a placeholder at per-eye size (the engine RTs will be captured via hook/FBO).
     // We keep one g_sharedTexture at per-eye size for fallback paths.
