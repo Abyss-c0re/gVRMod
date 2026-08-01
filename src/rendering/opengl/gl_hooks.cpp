@@ -64,16 +64,17 @@ void CreateTextureHook(GLsizei n, GLuint *textures) {
         g_captureTexture = textures[0];
         return;
     }
-    // Per-eye steal: first engine RT gen after Begin -> left, second -> right.
-    // This supports the new proper per-eye RT path (two GetRenderTargetEx calls).
+    // Soft hint only: GetRenderTargetEx often gens color+depth (and materials may gen
+    // more). Authoritative left/right assignment is done in FramebufferTextureHook on
+    // COLOR_ATTACHMENT0. We still record the first two gens as a fallback when FBO
+    // observation is unavailable.
     if (g_eyeStealIndex == 0) {
         g_leftEyeTexture = textures[0];
         g_eyeStealIndex = 1;
     } else if (g_eyeStealIndex == 1) {
         g_rightEyeTexture = textures[0];
         g_eyeStealIndex = 2;
-    } else {
-        // Fallback for any extra gens during window: keep classic shared for debug/compat.
+    } else if (g_sharedTexture == 0) {
         g_sharedTexture = textures[0];
     }
 }
@@ -92,9 +93,9 @@ void FramebufferTextureHook(GLenum target, GLenum attachment, GLenum textarget, 
     typedef void (*glFramebufferTexture2D_t)(GLenum, GLenum, GLenum, GLuint, GLint);
     ((glFramebufferTexture2D_t)g_framebufferTexture2D)(target, attachment, textarget, texture, level);
 
-    // While a share/capture steal window is active, a COLOR_ATTACHMENT0 with a real texture
-    // belongs to a VR RT (now per-eye). We record both the classic last-seen and the
-    // sequential per-eye slots so the new path has authoritative left/right backing textures.
+    // While a share/capture steal window is active, COLOR_ATTACHMENT0 is the authoritative
+    // signal for per-eye RTs (depth attaches and extra gens must not steal slots).
+    // We count distinct color attachments: 1st → left, 2nd → right.
     if (g_glIsPatched && attachment == GL_COLOR_ATTACHMENT0 && texture != 0) {
         g_vrRtColorTex = texture;
         GLint currentFBO = 0;
@@ -103,18 +104,20 @@ void FramebufferTextureHook(GLenum target, GLenum attachment, GLenum textarget, 
             g_vrRtFBO = (GLuint)currentFBO;
         }
 
-        // Per-eye FBO/tex capture (first attach in window = left eye RT, second = right).
-        if (g_eyeStealIndex <= 1) {
-            // still expecting left or assigning left
+        // Skip re-attaches of the same texture we already recorded for left.
+        if (g_leftEyeColorTex == 0) {
             g_leftEyeColorTex = texture;
             g_leftEyeFBO = (GLuint)currentFBO;
+            g_leftEyeTexture = texture;
             VRMOD_LOG_INFO("Framebuffer attach observed (left eye): COLOR0 tex=%u fbo=%u", texture, (unsigned)currentFBO);
-        } else if (g_eyeStealIndex == 2) {
+        } else if (g_rightEyeColorTex == 0 && texture != g_leftEyeColorTex) {
             g_rightEyeColorTex = texture;
             g_rightEyeFBO = (GLuint)currentFBO;
+            g_rightEyeTexture = texture;
             VRMOD_LOG_INFO("Framebuffer attach observed (right eye): COLOR0 tex=%u fbo=%u", texture, (unsigned)currentFBO);
         } else {
-            VRMOD_LOG_INFO("Framebuffer attach observed: COLOR0 tex=%u fbo=%u (captureSteal=%d)", texture, (unsigned)currentFBO, (int)g_captureStealActive);
+            VRMOD_LOG_INFO("Framebuffer attach observed: COLOR0 tex=%u fbo=%u (L=%u R=%u)",
+                texture, (unsigned)currentFBO, g_leftEyeColorTex, g_rightEyeColorTex);
         }
     }
 

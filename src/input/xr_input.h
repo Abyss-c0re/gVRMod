@@ -37,9 +37,12 @@ int XR_FindOrCreateActionSet(const char* name, actionSet* sets, int* count);
 void XR_SyncActions(const actionSet* activeSets, int activeCount);
 
 // ── Query action states ──
-bool XR_GetBooleanAction(VRActionHandle handle, bool* changed);
-float XR_GetFloatAction(VRActionHandle handle);
-void XR_GetVector2Action(VRActionHandle handle, float* x, float* y);
+// isActive (optional): true if OpenXR reports the action active, or if analog/chord
+// synthesis forced a pressed state. Used by GetActions to avoid inactive driving-set
+// actions clobbering main-set short names in the Lua table.
+bool XR_GetBooleanAction(VRActionHandle handle, bool* changed, bool* isActive = nullptr);
+float XR_GetFloatAction(VRActionHandle handle, bool* isActive = nullptr);
+void XR_GetVector2Action(VRActionHandle handle, float* x, float* y, bool* isActive = nullptr);
 PoseResult XR_GetPoseAction(VRActionHandle handle);
 
 // ── Haptics ──
@@ -50,7 +53,27 @@ void XR_TriggerHaptic(VRActionHandle handle, float startSec, float durationSec,
 VRActionHandle XR_FindActionHandleByName(const char* name, const action* actions, int count);
 
 // ── Attach action sets to session (must be done before first sync) ──
+// Suggests interaction profile bindings (Oculus Touch / Index / KHR simple)
+// then attaches. Call XR_SetActionCache first so bindings can resolve actions.
 bool XR_AttachActionSets();
+
+// Cache the parsed action table for binding suggestion + analog→boolean synthesis.
+void XR_SetActionCache(const action* actions, int count);
+
+// Create any missing pose action spaces (retry after session is available).
+// Returns number of spaces newly created.
+int XR_EnsureActionSpaces();
+
+// ── Physical controller sources (for Lua binding UI / chords) ──
+// Fixed hardware buttons/axes bound independently of logical VRMod actions so
+// users can rebind without SteamVR. Values: bools as 0/1, analogs 0..1.
+int XR_GetControllerSourceCount();
+const char* XR_GetControllerSourceId(int index);     // e.g. "right_trigger"
+const char* XR_GetControllerSourceLabel(int index);  // e.g. "Right Trigger"
+bool XR_GetControllerSourceIsFloat(int index);
+float XR_GetControllerSourceValue(int index);
+// true if OpenXR reports the source action as active (bound + path live)
+bool XR_GetControllerSourceIsActive(int index);
 
 // ── Update poses (HMD + action spaces) ──
 void XR_UpdatePoses();

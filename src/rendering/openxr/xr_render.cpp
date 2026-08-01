@@ -549,110 +549,96 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                     v1 = tmp1;
                 }
 
-                // For the destination (swapchain image): we draw with a textured quad into
-                // a GL FBO attachment. Low viewport Y writes the low rows of the dest texture.
-                // Runtimes treat the first/low row of the submitted image as the top scanline.
-                // Therefore, when we needed source V compensation, also map higher v (upper content)
-                // to low Y so upper scene ends up in the "top" as seen by the compositor.
-                float vForLowY  = g_rtTextureNeedsVFlip ? v1 : v0;
-                float vForHighY = g_rtTextureNeedsVFlip ? v0 : v1;
+                // Source rect in texels (OpenGL origin = bottom-left).
+                // v0/v1 are in [0,1] after optional V-flip compensation above.
+                GLint srcX0 = (GLint)(u0 * eyeSrcW);
+                GLint srcX1 = (GLint)(u1 * eyeSrcW);
+                GLint srcY0 = (GLint)(v0 * eyeSrcH);
+                GLint srcY1 = (GLint)(v1 * eyeSrcH);
+                // Clamp
+                if (srcX0 < 0) srcX0 = 0;
+                if (srcY0 < 0) srcY0 = 0;
+                if (srcX1 > eyeSrcW) srcX1 = eyeSrcW;
+                if (srcY1 > eyeSrcH) srcY1 = eyeSrcH;
+                if (srcX1 <= srcX0) srcX1 = srcX0 + 1;
+                if (srcY1 <= srcY0) srcY1 = srcY0 + 1;
 
                 glFinish();
 
-                // Quick content check at center of the source rect we will copy.
+                // Content check from the READ FBO (src) before we copy.
                 {
+                    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitSrcFBO);
                     glReadBuffer(GL_COLOR_ATTACHMENT0);
                     unsigned char p[4] = {0};
-                    float uc = (u0 + u1) * 0.5f;
-                    float vc = (v0 + v1) * 0.5f;
-                    GLint sx = (GLint)(uc * eyeSrcW);
-                    GLint sy = (GLint)(vc * eyeSrcH);
+                    GLint sx = (srcX0 + srcX1) / 2;
+                    GLint sy = (srcY0 + srcY1) / 2;
                     glReadPixels(sx, sy, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, p);
                     int sm = (int)p[0] + (int)p[1] + (int)p[2];
                     if (sm < 25) {
-                        VRMOD_LOG_INFO("### EYE%d BLACK? src=%u center=(%u,%u,%u) sz=%dx%d", eye, eyeSrcTex, p[0],p[1],p[2], eyeSrcW, eyeSrcH);
+                        VRMOD_LOG_INFO("### EYE%d BLACK? src=%u center=(%u,%u,%u) sz=%dx%d",
+                            eye, eyeSrcTex, p[0], p[1], p[2], eyeSrcW, eyeSrcH);
                     } else if ((s_submitCallCount % 45) == 0) {
-                        VRMOD_LOG_INFO("EYE%d content OK src=%u sum=%d sz=%dx%d", eye, eyeSrcTex, sm, eyeSrcW, eyeSrcH);
+                        VRMOD_LOG_INFO("EYE%d content OK src=%u sum=%d sz=%dx%d",
+                            eye, eyeSrcTex, sm, eyeSrcW, eyeSrcH);
                     }
                 }
 
-                glBindFramebufferPtr(GL_READ_FRAMEBUFFER, 0);
-
-                // Textured quad submission. Same V mapping as before for orientation.
-                {
-                    GLint prevViewport[4];
-                    glGetIntegerv(GL_VIEWPORT, prevViewport);
-                    GLboolean depthWasOn = glIsEnabled(GL_DEPTH_TEST);
-                    GLboolean cullWasOn = glIsEnabled(GL_CULL_FACE);
-                    GLboolean blendWasOn = glIsEnabled(GL_BLEND);
-                    GLint prevTex;
-                    glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex);
-                    GLint prevMatrixMode;
-                    glGetIntegerv(GL_MATRIX_MODE, &prevMatrixMode);
-
-                    glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_blitFBO);
-                    glViewport(0, 0, g_xrSwapchainWidth, g_xrSwapchainHeight);
-                    glDisable(GL_DEPTH_TEST);
-                    glDisable(GL_CULL_FACE);
-                    glDisable(GL_BLEND);
-
-                    if (glActiveTexturePtr) glActiveTexturePtr(GL_TEXTURE0);
-                    if (glUseProgramPtr) glUseProgramPtr(0);
-                    glEnable(GL_TEXTURE_2D);
-                    glBindTexture(GL_TEXTURE_2D, eyeSrcTex);
-
-                    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-                    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-
-                    glMatrixMode(GL_PROJECTION);
-                    glPushMatrix();
-                    glLoadIdentity();
-                    glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-
-                    glMatrixMode(GL_MODELVIEW);
-                    glPushMatrix();
-                    glLoadIdentity();
-
-                    glBegin(GL_QUADS);
-                        glTexCoord2f(u0, vForLowY); glVertex2f(-1.0f, -1.0f);
-                        glTexCoord2f(u1, vForLowY); glVertex2f( 1.0f, -1.0f);
-                        glTexCoord2f(u1, vForHighY); glVertex2f( 1.0f,  1.0f);
-                        glTexCoord2f(u0, vForHighY); glVertex2f(-1.0f,  1.0f);
-                    glEnd();
-
-                    glFinish();
-
-                    // Post sample
-                    {
-                        unsigned char dstSample[4] = {0};
-                        glReadBuffer(GL_COLOR_ATTACHMENT0);
-                        glReadPixels(g_xrSwapchainWidth / 2, g_xrSwapchainHeight / 2, 1, 1,
-                                     GL_RGBA, GL_UNSIGNED_BYTE, dstSample);
-                        int dstSum = (int)dstSample[0] + dstSample[1] + dstSample[2];
-                        if ((s_submitCallCount % 45) == 0 && eye == 0) {
-                            VRMOD_LOG_INFO("POST dst eye0 center sum=%d", dstSum);
-                        }
-                    }
-
-                    glBindTexture(GL_TEXTURE_2D, prevTex);
-                    glMatrixMode(GL_PROJECTION);
-                    glPopMatrix();
-                    glMatrixMode(GL_MODELVIEW);
-                    glPopMatrix();
-                    glMatrixMode(prevMatrixMode);
-
-                    if (blendWasOn) glEnable(GL_BLEND);
-                    if (cullWasOn) glEnable(GL_CULL_FACE);
-                    if (depthWasOn) glEnable(GL_DEPTH_TEST);
-                    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-                    glFlush();
-
-                    if ((s_submitCallCount % 30) == 0 && eye == 0) {
-                        VRMOD_LOG_INFO("QUAD eye%d u[%.3f-%.3f] v[%.3f-%.3f] src=%ux%u -> dst %ux%u perEye=%d",
-                            eye, u0, u1, v0, v1, eyeSrcW, eyeSrcH, g_xrSwapchainWidth, g_xrSwapchainHeight, (int)havePerEye);
-                    }
+                // Primary path: glBlitFramebuffer (reliable under togl / engine GL state).
+                // Optional V-flip for OpenXR compositor convention: invert dest Y when the
+                // source is a GL RT whose low row is bottom-of-scene after our v remap.
+                // After the crop V-flip above, srcY0 < srcY1 samples the correct region in
+                // GL space. OpenXR expects the first row of the swapchain image as the top
+                // of the view; GL FBO writes low Y as the first row → identity mapping is
+                // correct when g_rtTextureNeedsVFlip already flipped the crop. If we did
+                // NOT flip crop, invert dest Y here.
+                GLint dstY0 = 0;
+                GLint dstY1 = (GLint)g_xrSwapchainHeight;
+                // Extra dest flip only when crop was NOT flipped (Windows/D3D path).
+                // On Linux crop flip already put "upper scene" at high GL Y; without dest
+                // invert that becomes bottom of OpenXR image (upside-down). Match prior
+                // quad behavior: when g_rtTextureNeedsVFlip, map high src V → low dest Y.
+                if (g_rtTextureNeedsVFlip) {
+                    // Swap dest Y so upper scene (high GL Y after crop flip? after crop
+                    // flip v0 is former (1-v1) = lower GL Y of upper content...)
+                    // Prior quad: vForLowY = v1, vForHighY = v0 with flipped v's, meaning
+                    // dest low Y samples higher original crop v. With flipped v0/v1 already
+                    // applied to srcY, identity dest is wrong — use inverted dest Y.
+                    dstY0 = (GLint)g_xrSwapchainHeight;
+                    dstY1 = 0;
                 }
+
+                glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitSrcFBO);
+                glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_blitFBO);
+                glReadBuffer(GL_COLOR_ATTACHMENT0);
+                glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+                glBlitFramebufferPtr(
+                    srcX0, srcY0, srcX1, srcY1,
+                    0, dstY0, (GLint)g_xrSwapchainWidth, dstY1,
+                    GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+                // Verify destination (must bind READ to the blit dest FBO — previous code
+                // sampled the default framebuffer and always reported sum=0).
+                if ((s_submitCallCount % 45) == 0 && eye == 0) {
+                    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitFBO);
+                    glReadBuffer(GL_COLOR_ATTACHMENT0);
+                    unsigned char dstSample[4] = {0};
+                    glReadPixels((GLint)g_xrSwapchainWidth / 2, (GLint)g_xrSwapchainHeight / 2,
+                                 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, dstSample);
+                    int dstSum = (int)dstSample[0] + dstSample[1] + dstSample[2];
+                    VRMOD_LOG_INFO("POST dst eye0 center sum=%d (blit path) src=%ux%u->%ux%u flip=%d",
+                        dstSum, eyeSrcW, eyeSrcH, g_xrSwapchainWidth, g_xrSwapchainHeight,
+                        (int)g_rtTextureNeedsVFlip);
+                    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitSrcFBO);
+                }
+
+                if ((s_submitCallCount % 30) == 0 && eye == 0) {
+                    VRMOD_LOG_INFO("BLIT eye%d u[%.3f-%.3f] v[%.3f-%.3f] srcRect(%d,%d)-(%d,%d) -> dst %ux%u perEye=%d",
+                        eye, u0, u1, v0, v1, srcX0, srcY0, srcX1, srcY1,
+                        g_xrSwapchainWidth, g_xrSwapchainHeight, (int)havePerEye);
+                }
+
+                glFlush();
             }
 
             glBindFramebufferPtr(GL_READ_FRAMEBUFFER, prevR);
@@ -695,7 +681,10 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     fei.layerCount = 1;
     fei.layers = layers;
 
-    VRMOD_LOG_INFO("xrEndFrame: submitting layer space=stage views=2 srcTex=%u swap=%ux%u fmt=0x%llx", srcTex, g_xrSwapchainWidth, g_xrSwapchainHeight, (unsigned long long)g_xrSwapchainFormat);
+    if ((s_submitCallCount % 90) == 0) {
+        VRMOD_LOG_INFO("xrEndFrame: submitting layer space=stage views=2 srcTex=%u swap=%ux%u fmt=0x%llx",
+            srcTex, g_xrSwapchainWidth, g_xrSwapchainHeight, (unsigned long long)g_xrSwapchainFormat);
+    }
     res = g_xrEndFrame(g_xrSession, &fei);
     if (res != XR_SUCCESS) {
         result.errCode = (int)res;
@@ -709,8 +698,10 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         return result;
     }
 
-    // Success - log periodically to see if layer is submitted every frame (to catch if "logs are lying" about presentation)
-    VRMOD_LOG_INFO("EndFrame with layer succeeded (count=%d, state=%d)", s_submitCallCount, (int)g_xrSessionState);
+    // Success — log periodically (was every frame → 60MB logs).
+    if ((s_submitCallCount % 90) == 0) {
+        VRMOD_LOG_INFO("EndFrame with layer succeeded (count=%d, state=%d)", s_submitCallCount, (int)g_xrSessionState);
+    }
 
     result.ok = true;
     if (!s_lastSubmitOk) {

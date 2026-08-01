@@ -195,7 +195,12 @@ LUA_FUNCTION(SetActionManifest) {
 
     g_actionCount = result;
 
-    // Attach action sets to session
+    // Provide action table for binding suggestion (name→XrAction) and for
+    // analog→boolean threshold synthesis on Oculus Touch triggers/grips.
+    XR_SetActionCache(g_actions, g_actionCount);
+
+    // Suggest interaction profile bindings + attach action sets to session.
+    // Without bindings every controller action stays inactive (no hands, no buttons).
     if (!XR_AttachActionSets()) {
         LuaPrint(LUA, "[VRMOD] Warning: Failed to attach action sets (input may not work)");
     }
@@ -429,6 +434,39 @@ LUA_FUNCTION(GetPoses) {
     return 1;
 }
 
+// Physical controller sources for Lua rebinding UI (replaces SteamVR binding UI).
+LUA_FUNCTION(GetControllerSources) {
+    LUA->CreateTable();
+    const int n = XR_GetControllerSourceCount();
+    for (int i = 0; i < n; i++) {
+        const char* id = XR_GetControllerSourceId(i);
+        if (!id || !id[0]) continue;
+        LUA->CreateTable();
+        LUA->PushString(id);
+        LUA->SetField(-2, "id");
+        LUA->PushString(XR_GetControllerSourceLabel(i));
+        LUA->SetField(-2, "label");
+        LUA->PushBool(XR_GetControllerSourceIsFloat(i));
+        LUA->SetField(-2, "analog");
+        LUA->PushNumber(XR_GetControllerSourceValue(i));
+        LUA->SetField(-2, "value");
+        bool active = XR_GetControllerSourceIsActive(i);
+        LUA->PushBool(active);
+        LUA->SetField(-2, "active");
+        // pressed: bool sources as-is; floats use 0.55 threshold (matches fire/pickup)
+        bool pressed = false;
+        if (active) {
+            pressed = XR_GetControllerSourceIsFloat(i)
+                ? (XR_GetControllerSourceValue(i) >= 0.55f)
+                : (XR_GetControllerSourceValue(i) >= 0.5f);
+        }
+        LUA->PushBool(pressed);
+        LUA->SetField(-2, "pressed");
+        LUA->SetField(-2, id);
+    }
+    return 1;
+}
+
 LUA_FUNCTION(GetActions) {
     char* changedActionNames[MAX_ACTIONS];
     bool changedActionStates[MAX_ACTIONS];
@@ -436,32 +474,82 @@ LUA_FUNCTION(GetActions) {
 
     LUA->ReferencePush(g_luaRefs[LuaRefIndex_ActionTable]);
 
+    // Manifest short names collide across main/driving (boolean_spawnmenu, etc.).
+    // Inactive set actions must not overwrite active ones in the Lua table.
+    // Track short names already written by an *active* action this frame.
+    char activeWritten[MAX_ACTIONS][MAX_STR_LEN];
+    int activeWrittenCount = 0;
+    auto markActiveWritten = [&](const char* name) {
+        if (!name || activeWrittenCount >= MAX_ACTIONS) return;
+        for (int k = 0; k < activeWrittenCount; k++)
+            if (strcmp(activeWritten[k], name) == 0) return;
+        strncpy(activeWritten[activeWrittenCount], name, MAX_STR_LEN - 1);
+        activeWritten[activeWrittenCount][MAX_STR_LEN - 1] = '\0';
+        activeWrittenCount++;
+    };
+    auto wasActiveWritten = [&](const char* name) -> bool {
+        if (!name) return false;
+        for (int k = 0; k < activeWrittenCount; k++)
+            if (strcmp(activeWritten[k], name) == 0) return true;
+        return false;
+    };
+
     for (int i = 0; i < g_actionCount; i++) {
         if (g_actions[i].type == ActionType_Boolean) {
             bool changed = false;
-            bool state = XR_GetBooleanAction(g_actions[i].handle, &changed);
-            LUA->PushBool(state);
-            LUA->SetField(-2, g_actions[i].name);
-            if (changed) {
-                changedActionNames[changedActionCount] = g_actions[i].name;
-                changedActionStates[changedActionCount] = state;
-                changedActionCount++;
+            bool active = false;
+            bool state = XR_GetBooleanAction(g_actions[i].handle, &changed, &active);
+            const char* name = g_actions[i].name;
+            if (active) {
+                // OR with any earlier active duplicate (both sets rarely active together)
+                if (wasActiveWritten(name)) {
+                    LUA->GetField(-1, name);
+                    if (LUA->IsType(-1, GarrysMod::Lua::Type::BOOL) && LUA->GetBool(-1))
+                        state = true;
+                    LUA->Pop();
+                }
+                LUA->PushBool(state);
+                LUA->SetField(-2, name);
+                markActiveWritten(name);
+                if (changed) {
+                    changedActionNames[changedActionCount] = g_actions[i].name;
+                    changedActionStates[changedActionCount] = state;
+                    changedActionCount++;
+                }
+            } else if (!wasActiveWritten(name)) {
+                // Inactive and no active sibling yet — seed false (clears stale vehicle keys)
+                LUA->PushBool(false);
+                LUA->SetField(-2, name);
             }
+            // else: inactive duplicate after active write — leave active value alone
         }
         else if (g_actions[i].type == ActionType_Vector1) {
-            float val = XR_GetFloatAction(g_actions[i].handle);
-            LUA->PushNumber(val);
-            LUA->SetField(-2, g_actions[i].name);
+            bool active = false;
+            float val = XR_GetFloatAction(g_actions[i].handle, &active);
+            const char* name = g_actions[i].name;
+            if (active) {
+                LUA->PushNumber(val);
+                LUA->SetField(-2, name);
+                markActiveWritten(name);
+            } else if (!wasActiveWritten(name)) {
+                LUA->PushNumber(0.0);
+                LUA->SetField(-2, name);
+            }
         }
         else if (g_actions[i].type == ActionType_Vector2) {
             float x, y;
-            XR_GetVector2Action(g_actions[i].handle, &x, &y);
-            LUA->ReferencePush(g_actions[i].luaRefs[0]);
-            LUA->PushNumber(x);
-            LUA->SetField(-2, "x");
-            LUA->PushNumber(y);
-            LUA->SetField(-2, "y");
-            LUA->SetField(-2, g_actions[i].name);
+            bool active = false;
+            XR_GetVector2Action(g_actions[i].handle, &x, &y, &active);
+            const char* name = g_actions[i].name;
+            if (active || !wasActiveWritten(name)) {
+                LUA->ReferencePush(g_actions[i].luaRefs[0]);
+                LUA->PushNumber(active ? x : 0.0f);
+                LUA->SetField(-2, "x");
+                LUA->PushNumber(active ? y : 0.0f);
+                LUA->SetField(-2, "y");
+                LUA->SetField(-2, name);
+                if (active) markActiveWritten(name);
+            }
         }
         else if (g_actions[i].type == ActionType_Skeleton) {
             // OpenXR doesn't have skeletal summary in the same way.
@@ -766,6 +854,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "GetPoses");
     LUA->PushCFunction(GetActions);
     LUA->SetField(-2, "GetActions");
+    LUA->PushCFunction(GetControllerSources);
+    LUA->SetField(-2, "GetControllerSources");
     LUA->PushCFunction(ShareTextureBegin);
     LUA->SetField(-2, "ShareTextureBegin");
     LUA->PushCFunction(ShareTextureFinish);
