@@ -131,29 +131,34 @@ static bool LoadGLExtensions() {
 }
 
 // Pick a swapchain format from the runtime's supported list.
-// We prefer linear formats for the current side-by-side blit path (GMod renders in linear).
+//
+// Source Engine eye RTs are already tonemapped / display-referred (roughly sRGB
+// numbers after RenderView). OpenXR composition for HMDs expects sRGB layer
+// content. Prefer GL_SRGB8_ALPHA8 and blit *without* GL_FRAMEBUFFER_SRGB so we
+// store those bytes as-is. Writing display-referred data into a linear RGBA8
+// swapchain makes WiVRn/Quest re-apply gamma → washed-out / too bright.
 static int64_t ChooseXrSwapchainFormat() {
     uint32_t count = 0;
     if (!g_xrEnumerateSwapchainFormats ||
         g_xrEnumerateSwapchainFormats(g_xrSession, 0, &count, nullptr) != XR_SUCCESS ||
         count == 0) {
-        VRMOD_LOG_WARN("xrEnumerateSwapchainFormats unavailable or empty, defaulting to GL_RGBA8");
-        return GL_RGBA8;
+        VRMOD_LOG_WARN("xrEnumerateSwapchainFormats unavailable or empty, defaulting to GL_SRGB8_ALPHA8");
+        return GL_SRGB8_ALPHA8;
     }
 
     std::vector<int64_t> formats(count);
     if (g_xrEnumerateSwapchainFormats(g_xrSession, count, &count, formats.data()) != XR_SUCCESS) {
-        return GL_RGBA8;
+        return GL_SRGB8_ALPHA8;
     }
 
-    // Best: exact linear RGBA8 (matches our Source RT content)
-    for (int64_t f : formats) {
-        if (f == GL_RGBA8) return f;
-    }
-
-    // Acceptable: sRGB8_ALPHA8 (we will enable GL_FRAMEBUFFER_SRGB during blit)
+    // Best: sRGB (matches HMD compositor + Source tonemap output)
     for (int64_t f : formats) {
         if (f == GL_SRGB8_ALPHA8) return f;
+    }
+
+    // Fallback: linear RGBA8 (may look bright on some runtimes if content is already encoded)
+    for (int64_t f : formats) {
+        if (f == GL_RGBA8) return f;
     }
 
     // Next best: plain RGB8 if somehow present
@@ -168,7 +173,7 @@ static int64_t ChooseXrSwapchainFormat() {
         return formats[0];
     }
 
-    return GL_RGBA8;
+    return GL_SRGB8_ALPHA8;
 }
 
 bool XR_CreateSwapchains(char* errMsg, int errMsgLen) {
@@ -455,12 +460,12 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFBO);
     GLboolean prevSrgbEnabled = glIsEnabled(GL_FRAMEBUFFER_SRGB);
 
-    const bool useSrgbFramebuffer = (g_xrSwapchainFormat == GL_SRGB8_ALPHA8);
-    if (useSrgbFramebuffer) {
-        glEnable(GL_FRAMEBUFFER_SRGB);
-    } else {
-        glDisable(GL_FRAMEBUFFER_SRGB);
-    }
+    // Always disable FRAMEBUFFER_SRGB during the blit.
+    // Engine RT pixels are already tonemapped. Enabling SRGB on an sRGB
+    // swapchain would encode again (wrong). Leaving it on for linear formats
+    // does nothing useful for glBlitFramebuffer of display-referred data.
+    // Passthrough store into sRGB swapchain = correct brightness on WiVRn/Quest.
+    glDisable(GL_FRAMEBUFFER_SRGB);
 
     XrCompositionLayerProjectionView projViews[2];
 
