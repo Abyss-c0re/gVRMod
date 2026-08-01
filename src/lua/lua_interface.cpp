@@ -723,6 +723,12 @@ LUA_FUNCTION(SetRTTextureFlip) {
     return 0;
 }
 
+// Drain GPU between stereo eyes when mat_queue_mode=2 (material workers + GL race).
+LUA_FUNCTION(GLFinish) {
+    glFinish();
+    return 0;
+}
+
 LUA_FUNCTION(SubmitSharedTexture) {
     // Usable source: prefer per-eye textures (new path), fall back to legacy single shared/FBO.
     bool haveLeft = (g_leftEyeTexture != 0 && glIsTexture(g_leftEyeTexture)) || (g_leftEyeColorTex != 0 && glIsTexture(g_leftEyeColorTex)) || (g_leftEyeFBO != 0);
@@ -868,6 +874,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SetSubmitTextureBounds");
     LUA->PushCFunction(SetRTTextureFlip);
     LUA->SetField(-2, "SetRTTextureFlip");
+    LUA->PushCFunction(GLFinish);
+    LUA->SetField(-2, "GLFinish");
     LUA->PushCFunction(SubmitSharedTexture);
     LUA->SetField(-2, "SubmitSharedTexture");
     LUA->PushCFunction(Shutdown);
