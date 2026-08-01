@@ -344,8 +344,9 @@ cp -f "$MODULE_SRC" "$GMOD_DIR/$MODULE_REL"
 echo "$MODULE_REL" >> "$MANIFEST"
 echo "  copied: gmcl_vrmod_linux64.dll   →  garrysmod/lua/bin/"
 
-# 2. OpenXR loader + all its dependencies (must go to the engine's bin/linux64
-#    so the Steam Linux Runtime / engine can resolve them when the module dlopen's).
+# 2. OpenXR loader + deps → engine bin/linux64 (Steam/engine path) AND next to
+#    the module in garrysmod/lua/bin (module dlopen searches moduleDir first —
+#    "not detecting headset" is often a failed loader load under Steam Runtime).
 shopt -s nullglob
 for f in "$BUNDLE_DIR"/*; do
     bn="$(basename "$f")"
@@ -353,8 +354,17 @@ for f in "$BUNDLE_DIR"/*; do
     cp -f "$f" "$GMOD_DIR/$REL"
     echo "$REL" >> "$MANIFEST"
     echo "  copied: $bn   →  bin/linux64/"
+    # Mirror next to gmcl_vrmod_linux64.dll for XR_LoadLoader candidates
+    REL2="garrysmod/lua/bin/$bn"
+    cp -f "$f" "$GMOD_DIR/$REL2"
+    echo "$REL2" >> "$MANIFEST"
+    echo "  copied: $bn   →  garrysmod/lua/bin/"
 done
 shopt -u nullglob
+# Convenience soname next to module
+if [[ -f "$LUA_BIN_DIR/libopenxr_loader.so.1" ]]; then
+    ln -sfn libopenxr_loader.so.1 "$LUA_BIN_DIR/libopenxr_loader.so"
+fi
 
 rm -rf "$BUNDLE_DIR"
 
@@ -387,6 +397,17 @@ echo
 echo "You can now start Garry's Mod and use vrmod."
 echo "If you ever want to remove everything this script installed, run:"
 echo "    $0 --uninstall"
+echo
+echo "=== OpenXR / headset (required) ==="
+echo "gVRMod is OpenXR-only. WiVRn or Monado must be the active runtime."
+echo "  1) Start WiVRn server + connect Quest (or start monado-service)."
+echo "  2) Verify:  XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_wivrn.json openxr_runtime_list"
+echo "     Expect: Head: 'WiVRn HMD' / systemName with your headset."
+echo "  3) Steam → Garry's Mod → Launch Options (no nested quotes — VDF breaks):"
+echo "     XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_wivrn.json LD_LIBRARY_PATH=\$HOME/.local/share/Steam/steamapps/common/GarrysMod/garrysmod/lua/bin:\$HOME/.local/share/Steam/steamapps/common/GarrysMod/bin/linux64:/usr/lib/wivrn:\$LD_LIBRARY_PATH %command%"
+echo "  4) Ensure ~/.config/openxr/1/active_runtime.json → openxr_wivrn.json"
+echo "  5) Do NOT also load vrmod-x64 (OpenVR) addon — one module only."
+echo "  6) In-game: vrmod_start  (console errors show if XR_Init fails)"
 echo
 echo "Tip: If you update your system OpenXR packages later and want the"
 echo "     latest loader + deps, just run this installer again."
