@@ -57,10 +57,15 @@ if CLIENT then
     vrmod.AddCallbackedConvar("vrmod_viewscale", nil, "1.0")
     vrmod.AddCallbackedConvar("vrmod_fovscale_x", nil, "1")
     vrmod.AddCallbackedConvar("vrmod_fovscale_y", nil, "1")
-    vrmod.AddCallbackedConvar("vrmod_scalefactor", nil, "1")
+    -- Render supersample: multiplies per-eye RT vs raw HMD recommended (1=native, 1.5 crisp, 2.0 heavy).
+    -- Requires VR restart. Lua applies SS then clamps SBS ≤ 4096.
+    vrmod.AddCallbackedConvar("vrmod_supersample", nil, "1.5", FCVAR_ARCHIVE, "VR render supersample 0.5–2.0 (restart VR)", 0.5, 2.0, tonumber)
+    vrmod.AddCallbackedConvar("vrmod_scalefactor", nil, "1", FCVAR_ARCHIVE, "Submit UV scale factor (border crop)", 0.05, 4.0, tonumber)
     vrmod.AddCallbackedConvar("vrmod_eyescale", nil, "0.5")
-    vrmod.AddCallbackedConvar("vrmod_verticaloffset", nil, "0")
-    vrmod.AddCallbackedConvar("vrmod_horizontaloffset", nil, "0")
+    -- Workshop: inverted stereo / "seeing double" (PSVR2 etc.) — swap SBS halves without dual pose truth
+    vrmod.AddCallbackedConvar("vrmod_swap_eyes", nil, "0", FCVAR_ARCHIVE, "Swap left/right eye submit halves", nil, nil, tobool)
+    vrmod.AddCallbackedConvar("vrmod_verticaloffset", nil, "0", FCVAR_ARCHIVE, "Submit UV vertical offset", -1.0, 1.0, tonumber)
+    vrmod.AddCallbackedConvar("vrmod_horizontaloffset", nil, "0", FCVAR_ARCHIVE, "Submit UV horizontal offset", -1.0, 1.0, tonumber)
     vrmod.AddCallbackedConvar("vrmod_oldcharacteryaw", nil, "0")
     vrmod.AddCallbackedConvar("vrmod_postprocess", nil, "0", nil, nil, nil, nil, tobool, function(val) if g_VR.view then g_VR.view.dopostprocess = val end end)
     vrmod.AddCallbackedConvar("vrmod_skybox", nil, "0", nil, nil, nil, nil, tobool, function(val) RunConsoleCommand("r_3dsky", val and "1" or "0") end)
@@ -73,6 +78,9 @@ if CLIENT then
     vrmod.AddCallbackedConvar("vrmod_smoothturn", "smoothTurn", "1", nil, nil, nil, nil, tobool)
     vrmod.AddCallbackedConvar("vrmod_smoothturnrate", "smoothTurnRate", "180", nil, nil, nil, nil, tonumber)
     vrmod.AddCallbackedConvar("vrmod_crouchthreshold", "crouchThreshold", "40", nil, nil, nil, nil, tonumber)
+    -- Cube locomotion: full-stick auto sprint (Workshop: forced walk / no sprint)
+    vrmod.AddCallbackedConvar("vrmod_autosprint", "autoSprint", "1", FCVAR_ARCHIVE, "Auto-sprint when move stick fully deflected", nil, nil, tobool)
+    vrmod.AddCallbackedConvar("vrmod_autosprint_threshold", "autoSprintThreshold", "0.82", FCVAR_ARCHIVE, "Stick magnitude for auto-sprint", 0.5, 1.0, tonumber)
     vrmod.AddCallbackedConvar("vrmod_charactereyeheight", "characterEyeHeight", "66.8", FCVAR_ARCHIVE, "Character eye height", 30, 100, tonumber)
     vrmod.AddCallbackedConvar("vrmod_characterheadtohmddist", "characterHeadToHmdDist", "6.3", FCVAR_ARCHIVE, "Head to HMD distance", 0, 20, tonumber)
     vrmod.AddCallbackedConvar("vrmod_characterik", "characterIK", "1", FCVAR_ARCHIVE, "Enable character IK", nil, nil, tobool)

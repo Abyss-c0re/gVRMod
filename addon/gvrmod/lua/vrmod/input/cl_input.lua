@@ -79,6 +79,19 @@ local function VRMod_CleanupVehicleExit()
 	VRMOD_SetActiveActionSets("/actions/base", "/actions/main")
 	timer.Simple(1, function() g_VR.antiDrop = false end)
 	timer.Remove("vrmod_vehicle_watchdog")
+	timer.Remove("vrmod_glide_seat_recheck")
+	timer.Remove("vrmod_glide_bind_check")
+end
+
+local function ResolveGlideDriving(ply)
+	if not IsValid(ply) then return false end
+	local seat = 0
+	if ply.GlideGetSeatIndex then
+		seat = ply:GlideGetSeatIndex() or 0
+	end
+	-- Driver seat is 1. Seat 0 = API not ready yet → treat as driver until recheck.
+	if seat == 1 or seat < 1 then return true end
+	return false
 end
 
 hook.Add("VRMod_EnterVehicle", "vrmod_switchactionset", function()
@@ -95,7 +108,32 @@ hook.Add("VRMod_EnterVehicle", "vrmod_switchactionset", function()
 		g_VR.vehicle.glide = glide
 		g_VR.vehicle.bone_name = name
 		vrmod.logger.Info("Steer grip type selected: " .. tostring(vType))
-		if glide and ply:GlideGetSeatIndex() == 1 or not glide then g_VR.vehicle.driving = true end
+		if glide then
+			g_VR.vehicle.driving = ResolveGlideDriving(ply)
+			-- Seat index often 0 on first tick after enter — recheck once
+			timer.Create("vrmod_glide_seat_recheck", 0.6, 1, function()
+				if not IsValid(ply) or not g_VR.vehicle.inside or not g_VR.vehicle.glide then return end
+				g_VR.vehicle.driving = ResolveGlideDriving(ply)
+			end)
+			-- Cube W3: honest toast — stick drives; wheel is optional assist
+			if g_VR.vehicle.driving and vrmod.Toast then
+				vrmod.Toast("Glide: thumbstick throttle/steer · wheel grip is optional assist", 5, "hint")
+				-- If driving actions never bound, warn once (was silent dead car)
+				timer.Create("vrmod_glide_bind_check", 1.5, 1, function()
+					if not g_VR.vehicle.inside or not g_VR.vehicle.glide or not g_VR.vehicle.driving then return end
+					local inp = g_VR.input
+					if not inp or inp.vector2_steer == nil then
+						vrmod.Toast(
+							"Glide inputs unbound — SteamVR bindings missing for VRMod /actions/driving. Reinstall module or rebind.",
+							7,
+							"error"
+						)
+					end
+				end)
+			end
+		else
+			g_VR.vehicle.driving = true
+		end
 		-- Safety watchdog: check every second if the vehicle is still valid and player still inside
 		timer.Create("vrmod_vehicle_watchdog", 1, 0, function() if not IsValid(ply) or not ply:InVehicle() or not IsValid(g_VR.vehicle.current) then VRMod_CleanupVehicleExit() end end)
 	end)
@@ -139,6 +177,33 @@ hook.Add("VRMod_Input", "vrutil_hook_defaultinput", function(action, pressed)
 	end
 
 	if action == "boolean_left_pickup" then
+		-- Exact pre-breakage order (e91d04d): menu grab → ArcVR probe → stock FG → pickup
+		if vrmod.TryMenuGrab and vrmod.TryMenuGrab("left", pressed) then return end
+		if g_VR.menuGrabActive then return end
+
+		local awep = LocalPlayer():GetActiveWeapon()
+		local arcFG = IsValid(awep) and awep.ArcticVR and awep.ForegripGrabbed
+		local arcNearFG = false
+		if pressed and IsValid(awep) and awep.ArcticVR and awep.TwoHanded and not arcFG then
+			if awep.LeftHandInForegrip then
+				arcNearFG = awep:LeftHandInForegrip(awep.ForegripMins, awep.ForegripMaxs) and true or false
+			elseif awep.LeftHandNearForegrip then
+				arcNearFG = awep:LeftHandNearForegrip(18) and true or false
+			end
+		end
+
+		-- Stock two-hand foregrip claims left grip before world prop pickup
+		if vrmod.TryForegripGrab and vrmod.TryForegripGrab(pressed) then
+			if g_VR.vehicle.wheel_bone then leftGrip = pressed end
+			return
+		end
+		if arcFG or arcNearFG or g_VR.foregripActive or (vrmod.IsForegripActive and vrmod.IsForegripActive()) then
+			if g_VR.vehicle.wheel_bone then leftGrip = pressed end
+			return
+		end
+		if g_VR.avatarSteerTwin then return end
+		local twin = vrmod.avatar and vrmod.avatar.Get and vrmod.avatar.Get("avatar")
+		if twin and twin.active and twin.mode == "free" and not g_VR.menuFocus then return end
 		if g_VR.vehicle.wheel_bone then leftGrip = pressed end
 		if cl_pickupdisable:GetBool() then return end
 		vrmod.Pickup(true, not pressed)
@@ -146,6 +211,11 @@ hook.Add("VRMod_Input", "vrutil_hook_defaultinput", function(action, pressed)
 	end
 
 	if action == "boolean_right_pickup" then
+		if vrmod.TryMenuGrab and vrmod.TryMenuGrab("right", pressed) then return end
+		if g_VR.menuGrabActive then return end
+		if g_VR.avatarSteerTwin then return end
+		local twin = vrmod.avatar and vrmod.avatar.Get and vrmod.avatar.Get("avatar")
+		if twin and twin.active and twin.mode == "free" and not g_VR.menuFocus then return end
 		if g_VR.vehicle.wheel_bone or g_VR.vehicle.type == "aircraft" then rightGrip = pressed end
 		if cl_pickupdisable:GetBool() then return end
 		vrmod.Pickup(false, not pressed)
@@ -179,7 +249,29 @@ hook.Add("VRMod_Input", "vrutil_hook_defaultinput", function(action, pressed)
 	end
 
 	if action == "boolean_spawnmenu" then
+		-- 3× tap within ~1s → reset all window poses/sizes/anchors (then reopen QM)
 		if pressed then
+			g_VR._qmTapTimes = g_VR._qmTapTimes or {}
+			local taps = g_VR._qmTapTimes
+			local now = SysTime()
+			local window = 1.0
+			while #taps > 0 and (now - taps[1]) > window do
+				table.remove(taps, 1)
+			end
+			taps[#taps + 1] = now
+			if #taps >= 3 then
+				g_VR._qmTapTimes = {}
+				if g_VR.MenuClose then pcall(g_VR.MenuClose) end
+				if vrmod.ResetAllWindowLayouts then
+					vrmod.ResetAllWindowLayouts({ reopenQM = true, closeAll = true })
+				elseif isfunction(RunConsoleCommand) then
+					RunConsoleCommand("vrmod_reset_window_layouts")
+				end
+				if vrmod.Toast then
+					vrmod.Toast("3× menu — layouts reset to wrist defaults", 3, "ok")
+				end
+				return
+			end
 			g_VR.MenuOpen()
 			if cl_hudonlykey:GetBool() then LocalPlayer():ConCommand("vrmod_hud 1") end
 		else
@@ -296,12 +388,20 @@ hook.Add("VRMod_Tracking", "glide_vr_tracking", function()
 
 	if Glide and g_VR.vehicle.glide then
 		-- === Steering / throttle / brake ===
-		local throttle = g_VR.input.vector1_forward or 0
-		local brake = g_VR.input.vector1_reverse or 0
-		local steer = g_VR.wheelGripped and g_VR.analog_input.steer or g_VR.input.vector2_steer.x or 0
+		-- Cube W3: joystick/action-set is SoT; wheel grip is assist only when stick idle.
+		local inp = g_VR.input or {}
+		local throttle = inp.vector1_forward or 0
+		local brake = inp.vector1_reverse or 0
+		local stickX = (inp.vector2_steer and inp.vector2_steer.x) or 0
+		local stickY = (inp.vector2_steer and inp.vector2_steer.y) or 0
+		local wheelSteer = (g_VR.wheelGripped and g_VR.analog_input.steer) or 0
+		local steer = stickX
+		if math.abs(stickX) < 0.05 and math.abs(wheelSteer) > 0.02 then
+			steer = wheelSteer
+		end
 		if g_VR.vehicle.type == "aircraft" then throttle = throttle - brake end
-		local pitch = g_VR.analog_input.pitch + g_VR.input.vector2_steer.y or 0
-		local yaw = g_VR.analog_input.yaw + g_VR.input.vector2_steer.x or 0
+		local pitch = (g_VR.analog_input.pitch or 0) + stickY
+		local yaw = (g_VR.analog_input.yaw or 0) + stickX
 		local roll = g_VR.analog_input.roll or 0
 		-- === Send to server if significant change ===
 		local changed = math.abs(throttle - lastInputState.throttle) > ANALOG_EPSILON or math.abs(brake - lastInputState.brake) > ANALOG_EPSILON or math.abs(steer - lastInputState.steer) > ANALOG_EPSILON or math.abs(pitch - lastInputState.pitch) > ANALOG_EPSILON or math.abs(yaw - lastInputState.yaw) > ANALOG_EPSILON or math.abs(roll - lastInputState.roll) > ANALOG_EPSILON

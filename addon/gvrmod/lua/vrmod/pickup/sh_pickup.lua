@@ -55,13 +55,29 @@ if CLIENT then
 		end
 	end)
 
-	hook.Add("PostDrawOpaqueRenderables", "vrmod_draw_pickup_halo", function()
+	hook.Add("PostDrawOpaqueRenderables", "vrmod_draw_pickup_halo", function(depth, sky)
+		if depth or sky then return end
+		if not g_VR or not g_VR.active then return end
 		if not GetConVar("vrmod_pickup_halos"):GetBool() then return end
+		-- Only during a real stereo eye (nested RT captures have stereoEye nil)
+		if g_VR.stereoEye ~= "left" and g_VR.stereoEye ~= "right" then return end
+
 		table.Empty(haloTargetsLeft)
 		table.Empty(haloTargetsRight)
 		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
 		local heldLeft, heldRight = g_VR.heldEntityLeft, g_VR.heldEntityRight
-		local holdingRagdoll = IsValid(heldLeft) and heldLeft:GetNWBool("is_npc_ragdoll", false) or IsValid(heldRight) and heldRight:GetNWBool("is_npc_ragdoll", false)
+		-- Clear stale held refs (entity removed / dropped without client nil)
+		if heldLeft ~= nil and not IsValid(heldLeft) then
+			g_VR.heldEntityLeft = nil
+			heldLeft = nil
+		end
+		if heldRight ~= nil and not IsValid(heldRight) then
+			g_VR.heldEntityRight = nil
+			heldRight = nil
+		end
+		local holdingRagdoll = (IsValid(heldLeft) and heldLeft:GetNWBool("is_npc_ragdoll", false))
+			or (IsValid(heldRight) and heldRight:GetNWBool("is_npc_ragdoll", false))
 		local function ShouldAddHalo(ent)
 			if not IsValid(ent) or ent == heldLeft or ent == heldRight or holdingRagdoll then return false end
 			-- Check server flag for pickup validity, fallback to IsValidPickupTarget if flag missing
@@ -123,6 +139,11 @@ if CLIENT then
 		local bDrop = net.ReadBool()
 		if bDrop then
 			vrmod.logger.Debug("net.Receive vrmod_pickup: Player " .. ply:Nick() .. " dropped entity -> " .. ent:GetClass())
+			-- Always clear held on drop net (local drop path also nils; keep both in sync)
+			if ply == LocalPlayer() then
+				if g_VR.heldEntityLeft == ent then g_VR.heldEntityLeft = nil end
+				if g_VR.heldEntityRight == ent then g_VR.heldEntityRight = nil end
+			end
 			hook.Call("VRMod_Drop", nil, ply, ent)
 			return
 		end

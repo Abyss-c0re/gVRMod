@@ -103,28 +103,39 @@ function vrmod_fbt.Init(ply)
 	end
 
 	info.fingerboneids = fingerboneids
-	-- Validate required bones
-	g_VR.errorText = ply == LocalPlayer() and "" or g_VR.errorText
+	-- Soft-validate required bones (no crash / no hard abort)
+	local optional = { leftWrist = true, rightWrist = true, leftUlna = true, rightUlna = true }
+	local missing = {}
+	if ply == LocalPlayer() then g_VR.errorText = "" end
 	for k, v in pairs(boneids) do
-		if v == -1 and not table.HasValue({"leftWrist", "rightWrist", "leftUlna", "rightUlna"}, k) then
-			g_VR.errorText = ply == LocalPlayer() and "Missing bone: " .. k or g_VR.errorText
-			tmpPlayerModel:Remove()
-			vrmod_fbt.characterInfo[steamid] = nil
-			vrmod.logger.Err("FBT Init failed for %s - missing bone: %s", steamid, k)
-			return false
+		if v == -1 and not optional[k] then
+			missing[#missing + 1] = k
 		end
+	end
+	info.incompatible = #missing > 0
+	info.ikReady = #missing == 0
+	if #missing > 0 then
+		if ply == LocalPlayer() then
+			g_VR.errorText = "FBT limited — missing bone(s): " .. missing[1]
+		end
+		vrmod.logger.Warn("FBT Init soft-fail %s missing=%s", steamid, table.concat(missing, ", "))
+		-- Keep info so we don't re-spam; disable FBT active flag
+		if g_VR.fbtActive then g_VR.fbtActive[steamid] = false end
+		tmpPlayerModel:Remove()
+		info.modelName = pmname
+		return true
 	end
 
 	info.modelName = pmname
 	-- Build full bone info table
 	local boneinfo = {}
 	info.boneinfo = boneinfo
-	local boneCount = tmpPlayerModel:GetBoneCount()
+	local boneCount = tmpPlayerModel:GetBoneCount() or 0
 	info.boneCount = boneCount
 	for i = 0, boneCount - 1 do
 		local parent = tmpPlayerModel:GetBoneParent(i)
 		local mtx = tmpPlayerModel:GetBoneMatrix(i) or Matrix()
-		local mtxParent = tmpPlayerModel:GetBoneMatrix(parent) or mtx
+		local mtxParent = (isnumber(parent) and parent >= 0 and tmpPlayerModel:GetBoneMatrix(parent)) or mtx
 		local relativePos, relativeAng = WorldToLocal(mtx:GetTranslation(), mtx:GetAngles(), mtxParent:GetTranslation(), mtxParent:GetAngles())
 		boneinfo[i] = {
 			name = tmpPlayerModel:GetBoneName(i),
@@ -138,18 +149,32 @@ function vrmod_fbt.Init(ply)
 		}
 	end
 
+	local function mtxLen(a, b, fallback)
+		if not isnumber(a) or a < 0 or not isnumber(b) or b < 0 then return fallback end
+		local ma, mb = tmpPlayerModel:GetBoneMatrix(a), tmpPlayerModel:GetBoneMatrix(b)
+		if not ma or not mb then return fallback end
+		return (ma:GetTranslation() - mb:GetTranslation()):Length()
+	end
+
 	-- Measure limb lengths (using left side, assuming symmetry)
-	info.upperLegLen = (tmpPlayerModel:GetBoneMatrix(boneids.leftCalf):GetTranslation() - tmpPlayerModel:GetBoneMatrix(boneids.leftThigh):GetTranslation()):Length()
-	info.lowerLegLen = (tmpPlayerModel:GetBoneMatrix(boneids.leftFoot):GetTranslation() - tmpPlayerModel:GetBoneMatrix(boneids.leftCalf):GetTranslation()):Length()
-	info.clavicleLen = (tmpPlayerModel:GetBoneMatrix(boneids.leftUpperArm):GetTranslation() - tmpPlayerModel:GetBoneMatrix(boneids.leftClavicle):GetTranslation()):Length()
-	info.upperArmLen = (tmpPlayerModel:GetBoneMatrix(boneids.leftForearm):GetTranslation() - tmpPlayerModel:GetBoneMatrix(boneids.leftUpperArm):GetTranslation()):Length()
-	info.lowerArmLen = (tmpPlayerModel:GetBoneMatrix(boneids.leftHand):GetTranslation() - tmpPlayerModel:GetBoneMatrix(boneids.leftForearm):GetTranslation()):Length()
+	info.upperLegLen = mtxLen(boneids.leftCalf, boneids.leftThigh, 16)
+	info.lowerLegLen = mtxLen(boneids.leftFoot, boneids.leftCalf, 16)
+	info.clavicleLen = mtxLen(boneids.leftUpperArm, boneids.leftClavicle, 8)
+	info.upperArmLen = mtxLen(boneids.leftForearm, boneids.leftUpperArm, 12)
+	info.lowerArmLen = mtxLen(boneids.leftHand, boneids.leftForearm, 12)
 	-- Default angles
-	_, info.defaultToNeutralClavicleAng = WorldToLocal(vrmod_fbt.zeroVec, Angle(0, 90, 90), vrmod_fbt.zeroVec, tmpPlayerModel:GetBoneMatrix(boneids.leftClavicle):GetAngles())
-	info.defaultLeftFootAngles = tmpPlayerModel:GetBoneMatrix(boneids.leftFoot):GetAngles()
-	info.defaultRightFootAngles = tmpPlayerModel:GetBoneMatrix(boneids.rightFoot):GetAngles()
+	local clavMtx = tmpPlayerModel:GetBoneMatrix(boneids.leftClavicle)
+	if clavMtx then
+		_, info.defaultToNeutralClavicleAng = WorldToLocal(vrmod_fbt.zeroVec, Angle(0, 90, 90), vrmod_fbt.zeroVec, clavMtx:GetAngles())
+	else
+		info.defaultToNeutralClavicleAng = Angle()
+	end
+	local lf = tmpPlayerModel:GetBoneMatrix(boneids.leftFoot)
+	local rf = tmpPlayerModel:GetBoneMatrix(boneids.rightFoot)
+	info.defaultLeftFootAngles = lf and lf:GetAngles() or Angle()
+	info.defaultRightFootAngles = rf and rf:GetAngles() or Angle()
 	-- Build spine bend lookup tables
-	vrmod_fbt.BuildSpineBendTables(info, boneids, boneinfo, tmpPlayerModel)
+	pcall(vrmod_fbt.BuildSpineBendTables, info, boneids, boneinfo, tmpPlayerModel)
 	tmpPlayerModel:Remove()
 	vrmod.logger.Info("FBT Init succeeded for %s (model: %s)", steamid, pmname)
 	return true
@@ -301,8 +326,11 @@ function vrmod_fbt.CalculateBonePositions(ply)
 	local steamid = ply:SteamID()
 	local info = vrmod_fbt.characterInfo[steamid]
 	local frame = g_VR.net[steamid].lerpedFrame
-	if info.frameNumber == FrameNumber() or not frame then return end
-	info.frameNumber = FrameNumber()
+	-- Freeze once per stereo pair (not FrameNumber) so left/right eyes share one solve.
+	-- Foregrip stamps attach LH before the first eye; use that snap as SoT.
+	local sf = (g_VR and g_VR.stereoFrame) or FrameNumber() or 0
+	if info.frameNumber == sf or not frame then return end
+	info.frameNumber = sf
 	local boneids = info.boneids
 	local boneinfo = info.boneinfo
 	local boneCount = info.boneCount
@@ -320,7 +348,12 @@ function vrmod_fbt.CalculateBonePositions(ply)
 	-- Target poses
 	local pelvisTargetPos, pelvisTargetAng = LocalToWorld(info.waistCalibrationPos, info.waistCalibrationAng, frame.waistPos, frame.waistAng)
 	local headTargetPos, headTargetAng = LocalToWorld(info.headCalibrationPos, info.headCalibrationAng, frame.hmdPos, frame.hmdAng)
+	-- Stock foregrip: frozen attach hand (same both eyes) — not live device LH
 	local leftHandTargetPos, leftHandTargetAng = frame.lefthandPos, frame.lefthandAng
+	if g_VR.foregripActive and g_VR._leftHandSnapFrame == sf and g_VR._leftHandSnapPos and g_VR._leftHandSnapAng then
+		leftHandTargetPos = g_VR._leftHandSnapPos
+		leftHandTargetAng = g_VR._leftHandSnapAng
+	end
 	local rightHandTargetPos, rightHandTargetAng = frame.righthandPos, frame.righthandAng
 	local leftFootTargetPos, leftFootTargetAng = LocalToWorld(info.leftFootCalibrationPos, info.leftFootCalibrationAng, frame.leftfootPos, frame.leftfootAng)
 	local rightFootTargetPos, rightFootTargetAng = LocalToWorld(info.rightFootCalibrationPos, info.rightFootCalibrationAng, frame.rightfootPos, frame.rightfootAng)
@@ -387,45 +420,53 @@ function vrmod_fbt.CalculateBonePositions(ply)
 	end
 end
 
--- Track active calibration session
+-- Track active calibration session (uses shared vrmod.avatar util — same as height cal)
 vrmod_fbt.activeCalibration = vrmod_fbt.activeCalibration or {}
 function vrmod_fbt.Calibrate()
 	local ply = LocalPlayer()
 	-- Cleanup previous calibration if it exists
-	if vrmod_fbt.activeCalibration.model then
+	if vrmod_fbt.activeCalibration.session or vrmod_fbt.activeCalibration.model then
 		vrmod.logger.Info("Resetting previous FBT calibration...")
-		vrmod_fbt.activeCalibration.model:Remove()
+		if vrmod.avatar then vrmod.avatar.Close("fbt_cal") end
+		if IsValid(vrmod_fbt.activeCalibration.model) then
+			vrmod_fbt.activeCalibration.model:Remove()
+		end
 		ply.RenderOverride = nil
 		hook.Remove("PostDrawTranslucentRenderables", "fbt_showtrackers")
 		hook.Remove("VRMod_Input", "fbt_cal_input")
 		vrmod_fbt.activeCalibration = {}
 	end
 
-	-- Create new calibration session
-	local calibrationModel = ClientsideModel(ply.vrmod_pm or ply:GetModel())
-	vrmod_fbt.activeCalibration.model = calibrationModel
-	ply.RenderOverride = function() end
-	calibrationModel:SetPos(Vector(g_VR.tracking.hmd.pos.x, g_VR.tracking.hmd.pos.y, ply:GetPos().z))
-	calibrationModel:SetAngles(Angle(0, g_VR.tracking.hmd.ang.yaw, 0))
-	-- Show tracker boxes
-	hook.Add("PostDrawTranslucentRenderables", "fbt_showtrackers", function(depth, sky)
-		if depth or sky or not g_VR.tracking.pose_waist or not g_VR.tracking.pose_leftfoot or not g_VR.tracking.pose_rightfoot then return end
-		render.SetColorMaterial()
-		render.DrawBox(g_VR.tracking.pose_waist.pos, g_VR.tracking.pose_waist.ang, Vector(-1, -1, -1), Vector(1, 1, 1))
-		render.DrawBox(g_VR.tracking.pose_leftfoot.pos, g_VR.tracking.pose_leftfoot.ang, Vector(-1, -1, -1), Vector(1, 1, 1))
-		render.DrawBox(g_VR.tracking.pose_rightfoot.pos, g_VR.tracking.pose_rightfoot.ang, Vector(-1, -1, -1), Vector(1, 1, 1))
-	end)
+	-- Shared avatar editor: world-aligned idle PM + tracker boxes (concept-synced with height twin)
+	local session
+	if vrmod.avatar and vrmod.avatar.OpenFBTCal then
+		session = vrmod.avatar.OpenFBTCal()
+	end
+	if not session or not session:IsValid() then
+		vrmod.logger.Err("FBT Calibrate: avatar util unavailable")
+		return
+	end
+	vrmod_fbt.activeCalibration.session = session
+	vrmod_fbt.activeCalibration.model = session:GetEntity()
 
 	-- Input hook for finalizing calibration
 	hook.Add("VRMod_Input", "fbt_cal_input", function(action, pressed)
 		if action ~= "boolean_reload" or not pressed then return end
 		if vrmod_fbt.Init(ply) == false then return end
 		local boneids = vrmod_fbt.characterInfo[ply:SteamID()].boneids
+		local calibrationModel = session:GetEntity()
+		if not IsValid(calibrationModel) then return end
 		calibrationModel:SetupBones()
 		net.Start("vrmod_fbt_cal")
 		net.WriteBool(false)
 		local function sendBone(bone, tracker)
-			local pos, ang = WorldToLocal(calibrationModel:GetBoneMatrix(bone):GetTranslation(), calibrationModel:GetAngles(), tracker.pos, tracker.ang)
+			if not tracker or not tracker.pos then return end
+			local pos, ang = WorldToLocal(
+				calibrationModel:GetBoneMatrix(bone):GetTranslation(),
+				calibrationModel:GetAngles(),
+				tracker.pos,
+				tracker.ang or Angle()
+			)
 			net.WriteVector(pos)
 			net.WriteAngle(ang)
 		end
@@ -435,13 +476,12 @@ function vrmod_fbt.Calibrate()
 		sendBone(boneids.leftFoot, g_VR.tracking.pose_leftfoot)
 		sendBone(boneids.rightFoot, g_VR.tracking.pose_rightfoot)
 		net.SendToServer()
-		-- Cleanup calibration session
-		calibrationModel:Remove()
+		-- Cleanup via shared util
+		if vrmod.avatar then vrmod.avatar.Close("fbt_cal") end
 		ply.RenderOverride = nil
-		hook.Remove("PostDrawTranslucentRenderables", "fbt_showtrackers")
 		hook.Remove("VRMod_Input", "fbt_cal_input")
 		vrmod_fbt.activeCalibration = {}
-		vrmod.logger.Info("FBT calibration completed")
+		vrmod.logger.Info("FBT calibration completed (avatar util)")
 	end)
 end
 
@@ -516,9 +556,9 @@ hook.Add("VRMod_OpenQuickMenu", "fbt_quickmenu", function()
 	local steamid = LocalPlayer():SteamID()
 	local active = g_VR.fbtActive and g_VR.fbtActive[steamid] or false
 	if active then
-		vrmod.AddInGameMenuItem("Disable Full-body Tracking", 5, 0, function() vrmod_fbt.Stop(LocalPlayer()) end)
+		vrmod.AddInGameMenuItem("Disable Full-body Tracking", 5, 0, function() vrmod_fbt.Stop(LocalPlayer()) end, false, nil, "fbt_disable")
 	else
-		vrmod.AddInGameMenuItem("Calibrate Full-body Tracking", 5, 0, vrmod_fbt.Calibrate, false, "press reload when done")
+		vrmod.AddInGameMenuItem("Calibrate Full-body Tracking", 5, 0, vrmod_fbt.Calibrate, false, "press reload when done", "fbt_calibrate")
 	end
 end)
 

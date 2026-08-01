@@ -69,15 +69,20 @@ if CLIENT then
     function vrmod.GetStartupError()
         local error = nil
         local moduleFile = nil
+        -- requiredVersion = hard floor (must boot). latestVersion = full feature set (SS eye args, etc).
+        -- Lua degrades gracefully on older modules; only refuse if too ancient / missing.
         local requiredVersion, latestVersion
         if system.IsLinux() then
-            requiredVersion = 23
+            requiredVersion = 20
             latestVersion = 23
             moduleFile = "lua/bin/gmcl_vrmod_linux64.dll"
         else
-            requiredVersion = 21
-            latestVersion = 21
+            requiredVersion = 20
+            latestVersion = 23
             moduleFile = "lua/bin/gmcl_vrmod_win64.dll"
+            if not file.Exists(moduleFile, "GAME") then
+                moduleFile = "lua/bin/gmcl_vrmod_win32.dll"
+            end
         end
 
         g_VR.moduleVersion = g_VR.moduleVersion or 0
@@ -89,16 +94,29 @@ if CLIENT then
             end
         elseif g_VR.moduleVersion < requiredVersion then
             error = "Module update required.\nRun the installer or re-download from the workshop.\n\nInstalled: v" .. g_VR.moduleVersion .. "\nRequired: v" .. requiredVersion
-        elseif g_VR.moduleVersion > latestVersion then
-            print("[VRMOD] Warning: Module version is newer than tested. Installed: v" .. g_VR.moduleVersion .. " | Required: v" .. requiredVersion .. " | Addon version: " .. vrmod.GetVersion() .. " | Most features should work, but some bugs may exist.")
-        elseif VRMOD_IsHMDPresent and not VRMOD_IsHMDPresent() then
-            error = "VR headset not detected."
+        else
+            if g_VR.moduleVersion < latestVersion then
+                print(string.format(
+                    "[VRMOD] Module v%d is older than recommended v%d. VR still runs; supersample eye sizing and some crisp-path fixes need the latest modules.zip.",
+                    g_VR.moduleVersion, latestVersion
+                ))
+            elseif g_VR.moduleVersion > latestVersion then
+                print("[VRMOD] Warning: Module version is newer than tested. Installed: v" .. g_VR.moduleVersion .. " | Recommended: v" .. latestVersion .. " | Addon: " .. vrmod.GetVersion() .. " | Most features should work.")
+            end
+            if VRMOD_IsHMDPresent and not VRMOD_IsHMDPresent() then
+                error = "VR headset not detected."
+            end
         end
         return error
     end
 
+    --- Feature flags for optional module APIs (never hard-crash on missing exports).
+    function vrmod.ModuleSupportsEyeSizeArgs()
+        return (g_VR.moduleVersion or 0) >= 23
+    end
+
     function vrmod.GetModuleVersion()
-        return g_VR.moduleVersion, requiredModuleVersion, latestModuleVersion
+        return g_VR.moduleVersion, 20, 23
     end
 
     function vrmod.IsPlayerInVR(ply)
@@ -357,17 +375,38 @@ if CLIENT then
 
     function vrmod.SetLeftHandPose(pos, ang, smoothing)
         local ply = LocalPlayer()
-        -- Late override: write final tracking (what every local system reads)
-        if g_VR.tracking and g_VR.tracking.pose_lefthand and pos and ang then
-            g_VR.tracking.pose_lefthand.pos = SmoothValue(g_VR.tracking.pose_lefthand.pos, pos, smoothing or 0)
-            g_VR.tracking.pose_lefthand.ang = SmoothValue(g_VR.tracking.pose_lefthand.ang, ang, smoothing or 0)
-            pos = g_VR.tracking.pose_lefthand.pos
-            ang = g_VR.tracking.pose_lefthand.ang
+        if not pos or not ang then return end
+        -- Always write COPIES — never alias caller vectors into tracking/net
+        -- (foregrip + FBT flicker when state.leftPos became tracking.pos).
+        local factor = smoothing or 0
+        local L = g_VR.tracking and g_VR.tracking.pose_lefthand
+        if L and L.pos and L.ang then
+            local np = SmoothValue(L.pos, pos, factor)
+            local na = SmoothValue(L.ang, ang, factor)
+            if L.pos.Set and isvector(np) then
+                L.pos:Set(np)
+            else
+                L.pos = Vector(np.x, np.y, np.z)
+            end
+            if L.ang.Set and isangle and isangle(na) then
+                L.ang:Set(na)
+            elseif L.ang.Set and na.p then
+                L.ang:Set(na)
+            else
+                L.ang = Angle(na.p or 0, na.y or 0, na.r or 0)
+            end
+            pos, ang = L.pos, L.ang
         end
         local netFrame = g_VR.net and g_VR.net[ply:SteamID()] and g_VR.net[ply:SteamID()].lerpedFrame
         if not netFrame then return end
-        netFrame.lefthandPos = SmoothValue(netFrame.lefthandPos, pos, smoothing or 0)
-        netFrame.lefthandAng = SmoothValue(netFrame.lefthandAng, ang, smoothing or 0)
+        local npos = SmoothValue(netFrame.lefthandPos, pos, factor)
+        local nang = SmoothValue(netFrame.lefthandAng, ang, factor)
+        netFrame.lefthandPos = Vector(npos.x or npos[1] or 0, npos.y or npos[2] or 0, npos.z or npos[3] or 0)
+        if nang and nang.p then
+            netFrame.lefthandAng = Angle(nang.p, nang.y, nang.r)
+        else
+            netFrame.lefthandAng = Angle(ang.p, ang.y, ang.r)
+        end
     end
 
     function vrmod.SetRightHandPose(pos, ang, smoothing)
@@ -650,9 +689,14 @@ if CLIENT then
     end
 
     -- Add or restore a menu item
-    function vrmod.AddInGameMenuItem(name, slot, slotpos, func, forceSlot, hint)
+    -- id (optional): stable layout key for Quick Menu pages (Settings → Quick Menu)
+    function vrmod.AddInGameMenuItem(name, slot, slotpos, func, forceSlot, hint, id)
         g_VR.menuItems = g_VR.menuItems or {}
         g_VR.menuBackup = g_VR.menuBackup or {}
+        -- Stable layout id (for multi-page quick menu)
+        if not id and vrmod.QuickMenu and vrmod.QuickMenu.IdFromName then
+            id = vrmod.QuickMenu.IdFromName(name)
+        end
         -- Determine slot if not forced
         if not forceSlot then
             local occupied = {}
@@ -679,7 +723,11 @@ if CLIENT then
 
         -- Avoid exact duplicates
         for _, item in ipairs(g_VR.menuItems) do
-            if item.name == name and item.func == func then return end
+            if item.name == name and item.func == func then
+                -- Upgrade id if newer call provides one
+                if id and not item.id then item.id = id end
+                return
+            end
         end
 
         table.insert(g_VR.menuItems, {
@@ -687,18 +735,20 @@ if CLIENT then
             slot = slot,
             slotPos = slotpos,
             func = func,
-            hint = hint
+            hint = hint,
+            id = id,
         })
 
-        -- Store in backup with unique ID
-        local id = GetMenuItemID(name, func)
-        g_VR.menuBackup[id] = {
+        -- Store in backup with unique ID (name+func; not layout id)
+        local bakId = GetMenuItemID(name, func)
+        g_VR.menuBackup[bakId] = {
             name = name,
             slot = slot,
             slotPos = slotpos,
             func = func,
             internal = forceSlot == true,
-            hint = hint
+            hint = hint,
+            id = id,
         }
     end
 

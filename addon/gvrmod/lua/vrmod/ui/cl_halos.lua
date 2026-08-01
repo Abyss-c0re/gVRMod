@@ -1,103 +1,234 @@
+-- VR halo.Add for pickup outlines (stereo SBS-safe).
+--
+-- Pickup does: halo.Add(sharedTable, Color(...), ...) then later table.Empty(sharedTable).
+-- We MUST copy entity refs on Add — storing the table pointer means Empty wipes the
+-- queue before draw (halos vanish after pick/drop / next frame).
+--
+-- Draw: one soft tinted pass (ignoreZ). No multi-pass additive (that blew out to white).
+
 if SERVER then return end
-local halos = {}
-local haloCount = 0
-local haloFrame = 0
-local haloRT, haloMat
-local localAng = Angle(0, -90, -90)
-local haloAdd_orig
-timer.Simple(0, function() haloAdd_orig = halo.Add end)
-hook.Add("VRMod_Start", "halos", function(ply)
-	if ply ~= LocalPlayer() then return end
-	halo.Add = function(ents, color, blurX, blurY, passes, additive, ignoreZ)
-		if FrameNumber() ~= haloFrame then
-			if FrameNumber() > haloFrame + 1 then
-				--LocalPlayer():ChatPrint("installed halo hook")
-				hook.Add("PostDrawTranslucentRenderables", "vrmod_halos", function(depth, sky)
-					if not haloRT then
-						haloRT = GetRenderTarget("3dhalos" .. tostring(math.floor(SysTime())), g_VR.view.w, g_VR.view.h, false)
-						haloMat = CreateMaterial("3dhalos" .. tostring(math.floor(SysTime())), "UnlitGeneric", {
-							["$basetexture"] = haloRT:GetName()
-						})
-					end
 
-					if depth or sky or EyePos() ~= g_VR.view.origin then return end
-					if FrameNumber() > haloFrame + 1 then
-						haloCount = 0
-						hook.Remove("PostDrawTranslucentRenderables", "vrmod_halos")
-						--LocalPlayer():ChatPrint("removed halo hook")
-					end
+local mat_white = Material("models/debug/debugwhite")
+local modelFlags = bit.bor(STUDIO_RENDER, STUDIO_SKIP_DECALS or 0)
 
-					--
-					render.PushRenderTarget(haloRT)
-					render.Clear(0, 0, 0, 255, true, true)
-					render.SetStencilEnable(true)
-					render.SetStencilWriteMask(0xFF)
-					render.SetStencilTestMask(0xFF)
-					render.SetStencilPassOperation(STENCIL_REPLACE)
-					render.SetStencilFailOperation(STENCIL_KEEP)
-					render.SetStencilZFailOperation(STENCIL_KEEP)
-					render.SetStencilReferenceValue(1)
-					for i = 1, haloCount do
-						for k, v in pairs(halos[i].ents) do
-							if IsValid(v) then
-								render.ClearStencil()
-								render.SetStencilPassOperation(STENCIL_REPLACE)
-								render.SetStencilCompareFunction(STENCIL_ALWAYS)
-								v:DrawModel()
-								render.SetStencilPassOperation(STENCIL_KEEP)
-								render.SetStencilCompareFunction(STENCIL_EQUAL)
-								local col = halos[i].color
-								render.ClearBuffersObeyStencil(col.r, col.g, col.b, 255, false)
-							end
-						end
-					end
+local list = {}
+local installed = false
+local stockAdd
+local RenderEnt = NULL
+-- One flush per eye per stereo frame (opaque + translucent both fire)
+local flushedEye = { left = -1, right = -1 }
 
-					render.SetStencilEnable(false)
-					render.BlurRenderTarget(haloRT, 2, 2, 1)
-					render.SetStencilEnable(true)
-					render.ClearBuffersObeyStencil(0, 0, 0, 255, false)
-					render.SetStencilEnable(false)
-					render.PopRenderTarget()
-					local w = 10 * math.tan(math.rad(g_VR.view.fov / 2))
-					local h = w * 1 / g_VR.view.aspectratio
-					local pos = EyePos() + EyeAngles():Forward() * 10 + EyeAngles():Right() * -w + EyeAngles():Up() * h
-					local _, ang = LocalToWorld(Vector(0, 0, 0), localAng, Vector(0, 0, 0), EyeAngles())
-					local mtx = Matrix()
-					mtx:Translate(pos)
-					mtx:Rotate(ang)
-					mtx:Scale(Vector(w * 2, h * 2, 0))
-					cam.PushModelMatrix(mtx)
-					surface.SetDrawColor(255, 255, 255, 255)
-					surface.SetMaterial(haloMat)
-					render.OverrideBlend(true, BLEND_ONE, BLEND_ONE, BLENDFUNC_ADD, 0, 0, 0)
-					render.OverrideDepthEnable(true, false)
-					surface.DrawTexturedRect(0, 0, 1, 1)
-					surface.DrawTexturedRect(0, 0, 1, 1)
-					render.OverrideDepthEnable(false)
-					render.OverrideBlend(false)
-					cam.PopModelMatrix()
-					--
-				end)
-			end
-
-			haloFrame = FrameNumber()
-			haloCount = 0
-		end
-
-		haloEnts = ents
-		halos[haloCount + 1] = {
-			ents = ents,
-			color = color
-		}
-
-		haloCount = haloCount + 1
+local function ClearList()
+	for i = #list, 1, -1 do
+		list[i] = nil
 	end
+end
+
+local function ResetState()
+	pcall(function()
+		render.SetStencilEnable(false)
+		render.SetStencilTestMask(0)
+		render.SetStencilWriteMask(0)
+		render.SetStencilReferenceValue(0)
+		render.SuppressEngineLighting(false)
+		render.SetBlend(1)
+		render.SetColorModulation(1, 1, 1)
+		render.MaterialOverride(nil)
+		if render.OverrideBlend then render.OverrideBlend(false) end
+		if render.OverrideDepthEnable then render.OverrideDepthEnable(false, false) end
+		if render.DepthRange then render.DepthRange(0, 1) end
+		cam.IgnoreZ(false)
+	end)
+end
+
+local function CopyEnts(entities)
+	local out = {}
+	local n = 0
+	for _, ent in pairs(entities) do
+		if IsValid(ent) then
+			n = n + 1
+			out[n] = ent
+		end
+	end
+	return out, n
+end
+
+local function DrawEnts(ents)
+	for i = 1, #ents do
+		local ent = ents[i]
+		if not IsValid(ent) or ent:GetNoDraw() then continue end
+		RenderEnt = ent
+		if ent.SetupBones then pcall(function() ent:SetupBones() end) end
+		ent:DrawModel(modelFlags)
+	end
+	RenderEnt = NULL
+end
+
+--- Single soft coloured pass — keeps orange/cyan, not nuclear white.
+local function DrawEntry(entry)
+	if not entry or not entry.Ents or #entry.Ents < 1 then return end
+
+	local col = entry.Color or color_white
+	local r = (col.r or 255) / 255
+	local g = (col.g or 255) / 255
+	local b = (col.b or 255) / 255
+	-- Cap intensity so additive-looking props don't clip to white
+	local strength = 0.42
+	local ignoreZ = entry.IgnoreZ
+	if ignoreZ == nil then ignoreZ = true end
+
+	render.SuppressEngineLighting(true)
+	cam.IgnoreZ(ignoreZ)
+	render.MaterialOverride(mat_white)
+	render.SetColorModulation(r, g, b)
+	render.SetBlend(strength)
+
+	cam.Start3D()
+	DrawEnts(entry.Ents)
+	cam.End3D()
+
+	render.SetBlend(1)
+	render.SetColorModulation(1, 1, 1)
+	render.MaterialOverride(nil)
+	cam.IgnoreZ(false)
+	render.SuppressEngineLighting(false)
+end
+
+local function FlushHalos()
+	if not g_VR or not g_VR.active then return end
+	local eye = g_VR.stereoEye
+	if eye ~= "left" and eye ~= "right" then return end
+
+	local sf = g_VR.stereoFrame or 0
+	if flushedEye[eye] == sf then
+		-- Already drew this eye; drop any late adds so shared tables can't poison us
+		ClearList()
+		return
+	end
+	if #list < 1 then return end
+
+	flushedEye[eye] = sf
+	hook.Run("PreDrawHalos")
+
+	for i = 1, #list do
+		pcall(DrawEntry, list[i])
+	end
+	ClearList()
+	ResetState()
+end
+
+local function Install()
+	if installed then return end
+	if not halo or not isfunction(halo.Add) then return end
+
+	-- Capture true stock Add once (never chain our own wrapper)
+	if not stockAdd then
+		stockAdd = halo.Add
+	end
+	ClearList()
+
+	function halo.Add(entities, color, blurx, blury, passes, add, ignorez)
+		if not (g_VR and g_VR.active) then
+			if stockAdd then
+				return stockAdd(entities, color, blurx, blury, passes, add, ignorez)
+			end
+			return
+		end
+		if not istable(entities) then return end
+
+		-- COPY entities — pickup reuses/Empties the same tables every frame
+		local entsCopy, n = CopyEnts(entities)
+		if n < 1 then return end
+
+		list[#list + 1] = {
+			Ents = entsCopy,
+			Color = color and Color(color.r, color.g, color.b, color.a or 255) or Color(255, 255, 255),
+			IgnoreZ = ignorez,
+		}
+	end
+
+	local stockRendered = halo.RenderedEntity
+	function halo.RenderedEntity()
+		if IsValid(RenderEnt) then return RenderEnt end
+		if isfunction(stockRendered) then return stockRendered() end
+		return NULL
+	end
+
+	hook.Remove("PostDrawEffects", "RenderHalos")
+
+	-- After pickup's vrmod_draw_pickup_halo (zzz_ sorts later)
+	hook.Add("PostDrawOpaqueRenderables", "zzz_vrmod_halos", function(depth, sky)
+		if depth or sky then return end
+		FlushHalos()
+	end)
+
+	hook.Add("PostDrawTranslucentRenderables", "zzz_vrmod_halos", function(depth, sky)
+		if depth or sky then return end
+		if #list < 1 then return end
+		FlushHalos()
+	end)
+
+	hook.Add("VRMod_PostRender", "vrmod_halos_clear", function()
+		ClearList()
+		flushedEye.left = -1
+		flushedEye.right = -1
+		ResetState()
+	end)
+
+	installed = true
+	if vrmod.logger then
+		vrmod.logger.Info("[halo] Pickup glows: copy-on-add, single soft pass")
+	end
+end
+
+local function Uninstall()
+	if not installed then return end
+
+	hook.Remove("PostDrawOpaqueRenderables", "zzz_vrmod_halos")
+	hook.Remove("PostDrawTranslucentRenderables", "zzz_vrmod_halos")
+	hook.Remove("VRMod_PostRender", "vrmod_halos_clear")
+	hook.Remove("PostDrawEffects", "RenderHalos")
+	ClearList()
+	ResetState()
+
+	if stockAdd then
+		halo.Add = stockAdd
+	end
+	-- Keep stockAdd so re-enter VR doesn't chain wrappers if require fails
+	local savedStock = stockAdd
+	stockAdd = nil
+
+	package.loaded["halo"] = nil
+	local ok = pcall(require, "halo")
+	if not ok and savedStock then
+		halo.Add = savedStock
+		hook.Add("PostDrawEffects", "RenderHalos", function()
+			hook.Run("PreDrawHalos")
+		end)
+	end
+
+	installed = false
+end
+
+hook.Add("VRMod_Start", "vrmod_halos", function(ply)
+	if ply and ply ~= LocalPlayer() then return end
+	Install()
 end)
 
-hook.Add("VRMod_Exit", "halos", function(ply)
-	if ply ~= LocalPlayer() then return end
-	halo.Add = haloAdd_orig
-	hook.Remove("PostDrawTranslucentRenderables", "vrmod_halos")
-	haloCount = 0
-	haloRT = nil
+hook.Add("VRMod_Exit", "vrmod_halos", function(ply)
+	if ply and ply ~= LocalPlayer() then return end
+	Uninstall()
 end)
+
+hook.Add("VRMod_PreRender", "vrmod_halos_ensure", function()
+	if not g_VR or not g_VR.active then return end
+	if installed then
+		hook.Remove("VRMod_PreRender", "vrmod_halos_ensure")
+		return
+	end
+	Install()
+end)
+
+if g_VR and g_VR.active then
+	timer.Simple(0, Install)
+end

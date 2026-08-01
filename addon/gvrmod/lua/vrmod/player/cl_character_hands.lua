@@ -58,10 +58,31 @@ if CLIENT then
 				local netFrame = g_VR.net[steamid] and g_VR.net[steamid].lerpedFrame
 				local useTrack = (ply == LocalPlayer()) and g_VR.tracking and g_VR.tracking.pose_lefthand and g_VR.tracking.pose_righthand
 				if useTrack then
-					boneinfo[leftHand].overridePos = g_VR.tracking.pose_lefthand.pos
-					boneinfo[leftHand].overrideAng = g_VR.tracking.pose_lefthand.ang
-					boneinfo[rightHand].overridePos = g_VR.tracking.pose_righthand.pos
-					boneinfo[rightHand].overrideAng = g_VR.tracking.pose_righthand.ang + Angle(0, 0, 180)
+					-- Always clone into overrides — never hold tracking Vector refs
+					local lt, rt = g_VR.tracking.pose_lefthand, g_VR.tracking.pose_righthand
+					local lpos = lt.pos and Vector(lt.pos.x, lt.pos.y, lt.pos.z) or nil
+					local rpos = rt.pos and Vector(rt.pos.x, rt.pos.y, rt.pos.z) or nil
+					local lang = lt.ang and Angle(lt.ang.p, lt.ang.y, lt.ang.r) or Angle()
+					local rang = rt.ang and Angle(rt.ang.p, rt.ang.y, rt.ang.r) or Angle()
+					-- If still collapsed, fall back to rawTracking
+					local raw = g_VR.rawTracking
+					if lpos and rpos and lpos:DistToSqr(rpos) < 4 and raw then
+						local rL, rR = raw.pose_lefthand, raw.pose_righthand
+						if rL and rR and rL.pos and rR.pos and rL.pos:DistToSqr(rR.pos) > 36 then
+							lpos = Vector(rL.pos.x, rL.pos.y, rL.pos.z)
+							rpos = Vector(rR.pos.x, rR.pos.y, rR.pos.z)
+							if rL.ang then lang = Angle(rL.ang.p, rL.ang.y, rL.ang.r) end
+							if rR.ang then rang = Angle(rR.ang.p, rR.ang.y, rR.ang.r) end
+						end
+					end
+					if leftHand and leftHand >= 0 and boneinfo[leftHand] and lpos then
+						boneinfo[leftHand].overridePos = lpos
+						boneinfo[leftHand].overrideAng = lang
+					end
+					if rightHand and rightHand >= 0 and boneinfo[rightHand] and rpos then
+						boneinfo[rightHand].overridePos = rpos
+						boneinfo[rightHand].overrideAng = rang + Angle(0, 0, 180)
+					end
 					-- fingers from input / netFrame
 					local curls = g_VR.input and g_VR.input.skeleton_lefthand and g_VR.input.skeleton_lefthand.fingerCurls
 					for k, v in pairs(fingerboneids) do
@@ -112,64 +133,8 @@ if CLIENT then
 
 		g_VR = g_VR or {}
 		g_VR.characterYaw = 0
-		local convars, convarValues = vrmod.GetConvars()
-		if not g_VR.threePoints or VRUtilIsMenuOpen("heightmenu") then return end
-		--create mirror
-		rt_mirror = GetRenderTarget("rt_vrmod_heightcalmirror", 2048, 2048)
-		mat_mirror = CreateMaterial("mat_vrmod_heightcalmirror", "Core_DX90", {
-			["$basetexture"] = "rt_vrmod_heightcalmirror",
-			["$model"] = "1"
-		})
-
-		local mirrorYaw = 0
-		hook.Add("PreDrawTranslucentRenderables", "vrmod_floatinghands_dummymirror", function(depth, skybox)
-			if depth or skybox or not (EyePos() == g_VR.eyePosLeft or EyePos() == g_VR.eyePosRight) then return end
-			local ad = math.AngleDifference(EyeAngles().yaw, mirrorYaw)
-			if math.abs(ad) > 45 then mirrorYaw = mirrorYaw + (ad > 0 and 45 or -45) end
-			local mirrorPos = Vector(g_VR.tracking.hmd.pos.x, g_VR.tracking.hmd.pos.y, g_VR.origin.z + 45) + Angle(0, mirrorYaw, 0):Forward() * -5
-			local mirrorAng = Angle(0, mirrorYaw - 90, 90)
-			-- g_VR.menus.heightmenu.pos = mirrorPos + Vector(0,0,30) + mirrorAng:Forward()*-15
-			-- g_VR.menus.heightmenu.ang = mirrorAng
-			local camPos = LocalToWorld(WorldToLocal(EyePos(), Angle(), mirrorPos, mirrorAng) * Vector(1, 1, -1), Angle(), mirrorPos, mirrorAng)
-			local camAng = EyeAngles()
-			camAng = Angle(camAng.pitch, mirrorAng.yaw + mirrorAng.yaw - camAng.yaw, 180 - camAng.roll)
-			cam.Start({
-				x = 0,
-				y = 0,
-				w = 2048,
-				h = 2048,
-				type = "3D",
-				fov = g_VR.view.fov,
-				aspect = -g_VR.view.aspectratio,
-				origin = camPos,
-				angles = camAng
-			})
-
-			render.PushRenderTarget(rt_mirror)
-			render.Clear(200, 230, 255, 0, true, true)
-			render.CullMode(1)
-			local alloworig = g_VR.allowPlayerDraw
-			g_VR.allowPlayerDraw = true
-			cam.Start3D()
-			cam.End3D()
-			local ogEyePos = EyePos
-			EyePos = function() return Vector(0, 0, 0) end
-			local ogRenderOverride = LocalPlayer().RenderOverride
-			LocalPlayer().RenderOverride = nil
-			render.SuppressEngineLighting(true)
-			LocalPlayer():DrawModel()
-			render.SuppressEngineLighting(false)
-			EyePos = ogEyePos
-			LocalPlayer().RenderOverride = ogRenderOverride
-			g_VR.allowPlayerDraw = alloworig
-			cam.Start3D()
-			cam.End3D()
-			render.CullMode(0)
-			render.PopRenderTarget()
-			cam.End3D()
-			render.SetMaterial(mat_mirror)
-			render.DrawQuadEasy(mirrorPos, mirrorAng:Up(), 1, 1, Color(255, 255, 255, 255), 0)
-		end)
+		-- Cube: no floatinghands dummymirror. It drew a Core_DX90 world quad (black slab)
+		-- that occluded the Real. Height cal mirror lives only in cl_heightadjust while open.
 	end)
 
 	hook.Add("VRMod_Exit", "vrmod_stophandsonly", function(ply, steamid)
