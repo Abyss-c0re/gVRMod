@@ -199,10 +199,11 @@ LUA_FUNCTION(SetActionManifest) {
     // analog→boolean threshold synthesis on Oculus Touch triggers/grips.
     XR_SetActionCache(g_actions, g_actionCount);
 
-    // Suggest interaction profile bindings + attach action sets to session.
-    // Without bindings every controller action stays inactive (no hands, no buttons).
+    // Attach if session already exists; otherwise XR_EnsureSessionAndInput will attach
+    // on the first render frame when GLX is current (SetActionManifest often runs at
+    // startup before ShareTexture / RenderScene — "no session yet" is expected).
     if (!XR_AttachActionSets()) {
-        LuaPrint(LUA, "[VRMOD] Warning: Failed to attach action sets (input may not work)");
+        VRMOD_LOG_INFO("SetActionManifest: action sets will attach after GL session is created");
     }
 
     // Create lua refs for actions that need them
@@ -289,6 +290,28 @@ LUA_FUNCTION(GetDisplayInfo) {
 
 LUA_FUNCTION(UpdatePosesAndActions) {
     if (!g_xrInitialized) return 0;
+
+    // RenderScene / PreRender: GLX context is current — finish deferred session + input.
+    {
+        char serr[MAX_STR_LEN];
+        if (XR_EnsureSessionAndInput(serr, MAX_STR_LEN)) {
+            if (!g_xrSwapchainsCreated && g_xrSessionRunning) {
+                char scerr[MAX_STR_LEN];
+                if (XR_CreateSwapchains(scerr, MAX_STR_LEN)) {
+                    g_xrSwapchainsCreated = true;
+                    VRMOD_LOG_INFO("Swapchains created on first render frame (GLX deferred path)");
+                } else {
+                    static int s_scWarn = 0;
+                    if ((s_scWarn++ % 120) == 0)
+                        VRMOD_LOG_ERROR("Swapchain create: %s", scerr);
+                }
+            }
+        } else {
+            static int s_ensWarn = 0;
+            if ((s_ensWarn++ % 120) == 0 && serr[0])
+                VRMOD_LOG_WARN("%s", serr);
+        }
+    }
 
     // Poll events
     XR_PollEvents();
@@ -601,31 +624,21 @@ LUA_FUNCTION(ShareTextureBegin) {
         LUA->ThrowError("VRMOD: mprotect RWX failed");
     }
 
-    // Ensure we have an XrSession bound to the *current* render GLX context (this is the
-    // moment the main game context for the VR RTs is active). Doing the create here (deferred
-    // from XR_Init) makes the textures we later blit from valid names in the session's context.
-    if (!g_xrSession) {
+    // Session/GL often not current at Lua startup ShareTexture. Soft-try; first
+    // UpdatePosesAndActions (RenderScene, GLX current) will ensure session + attach.
+    {
         char serr[MAX_STR_LEN];
-        if (!XR_CreateSessionWithCurrentGL(serr, MAX_STR_LEN)) {
-            LuaPrint(LUA, serr);
-            VRMOD_LOG_ERROR("Deferred session create failed: %s", serr);
-        } else {
-            // Drive events so we reach READY / running quickly.
-            for (int i = 0; i < 60 && !g_xrSessionRunning; ++i) {
-                XR_PollEvents();
-                usleep(3000);
+        if (XR_EnsureSessionAndInput(serr, MAX_STR_LEN)) {
+            if (!g_xrSwapchainsCreated && g_xrSessionRunning) {
+                char errMsg[MAX_STR_LEN];
+                if (XR_CreateSwapchains(errMsg, MAX_STR_LEN)) {
+                    g_xrSwapchainsCreated = true;
+                } else {
+                    VRMOD_LOG_ERROR("Failed to create swapchains: %s", errMsg);
+                }
             }
-        }
-    }
-
-    // Create OpenXR swapchains if not already done
-    if (!g_xrSwapchainsCreated && g_xrSessionRunning) {
-        char errMsg[MAX_STR_LEN];
-        if (XR_CreateSwapchains(errMsg, MAX_STR_LEN)) {
-            g_xrSwapchainsCreated = true;
-        } else {
-            LuaPrint(LUA, errMsg);
-            VRMOD_LOG_ERROR("Failed to create swapchains: %s", errMsg);
+        } else if (serr[0]) {
+            VRMOD_LOG_INFO("ShareTextureBegin: session deferred (%s)", serr);
         }
     }
 
@@ -756,6 +769,17 @@ LUA_FUNCTION(SetKnownSubmitSize) {
 }
 
 LUA_FUNCTION(SubmitSharedTexture) {
+    // Last-chance session create if UpdatePoses skipped (GL must be current here).
+    if (g_xrInitialized && !g_xrSessionRunning) {
+        char serr[MAX_STR_LEN];
+        XR_EnsureSessionAndInput(serr, MAX_STR_LEN);
+        if (!g_xrSwapchainsCreated && g_xrSessionRunning) {
+            char scerr[MAX_STR_LEN];
+            if (XR_CreateSwapchains(scerr, MAX_STR_LEN))
+                g_xrSwapchainsCreated = true;
+        }
+    }
+
     // Do not require glIsTexture — false under mat_queue 2 for live engine RTs.
     bool haveLeft = (g_leftEyeTexture != 0) || (g_leftEyeColorTex != 0) || (g_leftEyeFBO != 0);
     bool haveRight = (g_rightEyeTexture != 0) || (g_rightEyeColorTex != 0) || (g_rightEyeFBO != 0);

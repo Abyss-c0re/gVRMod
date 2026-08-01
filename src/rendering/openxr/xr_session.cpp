@@ -7,6 +7,7 @@
 #include <cmath>
 #include <string>
 #include <cstdlib>   // setenv / unsetenv / getenv for LD_LIBRARY_PATH hack when bundling libs
+#include <unistd.h>  // usleep
 
 // On Linux we use XR_KHR_opengl_enable for the OpenGL graphics binding
 #define XR_USE_GRAPHICS_API_OPENGL
@@ -472,6 +473,47 @@ bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
 
     VRMOD_LOG_INFO("OpenXR GL session + spaces ready (deferred path)");
     return true;
+}
+
+#include "input/xr_input.h"
+
+bool XR_EnsureSessionAndInput(char* errMsg, int errMsgLen) {
+    if (!g_xrInstance || g_xrSystemId == XR_NULL_SYSTEM_ID) {
+        if (errMsg && errMsgLen > 0)
+            snprintf(errMsg, errMsgLen, "VRMOD OpenXR: not initialized");
+        return false;
+    }
+
+    if (!g_xrSession) {
+        Display* xDisplay = glXGetCurrentDisplay();
+        GLXContext glxContext = glXGetCurrentContext();
+        if (!xDisplay || !glxContext) {
+            if (errMsg && errMsgLen > 0)
+                snprintf(errMsg, errMsgLen,
+                    "VRMOD OpenXR: No active GLX context (will retry on next render frame)");
+            return false;
+        }
+        if (!XR_CreateSessionWithCurrentGL(errMsg, errMsgLen)) {
+            return false;
+        }
+        // Attach actions that were parsed earlier (SetActionManifest before session).
+        if (!XR_AttachActionSets()) {
+            VRMOD_LOG_WARN("XR_EnsureSessionAndInput: attach action sets pending/failed (will retry)");
+        }
+    } else {
+        // Session exists but attach may have been skipped earlier.
+        if (!XR_AttachActionSets()) {
+            // still no sets or already attached failure
+        }
+    }
+
+    // Pump until RUNNING (or a few frames of events).
+    for (int i = 0; i < 30 && !g_xrSessionRunning; ++i) {
+        XR_PollEvents();
+        if (g_xrSessionRunning) break;
+        usleep(1000);
+    }
+    return g_xrSession != XR_NULL_HANDLE;
 }
 
 bool XR_PollEvents() {

@@ -92,6 +92,11 @@ bool XR_Init(char* errMsg, int errMsgLen);
 // This is the key step to make stolen/capture textures valid for the FBO blit into swapchains.
 bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen);
 
+// Lazy path: create GL session if missing, attach action sets, poll until RUNNING.
+// Safe to call every frame from UpdatePosesAndActions / Submit when GL is current.
+// Returns true if g_xrSession exists (may still be warming up to RUNNING).
+bool XR_EnsureSessionAndInput(char* errMsg, int errMsgLen);
+
 // Pump the event loop. Returns true if session is still alive.
 bool XR_PollEvents();
 
