@@ -1109,6 +1109,9 @@ if CLIENT then
 
 	-- 2) Convar overrides for performance
 	local function OverridePerformanceConvars()
+		-- Cancel any pending exit restore so a quick restart does not flip mat_queue mid-start.
+		timer.Remove("vrmod_mat_queue_restore")
+		timer.Remove("vrmod_async_shutdown")
 		-- Keep skybox flag in sync with current settings at start time
 		PERFORMANCE_CONVARS.r_3dsky = tostring(convars.vrmod_skybox:GetBool() and 1 or 0)
 		RefreshMatQueuePin()
