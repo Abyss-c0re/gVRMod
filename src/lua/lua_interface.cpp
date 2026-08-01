@@ -731,9 +731,27 @@ LUA_FUNCTION(SetRTTextureFlip) {
     return 0;
 }
 
-// Drain GPU between stereo eyes when mat_queue_mode=2 (material workers + GL race).
+// Optional GPU drain (prefer not to call under mat_queue_mode 2 — races workers).
 LUA_FUNCTION(GLFinish) {
     glFinish();
+    return 0;
+}
+
+// Authoritative SBS/RT size from Lua (g_VR.rtWidth/Height). Required for mat_queue 2
+// because glGetTexLevelParameteriv often returns 0 on live engine RTs.
+LUA_FUNCTION(SetKnownSubmitSize) {
+    uint32_t w = 0, h = 0;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) {
+        double n = LUA->GetNumber(1);
+        if (n >= 16.0) w = (uint32_t)n;
+    }
+    if (LUA->IsType(2, GarrysMod::Lua::Type::NUMBER)) {
+        double n = LUA->GetNumber(2);
+        if (n >= 16.0) h = (uint32_t)n;
+    }
+    if (w > 0 && h > 0) {
+        VRMOD_SetKnownSubmitSize(w, h);
+    }
     return 0;
 }
 
@@ -884,6 +902,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SetRTTextureFlip");
     LUA->PushCFunction(GLFinish);
     LUA->SetField(-2, "GLFinish");
+    LUA->PushCFunction(SetKnownSubmitSize);
+    LUA->SetField(-2, "SetKnownSubmitSize");
     LUA->PushCFunction(SubmitSharedTexture);
     LUA->SetField(-2, "SubmitSharedTexture");
     LUA->PushCFunction(Shutdown);

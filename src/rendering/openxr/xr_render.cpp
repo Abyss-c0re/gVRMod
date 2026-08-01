@@ -429,33 +429,31 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         }
     }
 
-    // Query dimensions from a usable texture (prefer any per-eye for safety, else legacy).
-    // Under mat_queue_mode=2, glGetTexLevelParameteriv often returns 0 for live engine
-    // RTs (workers still own storage) — fall back to size recorded at ShareTextureBegin.
-    GLint srcWidth = 0, srcHeight = 0;
-    GLuint dimProbe = (perEyeSrc[0] && glIsTexture(perEyeSrc[0])) ? perEyeSrc[0] : ((perEyeSrc[1] && glIsTexture(perEyeSrc[1])) ? perEyeSrc[1] : srcTex);
-    if (dimProbe && glIsTexture(dimProbe)) {
-        glBindTexture(GL_TEXTURE_2D, dimProbe);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &srcWidth);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &srcHeight);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        if (srcWidth > 0 && srcHeight > 0) {
-            VRMOD_SetKnownSubmitSize((uint32_t)srcWidth, (uint32_t)srcHeight);
+    // Dimensions: prefer Lua/ShareTexture known size FIRST.
+    // Under mat_queue_mode=2, glGetTexLevelParameteriv on live engine RTs often
+    // returns 0x0 even when the texture name is valid for blit (private builds that
+    // "made 2 work" never trusted GL size queries mid-frame).
+    GLuint dimProbe = (perEyeSrc[0] && glIsTexture(perEyeSrc[0])) ? perEyeSrc[0]
+        : ((perEyeSrc[1] && glIsTexture(perEyeSrc[1])) ? perEyeSrc[1] : srcTex);
+    GLint srcWidth = g_knownSubmitSrcW;
+    GLint srcHeight = g_knownSubmitSrcH;
+    if (srcWidth <= 0 || srcHeight <= 0) {
+        if (dimProbe && glIsTexture(dimProbe)) {
+            glBindTexture(GL_TEXTURE_2D, dimProbe);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &srcWidth);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &srcHeight);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            if (srcWidth > 0 && srcHeight > 0) {
+                VRMOD_SetKnownSubmitSize((uint32_t)srcWidth, (uint32_t)srcHeight);
+            }
         }
     }
     if (srcWidth <= 0 || srcHeight <= 0) {
-        srcWidth = g_knownSubmitSrcW;
-        srcHeight = g_knownSubmitSrcH;
-    }
-    if (srcWidth <= 0 || srcHeight <= 0) {
-        // Last resort: recommended eye * 2 (SBS) from OpenXR HMD caps
         if (g_xrRecommendedWidth > 0 && g_xrRecommendedHeight > 0) {
             srcWidth = (GLint)(g_xrRecommendedWidth * 2);
             srcHeight = (GLint)g_xrRecommendedHeight;
         }
     }
-    // Fail only when we still have no size after fallbacks, or no GL texture to blit.
-    // mat_queue 2 often returns 0 from glGetTexLevel* but the texture name is still valid.
     static int s_zeroDimStreak = 0;
     const bool haveSrcTex = (dimProbe != 0 && glIsTexture(dimProbe));
     if (!havePerEye && (!haveSrcTex || srcWidth <= 0 || srcHeight <= 0)) {
@@ -475,9 +473,9 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     }
     s_zeroDimStreak = 0;
 
-    // Make sure the draw that touched the source (rtMaterial into captureRt or engine into main RT)
-    // has completed before we attach it for the per-eye blits.
-    glFinish();
+    // Do NOT glFinish here — under mat_queue 2 that races Source material workers
+    // ("Illegal termination of worker thread"). glFlush is enough to order our blits.
+    glFlush();
 
     // Direct path (modeled on backup xr_render.cpp): attach srcTex (g_captureTexture preferred) and blit.
     // No s_capture/Get/TexSub in the submitted data path. Locate was already done; we will submit layer with g_views.
@@ -632,7 +630,7 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                     else srcY0 = srcY1 - 1;
                 }
 
-                glFinish();
+                glFlush();
 
                 // Content check from the READ FBO (src) before we copy.
                 {
