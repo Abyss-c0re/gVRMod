@@ -401,12 +401,23 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         // capture kept for debug/compat only
     }
 
-    bool havePerEye = (perEyeSrc[0] != 0 && glIsTexture(perEyeSrc[0])) || (perEyeSrc[1] != 0 && glIsTexture(perEyeSrc[1]));
+    // True per-eye only when L and R are distinct live textures. If both resolve
+    // to the same SBS RT (or only one side exists), force legacy half-crop path —
+    // otherwise each eye would blit the full side-by-side image ("doubled", no stereo).
+    bool leftOk = (perEyeSrc[0] != 0 && glIsTexture(perEyeSrc[0]));
+    bool rightOk = (perEyeSrc[1] != 0 && glIsTexture(perEyeSrc[1]));
+    bool havePerEye = leftOk && rightOk && (perEyeSrc[0] != perEyeSrc[1]);
+    if (!havePerEye) {
+        // Prefer legacy shared/SBS for both eyes when per-eye is incomplete.
+        if (srcTex && glIsTexture(srcTex)) {
+            perEyeSrc[0] = perEyeSrc[1] = srcTex;
+        }
+    }
     if ((s_submitCallCount % 30) == 0) {
         if (havePerEye) {
             VRMOD_LOG_INFO("Submit using PER-EYE textures L=%u R=%u (leftFBO=%u rightFBO=%u)", perEyeSrc[0], perEyeSrc[1], g_leftEyeFBO, g_rightEyeFBO);
         } else {
-            VRMOD_LOG_INFO("Submit using legacy single srcTex=%u (rtFBO=%u)", srcTex, g_vrRtFBO);
+            VRMOD_LOG_INFO("Submit using legacy SBS srcTex=%u (rtFBO=%u) bounds-crop L/R halves", srcTex, g_vrRtFBO);
         }
     }
 
@@ -523,26 +534,41 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                 glReadBuffer(GL_COLOR_ATTACHMENT0);
                 glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
-                // Rect selection from Lua-provided textureBounds (allows tuning "bounds" / inset / asymmetry
-                // from Lua debug convars without recompiling the mod). Falls back to near-full rect if bounds
-                // look invalid (e.g. not initialized).
+                // Rect selection from Lua textureBounds.
+                // IMPORTANT: Linux ComputeSubmitBounds returns inverted V (v0>v1) for OpenVR
+                // UV convention. That must NOT be treated as "invalid full rect" — doing so
+                // resets U to 0..1 and each eye blits the entire SBS RT → doubled image,
+                // no stereo. Only repair the broken axis; keep L/R U halves for SBS.
                 float u0 = (eye == 0) ? textureBounds[0] : textureBounds[4];
                 float u1 = (eye == 0) ? textureBounds[2] : textureBounds[6];
                 float v0 = (eye == 0) ? textureBounds[1] : textureBounds[5];
                 float v1 = (eye == 0) ? textureBounds[3] : textureBounds[7];
 
-                // safety fallback to near-full if bounds are zero or inverted (e.g. before first SetSubmitTextureBounds)
-                if (u1 <= u0 + 0.001f || v1 <= v0 + 0.001f) {
-                    const float ins = 0.003f;
-                    u0 = ins; u1 = 1.0f - ins;
-                    v0 = ins; v1 = 1.0f - ins;
+                const float ins = 0.003f;
+                // U: require ordered min<max. If bad, default to correct SBS half for this eye.
+                if (!(u1 > u0 + 0.001f)) {
+                    if (havePerEye) {
+                        u0 = ins;
+                        u1 = 1.0f - ins;
+                    } else if (eye == 0) {
+                        u0 = ins;
+                        u1 = 0.5f;
+                    } else {
+                        u0 = 0.5f;
+                        u1 = 1.0f - ins;
+                    }
+                }
+                // V: empty (zero height) only → full. Inverted V is intentional (flip via blit).
+                if (std::fabs(v1 - v0) < 0.001f) {
+                    v0 = ins;
+                    v1 = 1.0f - ins;
                 }
 
-                // V-flip for OpenGL render targets (Linux).
-                // OpenGL RT textures have V=0 at the bottom. The crop numbers from the
-                // eye fov math are in "logical/D3D" convention (low v = upper frustum).
-                // We mirror the V crop so we sample the correct part of the GL source.
-                if (g_rtTextureNeedsVFlip) {
+                // g_rtTextureNeedsVFlip: mirror V into GL bottom-left space when bounds
+                // were authored in D3D-style (low V = top). If bounds already inverted
+                // (Linux Lua convention), they already encode the flip — do not mirror again.
+                const bool boundsVInverted = (v0 > v1);
+                if (g_rtTextureNeedsVFlip && !boundsVInverted) {
                     float tmp0 = 1.0f - v1;
                     float tmp1 = 1.0f - v0;
                     v0 = tmp0;
@@ -550,18 +576,29 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                 }
 
                 // Source rect in texels (OpenGL origin = bottom-left).
-                // v0/v1 are in [0,1] after optional V-flip compensation above.
+                // srcY0 > srcY1 is allowed: glBlitFramebuffer flips when src Y is inverted.
                 GLint srcX0 = (GLint)(u0 * eyeSrcW);
                 GLint srcX1 = (GLint)(u1 * eyeSrcW);
                 GLint srcY0 = (GLint)(v0 * eyeSrcH);
                 GLint srcY1 = (GLint)(v1 * eyeSrcH);
-                // Clamp
+                // Clamp X into texture
                 if (srcX0 < 0) srcX0 = 0;
-                if (srcY0 < 0) srcY0 = 0;
+                if (srcX1 < 0) srcX1 = 0;
+                if (srcX0 > eyeSrcW) srcX0 = eyeSrcW;
                 if (srcX1 > eyeSrcW) srcX1 = eyeSrcW;
+                if (srcX0 == srcX1) {
+                    if (srcX1 < eyeSrcW) srcX1 = srcX0 + 1;
+                    else srcX0 = srcX1 - 1;
+                }
+                // Clamp Y independently (order may be flipped)
+                if (srcY0 < 0) srcY0 = 0;
+                if (srcY1 < 0) srcY1 = 0;
+                if (srcY0 > eyeSrcH) srcY0 = eyeSrcH;
                 if (srcY1 > eyeSrcH) srcY1 = eyeSrcH;
-                if (srcX1 <= srcX0) srcX1 = srcX0 + 1;
-                if (srcY1 <= srcY0) srcY1 = srcY0 + 1;
+                if (srcY0 == srcY1) {
+                    if (srcY1 < eyeSrcH) srcY1 = srcY0 + 1;
+                    else srcY0 = srcY1 - 1;
+                }
 
                 glFinish();
 
@@ -578,31 +615,23 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                         VRMOD_LOG_INFO("### EYE%d BLACK? src=%u center=(%u,%u,%u) sz=%dx%d",
                             eye, eyeSrcTex, p[0], p[1], p[2], eyeSrcW, eyeSrcH);
                     } else if ((s_submitCallCount % 45) == 0) {
-                        VRMOD_LOG_INFO("EYE%d content OK src=%u sum=%d sz=%dx%d",
-                            eye, eyeSrcTex, sm, eyeSrcW, eyeSrcH);
+                        VRMOD_LOG_INFO("EYE%d content OK src=%u sum=%d sz=%dx%d u[%.2f-%.2f] v[%.2f-%.2f]",
+                            eye, eyeSrcTex, sm, eyeSrcW, eyeSrcH, u0, u1, v0, v1);
                     }
                 }
 
-                // Primary path: glBlitFramebuffer (reliable under togl / engine GL state).
-                // Optional V-flip for OpenXR compositor convention: invert dest Y when the
-                // source is a GL RT whose low row is bottom-of-scene after our v remap.
-                // After the crop V-flip above, srcY0 < srcY1 samples the correct region in
-                // GL space. OpenXR expects the first row of the swapchain image as the top
-                // of the view; GL FBO writes low Y as the first row → identity mapping is
-                // correct when g_rtTextureNeedsVFlip already flipped the crop. If we did
-                // NOT flip crop, invert dest Y here.
+                // Primary path: glBlitFramebuffer.
+                // OpenXR OpenGL swapchain: first row = top of view. Source Engine GL RTs
+                // store top-of-scene at high Y. When bounds already invert src Y (Linux),
+                // the blit itself flips. When bounds are ordered low→high, invert dest Y
+                // on Linux so the image is not upside-down in the HMD.
                 GLint dstY0 = 0;
                 GLint dstY1 = (GLint)g_xrSwapchainHeight;
-                // Extra dest flip only when crop was NOT flipped (Windows/D3D path).
-                // On Linux crop flip already put "upper scene" at high GL Y; without dest
-                // invert that becomes bottom of OpenXR image (upside-down). Match prior
-                // quad behavior: when g_rtTextureNeedsVFlip, map high src V → low dest Y.
-                if (g_rtTextureNeedsVFlip) {
-                    // Swap dest Y so upper scene (high GL Y after crop flip? after crop
-                    // flip v0 is former (1-v1) = lower GL Y of upper content...)
-                    // Prior quad: vForLowY = v1, vForHighY = v0 with flipped v's, meaning
-                    // dest low Y samples higher original crop v. With flipped v0/v1 already
-                    // applied to srcY, identity dest is wrong — use inverted dest Y.
+                const bool srcYFlips = (srcY0 > srcY1);
+                // Need one vertical flip total for Linux GL→OpenXR.
+                // - If src Y already inverted (blit flips): dest identity.
+                // - Else if g_rtTextureNeedsVFlip (or default Linux): invert dest Y.
+                if (!srcYFlips && g_rtTextureNeedsVFlip) {
                     dstY0 = (GLint)g_xrSwapchainHeight;
                     dstY1 = 0;
                 }

@@ -1081,6 +1081,10 @@ if CLIENT then
 		local renderOffset = convars.vrmod_renderoffset:GetBool()
 		local bounds = {vrmod.utils.ComputeSubmitBounds(leftCalc, rightCalc, hOffset, vOffset, scaleFactor, renderOffset)}
 		VRMOD_SetSubmitTextureBounds(unpack(bounds))
+		-- OpenXR OpenGL: flip GL RT V into compositor (Linux). Windows D3D path usually false.
+		if isfunction(VRMOD_SetRTTextureFlip) then
+			VRMOD_SetRTTextureFlip(not system.IsWindows())
+		end
 	end
 
 	-- Live update: UV bounds only (offsets/scale factor)

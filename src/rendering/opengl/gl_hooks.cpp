@@ -25,7 +25,9 @@ static int          g_eyeStealIndex = 0; // 0 -> left, 1 -> right during share w
 
 // Set from Lua based on system.IsWindows(). True on Linux so the submit path
 // can flip V when reading from the engine's GL render targets.
-bool                g_rtTextureNeedsVFlip = false;
+// Linux/OpenGL Source RTs need a V flip into OpenXR; Lua may override via SetRTTextureFlip.
+// Default true so we do not ship upside-down if Lua forgets the call after a tree mirror.
+bool                g_rtTextureNeedsVFlip = true;
 
 // Framebuffer attachment observation (used to discover the actual color texture backing
 // the VR RT created by GetRenderTargetEx, which may bypass the glGenTextures vtable slot).
