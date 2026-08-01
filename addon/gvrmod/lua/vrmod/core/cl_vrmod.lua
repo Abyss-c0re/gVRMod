@@ -157,11 +157,8 @@ if CLIENT then
 	end
 
 	local function restoreConvarOverrides()
-		-- Drain Source material workers before restoring mat_queue (avoids
-		-- "Illegal termination of worker thread" on VR exit under mode 2).
-		if convarOverrides["mat_queue_mode"] ~= nil then
-			setConvarValue("mat_queue_mode", "0")
-		end
+		-- Restore once to the pre-VR value. Do NOT bounce 2→0→user (that
+		-- destroys CThread workers: "Illegal termination of worker thread").
 		for k, v in pairs(convarOverrides) do
 			setConvarValue(k, v)
 		end
@@ -1537,7 +1534,15 @@ if CLIENT then
 			timer.Remove("vrmod_stereo_selftest")
 			g_VR._stereoSelfTestDone = true
 			matQueueAppliedForSession = false
-			restoreConvarOverrides()
+			-- 1) Stop stereo submit immediately (no more RenderScene / Submit under mat_queue 2)
+			g_VR.active = false
+			hook.Remove("RenderScene", "vrutil_hook_renderscene")
+			hook.Remove("CalcViewModelView", "vrutil_hook_calcviewmodelview")
+			hook.Remove("PostDrawTranslucentRenderables", "vrutil_hook_drawplayerandviewmodel")
+			hook.Remove("PreDrawPlayerHands", "vrutil_hook_predrawplayerhands")
+			hook.Remove("PreDrawViewModel", "vrutil_hook_predrawviewmodel")
+			hook.Remove("ShouldDrawLocalPlayer", "vrutil_hook_shoulddrawlocalplayer")
+			hook.Remove("CalcView", "vrutil_hook_calcview")
 			VRUtilMenuClose()
 			VRUtilNetworkCleanup()
 			vrmod.StopLocomotion()
@@ -1552,28 +1557,27 @@ if CLIENT then
 					vm:RemoveEffects(EF_NODRAW)
 				end
 			end
-			hook.Remove("RenderScene", "vrutil_hook_renderscene")
-			hook.Remove("CalcViewModelView", "vrutil_hook_calcviewmodelview")
-			hook.Remove("PostDrawTranslucentRenderables", "vrutil_hook_drawplayerandviewmodel")
-			hook.Remove("PreDrawPlayerHands", "vrutil_hook_predrawplayerhands")
-			hook.Remove("PreDrawViewModel", "vrutil_hook_predrawviewmodel")
-			hook.Remove("ShouldDrawLocalPlayer", "vrutil_hook_shoulddrawlocalplayer")
-			hook.Remove("CalcView", "vrutil_hook_calcview")
 			g_VR.tracking = {}
 			g_VR.rawTracking = {}
 			g_VR.threePoints = false
 			g_VR.sixPoints = false
 			if g_VR.rt then
-				render.PushRenderTarget(g_VR.rt)
-				render.Clear(0, 0, 0, 255, true, true)
-				render.PopRenderTarget()
+				pcall(function()
+					render.PushRenderTarget(g_VR.rt)
+					render.Clear(0, 0, 0, 255, true, true)
+					render.PopRenderTarget()
+				end)
 				g_VR.rt = nil
 			end
 			g_VR.rtWidth, g_VR.rtHeight = nil, nil
 			g_VR.stereoEye = nil
-			g_VR.active = false
 			EndVRNestedRenderLock()
-			VRMOD_Shutdown()
+			-- 2) Tear down OpenXR without glFinish (see module Shutdown)
+			pcall(function()
+				if isfunction(VRMOD_Shutdown) then VRMOD_Shutdown() end
+			end)
+			-- 3) Restore mat_queue last, once (no 2→0 bounce)
+			restoreConvarOverrides()
 			vrmod.logger.Info("Ended VR session")
 		end
 

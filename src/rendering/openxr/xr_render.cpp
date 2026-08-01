@@ -368,6 +368,10 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     // Fallback to the classic single stolen + bounds only if per-eye textures are not populated.
     GLuint perEyeSrc[2] = {0, 0};
 
+    // glIsTexture is unreliable under mat_queue_mode=2 (engine workers own RTs).
+    // Trust non-zero IDs from share hooks + known submit size from Lua.
+    auto texId = [](GLuint t) -> GLuint { return t != 0 ? t : 0; };
+
     // Resolve left
     GLuint leftSrc = g_leftEyeTexture;
     if (g_leftEyeFBO != 0 && glBindFramebufferPtr && glGetFramebufferAttachmentParameterivPtr) {
@@ -376,9 +380,9 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         GLint attached = 0;
         glGetFramebufferAttachmentParameterivPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE, &attached);
         glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevFB);
-        if (attached != 0 && glIsTexture((GLuint)attached)) leftSrc = (GLuint)attached;
+        if (attached != 0) leftSrc = (GLuint)attached;
     }
-    if (g_leftEyeColorTex && glIsTexture(g_leftEyeColorTex)) leftSrc = g_leftEyeColorTex;
+    if (g_leftEyeColorTex) leftSrc = g_leftEyeColorTex;
     perEyeSrc[0] = leftSrc ? leftSrc : stolenTexture;
 
     // Resolve right
@@ -389,9 +393,9 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         GLint attached = 0;
         glGetFramebufferAttachmentParameterivPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE, &attached);
         glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevFB);
-        if (attached != 0 && glIsTexture((GLuint)attached)) rightSrc = (GLuint)attached;
+        if (attached != 0) rightSrc = (GLuint)attached;
     }
-    if (g_rightEyeColorTex && glIsTexture(g_rightEyeColorTex)) rightSrc = g_rightEyeColorTex;
+    if (g_rightEyeColorTex) rightSrc = g_rightEyeColorTex;
     perEyeSrc[1] = rightSrc ? rightSrc : stolenTexture;
 
     // Legacy single-src resolve (only used if per-eye not available).
@@ -403,21 +407,19 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         GLint attached = 0;
         glGetFramebufferAttachmentParameterivPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE, &attached);
         glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevFB);
-        if (attached != 0 && glIsTexture((GLuint)attached)) srcTex = (GLuint)attached;
+        if (attached != 0) srcTex = (GLuint)attached;
     }
-    if (g_captureTexture && glIsTexture(g_captureTexture)) {
-        // capture kept for debug/compat only
-    }
+    if (!srcTex && g_vrRtColorTex) srcTex = g_vrRtColorTex;
+    if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
+    if (!srcTex && g_captureTexture) srcTex = g_captureTexture;
+    (void)texId;
 
-    // True per-eye only when L and R are distinct live textures. If both resolve
-    // to the same SBS RT (or only one side exists), force legacy half-crop path —
-    // otherwise each eye would blit the full side-by-side image ("doubled", no stereo).
-    bool leftOk = (perEyeSrc[0] != 0 && glIsTexture(perEyeSrc[0]));
-    bool rightOk = (perEyeSrc[1] != 0 && glIsTexture(perEyeSrc[1]));
+    // True per-eye only when L and R are distinct non-zero IDs.
+    bool leftOk = (perEyeSrc[0] != 0);
+    bool rightOk = (perEyeSrc[1] != 0);
     bool havePerEye = leftOk && rightOk && (perEyeSrc[0] != perEyeSrc[1]);
     if (!havePerEye) {
-        // Prefer legacy shared/SBS for both eyes when per-eye is incomplete.
-        if (srcTex && glIsTexture(srcTex)) {
+        if (srcTex) {
             perEyeSrc[0] = perEyeSrc[1] = srcTex;
         }
     }
@@ -433,19 +435,18 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     // Under mat_queue_mode=2, glGetTexLevelParameteriv on live engine RTs often
     // returns 0x0 even when the texture name is valid for blit (private builds that
     // "made 2 work" never trusted GL size queries mid-frame).
-    GLuint dimProbe = (perEyeSrc[0] && glIsTexture(perEyeSrc[0])) ? perEyeSrc[0]
-        : ((perEyeSrc[1] && glIsTexture(perEyeSrc[1])) ? perEyeSrc[1] : srcTex);
+    // Prefer known size; never require glIsTexture (false negatives under mat_queue 2).
+    GLuint dimProbe = perEyeSrc[0] ? perEyeSrc[0] : (perEyeSrc[1] ? perEyeSrc[1] : srcTex);
     GLint srcWidth = g_knownSubmitSrcW;
     GLint srcHeight = g_knownSubmitSrcH;
-    if (srcWidth <= 0 || srcHeight <= 0) {
-        if (dimProbe && glIsTexture(dimProbe)) {
-            glBindTexture(GL_TEXTURE_2D, dimProbe);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &srcWidth);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &srcHeight);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            if (srcWidth > 0 && srcHeight > 0) {
-                VRMOD_SetKnownSubmitSize((uint32_t)srcWidth, (uint32_t)srcHeight);
-            }
+    if ((srcWidth <= 0 || srcHeight <= 0) && dimProbe != 0) {
+        // Best-effort GL query only when Lua has not supplied size yet.
+        glBindTexture(GL_TEXTURE_2D, dimProbe);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &srcWidth);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &srcHeight);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        if (srcWidth > 0 && srcHeight > 0) {
+            VRMOD_SetKnownSubmitSize((uint32_t)srcWidth, (uint32_t)srcHeight);
         }
     }
     if (srcWidth <= 0 || srcHeight <= 0) {
@@ -455,7 +456,8 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         }
     }
     static int s_zeroDimStreak = 0;
-    const bool haveSrcTex = (dimProbe != 0 && glIsTexture(dimProbe));
+    // Non-zero ID + known size is enough to blit (crash log: tex=31 size=ok but glIsTexture failed).
+    const bool haveSrcTex = (dimProbe != 0);
     if (!havePerEye && (!haveSrcTex || srcWidth <= 0 || srcHeight <= 0)) {
         s_zeroDimStreak++;
         result.errCode = -2;
@@ -473,8 +475,7 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     }
     s_zeroDimStreak = 0;
 
-    // Do NOT glFinish here — under mat_queue 2 that races Source material workers
-    // ("Illegal termination of worker thread"). glFlush is enough to order our blits.
+    // No glFinish — mat workers die ("Illegal termination of worker thread").
     glFlush();
 
     // Direct path (modeled on backup xr_render.cpp): attach srcTex (g_captureTexture preferred) and blit.
@@ -533,15 +534,12 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
         // Choose source texture for this eye.
         GLuint eyeSrcTex = havePerEye ? perEyeSrc[eye] : srcTex;
         // Query actual source dimensions (may differ per eye in theory, but we use per-eye RTs at recommended size).
-        GLint eyeSrcW = 0, eyeSrcH = 0;
-        if (eyeSrcTex && glIsTexture(eyeSrcTex)) {
-            glBindTexture(GL_TEXTURE_2D, eyeSrcTex);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &eyeSrcW);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &eyeSrcH);
-            glBindTexture(GL_TEXTURE_2D, 0);
-        }
-        if (eyeSrcW == 0 || eyeSrcH == 0) {
-            eyeSrcW = srcWidth; eyeSrcH = srcHeight;
+        // Always use frame-level known size under mat_queue 2 (per-eye GL query lies).
+        GLint eyeSrcW = srcWidth;
+        GLint eyeSrcH = srcHeight;
+        if (eyeSrcW <= 0 || eyeSrcH <= 0) {
+            eyeSrcW = g_knownSubmitSrcW > 0 ? g_knownSubmitSrcW : (GLint)(g_xrSwapchainWidth > 0 ? g_xrSwapchainWidth * 2 : 2048);
+            eyeSrcH = g_knownSubmitSrcH > 0 ? g_knownSubmitSrcH : (GLint)(g_xrSwapchainHeight > 0 ? g_xrSwapchainHeight : 1024);
         }
 
         // Direct attach + full (or inset) blit per eye. With per-eye RTs the rendered content

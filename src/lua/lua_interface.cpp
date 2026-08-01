@@ -756,12 +756,10 @@ LUA_FUNCTION(SetKnownSubmitSize) {
 }
 
 LUA_FUNCTION(SubmitSharedTexture) {
-    // Usable source: prefer per-eye textures (new path), fall back to legacy single shared/FBO.
-    bool haveLeft = (g_leftEyeTexture != 0 && glIsTexture(g_leftEyeTexture)) || (g_leftEyeColorTex != 0 && glIsTexture(g_leftEyeColorTex)) || (g_leftEyeFBO != 0);
-    bool haveRight = (g_rightEyeTexture != 0 && glIsTexture(g_rightEyeTexture)) || (g_rightEyeColorTex != 0 && glIsTexture(g_rightEyeColorTex)) || (g_rightEyeFBO != 0);
-    bool haveLegacy = (g_sharedTexture != 0) ||
-                      (g_vrRtColorTex != 0 && glIsTexture(g_vrRtColorTex)) ||
-                      (g_vrRtFBO != 0);
+    // Do not require glIsTexture — false under mat_queue 2 for live engine RTs.
+    bool haveLeft = (g_leftEyeTexture != 0) || (g_leftEyeColorTex != 0) || (g_leftEyeFBO != 0);
+    bool haveRight = (g_rightEyeTexture != 0) || (g_rightEyeColorTex != 0) || (g_rightEyeFBO != 0);
+    bool haveLegacy = (g_sharedTexture != 0) || (g_vrRtColorTex != 0) || (g_vrRtFBO != 0);
     bool haveUsableSrc = haveLeft || haveRight || haveLegacy;
     if (!g_xrSwapchainsCreated || !haveUsableSrc) {
         if (g_xrSessionRunning && !g_xrSwapchainsCreated) {
@@ -770,18 +768,23 @@ LUA_FUNCTION(SubmitSharedTexture) {
         return 0;
     }
 
-    // We pass a best-effort single id (Submit will ignore it when per-eye globals are populated).
     GLuint submitId = 0;
     if (haveLeft || haveRight) {
-        submitId = g_leftEyeTexture ? g_leftEyeTexture : (g_leftEyeColorTex ? g_leftEyeColorTex : g_rightEyeTexture);
+        submitId = g_leftEyeTexture ? g_leftEyeTexture
+            : (g_leftEyeColorTex ? g_leftEyeColorTex
+            : (g_rightEyeTexture ? g_rightEyeTexture : g_rightEyeColorTex));
     }
     if (submitId == 0) {
-        submitId = g_sharedTexture ? g_sharedTexture :
-                   (g_vrRtColorTex && glIsTexture(g_vrRtColorTex) ? g_vrRtColorTex : g_sharedTexture);
+        submitId = g_vrRtColorTex ? g_vrRtColorTex
+            : (g_sharedTexture ? g_sharedTexture : g_captureTexture);
     }
     XrSubmitResult res = XR_SubmitStolenTexture(submitId, g_texBounds);
+    // Rate-limit console spam (was hundreds of lines under mat_queue 2).
     if (!res.ok && res.errMsg[0]) {
-        LuaPrint(LUA, res.errMsg);
+        static int s_subErr = 0;
+        if ((++s_subErr % 120) == 1) {
+            LuaPrint(LUA, res.errMsg);
+        }
     }
     return 0;
 }
@@ -792,8 +795,8 @@ LUA_FUNCTION(Shutdown) {
     if (g_IsPaused)
         return 0;
 
+    // Never glFinish on shutdown — tears down Source mat workers uncleanly.
     glFlush();
-    glFinish();
 
     // Free Lua references
     for (int i = 0; i < g_luaRefCount; i++) {
