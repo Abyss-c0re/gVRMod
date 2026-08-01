@@ -78,5 +78,8 @@ extern GLint g_knownSubmitSrcW;
 extern GLint g_knownSubmitSrcH;
 void VRMOD_SetKnownSubmitSize(uint32_t w, uint32_t h);
 
+// Mark g_sharedTexture as an engine RT (do not glDelete on next ShareTextureBegin).
+void VRMOD_MarkSharedTextureEngineOwned();
+
 int ShareCaptureTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc);
 bool ShareCaptureTextureFinish(ErrorFunc errFunc);  // note: name collides with LUA wrapper in other TU; use :: when calling from Lua bridge

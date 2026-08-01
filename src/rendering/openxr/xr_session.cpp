@@ -78,6 +78,10 @@ XrViewConfigurationView g_xrViewConfigs[2] = {};
 uint32_t         g_xrRecommendedWidth = 0;
 uint32_t         g_xrRecommendedHeight = 0;
 
+// Submit allowed while VR is live. Cleared first on exit so Submit no-ops
+// before swapchain/session teardown (avoids GLX/worker races under mat_queue 2).
+static bool      g_xrSubmitEnabled = true;
+
 static void* g_loaderLib = nullptr;
 static char g_resultBuf[XR_MAX_RESULT_STRING_SIZE];
 static char g_loaderErrBuf[256]; // last dlopen failure reason for better error messages
@@ -477,6 +481,17 @@ bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
 
 #include "input/xr_input.h"
 
+void XR_SetSubmitEnabled(bool enabled) {
+    g_xrSubmitEnabled = enabled;
+    if (!enabled) {
+        VRMOD_LOG_INFO("OpenXR submit disabled (async exit / teardown)");
+    }
+}
+
+bool XR_IsSubmitEnabled() {
+    return g_xrSubmitEnabled;
+}
+
 bool XR_EnsureSessionAndInput(char* errMsg, int errMsgLen) {
     if (!g_xrInstance || g_xrSystemId == XR_NULL_SYSTEM_ID) {
         if (errMsg && errMsgLen > 0)
@@ -500,18 +515,17 @@ bool XR_EnsureSessionAndInput(char* errMsg, int errMsgLen) {
         if (!XR_AttachActionSets()) {
             VRMOD_LOG_WARN("XR_EnsureSessionAndInput: attach action sets pending/failed (will retry)");
         }
+        // Re-enable submit when a fresh session is bound (restart path).
+        g_xrSubmitEnabled = true;
     } else {
-        // Session exists but attach may have been skipped earlier.
-        if (!XR_AttachActionSets()) {
-            // still no sets or already attached failure
-        }
+        // Session exists but attach may have been skipped earlier (non-fatal).
+        XR_AttachActionSets();
     }
 
-    // Pump until RUNNING (or a few frames of events).
-    for (int i = 0; i < 30 && !g_xrSessionRunning; ++i) {
+    // Non-blocking: one event pump per call. Runtime advances READY→RUNNING
+    // across frames; sleeping here stalls mat workers under mat_queue_mode 2.
+    if (!g_xrSessionRunning) {
         XR_PollEvents();
-        if (g_xrSessionRunning) break;
-        usleep(1000);
     }
     return g_xrSession != XR_NULL_HANDLE;
 }
@@ -685,6 +699,7 @@ bool XR_GetDisplayInfo(float nearZ, float farZ, XrDisplayInfo* out) {
 
 void XR_Shutdown() {
     VRMOD_LOG_INFO("Shutting down OpenXR...");
+    g_xrSubmitEnabled = false;
 
     if (g_xrStageSpace != XR_NULL_HANDLE && g_xrDestroySpace) {
         g_xrDestroySpace(g_xrStageSpace);

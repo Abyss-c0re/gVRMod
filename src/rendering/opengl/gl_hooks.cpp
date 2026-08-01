@@ -33,11 +33,22 @@ bool                g_rtTextureNeedsVFlip = true;
 GLint               g_knownSubmitSrcW = 0;
 GLint               g_knownSubmitSrcH = 0;
 
+// True only while g_sharedTexture is a placeholder we glGen'd (safe to delete).
+// False when promoted to an engine RT color attachment — never glDelete those under MT.
+static bool         g_sharedTextureOwned = false;
+
 void VRMOD_SetKnownSubmitSize(uint32_t w, uint32_t h) {
     if (w > 0 && h > 0) {
         g_knownSubmitSrcW = (GLint)w;
         g_knownSubmitSrcH = (GLint)h;
     }
+}
+
+void VRMOD_MarkSharedTextureEngineOwned() {
+    // Placeholder (if any) is abandoned — engine owns the live RT ID now.
+    // Do not glDelete the old placeholder here: it may already be unbound and
+    // under mat_queue 2 delete races workers; next Begin will skip if not owned.
+    g_sharedTextureOwned = false;
 }
 
 // Framebuffer attachment observation (used to discover the actual color texture backing
@@ -210,18 +221,26 @@ bool RemoveTexturePatch(ErrorFunc errFunc) {
 }
 
 int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) {
-    // Tear down previous shared (compat)
-    if (glIsTexture(g_sharedTexture)) {
+    // Only delete textures we allocated as placeholders. Stolen engine RT IDs must
+    // never be glDelete'd — under mat_queue_mode 2 that kills worker threads and
+    // can invalidate GLX context used by the material system.
+    if (g_sharedTextureOwned && g_sharedTexture != 0) {
         glDeleteTextures(1, &g_sharedTexture);
         g_sharedTexture = 0;
+        g_sharedTextureOwned = false;
         glFlush();
+    } else {
+        g_sharedTexture = 0;
+        g_sharedTextureOwned = false;
     }
 
-    // Reset per-eye state for new proper per-eye RT path.
-    if (glIsTexture(g_leftEyeTexture)) { glDeleteTextures(1, &g_leftEyeTexture); g_leftEyeTexture = 0; }
-    if (glIsTexture(g_rightEyeTexture)) { glDeleteTextures(1, &g_rightEyeTexture); g_rightEyeTexture = 0; }
+    // Reset per-eye steal state. IDs point at engine RTs — never delete them.
+    g_leftEyeTexture = 0;
+    g_rightEyeTexture = 0;
     g_leftEyeFBO = g_rightEyeFBO = 0;
     g_leftEyeColorTex = g_rightEyeColorTex = 0;
+    g_vrRtFBO = 0;
+    g_vrRtColorTex = 0;
     g_eyeStealIndex = 0;
 
     // Lua builds an SBS RT (eyeW*2 × eyeH). texWidth/texHeight here are per-eye from
@@ -233,6 +252,7 @@ int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) 
     // Pre-allocate a placeholder at per-eye size (the engine RTs will be captured via hook/FBO).
     // We keep one g_sharedTexture at per-eye size for fallback paths.
     glGenTextures(1, &g_sharedTexture);
+    g_sharedTextureOwned = true;
     glBindTexture(GL_TEXTURE_2D, g_sharedTexture);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);

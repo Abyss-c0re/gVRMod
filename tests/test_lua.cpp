@@ -135,7 +135,7 @@ TEST(ModuleRegistration_AllFunctionsPresent) {
         "SetActionManifest", "SetActiveActionSets", "GetDisplayInfo",
         "UpdatePosesAndActions", "GetPoses", "GetActions",
         "ShareTextureBegin", "ShareTextureFinish",
-        "SetSubmitTextureBounds", "SubmitSharedTexture",
+        "SetSubmitTextureBounds", "SetSubmitEnabled", "SubmitSharedTexture",
         "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames"
     };
 
@@ -150,8 +150,8 @@ TEST(ModuleRegistration_AllFunctionsPresent) {
     for (auto name : expectedFunctions) {
         ASSERT_TRUE(mock::HasSetField(lua, name));
     }
-    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::PUSH_CFUNC), 16);
-    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::SET_FIELD), 16);
+    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::PUSH_CFUNC), 17);
+    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::SET_FIELD), 17);
 }
 
 // ─── CheckString/CheckNumber mock returns ───

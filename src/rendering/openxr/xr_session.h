@@ -92,10 +92,16 @@ bool XR_Init(char* errMsg, int errMsgLen);
 // This is the key step to make stolen/capture textures valid for the FBO blit into swapchains.
 bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen);
 
-// Lazy path: create GL session if missing, attach action sets, poll until RUNNING.
+// Lazy path: create GL session if missing, attach action sets, poll events once.
+// Non-blocking — never usleep on the render thread (mat_queue_mode 2 workers).
 // Safe to call every frame from UpdatePosesAndActions / Submit when GL is current.
 // Returns true if g_xrSession exists (may still be warming up to RUNNING).
 bool XR_EnsureSessionAndInput(char* errMsg, int errMsgLen);
+
+// Submit gate: disable before exit/teardown so mid-frame SubmitSharedTexture no-ops
+// without racing material workers or GLX context teardown.
+void XR_SetSubmitEnabled(bool enabled);
+bool XR_IsSubmitEnabled();
 
 // Pump the event loop. Returns true if session is still alive.
 bool XR_PollEvents();

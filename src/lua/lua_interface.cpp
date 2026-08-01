@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <GL/gl.h>
+#include <GL/glx.h>
 
 #include <gmod/Interface.h>
 
@@ -88,7 +89,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    LUA->PushNumber(23);
+    // v24: proper mat_queue 2 / async submit gate + non-blocking session ensure
+    LUA->PushNumber(24);
     return 1;
 }
 
@@ -112,6 +114,7 @@ LUA_FUNCTION(Init) {
             LUA->CreateTable();
             g_luaRefs[LuaRefIndex_HmdPose] = LUA->ReferenceCreate();
             g_IsPaused = false;
+            XR_SetSubmitEnabled(true);
             VRMOD_LOG_INFO("Resumed from paused state.");
             return 0;
         }
@@ -133,16 +136,14 @@ LUA_FUNCTION(Init) {
         return 0;
     }
 
-    // Poll events to get session state to READY
-    // The session needs a few event pump cycles
-    for (int attempt = 0; attempt < 100 && !g_xrSessionRunning; attempt++) {
-        XR_PollEvents();
-        if (g_xrSessionRunning) break;
-        usleep(10000); // 10ms
-    }
+    // Session GL binding is deferred until a real render context is current.
+    // Do NOT busy-wait (usleep) here — that blocked the main thread ~1s every
+    // start and raced mat_queue_mode 2 workers when VR applied mode 2 immediately after.
+    XR_PollEvents();
     if (!g_xrSessionRunning) {
-        VRMOD_LOG_WARN("Session not running after init, will retry on first frame");
+        VRMOD_LOG_INFO("Session deferred after init (GL session binds on first RenderScene)");
     }
+    XR_SetSubmitEnabled(true);
 
     g_xrInitialized = true;
 
@@ -654,26 +655,28 @@ LUA_FUNCTION(ShareTextureFinish) {
         LUA->ThrowError("VRMOD: Failed to remove the texture patch.");
     }
 
-    // Promote per-eye textures discovered via FBO COLOR_ATTACHMENT0 (most authoritative for GetRenderTargetEx backing stores).
-    if (g_leftEyeColorTex != 0 && glIsTexture(g_leftEyeColorTex)) {
+    // Promote per-eye textures discovered via FBO COLOR_ATTACHMENT0.
+    // Do not require glIsTexture — false negatives under mat_queue_mode 2.
+    if (g_leftEyeColorTex != 0) {
         if (g_leftEyeTexture != g_leftEyeColorTex) {
             VRMOD_LOG_INFO("Promoting left eye color tex from FBO: %u (was %u)", g_leftEyeColorTex, g_leftEyeTexture);
             g_leftEyeTexture = g_leftEyeColorTex;
         }
     }
-    if (g_rightEyeColorTex != 0 && glIsTexture(g_rightEyeColorTex)) {
+    if (g_rightEyeColorTex != 0) {
         if (g_rightEyeTexture != g_rightEyeColorTex) {
             VRMOD_LOG_INFO("Promoting right eye color tex from FBO: %u (was %u)", g_rightEyeColorTex, g_rightEyeTexture);
             g_rightEyeTexture = g_rightEyeColorTex;
         }
     }
 
-    // Also keep legacy shared promotion for fallback paths.
-    if (g_vrRtColorTex != 0 && glIsTexture(g_vrRtColorTex)) {
+    // Legacy shared promotion for fallback paths (non-zero ID is enough).
+    if (g_vrRtColorTex != 0) {
         if (g_sharedTexture != g_vrRtColorTex) {
             VRMOD_LOG_INFO("Promoting VR RT color texture from FBO attach: %u (was %u)", g_vrRtColorTex, g_sharedTexture);
             g_sharedTexture = g_vrRtColorTex;
         }
+        VRMOD_MarkSharedTextureEngineOwned();
     }
 
     // Log what we ended up with for the per-eye path.
@@ -703,7 +706,8 @@ LUA_FUNCTION(ShareCaptureTextureBegin) {
 }
 
 LUA_FUNCTION(ShareCaptureTextureFinish) {
-    if (g_captureTexture == 0 || !glIsTexture(g_captureTexture)) {
+    // Non-zero ID only — glIsTexture is unreliable under mat_queue 2.
+    if (g_captureTexture == 0) {
         LUA->ThrowError("VRMOD: Failed to generate capture texture.");
         return 0;
     }
@@ -768,9 +772,26 @@ LUA_FUNCTION(SetKnownSubmitSize) {
     return 0;
 }
 
+LUA_FUNCTION(SetSubmitEnabled) {
+    // Async exit: Lua disables submit before deferred Shutdown / mat_queue restore.
+    bool en = true;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::BOOL)) {
+        en = LUA->GetBool(1);
+    } else if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) {
+        en = LUA->GetNumber(1) != 0.0;
+    }
+    XR_SetSubmitEnabled(en);
+    return 0;
+}
+
 LUA_FUNCTION(SubmitSharedTexture) {
+    // Exit / teardown gate — never touch GL or OpenXR once disabled.
+    if (!XR_IsSubmitEnabled() || g_IsPaused || !g_xrInitialized) {
+        return 0;
+    }
+
     // Last-chance session create if UpdatePoses skipped (GL must be current here).
-    if (g_xrInitialized && !g_xrSessionRunning) {
+    if (!g_xrSessionRunning) {
         char serr[MAX_STR_LEN];
         XR_EnsureSessionAndInput(serr, MAX_STR_LEN);
         if (!g_xrSwapchainsCreated && g_xrSessionRunning) {
@@ -785,8 +806,8 @@ LUA_FUNCTION(SubmitSharedTexture) {
     bool haveRight = (g_rightEyeTexture != 0) || (g_rightEyeColorTex != 0) || (g_rightEyeFBO != 0);
     bool haveLegacy = (g_sharedTexture != 0) || (g_vrRtColorTex != 0) || (g_vrRtFBO != 0);
     bool haveUsableSrc = haveLeft || haveRight || haveLegacy;
-    if (!g_xrSwapchainsCreated || !haveUsableSrc) {
-        if (g_xrSessionRunning && !g_xrSwapchainsCreated) {
+    if (!g_xrSwapchainsCreated || !haveUsableSrc || !g_xrSessionRunning) {
+        if (g_xrSessionRunning && !g_xrSwapchainsCreated && XR_IsSubmitEnabled()) {
             XR_EndFrame();
         }
         return 0;
@@ -819,8 +840,14 @@ LUA_FUNCTION(Shutdown) {
     if (g_IsPaused)
         return 0;
 
-    // Never glFinish on shutdown — tears down Source mat workers uncleanly.
-    glFlush();
+    // 1) Gate submit first — any in-flight RenderScene submit becomes a no-op.
+    XR_SetSubmitEnabled(false);
+    g_IsPaused = true;
+
+    // 2) Soft GL drain only if a context is current. Never glFinish (mat workers die).
+    if (glXGetCurrentContext()) {
+        glFlush();
+    }
 
     // Free Lua references
     for (int i = 0; i < g_luaRefCount; i++) {
@@ -842,15 +869,14 @@ LUA_FUNCTION(Shutdown) {
     memset(g_actions, 0, sizeof(g_actions));
     g_actionSetCount = 0;
     g_activeActionSetCount = 0;
-    g_IsPaused = true;
 
-    // Destroy swapchains
+    // Destroy swapchains (session/instance kept for quick resume path).
     if (g_xrSwapchainsCreated) {
         XR_DestroySwapchains();
         g_xrSwapchainsCreated = false;
     }
 
-    VRMOD_LOG_INFO("VR shutdown (paused).");
+    VRMOD_LOG_INFO("VR shutdown (paused, submit gated).");
     return 0;
 }
 
@@ -931,6 +957,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "GLFinish");
     LUA->PushCFunction(SetKnownSubmitSize);
     LUA->SetField(-2, "SetKnownSubmitSize");
+    LUA->PushCFunction(SetSubmitEnabled);
+    LUA->SetField(-2, "SetSubmitEnabled");
     LUA->PushCFunction(SubmitSharedTexture);
     LUA->SetField(-2, "SubmitSharedTexture");
     LUA->PushCFunction(Shutdown);

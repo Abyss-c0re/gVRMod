@@ -271,6 +271,13 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     result.errCode = 0;
     result.errMsg[0] = '\0';
 
+    // Async exit gate (also checked in Lua SubmitSharedTexture).
+    if (!XR_IsSubmitEnabled()) {
+        result.errCode = -3;
+        snprintf(result.errMsg, sizeof(result.errMsg), "Submit disabled");
+        return result;
+    }
+
     if (!g_xrSessionRunning) {
         result.errCode = -1;
         snprintf(result.errMsg, sizeof(result.errMsg), "Session not running");
@@ -368,51 +375,20 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
     // Fallback to the classic single stolen + bounds only if per-eye textures are not populated.
     GLuint perEyeSrc[2] = {0, 0};
 
-    // glIsTexture is unreliable under mat_queue_mode=2 (engine workers own RTs).
-    // Trust non-zero IDs from share hooks + known submit size from Lua.
-    auto texId = [](GLuint t) -> GLuint { return t != 0 ? t : 0; };
-
-    // Resolve left
-    GLuint leftSrc = g_leftEyeTexture;
-    if (g_leftEyeFBO != 0 && glBindFramebufferPtr && glGetFramebufferAttachmentParameterivPtr) {
-        GLint prevFB = 0; glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevFB);
-        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_leftEyeFBO);
-        GLint attached = 0;
-        glGetFramebufferAttachmentParameterivPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE, &attached);
-        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevFB);
-        if (attached != 0) leftSrc = (GLuint)attached;
-    }
-    if (g_leftEyeColorTex) leftSrc = g_leftEyeColorTex;
+    // mat_queue_mode 2: do NOT rebind engine FBOs every frame to re-query
+    // attachments — that races material workers. Trust IDs captured at share time.
+    GLuint leftSrc = g_leftEyeColorTex ? g_leftEyeColorTex
+        : (g_leftEyeTexture ? g_leftEyeTexture : 0);
+    GLuint rightSrc = g_rightEyeColorTex ? g_rightEyeColorTex
+        : (g_rightEyeTexture ? g_rightEyeTexture : 0);
     perEyeSrc[0] = leftSrc ? leftSrc : stolenTexture;
-
-    // Resolve right
-    GLuint rightSrc = g_rightEyeTexture;
-    if (g_rightEyeFBO != 0 && glBindFramebufferPtr && glGetFramebufferAttachmentParameterivPtr) {
-        GLint prevFB = 0; glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevFB);
-        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_rightEyeFBO);
-        GLint attached = 0;
-        glGetFramebufferAttachmentParameterivPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE, &attached);
-        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevFB);
-        if (attached != 0) rightSrc = (GLuint)attached;
-    }
-    if (g_rightEyeColorTex) rightSrc = g_rightEyeColorTex;
     perEyeSrc[1] = rightSrc ? rightSrc : stolenTexture;
 
     // Legacy single-src resolve (only used if per-eye not available).
     GLuint srcTex = stolenTexture;
-    if (g_vrRtFBO != 0 && glBindFramebufferPtr && glGetFramebufferAttachmentParameterivPtr) {
-        GLint prevFB = 0;
-        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevFB);
-        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_vrRtFBO);
-        GLint attached = 0;
-        glGetFramebufferAttachmentParameterivPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE, &attached);
-        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevFB);
-        if (attached != 0) srcTex = (GLuint)attached;
-    }
     if (!srcTex && g_vrRtColorTex) srcTex = g_vrRtColorTex;
     if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
     if (!srcTex && g_captureTexture) srcTex = g_captureTexture;
-    (void)texId;
 
     // True per-eye only when L and R are distinct non-zero IDs.
     bool leftOk = (perEyeSrc[0] != 0);
@@ -628,27 +604,9 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                     else srcY0 = srcY1 - 1;
                 }
 
-                glFlush();
-
-                // Content check from the READ FBO (src) before we copy.
-                {
-                    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitSrcFBO);
-                    glReadBuffer(GL_COLOR_ATTACHMENT0);
-                    unsigned char p[4] = {0};
-                    GLint sx = (srcX0 + srcX1) / 2;
-                    GLint sy = (srcY0 + srcY1) / 2;
-                    glReadPixels(sx, sy, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, p);
-                    int sm = (int)p[0] + (int)p[1] + (int)p[2];
-                    if (sm < 25) {
-                        VRMOD_LOG_INFO("### EYE%d BLACK? src=%u center=(%u,%u,%u) sz=%dx%d",
-                            eye, eyeSrcTex, p[0], p[1], p[2], eyeSrcW, eyeSrcH);
-                    } else if ((s_submitCallCount % 45) == 0) {
-                        VRMOD_LOG_INFO("EYE%d content OK src=%u sum=%d sz=%dx%d u[%.2f-%.2f] v[%.2f-%.2f]",
-                            eye, eyeSrcTex, sm, eyeSrcW, eyeSrcH, u0, u1, v0, v1);
-                    }
-                }
-
                 // Primary path: glBlitFramebuffer.
+                // No glReadPixels here — that forces a full GPU sync and races
+                // mat_queue_mode 2 workers ("Illegal termination of worker thread").
                 // OpenXR OpenGL swapchain: first row = top of view. Source Engine GL RTs
                 // store top-of-scene at high Y. When bounds already invert src Y (Linux),
                 // the blit itself flips. When bounds are ordered low→high, invert dest Y
@@ -674,28 +632,11 @@ XrSubmitResult XR_SubmitStolenTexture(GLuint stolenTexture, const float textureB
                     0, dstY0, (GLint)g_xrSwapchainWidth, dstY1,
                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
-                // Verify destination (must bind READ to the blit dest FBO — previous code
-                // sampled the default framebuffer and always reported sum=0).
-                if ((s_submitCallCount % 45) == 0 && eye == 0) {
-                    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitFBO);
-                    glReadBuffer(GL_COLOR_ATTACHMENT0);
-                    unsigned char dstSample[4] = {0};
-                    glReadPixels((GLint)g_xrSwapchainWidth / 2, (GLint)g_xrSwapchainHeight / 2,
-                                 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, dstSample);
-                    int dstSum = (int)dstSample[0] + dstSample[1] + dstSample[2];
-                    VRMOD_LOG_INFO("POST dst eye0 center sum=%d (blit path) src=%ux%u->%ux%u flip=%d",
-                        dstSum, eyeSrcW, eyeSrcH, g_xrSwapchainWidth, g_xrSwapchainHeight,
-                        (int)g_rtTextureNeedsVFlip);
-                    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitSrcFBO);
-                }
-
-                if ((s_submitCallCount % 30) == 0 && eye == 0) {
+                if ((s_submitCallCount % 90) == 0 && eye == 0) {
                     VRMOD_LOG_INFO("BLIT eye%d u[%.3f-%.3f] v[%.3f-%.3f] srcRect(%d,%d)-(%d,%d) -> dst %ux%u perEye=%d",
                         eye, u0, u1, v0, v1, srcX0, srcY0, srcX1, srcY1,
                         g_xrSwapchainWidth, g_xrSwapchainHeight, (int)havePerEye);
                 }
-
-                glFlush();
             }
 
             glBindFramebufferPtr(GL_READ_FRAMEBUFFER, prevR);
