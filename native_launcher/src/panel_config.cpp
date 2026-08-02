@@ -114,13 +114,15 @@ void LoadPanelConfig(const std::string& gmodRoot) {
   tryEnvF("CUBE_PANEL_ALPHA", g_cfg.panelAlpha, 0.4f, 1.01f);
   tryEnvF("CUBE_GRAB_THRESH", g_cfg.grabThresh, 0.2f, 1.01f);
   tryEnvB("CUBE_PASSTHROUGH", g_cfg.passthrough);
-  tryEnvB("CUBE_VIEW_LOCK", g_cfg.viewLock);
+  // Env overrides conf only when explicitly set (no silent force-off — research-3 heresy).
+  if (getenv("CUBE_VIEW_LOCK"))
+    tryEnvB("CUBE_VIEW_LOCK", g_cfg.viewLock);
   if (const char* v = getenv("CUBE_WORLD_LOCK")) {
     if (!(v[0] == '0' && v[1] == 0)) g_cfg.viewLock = false;
   }
-  if (!getenv("CUBE_VIEW_LOCK"))
-    g_cfg.viewLock = false;
-  g_cfg.grabThresh = std::min(g_cfg.grabThresh, 0.40f);
+  // Honor conf grab_thresh (shipped default 0.55). Only clamp to legal range.
+  if (g_cfg.grabThresh < 0.2f) g_cfg.grabThresh = 0.2f;
+  if (g_cfg.grabThresh > 1.f) g_cfg.grabThresh = 1.f;
   WorldPanelReset();
   fprintf(stderr,
           "[cube_webui] panel size=%.2fx%.2fm dist=%.2f world_lock=%d passthrough=%d grab>=%.2f\n",

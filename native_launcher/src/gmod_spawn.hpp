@@ -19,11 +19,15 @@ struct GfxLaunch {
   // OpenXR backend (vrmod module convars)
   float xrSupersample = 1.5f;
   float xrViewScale = 1.0f;
-  float xrFovScale = 1.0f;
+  // Independent X/Y — never force-link over archived asymmetric Vision cal
+  float xrFovScaleX = 1.0f;
+  float xrFovScaleY = 1.0f;
+  bool xrWriteFov = false; // only write fovscale when user touched SETTINGS
   float xrScaleFactor = 1.0f;
   float xrEyeScale = 0.5f;
   float xrZNear = 1.0f;
-  int xrDesktopView = 3; // 1 none, 2 left, 3 right
+  // 1=none (Cube seamless / shell policy), 2=left, 3=right
+  int xrDesktopView = 1;
   bool xrPostProcess = false;
   bool xrSwapEyes = false;
   bool xrSkybox = false;

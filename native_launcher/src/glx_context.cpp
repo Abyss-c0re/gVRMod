@@ -12,6 +12,7 @@ bool GlxCreate(GlxContext& g) {
   };
   XVisualInfo* vi = glXChooseVisual(g.dpy, scr, attribs);
   if (!vi) return false;
+  g.visualid = (uint32_t)vi->visualid;
   g.cmap = XCreateColormap(g.dpy, RootWindow(g.dpy, scr), vi->visual, AllocNone);
   XSetWindowAttributes swa{};
   swa.colormap = g.cmap;
@@ -23,8 +24,41 @@ bool GlxCreate(GlxContext& g) {
   XMapWindow(g.dpy, g.win);
   XFlush(g.dpy);
   g.ctx = glXCreateContext(g.dpy, vi, nullptr, GL_TRUE);
+  // Resolve FBConfig matching this visual (OpenXR binding requires it — research-3)
+  int fbId = 0;
+  if (g.ctx && glXQueryContext(g.dpy, g.ctx, GLX_FBCONFIG_ID, &fbId) == Success && fbId) {
+    int fbAttr[] = {GLX_FBCONFIG_ID, fbId, None};
+    int n = 0;
+    GLXFBConfig* fbs = glXChooseFBConfig(g.dpy, scr, fbAttr, &n);
+    if (fbs && n > 0) {
+      g.fbConfig = fbs[0];
+      XFree(fbs);
+    }
+  }
+  if (!g.fbConfig) {
+    // Fallback: any FBConfig with RGBA double-buffer
+    int fbAttr[] = {
+      GLX_RENDER_TYPE, GLX_RGBA_BIT,
+      GLX_DOUBLEBUFFER, True,
+      GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8,
+      GLX_DEPTH_SIZE, 16,
+      None
+    };
+    int n = 0;
+    GLXFBConfig* fbs = glXChooseFBConfig(g.dpy, scr, fbAttr, &n);
+    if (fbs && n > 0) {
+      g.fbConfig = fbs[0];
+      XVisualInfo* vi2 = glXGetVisualFromFBConfig(g.dpy, g.fbConfig);
+      if (vi2) {
+        g.visualid = (uint32_t)vi2->visualid;
+        XFree(vi2);
+      }
+      XFree(fbs);
+    }
+  }
   XFree(vi);
   if (!g.ctx) return false;
+  fprintf(stderr, "[cube_webui] GLX visualid=%u fbConfig=%p\n", g.visualid, (void*)g.fbConfig);
   return glXMakeCurrent(g.dpy, g.win, g.ctx);
 }
 

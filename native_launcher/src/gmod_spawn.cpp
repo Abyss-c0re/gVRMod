@@ -1,4 +1,5 @@
 #include "gmod_spawn.hpp"
+#include "panel_config.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -21,11 +22,40 @@ static bool DirExists(const std::string& p) {
   return stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
 }
 
+// Sync monorepo addon/vrmod-x64 → garrysmod/addons (shell helper used to; native Start must too).
+static void SyncMonorepoLua(const std::string& gmodRoot) {
+  std::string monorepo;
+  if (const char* e = getenv("GVRMOD_ROOT")) monorepo = e;
+  if (monorepo.empty()) {
+    std::string exe = PathExeDir();
+    if (!exe.empty()) {
+      // install/native → gVRMod
+      monorepo = PathDirname(PathDirname(exe));
+    }
+  }
+  if (monorepo.empty()) return;
+  std::string src = monorepo + "/addon/vrmod-x64";
+  std::string dest = gmodRoot + "/garrysmod/addons/vrmod-x64";
+  if (!DirExists(src)) {
+    fprintf(stderr, "[cube_webui] monorepo lua missing at %s (skip rsync)\n", src.c_str());
+    return;
+  }
+  mkdir((gmodRoot + "/garrysmod/addons").c_str(), 0755);
+  std::string cmd =
+      "rsync -a --delete --exclude '.git' --exclude '.scratch' "
+      "'" + src + "/' '" + dest + "/' 2>/dev/null";
+  int rc = system(cmd.c_str());
+  fprintf(stderr, "[cube_webui] rsync monorepo → addons/vrmod-x64 rc=%d\n", rc);
+}
+
 int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   if (req.gmodRoot.empty() || !DirExists(req.gmodRoot + "/garrysmod")) {
     errOut = "GMod root invalid";
     return 1;
   }
+
+  // Always land latest Cube Lua before Start (research-3: native path skipped this)
+  SyncMonorepoLua(req.gmodRoot);
 
   const std::string cfgDir = req.gmodRoot + "/garrysmod/cfg";
   const std::string dataDir = req.gmodRoot + "/garrysmod/data/vrmod";
@@ -33,6 +63,7 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   mkdir(dataDir.c_str(), 0755);
 
   // Cube boot cfg: GMod/Source graphics + OpenXR autostart
+  // Law: do not clobber Vision FOV archives or force mat_queue_mode 2 (VRMod safe = 1).
   const auto& g = req.gfx;
   std::ostringstream cfg;
   cfg << "// written by cube_webui_launcher — GMod native graphics + Cube OpenXR\n"
@@ -52,7 +83,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "r_waterforceexpensive " << (g.waterExpensive ? 1 : 0) << "\n"
       << "r_waterforcereflectentities " << (g.waterExpensive ? 1 : 0) << "\n"
       << "fps_max " << g.fpsMax << "\n"
-      << "mat_queue_mode " << (g.multicore ? 2 : 0) << "\n"
+      // VRMod policy: prefer mat_queue_mode 1 (2 can crash CThread workers mid-session)
+      << "mat_queue_mode " << (g.multicore ? 1 : 0) << "\n"
       << "cl_threaded_bone_setup " << (g.multicore ? 1 : 0) << "\n"
       << "r_threaded_particles " << (g.multicore ? 1 : 0) << "\n"
       << "r_threaded_renderables " << (g.multicore ? 1 : 0) << "\n"
@@ -69,10 +101,15 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "vrmod_menu_vr 0\n"
       << "vrmod_laserpointer 1\n"
       << "vrmod_supersample " << g.xrSupersample << "\n"
-      << "vrmod_viewscale " << g.xrViewScale << "\n"
-      << "vrmod_fovscale_x " << g.xrFovScale << "\n"
-      << "vrmod_fovscale_y " << g.xrFovScale << "\n"
-      << "vrmod_scalefactor " << g.xrScaleFactor << "\n"
+      << "vrmod_viewscale " << g.xrViewScale << "\n";
+  // FOV: only write when user touched XR FOV in SETTINGS — else preserve archive / Vision cal
+  if (g.xrWriteFov) {
+    cfg << "vrmod_fovscale_x " << g.xrFovScaleX << "\n"
+        << "vrmod_fovscale_y " << g.xrFovScaleY << "\n";
+  } else {
+    cfg << "// fovscale x/y omitted — preserve archived / Vision calibration\n";
+  }
+  cfg << "vrmod_scalefactor " << g.xrScaleFactor << "\n"
       << "vrmod_eyescale " << g.xrEyeScale << "\n"
       << "vrmod_znear " << g.xrZNear << "\n"
       << "vrmod_desktopview " << g.xrDesktopView << "\n"
@@ -91,7 +128,6 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   }
   WriteFile(cfgDir + "/gvrmod_hub.cfg", cfgBody);
   WriteFile(cfgDir + "/gvrmod_menu.cfg", cfgBody);
-  // Also drop a pure graphics snippet for manual +exec
   WriteFile(cfgDir + "/gvrmod_graphics.cfg", cfgBody);
 
   // Marker for openxr_launch.lua
@@ -105,10 +141,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
     return 3;
   }
 
-  // Steam appid
   WriteFile(req.gmodRoot + "/steam_appid.txt", "4000\n");
 
-  // Build command — reverse of control.NewGame.js StartGame + window size from Settings
   std::ostringstream win;
   if (req.windowed) win << " -windowed";
   else win << " -fullscreen";
@@ -146,7 +180,6 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " >/tmp/cube_webui_gmod.log 2>&1 &";
   }
 
-  // Handoff: native launcher keeps OpenXR until GMod signals take_xr
   WriteFile(dataDir + "/cube_handoff.txt",
             "phase=spawned\nts=" + std::to_string((long)time(nullptr)) + "\n");
   unlink((dataDir + "/cube_ready.txt").c_str());
@@ -161,7 +194,6 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
 }
 
 bool GModProcessRunning() {
-  // hl2_linux / gmod — exclude our own cube_webui_launcher
   FILE* p = popen("pgrep -af 'hl2_linux|garrysmod' 2>/dev/null | grep -v cube_webui | head -1", "r");
   if (!p) return false;
   char buf[256] = {};
@@ -178,7 +210,6 @@ std::string ReadCubeHandoffPhase(const std::string& gmodRoot) {
   while (std::getline(f, line)) {
     if (line.rfind("phase=", 0) == 0) {
       phase = line.substr(6);
-      // trim
       while (!phase.empty() && (phase.back() == '\r' || phase.back() == ' '))
         phase.pop_back();
     }

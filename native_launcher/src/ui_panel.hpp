@@ -19,11 +19,13 @@ struct OpenXrRenderSettings {
   // Supersample index into {0.75,1.0,1.25,1.5,1.75,2.0} — needs VR restart
   int ssIdx = 3;            // 1.5 default
   float viewScale = 1.0f;   // vrmod_viewscale
-  float fovScale = 1.0f;    // vrmod_fovscale_x/y (linked)
+  float fovScaleX = 1.0f;   // vrmod_fovscale_x (Vision cal may differ from Y)
+  float fovScaleY = 1.0f;   // vrmod_fovscale_y
+  bool fovTouched = false;  // only rewrite FOV on Start when user edited SETTINGS
   float scaleFactor = 1.0f; // vrmod_scalefactor (submit UV crop)
   float eyeScale = 0.5f;    // vrmod_eyescale (IPD-ish submit)
   float zNear = 1.0f;       // vrmod_znear
-  int desktopView = 3;      // 1=none 2=left 3=right (vrmod_desktopview)
+  int desktopView = 1;      // 1=none (Cube seamless) 2=left 3=right
   bool postProcess = false;
   bool swapEyes = false;
   bool skybox = false;

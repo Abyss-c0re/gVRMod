@@ -9,9 +9,9 @@ struct PanelConfig {
   float offsetX = 0.f;
   float offsetY = 0.f;
   float offsetZ = 0.f;
-  bool viewLock = false; // false = world-locked (product default)
+  bool viewLock = false; // false = world-locked (product default); conf view_lock=1 honors HUD
   bool passthrough = true;
-  float grabThresh = 0.40f;
+  float grabThresh = 0.55f; // match cube_webui.conf; no silent 0.40 heresy clamp
   float panelAlpha = 0.96f;
 };
 

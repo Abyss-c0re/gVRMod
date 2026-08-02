@@ -37,7 +37,9 @@ inline LaunchRequest LaunchRequestFromUI(const WebUIState& ui, const std::string
   if (ssi > 5) ssi = 5;
   lr.gfx.xrSupersample = kSs[ssi];
   lr.gfx.xrViewScale = ui.gfx.xr.viewScale;
-  lr.gfx.xrFovScale = ui.gfx.xr.fovScale;
+  lr.gfx.xrFovScaleX = ui.gfx.xr.fovScaleX;
+  lr.gfx.xrFovScaleY = ui.gfx.xr.fovScaleY;
+  lr.gfx.xrWriteFov = ui.gfx.xr.fovTouched;
   lr.gfx.xrScaleFactor = ui.gfx.xr.scaleFactor;
   lr.gfx.xrEyeScale = ui.gfx.xr.eyeScale;
   lr.gfx.xrZNear = ui.gfx.xr.zNear;

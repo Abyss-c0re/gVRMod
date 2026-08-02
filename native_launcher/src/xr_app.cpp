@@ -102,8 +102,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   binding.xDisplay = glx.dpy;
   binding.glxContext = glx.ctx;
   binding.glxDrawable = glx.win;
-  binding.visualid = 0;
-  binding.glxFBConfig = nullptr;
+  // Match module xr_session: real visualid + FBConfig (null/0 is heresy on some runtimes)
+  binding.visualid = glx.visualid;
+  binding.glxFBConfig = glx.fbConfig;
 
   XrSessionCreateInfo sci{XR_TYPE_SESSION_CREATE_INFO};
   sci.next = &binding;
@@ -292,6 +293,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       }
     }
 
+    // Orderly OpenXR release (research-3): never destroy mid-frame without exit session.
+    static bool handoffExitRequested = false;
+    static float handoffExitWait = 0.f;
     if (ui.handoff) {
       ui.handoffElapsed += 1.f / 72.f;
       const bool gmodUp = GModProcessRunning();
@@ -300,14 +304,27 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.handoffPhase = phase;
       ui.handoffDetail = gmodUp ? "GMod up · waiting take_xr" : "waiting for GMod process…";
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
-      bool soft = gmodUp && ui.handoffElapsed > 40.f;
+      // Soft only after long wait if process is up but never signaled (was 40s — race window)
+      bool soft = gmodUp && ui.handoffElapsed > 90.f;
       bool timeout = ui.handoffElapsed > 180.f;
-      bool gone = !sessionRunning && ui.handoffElapsed > 1.f;
-      if (takeXr || soft || timeout || gone) {
-        fprintf(stderr, "[cube_webui] handoff exit phase=%s t=%.1f\n", phase.c_str(), ui.handoffElapsed);
+      if ((takeXr || soft || timeout) && !handoffExitRequested) {
+        handoffExitRequested = true;
+        handoffExitWait = 0.f;
+        fprintf(stderr, "[cube_webui] handoff release phase=%s t=%.1f (orderly xrRequestExitSession)\n",
+                phase.c_str(), ui.handoffElapsed);
         if (sessionRunning) xrRequestExitSession(session);
-        running = false;
-        continue;
+        else running = false;
+      }
+      if (handoffExitRequested) {
+        handoffExitWait += 1.f / 72.f;
+        ui.handoffDetail = "releasing OpenXR for GMod…";
+        // Session STOPPING handler ends session; leave when ended or hard cap
+        if (!sessionRunning || handoffExitWait > 3.f) {
+          fprintf(stderr, "[cube_webui] handoff complete sessionRunning=%d wait=%.2f\n",
+                  sessionRunning ? 1 : 0, handoffExitWait);
+          running = false;
+          continue;
+        }
       }
     }
 

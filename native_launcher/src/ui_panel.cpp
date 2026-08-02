@@ -202,29 +202,33 @@ void WebUI_ApplyGfxPreset(WebUIState& s, int preset) {
     s.gfx.matHdrLevel = 0; s.gfx.shadows = false; s.gfx.flashlightShadows = false;
     s.gfx.specular = false; s.gfx.bumpmap = true; s.gfx.waterExpensive = false;
     s.gfx.multicore = true; s.gfx.fpsMax = 60;
-    x.ssIdx = 1; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
-    x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
+    x.ssIdx = 1; x.viewScale = 1.0f; x.fovScaleX = 1.0f; x.fovScaleY = 1.0f; x.scaleFactor = 1.0f;
+    x.fovTouched = false; x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
+    x.desktopView = 1;
   } else if (preset == 1) {
     s.gfx.matPicmip = 1; s.gfx.rRootLod = 1; s.gfx.matAntialias = 2; s.gfx.matForceAniso = 4;
     s.gfx.matHdrLevel = 1; s.gfx.shadows = true; s.gfx.flashlightShadows = false;
     s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = false;
     s.gfx.multicore = true; s.gfx.fpsMax = 90;
-    x.ssIdx = 2; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
-    x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
+    x.ssIdx = 2; x.viewScale = 1.0f; x.fovScaleX = 1.0f; x.fovScaleY = 1.0f; x.scaleFactor = 1.0f;
+    x.fovTouched = false; x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
+    x.desktopView = 1;
   } else if (preset == 2) {
     s.gfx.matPicmip = 0; s.gfx.rRootLod = 0; s.gfx.matAntialias = 4; s.gfx.matForceAniso = 8;
     s.gfx.matHdrLevel = 2; s.gfx.shadows = true; s.gfx.flashlightShadows = true;
     s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = true;
     s.gfx.multicore = true; s.gfx.fpsMax = 0;
-    x.ssIdx = 3; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
-    x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
+    x.ssIdx = 3; x.viewScale = 1.0f; x.fovScaleX = 1.0f; x.fovScaleY = 1.0f; x.scaleFactor = 1.0f;
+    x.fovTouched = false; x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
+    x.desktopView = 1;
   } else {
     s.gfx.matPicmip = -1; s.gfx.rRootLod = 0; s.gfx.matAntialias = 8; s.gfx.matForceAniso = 16;
     s.gfx.matHdrLevel = 2; s.gfx.shadows = true; s.gfx.flashlightShadows = true;
     s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = true;
     s.gfx.multicore = true; s.gfx.fpsMax = 0;
-    x.ssIdx = 5; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
-    x.postProcess = true; x.skybox = true; x.mq2SinglePass = true;
+    x.ssIdx = 5; x.viewScale = 1.0f; x.fovScaleX = 1.0f; x.fovScaleY = 1.0f; x.scaleFactor = 1.0f;
+    x.fovTouched = false; x.postProcess = true; x.skybox = true; x.mq2SinglePass = true;
+    x.desktopView = 1;
   }
 }
 
@@ -299,9 +303,12 @@ void WebUI_CycleSetting(WebUIState& s, int row, int dir) {
       break;
     }
     case SR_XR_FOVSCALE: {
-      int i = IndexOfF(kFovSc, kFovScN, g.xr.fovScale);
+      // Linked cycle for both axes when user intentionally edits (does not auto-write archive until Start)
+      int i = IndexOfF(kFovSc, kFovScN, g.xr.fovScaleX);
       i = (i + dir + kFovScN) % kFovScN;
-      g.xr.fovScale = kFovSc[i];
+      g.xr.fovScaleX = kFovSc[i];
+      g.xr.fovScaleY = kFovSc[i];
+      g.xr.fovTouched = true;
       g.preset = -1;
       break;
     }
@@ -404,7 +411,8 @@ static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) 
       snprintf(out, outN, "XR VIEW SCALE   %.2f", g.xr.viewScale);
       break;
     case SR_XR_FOVSCALE:
-      snprintf(out, outN, "XR FOV SCALE    %.2f", g.xr.fovScale);
+      snprintf(out, outN, "XR FOV X/Y      %.2f/%.2f%s", g.xr.fovScaleX, g.xr.fovScaleY,
+               g.xr.fovTouched ? "" : " (keep archive)");
       break;
     case SR_XR_SCALEFACTOR:
       snprintf(out, outN, "XR UV SCALE     %.2f", g.xr.scaleFactor);
