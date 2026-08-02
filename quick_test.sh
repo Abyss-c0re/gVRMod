@@ -49,9 +49,14 @@ echo "Install complete (module + OpenXR bundle deployed)."
 # Write a minimal test cfg.
 # We only set desktopview here. We send "vrmod_start" via xdotool *after* we have focused the window.
 mkdir -p "$LIVE_CFG_DIR"
+# Never exec mat_queue_mode from cfg mid-map load — that thrash alone can CThread-crash.
+# For mode 2 smoke, set engine mat_queue_mode in config.cfg *before* launching GMod.
 cat > "$LIVE_CFG_DIR/vrmod_quicktest.cfg" << 'CFG'
 vrmod_desktopview 2
-echo "=== VRMOD_QUICKTEST: desktopview set, waiting for focused vrmod_start ==="
+gmod_mcore_test 0
+engine_no_focus_sleep 0
+vrmod_require_window_focus 0
+echo "=== VRMOD_QUICKTEST: cfg ready (no mat_queue thrash) ==="
 CFG
 echo "Wrote $LIVE_CFG_DIR/vrmod_quicktest.cfg"
 
@@ -328,8 +333,45 @@ pkill -f 'GarrysMod/hl2.sh' 2>/dev/null || true
 pkill -9 -f 'bin/linux64/gmod' 2>/dev/null || true
 
 echo ""
-echo "The vrmod_quicktest.cfg sets desktopview 2. vrmod_start was injected via console (if focused)."
-echo "Logs are being monitored by the active log tails."
+echo "=== Post-run smoke checks ==="
+FAIL=0
+# Crash detect: fresh core for gmod in last 3 minutes
+if coredumpctl list 2>/dev/null | awk -v now="$(date +%s)" '
+  /gmod/ {
+    # last lines are newest; print and count if today-ish
+    last=$0
+  }
+  END {
+    if (last != "") print last
+  }' | grep -qi gmod; then
+  RECENT=$(coredumpctl list 2>/dev/null | grep gmod | tail -1 || true)
+  echo "Latest gmod coredump entry: $RECENT"
+  # If timestamp is within this session (~20 min), flag
+  if echo "$RECENT" | grep -q "$(date +%Y-%m-%d)" 2>/dev/null; then
+    # Compare hour roughly — still report for human
+    echo "WARN: a gmod coredump exists for today — inspect if crash during this run."
+  fi
+fi
+# Illegal termination in console/module logs from this run
+for log in "$GAME_DIR/garrysmod/console.log" "$GAME_DIR/vrmod_debug.log"; do
+  if [ -f "$log" ]; then
+    if grep -qi "Illegal termination of worker thread" "$log" 2>/dev/null; then
+      echo "FAIL: $log contains Illegal termination of worker thread"
+      FAIL=1
+    fi
+    if grep -qi "mat_queue_mode=.*read-only\|mat_queue_mode=.*never writes" "$log" 2>/dev/null; then
+      echo "OK: mat_queue never-write log present in $log"
+    fi
+    if grep -qi "Started VR session\|VR session\|First successful OpenXR submit" "$log" 2>/dev/null; then
+      echo "OK: VR session / submit signal in $log"
+    fi
+  fi
+done
+if [ "$FAIL" -ne 0 ]; then
+  echo "=== QUICK TEST FAILED (crash signatures) ==="
+  exit 1
+fi
+echo "=== QUICK TEST FINISHED (no worker-thread crash in logs) ==="
 echo ""
-echo "To force-kill the game between tests: pkill -f 'bin/linux64/gmod'   (or pkill -f 'GarrysMod/hl2.sh')"
-echo "Then just run this script again after you make code changes."
+echo "The vrmod_quicktest.cfg sets desktopview 2. vrmod_start was injected via console (if focused)."
+echo "To force-kill: pkill -f 'bin/linux64/gmod'"

@@ -221,18 +221,11 @@ bool RemoveTexturePatch(ErrorFunc errFunc) {
 }
 
 int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) {
-    // Only delete textures we allocated as placeholders. Stolen engine RT IDs must
-    // never be glDelete'd — under mat_queue_mode 2 that kills worker threads and
-    // can invalidate GLX context used by the material system.
-    if (g_sharedTextureOwned && g_sharedTexture != 0) {
-        glDeleteTextures(1, &g_sharedTexture);
-        g_sharedTexture = 0;
-        g_sharedTextureOwned = false;
-        glFlush();
-    } else {
-        g_sharedTexture = 0;
-        g_sharedTextureOwned = false;
-    }
+    // Never glDelete here — even placeholders. Under mat_queue_mode 2, delete +
+    // flush races material workers ("Illegal termination of worker thread").
+    // Abandon old IDs; GPU reclaims on context teardown / next engine GC.
+    g_sharedTexture = 0;
+    g_sharedTextureOwned = false;
 
     // Reset per-eye steal state. IDs point at engine RTs — never delete them.
     g_leftEyeTexture = 0;
@@ -354,11 +347,8 @@ int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) 
 // Mirrors ShareTexture but targets g_captureTexture and sets steal flag
 // so the engine's glGen for the capture RT is recorded.
 int ShareCaptureTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) {
-    if (glIsTexture(g_captureTexture)) {
-        glDeleteTextures(1, &g_captureTexture);
-        g_captureTexture = 0;
-        glFlush();
-    }
+    // Abandon only — no glDelete/glIsTexture (mat_queue 2 worker race).
+    g_captureTexture = 0;
 
     // Pre-allocate a texture of the *final* size the caller (Lua) will use for the capture RT.
     // Unlike the main Share path (which passes "per-eye-ish" and does *2 inside), the capture

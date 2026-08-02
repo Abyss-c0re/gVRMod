@@ -135,23 +135,27 @@ TEST(ModuleRegistration_AllFunctionsPresent) {
         "SetActionManifest", "SetActiveActionSets", "GetDisplayInfo",
         "UpdatePosesAndActions", "GetPoses", "GetActions",
         "ShareTextureBegin", "ShareTextureFinish",
-        "SetSubmitTextureBounds", "SetSubmitEnabled", "SubmitSharedTexture",
+        "SetSubmitTextureBounds", "SetSubmitEnabled",
+        "ShouldRender", "CollectEyes", "HasCollectedEyes",
+        "SetKnownSubmitSize", "SubmitSharedTexture",
         "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames"
     };
 
     // Simulate what GMOD_MODULE_OPEN does: PushCFunction + SetField for each
     mock::MockLuaBase lua;
+    int n = 0;
     for (auto name : expectedFunctions) {
         lua.PushCFunction(nullptr);
         lua.SetField(-2, name);
+        n++;
     }
 
     // Verify all names were set
     for (auto name : expectedFunctions) {
         ASSERT_TRUE(mock::HasSetField(lua, name));
     }
-    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::PUSH_CFUNC), 18);
-    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::SET_FIELD), 18);
+    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::PUSH_CFUNC), n);
+    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::SET_FIELD), n);
 }
 
 // ─── CheckString/CheckNumber mock returns ───

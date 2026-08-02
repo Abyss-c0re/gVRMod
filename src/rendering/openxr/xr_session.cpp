@@ -715,6 +715,10 @@ bool XR_WaitAndBeginFrame() {
     return g_xrFrameState.shouldRender;
 }
 
+bool XR_ShouldRenderThisFrame() {
+    return g_xrSubmitEnabled && g_xrFrameBegun && g_xrFrameState.shouldRender;
+}
+
 void XR_EndFrame() {
     if (!g_xrSession || !g_xrEndFrame) {
         g_xrFrameBegun = false;

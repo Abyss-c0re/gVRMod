@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v36: mat_queue 2 harden — no GL tex query / glFinish; no mcore pin
-    LUA->PushNumber(36);
+    // v44: linear RGBA8 swapchain (brighter); mode 2 no mat_* thrash + forced single-pass.
+    LUA->PushNumber(44);
     return 1;
 }
 
@@ -850,6 +850,37 @@ LUA_FUNCTION(SetSubmitEnabled) {
     return 0;
 }
 
+// After UpdatePosesAndActions (WaitFrame+Begin): true if compositor wants a layer this frame.
+LUA_FUNCTION(ShouldRender) {
+    LUA->PushBool(XR_ShouldRenderThisFrame());
+    return 1;
+}
+
+// Copy last complete engine stereo (SBS or per-eye) into module staging.
+// Call at frame start *before* overwriting the engine RT (after MatQueue had a frame boundary).
+LUA_FUNCTION(CollectEyes) {
+#ifndef _WIN32
+    if (!XR_IsSubmitEnabled() || g_IsPaused || !g_xrInitialized) {
+        LUA->PushBool(false);
+        return 1;
+    }
+    bool ok = XR_CollectEyesFromEngine(g_texBounds);
+    LUA->PushBool(ok);
+#else
+    LUA->PushBool(false);
+#endif
+    return 1;
+}
+
+LUA_FUNCTION(HasCollectedEyes) {
+#ifndef _WIN32
+    LUA->PushBool(XR_HasCollectedEyes());
+#else
+    LUA->PushBool(false);
+#endif
+    return 1;
+}
+
 LUA_FUNCTION(SubmitSharedTexture) {
     // Exit / teardown gate — never touch GL or OpenXR once disabled.
     if (!XR_IsSubmitEnabled() || g_IsPaused || !g_xrInitialized) {
@@ -914,9 +945,7 @@ LUA_FUNCTION(Shutdown) {
 
 #ifdef _WIN32
 #else
-    if (glXGetCurrentContext()) {
-        glFlush(); // never glFinish — mat_queue 2 workers die
-    }
+    // No glFlush/glFinish on teardown — stalls/races mat_queue workers mid-exit.
     // Force-remove texture hooks left mid-Share (partial start/fail).
     {
         auto errBridge = [](const char* msg) { VRMOD_LOG_ERROR("%s", msg); };
@@ -1059,6 +1088,12 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SetKnownSubmitSize");
     LUA->PushCFunction(SetSubmitEnabled);
     LUA->SetField(-2, "SetSubmitEnabled");
+    LUA->PushCFunction(ShouldRender);
+    LUA->SetField(-2, "ShouldRender");
+    LUA->PushCFunction(CollectEyes);
+    LUA->SetField(-2, "CollectEyes");
+    LUA->PushCFunction(HasCollectedEyes);
+    LUA->SetField(-2, "HasCollectedEyes");
     LUA->PushCFunction(SubmitSharedTexture);
     LUA->SetField(-2, "SubmitSharedTexture");
     LUA->PushCFunction(Shutdown);

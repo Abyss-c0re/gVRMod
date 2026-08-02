@@ -23,6 +23,25 @@ struct XrSubmitResult {
 // stolenTexture is GL id on Linux; ignored on Windows (uses g_d3d11SharedTexture).
 XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float textureBounds[8]);
 
+// ── Per-eye collect + backend-timed submit (Linux GL) ──
+// Pipeline for mat_queue_mode 2 / true dual-eye:
+//   1) XR_WaitAndBeginFrame()          — backend owns frame timing
+//   2) XR_CollectEyesFromEngine()      — copy last complete engine stereo into module staging
+//   3) XR_SubmitStolenTexture / collected path — EndFrame with staging (not live engine RT)
+//   4) Lua dual RenderView             — record next eyes into engine RT
+// Collect is deferred to the *next* frame start so MatQueue can drain before the blit.
+#ifndef _WIN32
+void XR_EnsureEyeCollectors(uint32_t eyeW, uint32_t eyeH);
+// Blit engine SBS or per-eye RTs → write slot, swap. Uses textureBounds for SBS U halves.
+bool XR_CollectEyesFromEngine(const float textureBounds[8]);
+// True when a complete collected pair is ready for submit.
+bool XR_HasCollectedEyes();
+// Prefer collected staging as submit source (set after successful Collect).
+void XR_SetPreferCollectedEyes(bool prefer);
+bool XR_PreferCollectedEyes();
+void XR_DestroyEyeCollectors();
+#endif
+
 // ── Recommended size ──
 extern uint32_t g_xrSwapchainWidth;
 extern uint32_t g_xrSwapchainHeight;

@@ -95,6 +95,18 @@ int64_t  g_xrSwapchainFormat = 0;
 static GLuint g_blitFBO = 0;
 static GLuint g_blitSrcFBO = 0;
 
+// Per-eye module-owned staging (double-buffered). Backend times XR; Lua only fills engine RT.
+// [eye][slot] — after Collect, read slot holds last complete pair for submit.
+static GLuint g_eyeStage[2][2] = {{0, 0}, {0, 0}};
+static uint32_t g_eyeStageW = 0;
+static uint32_t g_eyeStageH = 0;
+static int g_eyeStageWrite = 0; // next Collect writes here
+static int g_eyeStageRead = 1;  // Submit reads this (previous Collect)
+static bool g_eyeStageReady = false;
+// Prefer staging only after a successful Collect; default false so cold start
+// uses engine RT (v38 path). Collect under mode 0/1 can set ready.
+static bool g_preferCollectedEyes = false;
+
 // GL extension function pointers (resolved lazily)
 static PFNGLGENFRAMEBUFFERSPROC    glGenFramebuffersPtr = nullptr;
 static PFNGLDELETEFRAMEBUFFERSPROC glDeleteFramebuffersPtr = nullptr;
@@ -137,33 +149,33 @@ static bool LoadGLExtensions() {
 
 // Pick a swapchain format from the runtime's supported list.
 //
-// Source Engine eye RTs are already tonemapped / display-referred (roughly sRGB
-// numbers after RenderView). OpenXR composition for HMDs expects sRGB layer
-// content. Prefer GL_SRGB8_ALPHA8 and blit *without* GL_FRAMEBUFFER_SRGB so we
-// store those bytes as-is. Writing display-referred data into a linear RGBA8
-// swapchain makes WiVRn/Quest re-apply gamma → washed-out / too bright.
+// Source Engine RTs are already tonemapped / display-referred (gamma-ish 8-bit).
+// Blitting those bytes into an sRGB swapchain (0x8C43) with FRAMEBUFFER_SRGB off
+// stores them as-if-sRGB; the compositor then *decodes* → image looks too dark.
+// Prefer linear GL_RGBA8 and passthrough blit (no encode) so midtones stay correct
+// on WiVRn/Quest/Monado. Fall back to sRGB if the runtime has no RGBA8.
 static int64_t ChooseXrSwapchainFormat() {
     uint32_t count = 0;
     if (!g_xrEnumerateSwapchainFormats ||
         g_xrEnumerateSwapchainFormats(g_xrSession, 0, &count, nullptr) != XR_SUCCESS ||
         count == 0) {
-        VRMOD_LOG_WARN("xrEnumerateSwapchainFormats unavailable or empty, defaulting to GL_SRGB8_ALPHA8");
-        return GL_SRGB8_ALPHA8;
+        VRMOD_LOG_WARN("xrEnumerateSwapchainFormats unavailable or empty, defaulting to GL_RGBA8");
+        return GL_RGBA8;
     }
 
     std::vector<int64_t> formats(count);
     if (g_xrEnumerateSwapchainFormats(g_xrSession, count, &count, formats.data()) != XR_SUCCESS) {
-        return GL_SRGB8_ALPHA8;
+        return GL_RGBA8;
     }
 
-    // Best: sRGB (matches HMD compositor + Source tonemap output)
-    for (int64_t f : formats) {
-        if (f == GL_SRGB8_ALPHA8) return f;
-    }
-
-    // Fallback: linear RGBA8 (may look bright on some runtimes if content is already encoded)
+    // Best: linear RGBA8 (Source tonemap → no second gamma decode)
     for (int64_t f : formats) {
         if (f == GL_RGBA8) return f;
+    }
+
+    // Fallback: sRGB (may look dark with passthrough blit of display-referred data)
+    for (int64_t f : formats) {
+        if (f == GL_SRGB8_ALPHA8) return f;
     }
 
     // Next best: plain RGB8 if somehow present
@@ -178,7 +190,7 @@ static int64_t ChooseXrSwapchainFormat() {
         return formats[0];
     }
 
-    return GL_SRGB8_ALPHA8;
+    return GL_RGBA8;
 }
 
 bool XR_CreateSwapchains(char* errMsg, int errMsgLen) {
@@ -235,12 +247,164 @@ bool XR_CreateSwapchains(char* errMsg, int errMsgLen) {
     glGenFramebuffersPtr(1, &g_blitFBO);
     glGenFramebuffersPtr(1, &g_blitSrcFBO);
 
+    // Pre-allocate eye collectors at swapchain size (once) — never glGen mid-frame under mode 2.
+    if (g_xrSwapchainWidth > 0 && g_xrSwapchainHeight > 0) {
+        XR_EnsureEyeCollectors(g_xrSwapchainWidth, g_xrSwapchainHeight);
+    }
+
     VRMOD_LOG_INFO("OpenXR swapchains created successfully (format 0x%llx)",
         (unsigned long long)g_xrSwapchainFormat);
     return true;
 }
 
+void XR_DestroyEyeCollectors() {
+    for (int e = 0; e < 2; e++) {
+        for (int s = 0; s < 2; s++) {
+            if (g_eyeStage[e][s]) {
+                // Safe at full XR teardown only (not mid mat_queue session thrash).
+                glDeleteTextures(1, &g_eyeStage[e][s]);
+                g_eyeStage[e][s] = 0;
+            }
+        }
+    }
+    g_eyeStageW = g_eyeStageH = 0;
+    g_eyeStageReady = false;
+    g_eyeStageWrite = 0;
+    g_eyeStageRead = 1;
+}
+
+void XR_EnsureEyeCollectors(uint32_t eyeW, uint32_t eyeH) {
+    if (eyeW < 16) eyeW = 16;
+    if (eyeH < 16) eyeH = 16;
+    if (g_eyeStage[0][0] && g_eyeStageW == eyeW && g_eyeStageH == eyeH)
+        return;
+    // Size change: abandon old IDs (no delete mid-session — leak until shutdown).
+    if (g_eyeStageW != eyeW || g_eyeStageH != eyeH) {
+        for (int e = 0; e < 2; e++)
+            for (int s = 0; s < 2; s++)
+                g_eyeStage[e][s] = 0;
+        g_eyeStageReady = false;
+    }
+    g_eyeStageW = eyeW;
+    g_eyeStageH = eyeH;
+    for (int e = 0; e < 2; e++) {
+        for (int s = 0; s < 2; s++) {
+            if (g_eyeStage[e][s]) continue;
+            glGenTextures(1, &g_eyeStage[e][s]);
+            glBindTexture(GL_TEXTURE_2D, g_eyeStage[e][s]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)eyeW, (GLsizei)eyeH,
+                0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+    VRMOD_LOG_INFO("Eye collectors ready %ux%u (double-buffered)", eyeW, eyeH);
+}
+
+bool XR_HasCollectedEyes() { return g_eyeStageReady; }
+void XR_SetPreferCollectedEyes(bool prefer) { g_preferCollectedEyes = prefer; }
+bool XR_PreferCollectedEyes() { return g_preferCollectedEyes; }
+
+bool XR_CollectEyesFromEngine(const float textureBounds[8]) {
+    // Soft-fail only — never assert. Mid-session GL alloc/blit under mat_queue 2
+    // is the crash path; callers gate Collect to mode < 2.
+    if (!LoadGLExtensions() || !glBlitFramebufferPtr) return false;
+    if (!g_blitFBO || !g_blitSrcFBO) return false;
+
+    GLuint leftSrc = g_leftEyeColorTex ? g_leftEyeColorTex
+        : (g_leftEyeTexture ? g_leftEyeTexture : 0);
+    GLuint rightSrc = g_rightEyeColorTex ? g_rightEyeColorTex
+        : (g_rightEyeTexture ? g_rightEyeTexture : 0);
+    GLuint sbs = g_vrRtColorTex ? g_vrRtColorTex
+        : (g_sharedTexture ? g_sharedTexture : g_captureTexture);
+    bool havePerEye = leftSrc && rightSrc && leftSrc != rightSrc;
+    if (!havePerEye && !sbs) return false;
+
+    GLint srcW = g_knownSubmitSrcW;
+    GLint srcH = g_knownSubmitSrcH;
+    if (srcW <= 0 || srcH <= 0) {
+        srcW = (GLint)(g_xrSwapchainWidth > 0 ? g_xrSwapchainWidth * 2 : 0);
+        srcH = (GLint)(g_xrSwapchainHeight > 0 ? g_xrSwapchainHeight : 0);
+    }
+    if (srcW < 32 || srcH < 32) return false;
+
+    uint32_t eyeW = g_xrSwapchainWidth > 0 ? g_xrSwapchainWidth : (uint32_t)(srcW / 2);
+    uint32_t eyeH = g_xrSwapchainHeight > 0 ? g_xrSwapchainHeight : (uint32_t)srcH;
+    // Only ensure collectors if missing — never resize/recreate mid-session (worker race).
+    if (!g_eyeStage[0][0] || !g_eyeStage[1][0]) {
+        XR_EnsureEyeCollectors(eyeW, eyeH);
+    }
+    if (!g_eyeStage[0][g_eyeStageWrite] || !g_eyeStage[1][g_eyeStageWrite])
+        return false;
+
+    GLint prevR = 0, prevD = 0;
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevR);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevD);
+    const int wslot = g_eyeStageWrite;
+    int okEyes = 0;
+
+    for (int eye = 0; eye < 2; eye++) {
+        GLuint srcTex = havePerEye ? (eye == 0 ? leftSrc : rightSrc) : sbs;
+        if (!srcTex || !g_eyeStage[eye][wslot]) continue;
+
+        // Crop U for SBS halves only. V always full ordered 0→1 — no flip here.
+        // Staging keeps engine GL orientation; submit applies the single Linux V flip.
+        // (Collect flip + submit flip = upside-down.)
+        float u0, u1;
+        if (havePerEye) {
+            u0 = 0.f; u1 = 1.f;
+        } else {
+            u0 = textureBounds ? textureBounds[eye * 4 + 0] : (eye == 0 ? 0.f : 0.5f);
+            u1 = textureBounds ? textureBounds[eye * 4 + 2] : (eye == 0 ? 0.5f : 1.f);
+            if (!(u1 > u0 + 0.001f)) {
+                u0 = (eye == 0) ? 0.f : 0.5f;
+                u1 = (eye == 0) ? 0.5f : 1.f;
+            }
+        }
+
+        GLint sx0 = (GLint)(u0 * srcW);
+        GLint sx1 = (GLint)(u1 * srcW);
+        GLint sy0 = 0;
+        GLint sy1 = srcH;
+        if (sx0 < 0) sx0 = 0;
+        if (sx1 < 0) sx1 = 0;
+        if (sx0 > srcW) sx0 = srcW;
+        if (sx1 > srcW) sx1 = srcW;
+        if (sx0 == sx1) continue;
+
+        glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitSrcFBO);
+        glFramebufferTexture2DPtr(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcTex, 0);
+        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_blitFBO);
+        glFramebufferTexture2DPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_eyeStage[eye][wslot], 0);
+        if (glCheckFramebufferStatusPtr(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE ||
+            glCheckFramebufferStatusPtr(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            continue;
+        }
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        // Identity dest — orientation fixed once at OpenXR submit.
+        glBlitFramebufferPtr(sx0, sy0, sx1, sy1, 0, 0, (GLint)g_eyeStageW, (GLint)g_eyeStageH,
+            GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        okEyes++;
+    }
+
+    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, prevR);
+    glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevD);
+
+    if (okEyes < 2) return false;
+
+    g_eyeStageRead = wslot;
+    g_eyeStageWrite = 1 - wslot;
+    g_eyeStageReady = true;
+    g_preferCollectedEyes = true;
+    return true;
+}
+
 void XR_DestroySwapchains() {
+    XR_DestroyEyeCollectors();
     if (g_blitFBO) {
         glDeleteFramebuffersPtr(1, &g_blitFBO);
         g_blitFBO = 0;
@@ -371,34 +535,44 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
       g_xrEyePosesValid = true;
     }
 
-    // Per-eye path (preferred): each eye has its own RT of recommended size.
-    // The content of each RT was rendered with that eye's correct (asymmetric) projection
-    // and full viewport, so we submit the full texture rect per eye (small inset for safety).
-    // Fallback to the classic single stolen + bounds only if per-eye textures are not populated.
+    // Per-eye path. Prefer module staging (collected after previous stereo + MatQueue drain).
+    // Backend times this submit (WaitFrame already done); staging isolates live engine RTs.
     GLuint perEyeSrc[2] = {0, 0};
-
-    // mat_queue_mode 2: do NOT rebind engine FBOs every frame to re-query
-    // attachments — that races material workers. Trust IDs captured at share time.
-    GLuint leftSrc = g_leftEyeColorTex ? g_leftEyeColorTex
-        : (g_leftEyeTexture ? g_leftEyeTexture : 0);
-    GLuint rightSrc = g_rightEyeColorTex ? g_rightEyeColorTex
-        : (g_rightEyeTexture ? g_rightEyeTexture : 0);
-    perEyeSrc[0] = leftSrc ? leftSrc : stolenTexture;
-    perEyeSrc[1] = rightSrc ? rightSrc : stolenTexture;
-
-    // Legacy single-src resolve (only used if per-eye not available).
+    bool havePerEye = false;
     GLuint srcTex = stolenTexture;
-    if (!srcTex && g_vrRtColorTex) srcTex = g_vrRtColorTex;
-    if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
-    if (!srcTex && g_captureTexture) srcTex = g_captureTexture;
 
-    // True per-eye only when L and R are distinct non-zero IDs.
-    bool leftOk = (perEyeSrc[0] != 0);
-    bool rightOk = (perEyeSrc[1] != 0);
-    bool havePerEye = leftOk && rightOk && (perEyeSrc[0] != perEyeSrc[1]);
-    if (!havePerEye) {
-        if (srcTex) {
-            perEyeSrc[0] = perEyeSrc[1] = srcTex;
+    if (g_preferCollectedEyes && g_eyeStageReady
+        && g_eyeStage[0][g_eyeStageRead] && g_eyeStage[1][g_eyeStageRead]) {
+        perEyeSrc[0] = g_eyeStage[0][g_eyeStageRead];
+        perEyeSrc[1] = g_eyeStage[1][g_eyeStageRead];
+        havePerEye = true;
+        srcTex = perEyeSrc[0];
+        // Staging is already one eye each at swapchain size — full rect.
+        // Override known size for this submit path.
+        if (g_eyeStageW > 0 && g_eyeStageH > 0) {
+            VRMOD_SetKnownSubmitSize(g_eyeStageW, g_eyeStageH);
+        }
+    } else {
+        // mat_queue_mode 2: do NOT rebind engine FBOs every frame to re-query
+        // attachments — that races material workers. Trust IDs captured at share time.
+        GLuint leftSrc = g_leftEyeColorTex ? g_leftEyeColorTex
+            : (g_leftEyeTexture ? g_leftEyeTexture : 0);
+        GLuint rightSrc = g_rightEyeColorTex ? g_rightEyeColorTex
+            : (g_rightEyeTexture ? g_rightEyeTexture : 0);
+        perEyeSrc[0] = leftSrc ? leftSrc : stolenTexture;
+        perEyeSrc[1] = rightSrc ? rightSrc : stolenTexture;
+
+        if (!srcTex && g_vrRtColorTex) srcTex = g_vrRtColorTex;
+        if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
+        if (!srcTex && g_captureTexture) srcTex = g_captureTexture;
+
+        bool leftOk = (perEyeSrc[0] != 0);
+        bool rightOk = (perEyeSrc[1] != 0);
+        havePerEye = leftOk && rightOk && (perEyeSrc[0] != perEyeSrc[1]);
+        if (!havePerEye) {
+            if (srcTex) {
+                perEyeSrc[0] = perEyeSrc[1] = srcTex;
+            }
         }
     }
     if ((s_submitCallCount % 30) == 0) {
@@ -452,11 +626,10 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFBO);
     GLboolean prevSrgbEnabled = glIsEnabled(GL_FRAMEBUFFER_SRGB);
 
-    // Always disable FRAMEBUFFER_SRGB during the blit.
-    // Engine RT pixels are already tonemapped. Enabling SRGB on an sRGB
-    // swapchain would encode again (wrong). Leaving it on for linear formats
-    // does nothing useful for glBlitFramebuffer of display-referred data.
-    // Passthrough store into sRGB swapchain = correct brightness on WiVRn/Quest.
+    // Always disable FRAMEBUFFER_SRGB during blit.
+    // Source RT = display-referred. We prefer linear RGBA8 swapchains so these
+    // bytes pass through. If runtime only has sRGB, still disable encode so we
+    // don't linear→sRGB encode already-gamma content (would go darker still).
     glDisable(GL_FRAMEBUFFER_SRGB);
 
     XrCompositionLayerProjectionView projViews[2];
@@ -479,7 +652,9 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         }
 
         XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-        waitInfo.timeout = XR_INFINITE_DURATION;
+        // Bound wait — XR_INFINITE_DURATION freezes the game (and mat workers) if
+        // the compositor stalls. 100ms is enough for a healthy runtime frame.
+        waitInfo.timeout = 100000000; // 100 ms in nanoseconds
         res = g_xrWaitSwapchainImage(g_swapchains[eye], &waitInfo);
         if (res != XR_SUCCESS) {
             g_xrReleaseSwapchainImage(g_swapchains[eye], nullptr);
@@ -539,8 +714,18 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 float v1 = (eye == 0) ? textureBounds[3] : textureBounds[7];
 
                 const float ins = 0.003f;
+                // Staging = engine GL orientation, one full eye (no SBS U halves).
+                const bool fromCollector = g_preferCollectedEyes && g_eyeStageReady
+                    && perEyeSrc[eye] == g_eyeStage[eye][g_eyeStageRead];
+                if (fromCollector) {
+                    u0 = ins;
+                    u1 = 1.0f - ins;
+                    // Ordered V; one flip applied below via dest Y (same as engine RT path).
+                    v0 = ins;
+                    v1 = 1.0f - ins;
+                }
                 // U: require ordered min<max. If bad, default to correct SBS half for this eye.
-                if (!(u1 > u0 + 0.001f)) {
+                else if (!(u1 > u0 + 0.001f)) {
                     if (havePerEye) {
                         u0 = ins;
                         u1 = 1.0f - ins;
@@ -553,7 +738,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     }
                 }
                 // V: empty (zero height) only → full. Inverted V is intentional (flip via blit).
-                if (std::fabs(v1 - v0) < 0.001f) {
+                if (!fromCollector && std::fabs(v1 - v0) < 0.001f) {
                     v0 = ins;
                     v1 = 1.0f - ins;
                 }
@@ -561,6 +746,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 // g_rtTextureNeedsVFlip: mirror V into GL bottom-left space when bounds
                 // were authored in D3D-style (low V = top). If bounds already inverted
                 // (Linux Lua convention), they already encode the flip — do not mirror again.
+                // Staging uses ordered V → always apply one flip on Linux via dest when needed.
                 const bool boundsVInverted = (v0 > v1);
                 if (g_rtTextureNeedsVFlip && !boundsVInverted) {
                     float tmp0 = 1.0f - v1;
@@ -650,8 +836,10 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
     glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevDrawFBO);
     if (prevSrgbEnabled) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB);
 
-    // Final flush so the compositor sees completed images when we call xrEndFrame
-    glFlush();
+    // glFlush can stall MatQueue workers under mat_queue_mode 2.
+    // Compositor usually sees images after EndFrame without an explicit flush.
+    // (glFinish is always forbidden — kills CThread.)
+    // glFlush();
 
     // Submit frame
     XrCompositionLayerProjection projLayer = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};

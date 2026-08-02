@@ -115,6 +115,8 @@ const char* XR_ResultToString(XrResult result);
 // ── Frame lifecycle ──
 // Returns true if we should render this frame.
 bool XR_WaitAndBeginFrame();
+// True after WaitAndBegin when compositor wants layers this frame.
+bool XR_ShouldRenderThisFrame();
 // End frame with 0 layers (orphan begin / shouldRender=false).
 void XR_EndFrame();
 // Clear frame-begun flag after xr_render's layered xrEndFrame (or failed end).
