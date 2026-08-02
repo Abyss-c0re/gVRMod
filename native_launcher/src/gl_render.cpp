@@ -108,13 +108,11 @@ void GlDrawWorldPanel(GLuint tex) {
   const auto& cfg = PanelCfgConst();
   const float hw = (wp.widthM > 0.05f) ? wp.widthM * 0.5f : cfg.halfW;
   const float hh = (wp.heightM > 0.05f) ? wp.heightM * 0.5f : cfg.halfH;
-  // Quest ADB: content was 180° in view — flip right+up so CLOSE is top-right upright
-  const Vec3 R = wp.right * -1.f;
-  const Vec3 U = wp.up * -1.f;
-  const Vec3 bl = wp.c - R * hw - U * hh;
-  const Vec3 br = wp.c + R * hw - U * hh;
-  const Vec3 tr = wp.c + R * hw + U * hh;
-  const Vec3 tl = wp.c - R * hw + U * hh;
+  // Geometry: bl/br = bottom, tl/tr = top in world (wp.up = +Y)
+  const Vec3 bl = wp.c - wp.right * hw - wp.up * hh;
+  const Vec3 br = wp.c + wp.right * hw - wp.up * hh;
+  const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
+  const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
 
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
@@ -123,14 +121,16 @@ void GlDrawWorldPanel(GLuint tex) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
+  // ADB Quest: only V was inverted (180° around horizontal). Flip V only.
+  // CPU y=0 top → after glTexImage, flip so top verts get UI top.
   glBegin(GL_QUADS);
-  glTexCoord2f(0.f, 1.f);
-  glVertex3f(bl.x, bl.y, bl.z);
-  glTexCoord2f(1.f, 1.f);
-  glVertex3f(br.x, br.y, br.z);
-  glTexCoord2f(1.f, 0.f);
-  glVertex3f(tr.x, tr.y, tr.z);
   glTexCoord2f(0.f, 0.f);
+  glVertex3f(bl.x, bl.y, bl.z);
+  glTexCoord2f(1.f, 0.f);
+  glVertex3f(br.x, br.y, br.z);
+  glTexCoord2f(1.f, 1.f);
+  glVertex3f(tr.x, tr.y, tr.z);
+  glTexCoord2f(0.f, 1.f);
   glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
   glDisable(GL_TEXTURE_2D);
