@@ -74,11 +74,11 @@ if CLIENT then
         local requiredVersion, latestVersion
         if system.IsLinux() then
             requiredVersion = 20
-            latestVersion = 26
+            latestVersion = 27
             moduleFile = "lua/bin/gmcl_vrmod_linux64.dll"
         else
             requiredVersion = 20
-            latestVersion = 26
+            latestVersion = 27
             moduleFile = "lua/bin/gmcl_vrmod_win64.dll"
             if not file.Exists(moduleFile, "GAME") then
                 moduleFile = "lua/bin/gmcl_vrmod_win32.dll"
@@ -116,7 +116,7 @@ if CLIENT then
     end
 
     function vrmod.GetModuleVersion()
-        return g_VR.moduleVersion, 20, 26
+        return g_VR.moduleVersion, 20, 27
     end
 
     function vrmod.IsPlayerInVR(ply)

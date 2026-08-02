@@ -131,7 +131,7 @@ TEST(LuaError_ThrowRecorded) {
 
 TEST(ModuleRegistration_AllFunctionsPresent) {
     const char* expectedFunctions[] = {
-        "GetVersion", "IsHMDPresent", "Init",
+        "GetVersion", "GetBackend", "IsHMDPresent", "Init",
         "SetActionManifest", "SetActiveActionSets", "GetDisplayInfo",
         "UpdatePosesAndActions", "GetPoses", "GetActions",
         "ShareTextureBegin", "ShareTextureFinish",
@@ -150,8 +150,8 @@ TEST(ModuleRegistration_AllFunctionsPresent) {
     for (auto name : expectedFunctions) {
         ASSERT_TRUE(mock::HasSetField(lua, name));
     }
-    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::PUSH_CFUNC), 17);
-    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::SET_FIELD), 17);
+    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::PUSH_CFUNC), 18);
+    ASSERT_EQ(mock::CountCalls(lua, mock::LuaCall::SET_FIELD), 18);
 }
 
 // ─── CheckString/CheckNumber mock returns ───

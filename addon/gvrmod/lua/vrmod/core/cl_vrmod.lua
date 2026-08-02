@@ -96,6 +96,12 @@ if CLIENT then
 			end
 
 			g_VR.moduleVersion = VRMOD_GetVersion and VRMOD_GetVersion() or 0
+			if vrmod.DetectBackend then
+				local pol = vrmod.DetectBackend()
+				if vrmod.logger then
+					vrmod.logger.Info("Runtime: %s", vrmod.DescribeBackend and vrmod.DescribeBackend() or tostring(pol.backend))
+				end
+			end
 		else
 			vrmod.logger.Err("Failed to load module:", err)
 		end

@@ -101,8 +101,14 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v26: full shutdown for clean restart; mat_queue never thrash on exit
-    LUA->PushNumber(26);
+    // v27: GetBackend() for dual-addon OpenVR/OpenXR auto-detect
+    LUA->PushNumber(27);
+    return 1;
+}
+
+// "openxr" | future backends — missing export means OpenVR (module-master).
+LUA_FUNCTION(GetBackend) {
+    LUA->PushString("openxr");
     return 1;
 }
 
@@ -1025,6 +1031,8 @@ GMOD_MODULE_OPEN() {
     }
     LUA->PushCFunction(GetVersion);
     LUA->SetField(-2, "GetVersion");
+    LUA->PushCFunction(GetBackend);
+    LUA->SetField(-2, "GetBackend");
     LUA->PushCFunction(IsHMDPresent);
     LUA->SetField(-2, "IsHMDPresent");
     LUA->PushCFunction(Init);
