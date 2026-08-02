@@ -1,8 +1,8 @@
 [Desktop Entry]
-Name=gVRMod (VR Hub)
-Comment=Garry's Mod with OpenXR auto VR hub
+Name=gVRMod (OpenXR)
+Comment=Garry's Mod native OpenXR launch — menu-first VR (WiVRn/Quest)
 Exec=/home/voldemar/Dev/GMod/gVRMod/scripts/gvrmod_launcher.sh
 Icon=steam_icon_4000
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Game;
