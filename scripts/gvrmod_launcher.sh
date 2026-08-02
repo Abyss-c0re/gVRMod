@@ -13,14 +13,30 @@
 #   • Lua force-start via data/vrmod/openxr_launch.txt marker.
 #
 # Usage:
-#   ./scripts/gvrmod_launcher.sh                 # steam + gm_construct @ 720x480
+#   ./scripts/gvrmod_launcher.sh                 # pull Lua from GitHub + steam launch
+#   ./scripts/gvrmod_launcher.sh --no-pull       # skip git pull / rsync
 #   ./scripts/gvrmod_launcher.sh --native        # hl2.sh (advanced)
 #   ./scripts/gvrmod_launcher.sh --map gm_flatgrass
 #   ./scripts/gvrmod_launcher.sh --background    # map_background (menu under world)
 #   ./scripts/gvrmod_launcher.sh --hub
 #   ./scripts/gvrmod_launcher.sh -- %command%    # Steam Launch Options wrapper
+#
+# Env:
+#   GVMOD_LUA_REPO   default https://github.com/Abyss-c0re/vrmod-x64.git
+#   GVMOD_LUA_BRANCH default main
+#   GVMOD_LUA_DIR    optional override checkout path
+#   GVMOD_NO_PULL=1  same as --no-pull
 # =============================================================================
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+LUA_REPO="${GVMOD_LUA_REPO:-https://github.com/Abyss-c0re/vrmod-x64.git}"
+LUA_BRANCH="${GVMOD_LUA_BRANCH:-main}"
+LUA_CACHE="${GVMOD_LUA_DIR:-$HOME/.cache/gvrmod/vrmod-x64}"
+PULL_LUA=1
+[[ "${GVMOD_NO_PULL:-0}" == "1" ]] && PULL_LUA=0
 
 resolve_gmod() {
   local c
@@ -105,9 +121,11 @@ while [[ $# -gt 0 ]]; do
     --steam) USE_STEAM=1; shift ;;
     --native) USE_STEAM=0; shift ;;
     --no-wivrn) NO_WIVRN=1; shift ;;
+    --no-pull) PULL_LUA=0; shift ;;
+    --pull) PULL_LUA=1; shift ;;
     --gmod-dir) GMOD="$2"; shift 2 ;;
     --) shift; EXTRA_ARGS+=("$@"); WRAPPER=1; break ;;
-    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
     *) EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
@@ -118,6 +136,110 @@ fi
 if [[ "$MODE" == "hub" ]]; then
   MAP_MODE="full"; MAP="${MAP:-gm_construct}"; USE_MAP=1
 fi
+
+# ── OpenXR Lua: pull GitHub sources + rsync into live GMod addon ────────────
+# Prefer monorepo submodule; else cache clone of Abyss-c0re/vrmod-x64.
+resolve_lua_src() {
+  local sub="$ROOT/addon/vrmod-x64"
+  if [[ -d "$sub/lua" && -e "$sub/.git" ]]; then
+    echo "$sub"
+    return 0
+  fi
+  if [[ -d "$LUA_CACHE/lua" ]]; then
+    echo "$LUA_CACHE"
+    return 0
+  fi
+  return 1
+}
+
+pull_and_sync_lua() {
+  if [[ "$PULL_LUA" != "1" ]]; then
+    echo "[gVRMod] Lua pull skipped (--no-pull / GVMOD_NO_PULL)"
+    return 0
+  fi
+  if ! command -v git >/dev/null 2>&1; then
+    echo "[gVRMod] WARN: git missing — cannot pull Lua sources" >&2
+    return 0
+  fi
+
+  local src
+  src="$(resolve_lua_src || true)"
+  if [[ -z "$src" ]]; then
+    echo "[gVRMod] cloning Lua addon → $LUA_CACHE"
+    mkdir -p "$(dirname "$LUA_CACHE")"
+    git clone --depth 1 --branch "$LUA_BRANCH" "$LUA_REPO" "$LUA_CACHE" \
+      || git clone --depth 1 "$LUA_REPO" "$LUA_CACHE"
+    src="$LUA_CACHE"
+  fi
+
+  echo "[gVRMod] OpenXR Lua sync from GitHub"
+  echo "  src=$src"
+  echo "  branch=$LUA_BRANCH repo=$LUA_REPO"
+
+  # Never leave a polluted LD_LIBRARY_PATH for git (steam-runtime breaks libcurl)
+  (
+    export -n LD_LIBRARY_PATH 2>/dev/null || true
+    unset LD_LIBRARY_PATH
+    cd "$src"
+    # Fetch latest
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      git remote set-url origin "$LUA_REPO" 2>/dev/null || \
+        git remote add origin "$LUA_REPO" 2>/dev/null || true
+      git fetch --depth 1 origin "$LUA_BRANCH" 2>/dev/null \
+        || git fetch origin "$LUA_BRANCH" 2>/dev/null \
+        || git fetch origin 2>/dev/null || true
+      # Prefer ff-only; if dirty local, still hard-reset to origin (launcher SoT = GitHub)
+      local head_before head_after
+      head_before="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+      if git show-ref --verify --quiet "refs/remotes/origin/$LUA_BRANCH"; then
+        if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+          echo "  WARN: local changes in $src — resetting to origin/$LUA_BRANCH (GitHub wins)"
+        fi
+        git checkout -B "$LUA_BRANCH" "origin/$LUA_BRANCH" 2>/dev/null \
+          || git reset --hard "origin/$LUA_BRANCH" 2>/dev/null \
+          || git pull --ff-only origin "$LUA_BRANCH" 2>/dev/null || true
+      else
+        git pull --ff-only 2>/dev/null || git pull 2>/dev/null || true
+      fi
+      head_after="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+      echo "  HEAD $head_before → $head_after ($(git log -1 --oneline 2>/dev/null || echo '?'))"
+    fi
+  )
+
+  if [[ ! -d "$src/lua" ]]; then
+    echo "[gVRMod] WARN: no lua/ under $src — skip rsync" >&2
+    return 0
+  fi
+
+  # Sync into every known GMod addons tree (Steam often has two install paths)
+  local dest g
+  for g in \
+    "$GMOD" \
+    "$HOME/.steam/steam/steamapps/common/GarrysMod" \
+    "$HOME/.local/share/Steam/steamapps/common/GarrysMod"
+  do
+    [[ -d "$g/garrysmod/addons" ]] || continue
+    dest="$g/garrysmod/addons/vrmod-x64"
+    mkdir -p "$dest"
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a --delete \
+        --exclude '.git/' \
+        --exclude 'state/' \
+        --exclude 'docs/' \
+        --exclude '.github/' \
+        --exclude '.workshop_id' \
+        "$src/" "$dest/"
+    else
+      rm -rf "$dest"
+      mkdir -p "$dest"
+      cp -a "$src/." "$dest/"
+      rm -rf "$dest/.git" "$dest/state" "$dest/docs" "$dest/.github" 2>/dev/null || true
+    fi
+    echo "  rsync → $dest"
+  done
+}
+
+pull_and_sync_lua
 
 # ── OpenXR (works without process env if active_runtime is set) ─────────────
 XR_JSON="${XR_RUNTIME_JSON:-}"
