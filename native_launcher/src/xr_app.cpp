@@ -244,6 +244,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   bool grabbing = false;
   XrHand grabHand = XrHand::Right;
   float grabArmL = 0.f, grabArmR = 0.f; // sustained-grip arming (Meta Cam: thrash-grab)
+  float grabCooldown = 0.f;              // post-end lockout so grip flicker cannot re-grab
   bool worldInitPending = true;
 
   SmxPeerState smx{};
@@ -443,20 +444,28 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
               XrInputReadTriggerHand(session, input, XrHand::Right) ? 1 : 0);
 
     // Grab: per-hand grip + ray on panel. Meta Cam review: resting squeeze was
-    // thrash-grabbing and blocking every click — require high thresh + arm time,
-    // and never start grab on the same frame as a trigger press.
+    // thrash-grabbing and blocking every click — high thresh, hysteresis, arm,
+    // post-end cooldown, and never start grab on the same frame as a trigger.
     float grabL = XrInputReadGrabHand(session, input, XrHand::Left);
     float grabR = XrInputReadGrabHand(session, input, XrHand::Right);
-    const bool grabHeldL = grabL >= cfg.grabThresh;
-    const bool grabHeldR = grabR >= cfg.grabThresh;
+    const float grabOn = cfg.grabThresh;
+    // Release well below start so borderline squeeze cannot thrash start/end.
+    const float grabOffHyst = std::max(0.35f, grabOn - 0.22f);
+    const bool grabEngageL = grabL >= grabOn;
+    const bool grabEngageR = grabR >= grabOn;
+    const bool grabHeldL = grabbing && grabHand == XrHand::Left ? (grabL >= grabOffHyst)
+                                                               : grabEngageL;
+    const bool grabHeldR = grabbing && grabHand == XrHand::Right ? (grabR >= grabOffHyst)
+                                                                : grabEngageR;
     const float dt = 1.f / 72.f;
-    const float grabArmNeed = 0.18f; // ~13 frames at 72 Hz
-    auto armGrip = [&](bool held, float& arm) {
-      if (held) arm = std::min(grabArmNeed + 0.05f, arm + dt);
+    if (grabCooldown > 0.f) grabCooldown = std::max(0.f, grabCooldown - dt);
+    const float grabArmNeed = 0.28f; // ~20 frames at 72 Hz
+    auto armGrip = [&](bool engage, float& arm) {
+      if (engage) arm = std::min(grabArmNeed + 0.05f, arm + dt);
       else arm = 0.f;
     };
-    armGrip(grabHeldL, grabArmL);
-    armGrip(grabHeldR, grabArmR);
+    armGrip(grabEngageL, grabArmL);
+    armGrip(grabEngageR, grabArmR);
 
     // Peek trigger early so grab cannot steal click frames
     bool trigLEarly = XrInputReadTriggerHand(session, input, XrHand::Left);
@@ -469,6 +478,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (anyTrig) {
         grabbing = false;
         grabArmL = grabArmR = 0.f;
+        grabCooldown = 0.45f;
         ui.status = "STATIC · click priority";
         WebUI_MarkDirty(ui);
       } else if (still) {
@@ -485,12 +495,13 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         }
       } else {
         grabbing = false;
+        grabCooldown = 0.45f;
         ui.status = "STATIC (room locked)";
         WebUI_MarkDirty(ui);
         fprintf(stderr, "[cube_webui] grab end hand=%s pos=(%.3f,%.3f,%.3f)\n",
                 grabHand == XrHand::Left ? "L" : "R", wp.c.x, wp.c.y, wp.c.z);
       }
-    } else if (wp.ready && wp.frozen && !anyTrig) {
+    } else if (wp.ready && wp.frozen && !anyTrig && grabCooldown <= 0.f) {
       // Start grab only after sustained squeeze + ray on panel (no accidental thrash)
       if (grabArmL >= grabArmNeed && aimValidL && panelHitL) {
         grabbing = true;
@@ -498,12 +509,14 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         grabOff = wp.c - aimOL;
         ui.status = "MOVING panel (left grip)";
         WebUI_MarkDirty(ui);
+        fprintf(stderr, "[cube_webui] grab start hand=L\n");
       } else if (grabArmR >= grabArmNeed && aimValidR && panelHitR) {
         grabbing = true;
         grabHand = XrHand::Right;
         grabOff = wp.c - aimOR;
         ui.status = "MOVING panel (right grip)";
         WebUI_MarkDirty(ui);
+        fprintf(stderr, "[cube_webui] grab start hand=R\n");
       }
     }
 
