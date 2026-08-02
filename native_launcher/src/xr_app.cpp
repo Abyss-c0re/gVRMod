@@ -540,7 +540,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         glMatrixMode(GL_MODELVIEW);
         GlLoadModelviewLocal(views0[eye].pose);
         if (wp.ready)
-          GlDrawWorldPanel(panelTex);
+          GlDrawWorldPanel(panelTex, views0[eye].pose);
         if (aimValid) {
           Vec3 tip = panelHit ? hitPt : (aimO + aimD * 2.5f);
           float cr = grabbing ? 0.3f : (panelHit ? 1.f : 0.45f);

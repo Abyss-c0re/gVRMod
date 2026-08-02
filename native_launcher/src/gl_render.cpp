@@ -114,17 +114,21 @@ void GlLoadProjectionFov(const XrFovf& fov, float nearZ, float farZ) {
   glFrustum(L, R, B, T, nearZ, farZ);
 }
 
-void GlDrawWorldPanel(GLuint tex) {
+void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   const auto& wp = WorldPanelState();
   if (!wp.ready) return;
   const auto& cfg = PanelCfgConst();
   const float hw = (wp.widthM > 0.05f) ? wp.widthM * 0.5f : cfg.halfW;
   const float hh = (wp.heightM > 0.05f) ? wp.heightM * 0.5f : cfg.halfH;
-  // Geometry: bl/br = bottom, tl/tr = top in world (wp.up = +Y)
   const Vec3 bl = wp.c - wp.right * hw - wp.up * hh;
   const Vec3 br = wp.c + wp.right * hw - wp.up * hh;
   const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
   const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
+
+  // Front if eye is on the normal side (normal points toward intended user)
+  const Vec3 eyeP = {eyeWorld.position.x, eyeWorld.position.y, eyeWorld.position.z};
+  const Vec3 toPanel = wp.c - eyeP;
+  const bool backFace = Dot(toPanel, wp.normal) > 0.f;
 
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
@@ -133,16 +137,31 @@ void GlDrawWorldPanel(GLuint tex) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // After Y-flip upload: V=0 is UI top. Panel top (tl/tr) → V=0.
+  // Y-flipped upload: V=0 = UI top. Top verts → V=0.
+  // Back-face: flip U so text is not mirrored when viewing reverse side.
+  const float u0 = backFace ? 1.f : 0.f;
+  const float u1 = backFace ? 0.f : 1.f;
   glBegin(GL_QUADS);
-  glTexCoord2f(0.f, 1.f);
-  glVertex3f(bl.x, bl.y, bl.z);
-  glTexCoord2f(1.f, 1.f);
-  glVertex3f(br.x, br.y, br.z);
-  glTexCoord2f(1.f, 0.f);
-  glVertex3f(tr.x, tr.y, tr.z);
-  glTexCoord2f(0.f, 0.f);
-  glVertex3f(tl.x, tl.y, tl.z);
+  if (!backFace) {
+    glTexCoord2f(u0, 1.f);
+    glVertex3f(bl.x, bl.y, bl.z);
+    glTexCoord2f(u1, 1.f);
+    glVertex3f(br.x, br.y, br.z);
+    glTexCoord2f(u1, 0.f);
+    glVertex3f(tr.x, tr.y, tr.z);
+    glTexCoord2f(u0, 0.f);
+    glVertex3f(tl.x, tl.y, tl.z);
+  } else {
+    // Reverse winding + flip V so upright when viewed from behind
+    glTexCoord2f(u0, 0.f);
+    glVertex3f(bl.x, bl.y, bl.z);
+    glTexCoord2f(u0, 1.f);
+    glVertex3f(tl.x, tl.y, tl.z);
+    glTexCoord2f(u1, 1.f);
+    glVertex3f(tr.x, tr.y, tr.z);
+    glTexCoord2f(u1, 0.f);
+    glVertex3f(br.x, br.y, br.z);
+  }
   glEnd();
   glDisable(GL_TEXTURE_2D);
   glColor4f(1.f, 1.f, 1.f, 1.f);

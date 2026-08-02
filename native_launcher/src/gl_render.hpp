@@ -17,5 +17,6 @@ void GlLoadModelviewLocal(const XrPosef& eyeLocal);
 // Projection from OpenXR FOV (tan-space, no near factor bug).
 void GlLoadProjectionFov(const XrFovf& fov, float nearZ = 0.05f, float farZ = 50.f);
 
-void GlDrawWorldPanel(GLuint tex);
+// eyeWorld: current eye pose so we can UV-correct when viewing the back face
+void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld);
 void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb);
