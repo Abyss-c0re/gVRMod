@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# gVRMod pre-commit: if shared addon Lua/assets change, keep vrmod-x64 submodule in sync.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Only when monorepo is the active work tree (not when committing inside submodule alone).
+if [[ ! -f "$ROOT/scripts/sync_vrmod_x64.sh" ]]; then
+  exit 0
+fi
+
+# Staged paths under addon/gvrmod that are shared with the submodule
+CHANGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^addon/gvrmod/(lua|materials|models)/' || true)
+if [[ -z "$CHANGED" ]]; then
+  exit 0
+fi
+
+echo "[pre-commit] shared addon changed — syncing vrmod-x64 submodule..."
+# Copy + commit submodule + stage pointer (sync script commits; we re-stage pointer)
+"$ROOT/scripts/sync_vrmod_x64.sh" --no-commit
+# Stage submodule working tree changes for the parent commit
+if [[ -d "$ROOT/vrmod-x64/.git" || -f "$ROOT/vrmod-x64/.git" ]]; then
+  (
+    cd "$ROOT/vrmod-x64"
+    git add -A lua materials models 2>/dev/null || true
+    if ! git diff --cached --quiet 2>/dev/null; then
+      git commit -m "sync: Truth Matrix from gVRMod monorepo (pre-commit)" || true
+      git push 2>/dev/null || true
+    fi
+  )
+  git add vrmod-x64
+fi
+
+echo "[pre-commit] vrmod-x64 sync staged."
+exit 0
