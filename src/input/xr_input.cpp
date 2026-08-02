@@ -15,8 +15,11 @@ int               g_xrActionSpaceCount = 0;
 bool              g_xrActionsAttached = false;
 PoseResult        g_xrHMDPose;
 
-void XR_CleanupActions() {
-    // Spaces are session-tied — destroy first.
+// Defined after internal action statics — must zero them or restart SuggestBindings
+// feeds dead XrAction handles into the runtime (WiVRn SEGV on vrmod_exit→start).
+static void XR_ClearInternalActionHandles();
+
+void XR_DestroyActionSpacesOnly() {
     for (int i = 0; i < g_xrActionSpaceCount; i++) {
         if (g_xrActionSpaces[i].space != XR_NULL_HANDLE && g_xrDestroySpace) {
             g_xrDestroySpace(g_xrActionSpaces[i].space);
@@ -25,8 +28,11 @@ void XR_CleanupActions() {
     }
     g_xrActionSpaceCount = 0;
     memset(g_xrActionSpaces, 0, sizeof(g_xrActionSpaces));
+}
 
-    // Action sets (instance-level); contained actions go with them.
+// Call ONLY after session destroy (or when never attached). Spec: attached action
+// sets must not be destroyed until the session is destroyed.
+void XR_DestroyActionSetsOnly() {
     for (int i = 0; i < g_xrActionSetCount; i++) {
         if (g_xrActionSets[i] != XR_NULL_HANDLE && g_xrDestroyActionSet) {
             g_xrDestroyActionSet(g_xrActionSets[i]);
@@ -37,25 +43,32 @@ void XR_CleanupActions() {
     memset(g_xrActionSets, 0, sizeof(g_xrActionSets));
     memset(g_xrActionSetNames, 0, sizeof(g_xrActionSetNames));
     g_xrActionsAttached = false;
+}
+
+void XR_CleanupActions() {
+    // Full clear of handle caches. Prefer ordered teardown via XR_Shutdown:
+    // spaces → session → sets → instance. If session still exists, skip set
+    // destroy (instance teardown owns them) but always null local caches.
+    XR_DestroyActionSpacesOnly();
+    if (g_xrSession == XR_NULL_HANDLE) {
+        XR_DestroyActionSetsOnly();
+    } else {
+        // Session still live — do not xrDestroyActionSet (attached). Clear counts
+        // only after caller destroys session; still wipe local set array so we
+        // never pass stale handles into a new instance.
+        g_xrActionSetCount = 0;
+        memset(g_xrActionSets, 0, sizeof(g_xrActionSets));
+        memset(g_xrActionSetNames, 0, sizeof(g_xrActionSetNames));
+        g_xrActionsAttached = false;
+    }
+    XR_ClearInternalActionHandles();
     XR_SetActionCache(nullptr, 0);
     memset(&g_xrHMDPose, 0, sizeof(g_xrHMDPose));
-    VRMOD_LOG_INFO("XR action state cleaned (sets/spaces) for restart");
+    VRMOD_LOG_INFO("XR action state cleaned for restart");
 }
 
 void XR_ResetInputState() {
-    // Prefer real destroy when entry points still live (pre-instance teardown).
-    if (g_xrDestroySpace || g_xrDestroyActionSet) {
-        XR_CleanupActions();
-        return;
-    }
-    g_xrActionSetCount = 0;
-    memset(g_xrActionSets, 0, sizeof(g_xrActionSets));
-    memset(g_xrActionSetNames, 0, sizeof(g_xrActionSetNames));
-    g_xrActionSpaceCount = 0;
-    memset(g_xrActionSpaces, 0, sizeof(g_xrActionSpaces));
-    g_xrActionsAttached = false;
-    memset(&g_xrHMDPose, 0, sizeof(g_xrHMDPose));
-    XR_SetActionCache(nullptr, 0);
+    XR_CleanupActions();
     VRMOD_LOG_INFO("OpenXR input state reset (ready for restart)");
 }
 
@@ -538,6 +551,30 @@ static CtrlSource g_ctrlSources[kMaxCtrlSources] = {
 };
 static const int g_ctrlSourceCount = 21;
 static const float kStickDpadThreshold = 0.55f;
+
+// Null every cached XrAction after instance/session teardown. Leaving non-null
+// values makes XR_AttachActionSets skip CreateInternal* and pass dead handles
+// into xrSuggestInteractionProfileBindings → SEGV in WiVRn/Monado on restart.
+static void XR_ClearInternalActionHandles() {
+    g_xrLeftTriggerFloat = XR_NULL_HANDLE;
+    g_xrRightTriggerFloat = XR_NULL_HANDLE;
+    g_xrLeftSqueezeFloat = XR_NULL_HANDLE;
+    g_xrRightSqueezeFloat = XR_NULL_HANDLE;
+    g_xrLeftThumbrestTouch = XR_NULL_HANDLE;
+    g_xrRightThumbrestTouch = XR_NULL_HANDLE;
+    g_xrLeftStickVec2 = XR_NULL_HANDLE;
+    g_xrRightStickVec2 = XR_NULL_HANDLE;
+    s_srcLeftX = XR_NULL_HANDLE;
+    s_srcLeftY = XR_NULL_HANDLE;
+    s_srcLeftMenu = XR_NULL_HANDLE;
+    s_srcRightA = XR_NULL_HANDLE;
+    s_srcRightB = XR_NULL_HANDLE;
+    s_srcLeftStickClick = XR_NULL_HANDLE;
+    s_srcRightStickClick = XR_NULL_HANDLE;
+    for (int i = 0; i < g_ctrlSourceCount; i++) {
+        g_ctrlSources[i].action = XR_NULL_HANDLE;
+    }
+}
 
 // Cached action list pointer set by Attach (for name→handle lookups in GetBoolean).
 static const action* g_xrCachedActions = nullptr;

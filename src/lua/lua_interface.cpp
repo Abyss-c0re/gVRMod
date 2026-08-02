@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v30: full teardown restart (cb59aeb model) — reliable vrmod_exit → vrmod_start
-    LUA->PushNumber(30);
+    // v31: restart SEGV fix — clear cached XrActions; destroy sets only after session
+    LUA->PushNumber(31);
     return 1;
 }
 
@@ -960,8 +960,8 @@ LUA_FUNCTION(Shutdown) {
         g_xrSwapchainsCreated = false;
     }
 
-    // Destroy spaces/action sets then instance+loader.
-    XR_CleanupActions();
+    // Ordered teardown lives in XR_Shutdown (spaces → session → sets → instance).
+    // Do NOT XR_CleanupActions() before session destroy — destroys attached sets.
     XR_Shutdown();
     g_xrInitialized = false;
     g_xrEyePosesValid = false;

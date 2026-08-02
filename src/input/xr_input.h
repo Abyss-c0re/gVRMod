@@ -58,11 +58,13 @@ VRActionHandle XR_FindActionHandleByName(const char* name, const action* actions
 bool XR_AttachActionSets();
 
 // Reset input SoT so a full VR restart can re-parse the manifest and re-attach.
-// Call from Lua Shutdown before XR_Shutdown (destroys session/instance).
 void XR_ResetInputState();
 
-// Destroy action spaces + action sets (before instance destroy). Required for clean restart
-// (see cb59aeb — blackscreen on VR restart).
+// Ordered teardown helpers (see XR_Shutdown):
+//   spaces while session live → destroy session → sets → clear handle cache.
+void XR_DestroyActionSpacesOnly();
+void XR_DestroyActionSetsOnly();
+// Full cache clear; does not destroy attached sets while session still exists.
 void XR_CleanupActions();
 
 // Cache the parsed action table for binding suggestion + analog→boolean synthesis.

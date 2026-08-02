@@ -832,6 +832,9 @@ void XR_Shutdown() {
     }
     g_xrFrameBegun = false;
 
+    // 1) Session-tied action spaces first (while session + PFNs still valid).
+    XR_DestroyActionSpacesOnly();
+
     if (g_xrStageSpace != XR_NULL_HANDLE && g_xrDestroySpace) {
         g_xrDestroySpace(g_xrStageSpace);
         g_xrStageSpace = XR_NULL_HANDLE;
@@ -840,19 +843,27 @@ void XR_Shutdown() {
         g_xrDestroySpace(g_xrViewSpace);
         g_xrViewSpace = XR_NULL_HANDLE;
     }
+
+    // 2) Destroy session — detaches action sets (required before set destroy).
     if (g_xrSession != XR_NULL_HANDLE && g_xrDestroySession) {
         g_xrDestroySession(g_xrSession);
         g_xrSession = XR_NULL_HANDLE;
     }
+    g_xrSessionRunning = false;
+    g_xrSessionReady = false;
+    g_xrSessionState = XR_SESSION_STATE_UNKNOWN;
+
+    // 3) Action sets now safe to destroy; always null internal XrAction caches
+    //    (stale handles → WiVRn SEGV in SuggestBindings on next start).
+    XR_DestroyActionSetsOnly();
+    XR_CleanupActions(); // zeros internal/companion/source handles + cache
+
+    // 4) Instance last.
     if (g_xrInstance != XR_NULL_HANDLE && g_xrDestroyInstance) {
         g_xrDestroyInstance(g_xrInstance);
         g_xrInstance = XR_NULL_HANDLE;
     }
-
     g_xrSystemId = XR_NULL_SYSTEM_ID;
-    g_xrSessionRunning = false;
-    g_xrSessionReady = false;
-    g_xrSessionState = XR_SESSION_STATE_UNKNOWN;
 
 #ifdef _WIN32
     D3D_ShutdownShare();
@@ -866,7 +877,21 @@ void XR_Shutdown() {
         g_loaderLib = nullptr;
     }
 #endif
+    // PFNs invalid after unload — do not leave dangling for a half-init restart.
     g_xrGetInstanceProcAddr = nullptr;
+    g_xrCreateInstance = nullptr;
+    g_xrDestroyInstance = nullptr;
+    g_xrDestroySession = nullptr;
+    g_xrDestroySpace = nullptr;
+    g_xrDestroyActionSet = nullptr;
+    g_xrDestroyAction = nullptr;
+    g_xrDestroySwapchain = nullptr;
+    g_xrSuggestInteractionProfileBindings = nullptr;
+    g_xrAttachSessionActionSets = nullptr;
+    g_xrCreateActionSet = nullptr;
+    g_xrCreateAction = nullptr;
+    g_xrCreateActionSpace = nullptr;
+    g_xrStringToPath = nullptr;
 
     VRMOD_LOG_INFO("OpenXR shutdown complete");
 }
