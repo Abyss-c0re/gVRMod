@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v34: drop grip -90°X — hand bones already use OpenVR-style offsets
-    LUA->PushNumber(34);
+    // v35: OpenVR-compatible GetSkeletalSummaryData for finger curls
+    LUA->PushNumber(35);
     return 1;
 }
 
@@ -508,6 +508,8 @@ LUA_FUNCTION(GetControllerSources) {
 }
 
 LUA_FUNCTION(GetActions) {
+    // OpenVR module-master: InputDigital/Analog/SkeletalSummary locals at top of GetActions.
+    VRSkeletalSummaryData_t skeletalSummaryData;
     char* changedActionNames[MAX_ACTIONS];
     bool changedActionStates[MAX_ACTIONS];
     int changedActionCount = 0;
@@ -592,13 +594,16 @@ LUA_FUNCTION(GetActions) {
             }
         }
         else if (g_actions[i].type == ActionType_Skeleton) {
-            // OpenXR doesn't have skeletal summary in the same way.
-            // For PoC, push zeroed finger curls.
+            // Duplicate OpenVR module-master GetActions skeleton branch:
+            //   g_pInput->GetSkeletalSummaryData(handle, EVRSummaryType(1), &skeletalSummaryData);
+            //   push flFingerCurl[0..4] into fingerCurls table on action name.
+            XR_GetSkeletalSummaryData(g_actions[i].handle,
+                static_cast<int>(VRSummaryType_FromDevice), &skeletalSummaryData);
             LUA->ReferencePush(g_actions[i].luaRefs[0]);
             LUA->ReferencePush(g_actions[i].luaRefs[1]);
             for (int j = 0; j < 5; j++) {
                 LUA->PushNumber(j + 1);
-                LUA->PushNumber(0.0);
+                LUA->PushNumber(skeletalSummaryData.flFingerCurl[j]);
                 LUA->SetTable(-3);
             }
             LUA->SetField(-2, "fingerCurls");

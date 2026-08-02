@@ -58,3 +58,24 @@ struct PoseResult {
     float angvel[3];
     bool valid;
 };
+
+// ── OpenVR skeletal summary (module-master / openvr.h) ──
+// Mirrored so GetActions skeleton branch can match OpenVR line-for-line.
+// OpenXR has no GetSkeletalSummaryData; XR_GetSkeletalSummaryData fills this.
+enum {
+    VRFinger_Count = 5,       // thumb, index, middle, ring, pinky
+    VRFingerSplay_Count = 4,  // adjacent finger pairs
+};
+// EVRSummaryType — OpenVR uses FromDevice = 1 in GetActions
+enum EVRSummaryType {
+    VRSummaryType_FromAnimation = 0,
+    VRSummaryType_FromDevice = 1,
+};
+struct VRSkeletalSummaryData_t {
+    float flFingerCurl[VRFinger_Count];
+    float flFingerSplay[VRFingerSplay_Count];
+};
+
+// Synthetic skeleton action handles (not real XrAction) — set at manifest parse.
+#define VRMOD_SKELETON_HANDLE_LEFT  1ull
+#define VRMOD_SKELETON_HANDLE_RIGHT 2ull

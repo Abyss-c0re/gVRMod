@@ -85,6 +85,13 @@ float XR_GetControllerSourceValue(int index);
 // true if OpenXR reports the source action as active (bound + path live)
 bool XR_GetControllerSourceIsActive(int index);
 
+// OpenVR-compatible: IVRInput::GetSkeletalSummaryData
+// eSummaryType: pass VRSummaryType_FromDevice (1) like module-master.
+// action: VRMOD_SKELETON_HANDLE_LEFT / RIGHT (synthetic; no OpenXR skeleton actions).
+// Fills flFingerCurl[5] + flFingerSplay[4] from controller trigger/grip/buttons.
+bool XR_GetSkeletalSummaryData(VRActionHandle action, int eSummaryType,
+                               VRSkeletalSummaryData_t* pSkeletalSummaryData);
+
 // ── Update poses (HMD + action spaces) ──
 void XR_UpdatePoses();
 

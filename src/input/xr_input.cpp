@@ -357,7 +357,22 @@ int XR_ParseActionManifest(const char* path, action* actions, int maxActions) {
             case ActionType_Vector1:    xrType = XR_ACTION_TYPE_FLOAT_INPUT; break;
             case ActionType_Vector2:    xrType = XR_ACTION_TYPE_VECTOR2F_INPUT; break;
             case ActionType_Pose:       xrType = XR_ACTION_TYPE_POSE_INPUT; isPose = true; break;
-            case ActionType_Skeleton:   continue; // OpenXR handles skeletons differently, skip for PoC
+            case ActionType_Skeleton: {
+                // OpenVR: GetActionHandle + GetSkeletalSummaryData.
+                // OpenXR: no skeleton actions — keep Lua SoT with synthetic handles
+                // so GetActions can call XR_GetSkeletalSummaryData like OpenVR.
+                const char* sn = actions[i].name ? actions[i].name : "";
+                const char* full = actions[i].fullname;
+                bool left = (strstr(sn, "left") != nullptr) || (strstr(full, "left") != nullptr)
+                         || (strstr(sn, "Left") != nullptr) || (strstr(full, "Left") != nullptr);
+                if ((strstr(sn, "right") != nullptr) || (strstr(full, "right") != nullptr)
+                    || (strstr(sn, "Right") != nullptr) || (strstr(full, "Right") != nullptr))
+                    left = false;
+                actions[i].handle = left ? VRMOD_SKELETON_HANDLE_LEFT : VRMOD_SKELETON_HANDLE_RIGHT;
+                VRMOD_LOG_INFO("Skeleton action '%s' → synthetic handle %llu (OpenXR summary synthesis)",
+                    actions[i].name, (unsigned long long)actions[i].handle);
+                continue; // no xrCreateAction
+            }
             case ActionType_Vibration:  xrType = XR_ACTION_TYPE_VIBRATION_OUTPUT; isVibration = true; break;
             default:                    continue;
         }
@@ -1053,6 +1068,114 @@ bool XR_GetControllerSourceIsActive(int index) {
     XrActionStateBoolean state = {XR_TYPE_ACTION_STATE_BOOLEAN};
     if (g_xrGetActionStateBoolean(g_xrSession, &getInfo, &state) != XR_SUCCESS) return false;
     return state.isActive;
+}
+
+static float clampf01(float v) {
+    if (v < 0.0f) return 0.0f;
+    if (v > 1.0f) return 1.0f;
+    return v;
+}
+
+// OpenVR IVRInput::GetSkeletalSummaryData — same signature / fill as module-master.
+// OpenXR has no skeleton input; FromDevice summary is built from controller analogs
+// (same finger order: thumb, index, middle, ring, pinky).
+bool XR_GetSkeletalSummaryData(VRActionHandle action, int eSummaryType,
+                               VRSkeletalSummaryData_t* pSkeletalSummaryData) {
+    (void)eSummaryType; // OpenVR passes FromDevice (1); we only have device-derived data
+    if (!pSkeletalSummaryData) return false;
+    memset(pSkeletalSummaryData, 0, sizeof(*pSkeletalSummaryData));
+
+    const bool leftHand = (action == VRMOD_SKELETON_HANDLE_LEFT);
+    const bool rightHand = (action == VRMOD_SKELETON_HANDLE_RIGHT);
+    if (!leftHand && !rightHand) return false;
+    if (!g_xrSession) return true; // valid empty summary (OpenVR also zeros on failure)
+
+    float trigger = 0.0f;
+    float squeeze = 0.0f;
+    float thumb = 0.0f;
+
+    if (leftHand) {
+        trigger = ReadFloatActionRaw(g_xrLeftTriggerFloat);
+        squeeze = ReadFloatActionRaw(g_xrLeftSqueezeFloat);
+        if (trigger < 0.02f) {
+            XrAction fire = FindXrActionByName("boolean_left_primaryfire");
+            if (fire != XR_NULL_HANDLE && ReadBooleanActionRaw(fire)) trigger = 1.0f;
+        }
+        if (ReadBooleanActionRaw(s_srcLeftX) || ReadBooleanActionRaw(s_srcLeftY)
+            || ReadBooleanActionRaw(s_srcLeftStickClick)
+            || ReadBooleanActionRaw(g_xrLeftThumbrestTouch)
+            || ReadBooleanActionRaw(s_srcLeftMenu)) {
+            thumb = 1.0f;
+        }
+        if (g_xrLeftStickVec2 != XR_NULL_HANDLE) {
+            XrActionStateGetInfo gi = {XR_TYPE_ACTION_STATE_GET_INFO};
+            gi.action = g_xrLeftStickVec2;
+            XrActionStateVector2f st = {XR_TYPE_ACTION_STATE_VECTOR2F};
+            if (g_xrGetActionStateVector2f(g_xrSession, &gi, &st) == XR_SUCCESS && st.isActive) {
+                float m = sqrtf(st.currentState.x * st.currentState.x
+                              + st.currentState.y * st.currentState.y);
+                if (m > 0.12f) thumb = fmaxf(thumb, clampf01(0.25f + m * 0.75f));
+            }
+        }
+    } else {
+        trigger = ReadFloatActionRaw(g_xrRightTriggerFloat);
+        {
+            XrAction pf = FindXrActionByName("vector1_primaryfire");
+            if (pf != XR_NULL_HANDLE) {
+                float v = ReadFloatActionRaw(pf);
+                if (v > trigger) trigger = v;
+            }
+        }
+        squeeze = ReadFloatActionRaw(g_xrRightSqueezeFloat);
+        if (trigger < 0.02f) {
+            XrAction fire = FindXrActionByName("boolean_primaryfire");
+            if (fire != XR_NULL_HANDLE && ReadBooleanActionRaw(fire)) trigger = 1.0f;
+        }
+        if (ReadBooleanActionRaw(s_srcRightA) || ReadBooleanActionRaw(s_srcRightB)
+            || ReadBooleanActionRaw(s_srcRightStickClick)
+            || ReadBooleanActionRaw(g_xrRightThumbrestTouch)) {
+            thumb = 1.0f;
+        }
+        if (g_xrRightStickVec2 != XR_NULL_HANDLE) {
+            XrActionStateGetInfo gi = {XR_TYPE_ACTION_STATE_GET_INFO};
+            gi.action = g_xrRightStickVec2;
+            XrActionStateVector2f st = {XR_TYPE_ACTION_STATE_VECTOR2F};
+            if (g_xrGetActionStateVector2f(g_xrSession, &gi, &st) == XR_SUCCESS && st.isActive) {
+                float m = sqrtf(st.currentState.x * st.currentState.x
+                              + st.currentState.y * st.currentState.y);
+                if (m > 0.12f) thumb = fmaxf(thumb, clampf01(0.25f + m * 0.75f));
+            }
+        }
+    }
+
+    if (squeeze < 0.02f) {
+        XrAction sq = FindXrActionByName(leftHand ? "boolean_left_secondaryfire" : "boolean_secondaryfire");
+        if (sq != XR_NULL_HANDLE && ReadBooleanActionRaw(sq)) squeeze = 1.0f;
+        XrAction sqf = FindXrActionByName(leftHand ? "vector1_left_secondaryfire" : "vector1_secondaryfire");
+        if (sqf != XR_NULL_HANDLE) {
+            float v = ReadFloatActionRaw(sqf);
+            if (v > squeeze) squeeze = v;
+        }
+    }
+
+    trigger = clampf01(trigger);
+    squeeze = clampf01(squeeze);
+    thumb = clampf01(thumb);
+
+    // flFingerCurl — same order as OpenVR VRFinger_t / module-master
+    pSkeletalSummaryData->flFingerCurl[0] = thumb;   // Thumb
+    pSkeletalSummaryData->flFingerCurl[1] = trigger; // Index
+    pSkeletalSummaryData->flFingerCurl[2] = squeeze; // Middle
+    pSkeletalSummaryData->flFingerCurl[3] = clampf01(squeeze * 0.95f); // Ring
+    pSkeletalSummaryData->flFingerCurl[4] = clampf01(squeeze * 0.88f); // Pinky
+
+    // flFingerSplay — 0=touching, 1=separated (OpenVR). Controllers: open hand → high splay.
+    const float open = 1.0f - squeeze;
+    pSkeletalSummaryData->flFingerSplay[0] = open; // thumb-index
+    pSkeletalSummaryData->flFingerSplay[1] = open; // index-middle
+    pSkeletalSummaryData->flFingerSplay[2] = open; // middle-ring
+    pSkeletalSummaryData->flFingerSplay[3] = open; // ring-pinky
+    return true;
 }
 
 // Create any missing action spaces for pose actions (safe to call repeatedly).
