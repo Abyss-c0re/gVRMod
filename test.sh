@@ -69,7 +69,7 @@ pushd build_release >/dev/null
 cmake .. -DCMAKE_BUILD_TYPE=Release -DVRMOD_BUILD_TESTS=OFF >/dev/null
 make -j"$(nproc)" vrmod_release
 popd >/dev/null
-echo "    Release module: install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_linux64.dll"
+echo "    Release module: install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll"
 
 # ── Build + run tests ──
 echo "[+] Building test runner (VRMOD_BUILD_TESTS=ON)..."

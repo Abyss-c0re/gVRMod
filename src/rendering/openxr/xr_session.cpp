@@ -159,7 +159,7 @@ bool XR_LoadLoader() {
     if (!g_loaderLib) {
         VRMOD_LOG_ERROR("Failed to LoadLibrary openxr_loader.dll");
         snprintf(g_loaderErrBuf, sizeof(g_loaderErrBuf),
-                 "openxr_loader.dll not found (place next to gmcl_vrmod_win64.dll or on PATH)");
+                 "openxr_loader.dll not found (place next to gmcl_vrmod_xr_win64.dll or on PATH)");
         return false;
     }
     g_xrGetInstanceProcAddr =
@@ -171,7 +171,7 @@ bool XR_LoadLoader() {
         return false;
     }
 #else
-    // Discover the directory containing our module (gmcl_vrmod_linux64.dll).
+    // Discover the directory containing our module (gmcl_vrmod_xr_linux64.dll).
     std::string moduleDir;
     Dl_info selfInfo{};
     if (dladdr((void*)&XR_LoadLoader, &selfInfo) && selfInfo.dli_fname) {
@@ -306,7 +306,7 @@ bool XR_Init(char* errMsg, int errMsgLen) {
                 "VRMOD OpenXR: Failed to load OpenXR loader library: %s\n\n"
                 "On Steam Linux the host packages are often invisible to GMod.\n"
                 "Solution: copy libopenxr_loader.so + ALL its dependencies (libjsoncpp etc.)\n"
-                "into garrysmod/lua/bin/ next to gmcl_vrmod_linux64.dll\n"
+                "into garrysmod/lua/bin/ next to gmcl_vrmod_xr_linux64.dll\n"
                 "See the README (\"Linux Bundling\" section) for the exact copy commands using ldd.",
                 g_loaderErrBuf);
         } else {

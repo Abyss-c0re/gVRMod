@@ -6,7 +6,8 @@
 # - Locates your Garry's Mod installation (Steam Linux)
 # - Collects libopenxr_loader.so + its runtime dependencies (using ldd)
 # - Copies:
-#     * the module (gmcl_vrmod_linux64.dll) → garrysmod/lua/bin/
+#     * the OpenXR module (gmcl_vrmod_xr_linux64.dll) → garrysmod/lua/bin/
+#       (does not overwrite OpenVR gmcl_vrmod_linux64.dll — both may coexist)
 #     * OpenXR loader + all its dependencies → bin/linux64/
 #   (overwrites existing files)
 # - Supports --uninstall to cleanly remove what was installed
@@ -22,13 +23,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_SCRIPT="$SCRIPT_DIR/build.sh"
-MODULE_SRC="$SCRIPT_DIR/install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_linux64.dll"
+MODULE_SRC="$SCRIPT_DIR/install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll"
+# Legacy OpenXR name (pre-rename) — removed on install/uninstall so it does not shadow OpenVR.
+LEGACY_XR_MODULE_NAME="gmcl_vrmod_linux64.dll"
 
 # Files we manage (will be written to a manifest at install time)
 MANIFEST_NAME=".vrmod_bundle_manifest.txt"
 
-# Client-side addon (Lua, models, materials, etc.)
-ADDON_SRC="$SCRIPT_DIR/addon/gvrmod"
+# Client-side addon — single tree (git submodule: Workshop package layout)
+ADDON_SRC="$SCRIPT_DIR/addon/vrmod-x64"
+ADDON_INSTALL_NAME="vrmod-x64"
 
 # Default / common Steam locations (in order of preference)
 GMOD_CANDIDATES=(
@@ -56,10 +60,9 @@ Usage:
 Options:
   --gmod-dir PATH     Explicit path to the Garry's Mod folder
                       (the one that contains "garrysmod/" and "bin/")
-  --uninstall         Remove the module (from lua/bin), the OpenXR
-                      libraries (from bin/linux64), and the client
-                      addon (garrysmod/addons/gvrmod) that were
-                      installed by this script.
+  --uninstall         Remove the OpenXR module (gmcl_vrmod_xr_*), OpenXR
+                      libraries (bin/linux64), and the client addon
+                      (garrysmod/addons/vrmod-x64, legacy gvrmod/).
   --skip-build        Do not run build.sh (assume the module is already built).
   -y, --yes           Assume "yes" to all prompts (non-interactive).
   -h, --help          Show this help.
@@ -72,8 +75,9 @@ Examples:
 
 Note:
 - OpenXR runtime libraries → bin/linux64/
-- Lua module                  → garrysmod/lua/bin/
-- Client addon (gvrmod/)      → garrysmod/addons/gvrmod/   (existing folder is deleted first)
+- OpenXR Lua module         → garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll
+  (OpenVR gmcl_vrmod_linux64.dll is never overwritten — dual install OK)
+- Client addon              → garrysmod/addons/vrmod-x64/  (from submodule addon/vrmod-x64)
 EOF
 }
 
@@ -258,8 +262,9 @@ echo "  Addons:             $ADDONS_DIR"
 echo
 
 if [[ "$UNINSTALL" == true ]]; then
-    if [[ ! -d "$LUA_BIN_DIR" && ! -d "$ENGINE_BIN_DIR" && ! -d "$ADDONS_DIR/gvrmod" ]]; then
-        echo "Nothing to uninstall (no module, no OpenXR libs, and no gvrmod addon found)."
+    if [[ ! -d "$LUA_BIN_DIR" && ! -d "$ENGINE_BIN_DIR" \
+        && ! -d "$ADDONS_DIR/vrmod-x64" && ! -d "$ADDONS_DIR/gvrmod" ]]; then
+        echo "Nothing to uninstall (no module, no OpenXR libs, and no addon found)."
         exit 0
     fi
 
@@ -288,12 +293,14 @@ if [[ "$UNINSTALL" == true ]]; then
         done < "$MANIFEST"
         rm -f "$MANIFEST"
     else
-        # Fallback for old/manual installs
-        rm -f "$LUA_BIN_DIR/gmcl_vrmod_linux64.dll"
+        # Fallback for old/manual installs — only remove OpenXR-named binaries.
+        # Never delete OpenVR gmcl_vrmod_linux64.dll (Workshop / module-master).
+        rm -f "$LUA_BIN_DIR/gmcl_vrmod_xr_linux64.dll"
         rm -f "$ENGINE_BIN_DIR"/libopenxr_loader*
-        rm -rf "$ADDONS_DIR/gvrmod"
-        echo "  removed module (lua/bin) + any libopenxr_loader* files (bin/linux64)"
-        echo "  removed addon (if present)"
+        rm -rf "$ADDONS_DIR/vrmod-x64" "$ADDONS_DIR/gvrmod"
+        echo "  removed gmcl_vrmod_xr_linux64.dll (OpenXR) + libopenxr_loader* (bin/linux64)"
+        echo "  removed addons/vrmod-x64 and legacy addons/gvrmod (if present)"
+        echo "  left gmcl_vrmod_linux64.dll alone (OpenVR slot)"
         echo "  (no manifest was present)"
     fi
 
@@ -338,14 +345,18 @@ mkdir -p "$ENGINE_BIN_DIR"
 # the manifest itself lives.
 : > "$MANIFEST"
 
-# 1. The actual GMod Lua module (must stay in garrysmod/lua/bin)
-MODULE_REL="garrysmod/lua/bin/gmcl_vrmod_linux64.dll"
+# 1. OpenXR GMod module — distinct name so OpenVR gmcl_vrmod_linux64.dll can coexist.
+MODULE_REL="garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll"
 cp -f "$MODULE_SRC" "$GMOD_DIR/$MODULE_REL"
 echo "$MODULE_REL" >> "$MANIFEST"
-echo "  copied: gmcl_vrmod_linux64.dll   →  garrysmod/lua/bin/"
+echo "  copied: gmcl_vrmod_xr_linux64.dll   →  garrysmod/lua/bin/  (require \"vrmod_xr\")"
+if [[ -f "$LUA_BIN_DIR/gmcl_vrmod_linux64.dll" ]]; then
+    echo "  note: gmcl_vrmod_linux64.dll also present — OpenVR + OpenXR dual install OK"
+    echo "        (if that file is an *old* gVRMod OpenXR build, remove/rename it so OpenVR can use the slot)"
+fi
 
 # 2. OpenXR loader + deps → engine bin/linux64 (Steam/engine path) AND next to
-#    the module in garrysmod/lua/bin (module dlopen searches moduleDir first —
+#    the XR module in garrysmod/lua/bin (module dlopen searches moduleDir first —
 #    "not detecting headset" is often a failed loader load under Steam Runtime).
 shopt -s nullglob
 for f in "$BUNDLE_DIR"/*; do
@@ -354,7 +365,7 @@ for f in "$BUNDLE_DIR"/*; do
     cp -f "$f" "$GMOD_DIR/$REL"
     echo "$REL" >> "$MANIFEST"
     echo "  copied: $bn   →  bin/linux64/"
-    # Mirror next to gmcl_vrmod_linux64.dll for XR_LoadLoader candidates
+    # Mirror next to gmcl_vrmod_xr_*.dll for XR_LoadLoader candidates
     REL2="garrysmod/lua/bin/$bn"
     cp -f "$f" "$GMOD_DIR/$REL2"
     echo "$REL2" >> "$MANIFEST"
@@ -369,27 +380,45 @@ fi
 rm -rf "$BUNDLE_DIR"
 
 echo
-echo "=== Installing client addon (gvrmod) ==="
+echo "=== Installing client addon (addon/vrmod-x64 submodule) ==="
 ADDONS_DIR="$GMOD_DIR/garrysmod/addons"
+mkdir -p "$ADDONS_DIR"
 
-if [[ -d "$ADDON_SRC" ]]; then
+if [[ -d "$ADDON_SRC/lua" ]]; then
+    # Drop legacy folder name from older gVRMod installs
     if [[ -d "$ADDONS_DIR/gvrmod" ]]; then
-        echo "  Removing existing addon: $ADDONS_DIR/gvrmod"
+        echo "  Removing legacy addon: $ADDONS_DIR/gvrmod"
         rm -rf "$ADDONS_DIR/gvrmod"
     fi
-
-    cp -r "$ADDON_SRC" "$ADDONS_DIR/"
-    echo "garrysmod/addons/gvrmod" >> "$MANIFEST"
-    echo "  copied: gvrmod/ → garrysmod/addons/gvrmod/"
+    DEST="$ADDONS_DIR/$ADDON_INSTALL_NAME"
+    if [[ -d "$DEST" ]]; then
+        echo "  Removing existing addon: $DEST"
+        rm -rf "$DEST"
+    fi
+    mkdir -p "$DEST"
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -a \
+          --exclude '.git/' \
+          --exclude 'state/' \
+          --exclude 'docs/' \
+          --exclude '.github/' \
+          --exclude '.workshop_id' \
+          "$ADDON_SRC/" "$DEST/"
+    else
+        cp -a "$ADDON_SRC/." "$DEST/"
+        rm -rf "$DEST/.git" "$DEST/state" "$DEST/docs" "$DEST/.github" 2>/dev/null || true
+    fi
+    echo "garrysmod/addons/$ADDON_INSTALL_NAME" >> "$MANIFEST"
+    echo "  copied: addon/vrmod-x64/ → garrysmod/addons/$ADDON_INSTALL_NAME/"
 else
-    echo "  WARNING: No addon/ directory found at $ADDON_SRC — skipping client addon install."
+    echo "  WARNING: No addon at $ADDON_SRC — run: git submodule update --init --recursive"
 fi
 
 echo
 echo "Installation successful!"
 echo "  Module installed to:      $LUA_BIN_DIR"
 echo "  OpenXR libs installed to: $ENGINE_BIN_DIR"
-echo "  Client addon installed to: $ADDONS_DIR/gvrmod"
+echo "  Client addon installed to: $ADDONS_DIR/$ADDON_INSTALL_NAME"
 echo
 echo "A manifest was written to:"
 echo "    $MANIFEST"
@@ -398,16 +427,11 @@ echo "You can now start Garry's Mod and use vrmod."
 echo "If you ever want to remove everything this script installed, run:"
 echo "    $0 --uninstall"
 echo
-echo "=== OpenXR / headset (required) ==="
-echo "gVRMod is OpenXR-only. WiVRn or Monado must be the active runtime."
-echo "  1) Start WiVRn server + connect Quest (or start monado-service)."
-echo "  2) Verify:  XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_wivrn.json openxr_runtime_list"
-echo "     Expect: Head: 'WiVRn HMD' / systemName with your headset."
-echo "  3) Steam → Garry's Mod → Launch Options (no nested quotes — VDF breaks):"
-echo "     XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_wivrn.json LD_LIBRARY_PATH=\$HOME/.local/share/Steam/steamapps/common/GarrysMod/garrysmod/lua/bin:\$HOME/.local/share/Steam/steamapps/common/GarrysMod/bin/linux64:/usr/lib/wivrn:\$LD_LIBRARY_PATH %command%"
-echo "  4) Ensure ~/.config/openxr/1/active_runtime.json → openxr_wivrn.json"
-echo "  5) Do NOT also load vrmod-x64 (OpenVR) addon — one module only."
-echo "  6) In-game: vrmod_start  (console errors show if XR_Init fails)"
+echo "=== OpenXR / headset ==="
+echo "  Binaries: OpenXR = gmcl_vrmod_xr_* ; OpenVR = gmcl_vrmod_* (both may coexist)."
+echo "  Prefer:   vrmod_prefer_backend auto|openxr|openvr"
+echo "  Status:   vrmod_backend"
+echo "  WiVRn:    XR_RUNTIME_JSON=... + loader on LD_LIBRARY_PATH (see README)"
+echo "  Start:    vrmod_start"
 echo
-echo "Tip: If you update your system OpenXR packages later and want the"
-echo "     latest loader + deps, just run this installer again."
+echo "Tip: re-run this installer after updating OpenXR packages or the submodule."

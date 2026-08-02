@@ -19,9 +19,9 @@ echo "Building..."
 ./build.sh
 
 GAME_DIR="$HOME/.local/share/Steam/steamapps/common/GarrysMod"
-LIVE_BIN="$GAME_DIR/garrysmod/lua/bin/gmcl_vrmod_linux64.dll"
+LIVE_BIN="$GAME_DIR/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll"
 LIVE_CFG_DIR="$GAME_DIR/garrysmod/cfg"
-DEV_DLL="install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_linux64.dll"
+DEV_DLL="install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll"
 
 # Clean logs on each start (as requested). Truncate module debug log and engine console.log
 # so each quick test cycle starts with a fresh, easy-to-read log.

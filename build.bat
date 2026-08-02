@@ -47,19 +47,21 @@ set FLAGS=/nologo /O2 /W3 /wd4996 /MT /EHsc /std:c++17 /D_CRT_SECURE_NO_WARNINGS
 set LIBS=d3d11.lib dxgi.lib user32.lib shell32.lib
 
 pushd build_win64
-cl %FLAGS% %INC% %SRC% /link %LIBS% /DLL /OUT:..\install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_win64.dll
+cl %FLAGS% %INC% %SRC% /link %LIBS% /DLL /OUT:..\install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_xr_win64.dll
 if errorlevel 1 (
     echo BUILD FAILED
     popd
     exit /b 1
 )
 del /q *.obj 2>NUL
-del /q ..\install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_win64.exp 2>NUL
-del /q ..\install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_win64.lib 2>NUL
+del /q ..\install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_xr_win64.exp 2>NUL
+del /q ..\install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_xr_win64.lib 2>NUL
 popd
 
 echo.
-echo [+] Built: install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_win64.dll
+echo [+] Built: install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_xr_win64.dll
+echo     OpenXR binary name (coexists with OpenVR gmcl_vrmod_win64.dll)
+echo     require: vrmod_xr
 echo     Texture hook: D3D9 CreateTexture (vrmod-module-master main)
 echo     Graphics API: OpenXR XR_KHR_D3D11_enable
 echo     RT flip: 0 (Windows top-left)

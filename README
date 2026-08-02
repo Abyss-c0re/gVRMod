@@ -1,89 +1,74 @@
-# gVRMod — OpenXR for Garry's Mod
+# gVRMod — OpenXR module + dual-backend Lua addon
 
-Native OpenXR module + client addon (`addon/gvrmod`).
+Native **OpenXR** binary (`gmcl_vrmod_xr_*`) and one client Lua addon tree.
 
-## Submodule: vrmod-x64 (Workshop / OpenVR-compatible Lua)
+## Why only one Lua addon?
 
-[vrmod-x64](https://github.com/Abyss-c0re/vrmod-x64) is a **git submodule** at `vrmod-x64/`.  
-It is the Workshop Lua tree (OpenVR + OpenXR dual-detect). Shared Truth Matrix:
+There used to be two copies (`addon/gvrmod` + `vrmod-x64`). That was accidental dual-SoT thrash.
+
+**Now there is one:**
+
+| Path | Role |
+|------|------|
+| **`addon/vrmod-x64/`** | **Only** client addon (git submodule → [vrmod-x64](https://github.com/Abyss-c0re/vrmod-x64)) |
+| `src/` + CMake | OpenXR native module |
+| `install.sh` | Installs XR binary + this addon |
+
+The same Lua tree works with **OpenVR** (`gmcl_vrmod_*`) or **OpenXR** (`gmcl_vrmod_xr_*`) via auto-detect (`vrmod_backend` / `vrmod_prefer_backend`).
+
+Edit Lua **only** under `addon/vrmod-x64/`. Then:
+
+```bash
+./scripts/sync_vrmod_x64.sh    # commit submodule + bump parent pointer
+# or rely on ./scripts/install_git_hooks.sh pre-commit
+```
+
+## Dual native modules (no filename clash)
+
+| Backend | Binary | `require` |
+|---------|--------|-----------|
+| **OpenVR** | `gmcl_vrmod_linux64.dll` / `gmcl_vrmod_win64.dll` | `"vrmod"` |
+| **OpenXR** (this repo) | `gmcl_vrmod_xr_linux64.dll` / `gmcl_vrmod_xr_win64.dll` | `"vrmod_xr"` |
+
+Both may sit in `garrysmod/lua/bin` at once. Lua loads one (`vrmod_prefer_backend` = `auto` \| `openxr` \| `openvr`).
 
 ```
-addon/gvrmod/{lua,materials,models}  ↔  vrmod-x64/{lua,materials,models}
+vrmod_backend
 ```
 
-**Clone**
+## Clone
+
 ```bash
 git clone --recurse-submodules https://github.com/Abyss-c0re/gVRMod.git
-# or after plain clone:
+# or:
 git submodule update --init --recursive
+./scripts/install_git_hooks.sh
 ```
 
-**Sync (every shared change)**
-```bash
-./scripts/install_git_hooks.sh   # once per clone — pre-commit auto-sync
-./scripts/sync_vrmod_x64.sh      # monorepo → submodule (default SoT)
-./scripts/sync_vrmod_x64.sh --check
-./scripts/sync_vrmod_x64.sh --from-submodule   # Workshop → monorepo
-```
-
-Agents / humans: after editing `addon/gvrmod/lua` (or materials/models), run `./scripts/sync_vrmod_x64.sh` (or rely on the pre-commit hook).
-
-| Platform | Graphics | Texture share | RT flip |
-|----------|----------|---------------|---------|
-| **Linux x64** | OpenGL (GLX / togl) | glGenTextures + FBO observation hooks | **1** (V flip) |
-| **Windows x64** | D3D11 (`XR_KHR_D3D11_enable`) | **D3D9 `CreateTexture` hook** from [vrmod-module-master **main**](https://github.com/Abyss-c0re/vrmod-module-master) | **0** (no flip) |
-
-Windows flip is **hard-forced to 0** in the module (`SetRTTextureFlip` cannot enable it). D3D and OpenXR both use top-left origin.
-
-### Windows texture hook (main branch)
-
-From `vrmod-module-master` `src/vrmod.cpp` (main):
-
-1. Resolve `IDirect3DDevice9` via `shaderapidx9.dll` `CreateInterface("ShaderDevice001")`
-2. Hook vtable **[23]** `CreateTexture` with the 14-byte trampoline
-3. Force `D3DPOOL_DEFAULT` + NT **shared handle** on the next engine RT
-4. `D3D11CreateDevice` + `OpenSharedResource` → `ID3D11Texture2D` for OpenXR
-
-### Build
+## Build / install
 
 **Linux**
 ```bash
 ./build.sh
 ./install.sh
+# → gmcl_vrmod_xr_linux64.dll + garrysmod/addons/vrmod-x64/
 ```
 
-**Windows** (Visual Studio 2019/2022 + MSVC x64)
+**Windows**
 ```bat
 build.bat
-```
-Output: `install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_win64.dll`
-
-Optional CMake (Windows or Linux):
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+# → install\GarrysMod\garrysmod\lua\bin\gmcl_vrmod_xr_win64.dll
 ```
 
-### Runtime
+| Platform | Graphics | Texture share | RT flip |
+|----------|----------|---------------|---------|
+| **Linux x64** | OpenGL (GLX / togl) | glGenTextures + FBO observation | **1** |
+| **Windows x64** | D3D11 | D3D9 CreateTexture hook (module-master main) | **0** |
 
-- Active OpenXR runtime (SteamVR OpenXR, Oculus, WMR, WiVRn/Monado on Linux, …)
-- Windows: `openxr_loader.dll` next to the module or on PATH
-- Linux: loader often bundled by `./install.sh` next to the module
-- Do **not** load `vrmod-x64` (OpenVR) at the same time
+## Module version
 
-### Addon
+**v27** — `GetBackend()` · dual binary names · full restart teardown.
 
-Copy `addon/gvrmod` → `garrysmod/addons/gvrmod`.  
-Lua already selects `gmcl_vrmod_win64.dll` / `gmcl_vrmod_linux64.dll` and sets:
-
-```lua
-VRMOD_SetRTTextureFlip(not system.IsWindows())  -- flip=0 on Windows
-```
-
-### Module version
-
-**v27** — `GetBackend()` for dual OpenVR/OpenXR detect; Windows D3D + Linux GLX.
-
-### License
+## License
 
 CUBECHAIN — see [LICENSE](LICENSE).

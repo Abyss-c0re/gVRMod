@@ -53,7 +53,8 @@ make -j$(nproc) vrmod_release
 
 echo ""
 echo "[+] Build complete!"
-echo "    Module: install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_linux64.dll"
+echo "    Module: install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll"
+echo "    (OpenXR name — OpenVR keeps gmcl_vrmod_linux64.dll; both may coexist)"
 echo ""
 
 # ── Build and run tests ──

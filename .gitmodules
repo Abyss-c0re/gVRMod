@@ -1,4 +1,4 @@
 [submodule "vrmod-x64"]
-	path = vrmod-x64
+	path = addon/vrmod-x64
 	url = https://github.com/Abyss-c0re/vrmod-x64.git
 	branch = main

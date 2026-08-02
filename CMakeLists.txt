@@ -37,14 +37,17 @@ if(WIN32)
         src/rendering/d3d/d3d_hooks.cpp
         src/rendering/openxr/xr_render_d3d.cpp
     )
-    set(VRMOD_OUTPUT_NAME "gmcl_vrmod_win64")
+    # Distinct from OpenVR gmcl_vrmod_win64.dll so both can live in lua/bin.
+    set(VRMOD_OUTPUT_NAME "gmcl_vrmod_xr_win64")
     set(VRMOD_PLATFORM_LIBS d3d11 dxgi)
 else()
     set(RENDER_PLATFORM_SOURCES
         src/rendering/opengl/gl_hooks.cpp
         src/rendering/openxr/xr_render.cpp
     )
-    set(VRMOD_OUTPUT_NAME "gmcl_vrmod_linux64")
+    # Distinct from OpenVR gmcl_vrmod_linux64.dll so both can live in lua/bin.
+    # require("vrmod_xr") → gmcl_vrmod_xr_linux64.dll
+    set(VRMOD_OUTPUT_NAME "gmcl_vrmod_xr_linux64")
     set(VRMOD_PLATFORM_LIBS dl X11 GL GLX)
 endif()
 
