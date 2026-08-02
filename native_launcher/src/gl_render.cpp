@@ -137,29 +137,28 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // Y-flipped upload: V=0 = UI top. Top verts → V=0.
-  // Back-face: flip U so text is not mirrored when viewing reverse side.
+  // Y-flip on upload: GL V=0 = UI bottom, V=1 = UI top.
+  // Bottom verts → V=0, top verts → V=1. Back-face flips U only.
   const float u0 = backFace ? 1.f : 0.f;
   const float u1 = backFace ? 0.f : 1.f;
   glBegin(GL_QUADS);
   if (!backFace) {
-    glTexCoord2f(u0, 1.f);
-    glVertex3f(bl.x, bl.y, bl.z);
-    glTexCoord2f(u1, 1.f);
-    glVertex3f(br.x, br.y, br.z);
-    glTexCoord2f(u1, 0.f);
-    glVertex3f(tr.x, tr.y, tr.z);
     glTexCoord2f(u0, 0.f);
+    glVertex3f(bl.x, bl.y, bl.z);
+    glTexCoord2f(u1, 0.f);
+    glVertex3f(br.x, br.y, br.z);
+    glTexCoord2f(u1, 1.f);
+    glVertex3f(tr.x, tr.y, tr.z);
+    glTexCoord2f(u0, 1.f);
     glVertex3f(tl.x, tl.y, tl.z);
   } else {
-    // Reverse winding + flip V so upright when viewed from behind
-    glTexCoord2f(u0, 0.f);
-    glVertex3f(bl.x, bl.y, bl.z);
     glTexCoord2f(u0, 1.f);
+    glVertex3f(bl.x, bl.y, bl.z);
+    glTexCoord2f(u0, 0.f);
     glVertex3f(tl.x, tl.y, tl.z);
-    glTexCoord2f(u1, 1.f);
-    glVertex3f(tr.x, tr.y, tr.z);
     glTexCoord2f(u1, 0.f);
+    glVertex3f(tr.x, tr.y, tr.z);
+    glTexCoord2f(u1, 1.f);
     glVertex3f(br.x, br.y, br.z);
   }
   glEnd();
