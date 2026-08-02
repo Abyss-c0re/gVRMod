@@ -100,8 +100,14 @@ void GlLoadProjectionFov(const XrFovf& fov, float nearZ, float farZ) {
   const float R = tanR * nearZ;
   const float B = tanD * nearZ;
   const float T = tanU * nearZ;
-  // glFrustum(left, right, bottom, top, near, far)
-  glFrustum(L, R, B, T, nearZ, farZ);
+  // OpenXR may report angleDown positive on some runtimes; ensure bottom < top
+  if (B > T) {
+    const float tmp = B;
+    B = T;
+    T = tmp;
+  }
+  // ADB Quest: rendered UI was Y-inverted vs passthrough. Flip frustum Y.
+  glFrustum(L, R, T, B, nearZ, farZ);
 }
 
 void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
