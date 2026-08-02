@@ -104,14 +104,6 @@ static void ConvertRotToSourceAng(const float m[3][3], float ang[3]) {
     ang[2] =  atan2f(-m[1][0], m[1][1]) * (180.0f / PI_F);
 }
 
-// Multiply orientation q by a local fixed rotation (q_out = q * q_local).
-static void QuatMulLocal(const XrQuaternionf& q, const XrQuaternionf& loc, XrQuaternionf* out) {
-    out->w = q.w * loc.w - q.x * loc.x - q.y * loc.y - q.z * loc.z;
-    out->x = q.w * loc.x + q.x * loc.w + q.y * loc.z - q.z * loc.y;
-    out->y = q.w * loc.y - q.x * loc.z + q.y * loc.w + q.z * loc.x;
-    out->z = q.w * loc.z + q.x * loc.y - q.y * loc.x + q.z * loc.w;
-}
-
 PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
     PoseResult r;
     memset(&r, 0, sizeof(r));
@@ -127,7 +119,9 @@ PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
     r.pos[1] = -loc.pose.position.x;
     r.pos[2] =  loc.pose.position.y;
 
-    // Raw OpenXR rotation → Source Euler (matches unit tests + HMD view).
+    // Same convert for HMD and controllers. Hand *meshes* add ValveBiped offsets
+    // (e.g. right hand +180 roll) in Lua — do not invent a second grip rotation here
+    // (v33 -90°X stacked with bone roll and twisted fingers/wrists).
     float Rxr[3][3];
     QuatToRotMat(loc.pose.orientation, Rxr);
     ConvertRotToSourceAng(Rxr, r.ang);
@@ -148,24 +142,6 @@ PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
     }
 
     return r;
-}
-
-// Controller grip only: OpenXR grip rests with +Y along the handle; OpenVR-era
-// hand meshes / VRMod offsets expect the tip roughly along -Z / game forward.
-// Apply a local -90° about X on the XR quat *before* the same extract — HMD/eyes
-// never take this path (they use ConvertXrPose only).
-static PoseResult ConvertXrGripPose(const XrSpaceLocation& loc) {
-    if (!(loc.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)) {
-        return ConvertXrPose(loc);
-    }
-    XrSpaceLocation adj = loc;
-    // q = q_grip * quat(-90° around X)  →  grip +Y maps toward grip -Z (pointing)
-    const float hs = 0.70710678f; // sin(45°), cos(45°)
-    XrQuaternionf qFix = {-hs, 0.0f, 0.0f, hs}; // -90° about X
-    XrQuaternionf qOut;
-    QuatMulLocal(loc.pose.orientation, qFix, &qOut);
-    adj.pose.orientation = qOut;
-    return ConvertXrPose(adj);
 }
 
 PoseResult GetHMDPose() {
@@ -1346,18 +1322,7 @@ PoseResult XR_GetPoseAction(VRActionHandle handle) {
         g_xrFrameState.predictedDisplayTime, &location);
     if (res != XR_SUCCESS) return r;
 
-    // Hand/controller action spaces only — never HMD/eye (those use ConvertXrPose).
-    const char* spaceName = nullptr;
-    for (int i = 0; i < g_xrActionSpaceCount; i++) {
-        if (g_xrActionSpaces[i].space == space) {
-            spaceName = g_xrActionSpaces[i].name;
-            break;
-        }
-    }
-    const bool isHand =
-        spaceName &&
-        (strstr(spaceName, "hand") != nullptr || strstr(spaceName, "Hand") != nullptr);
-    r = isHand ? ConvertXrGripPose(location) : ConvertXrPose(location);
+    r = ConvertXrPose(location);
     return r;
 }
 

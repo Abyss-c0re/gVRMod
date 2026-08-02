@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v33: HMD keeps raw pose convert; grip-only -90°X for hands (no view tilt)
-    LUA->PushNumber(33);
+    // v34: drop grip -90°X — hand bones already use OpenVR-style offsets
+    LUA->PushNumber(34);
     return 1;
 }
 
