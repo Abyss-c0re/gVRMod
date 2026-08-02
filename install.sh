@@ -83,9 +83,10 @@ Note:
 EOF
 }
 
-# Install application menu entry for gvrmod_launcher.sh
+# Install application menu entry — Cube native launcher (default product entry)
 install_desktop_entry() {
-    local launcher="$SCRIPT_DIR/scripts/gvrmod_launcher.sh"
+    # Product law: desktop opens Cube OpenXR menu first; GMod only after START GAME.
+    local launcher="$SCRIPT_DIR/scripts/cube_webui_launcher.sh"
     local desktop_src="$SCRIPT_DIR/scripts/gvrmod.desktop"
     local app_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
     local icon_dir="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
@@ -94,13 +95,13 @@ install_desktop_entry() {
     local icon_name="gvrmod"
 
     echo
-    echo "=== Installing desktop launcher ==="
+    echo "=== Installing desktop launcher (Cube UI) ==="
 
     if [[ ! -x "$launcher" ]]; then
         if [[ -f "$launcher" ]]; then
             chmod +x "$launcher"
         else
-            echo "  WARNING: launcher missing at $launcher — skip desktop entry"
+            echo "  WARNING: Cube launcher missing at $launcher — skip desktop entry"
             return 0
         fi
     fi
@@ -121,37 +122,37 @@ install_desktop_entry() {
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=gVRMod
-GenericName=Garry's Mod VR
-Comment=OpenXR Garry's Mod — WiVRn/Quest, Cube VR launcher
+Name=gVRMod Cube
+GenericName=Cube VR Launcher for Garry's Mod
+Comment=Native OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
 Exec=$launcher
 Path=$SCRIPT_DIR
 Icon=$icon_name
 Terminal=true
 StartupNotify=true
 Categories=Game;ActionGame;
-Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;VRMod;
-StartupWMClass=gmod
+Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;
+StartupWMClass=cube_webui_glx
 EOF
     chmod +x "$desktop_dst" 2>/dev/null || true
 
-    # Keep repo template in sync (relative copy for git)
+    # Repo template (install rewrites absolute Exec; template keeps portable name)
     if [[ -d "$SCRIPT_DIR/scripts" ]]; then
         cat > "$desktop_src" <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=gVRMod
-GenericName=Garry's Mod VR
-Comment=OpenXR Garry's Mod — WiVRn/Quest, Cube VR launcher
+Name=gVRMod Cube
+GenericName=Cube VR Launcher for Garry's Mod
+Comment=Native OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
 Exec=$launcher
 Path=$SCRIPT_DIR
 Icon=$icon_name
 Terminal=true
 StartupNotify=true
 Categories=Game;ActionGame;
-Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;VRMod;
-StartupWMClass=gmod
+Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;
+StartupWMClass=cube_webui_glx
 EOF
     fi
 
@@ -163,7 +164,7 @@ EOF
     fi
 
     echo "  desktop: $desktop_dst"
-    echo "  launch:  $launcher"
+    echo "  launch:  $launcher  (Cube UI — not GMod-first)"
 }
 
 uninstall_desktop_entry() {
@@ -530,8 +531,9 @@ echo
 echo "A manifest was written to:"
 echo "    $MANIFEST"
 echo
-echo "You can now start Garry's Mod and use vrmod."
-echo "App menu: search for \"gVRMod\" (runs scripts/gvrmod_launcher.sh)."
+echo "App menu: search for \"gVRMod Cube\" → scripts/cube_webui_launcher.sh"
+echo "(GMod is started only after START GAME in the Cube headset menu.)"
+echo "Legacy GMod-only helper: scripts/gvrmod_launcher.sh"
 echo "If you ever want to remove everything this script installed, run:"
 echo "    $0 --uninstall"
 echo
@@ -540,6 +542,6 @@ echo "  Binaries: OpenXR = gmcl_vrmod_xr_* ; OpenVR = gmcl_vrmod_* (both may coe
 echo "  Prefer:   vrmod_prefer_backend auto|openxr|openvr"
 echo "  Status:   vrmod_backend"
 echo "  OpenXR:   any active runtime (SteamVR OpenXR, Monado, ALVR, WiVRn, …)"
-echo "  Start:    desktop \"gVRMod\" or vrmod_start"
+echo "  Start:    desktop \"gVRMod Cube\" (Cube UI) → START GAME → GMod"
 echo
 echo "Tip: re-run this installer after updating packages or the submodule."

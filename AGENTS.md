@@ -13,8 +13,10 @@ Never leave product work only in the working tree. Screenshots/temp go in `.scra
 
 Repos: `Abyss-c0re/gVRMod`, `Abyss-c0re/vrmod-x64`. No force-push / hard-reset of shared history unless the user explicitly asks.
 
-## Cube WebUI native launcher
+## Cube native launcher (default desktop entry)
 
-- Product entry: `scripts/cube_webui_launcher.sh` → `install/native/cube_webui_launcher`
+- **Default product entry:** desktop **gVRMod Cube** → `scripts/cube_webui_launcher.sh` → `install/native/cube_webui_launcher`
+- Installer (`install.sh`) writes `~/.local/share/applications/gvrmod.desktop` to that script
+- `scripts/gvrmod_launcher.sh` is **GMod-only helper** (after Start), not the menu
 - Source: `native_launcher/`
 - Defaults: `native_launcher/cube_webui.conf` (shipped; user overrides in `~/.config/gvrmod/`)
