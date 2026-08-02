@@ -11,7 +11,7 @@
 #     * OpenXR loader + all its dependencies → bin/linux64/
 #   (overwrites existing files)
 # - Supports --uninstall to cleanly remove what was installed
-- Installs a desktop launcher (gVRMod.desktop) for the OpenXR launcher script
+# - Installs a desktop launcher (gVRMod.desktop) for the OpenXR launcher script
 #
 # Usage:
 #   ./install.sh                 # build + install (or update)
@@ -79,7 +79,108 @@ Note:
 - OpenXR Lua module         → garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll
   (OpenVR gmcl_vrmod_linux64.dll is never overwritten — dual install OK)
 - Client addon              → garrysmod/addons/vrmod-x64/  (from submodule addon/vrmod-x64)
+- Desktop launcher          → ~/.local/share/applications/gvrmod.desktop
 EOF
+}
+
+# Install application menu entry for gvrmod_launcher.sh
+install_desktop_entry() {
+    local launcher="$SCRIPT_DIR/scripts/gvrmod_launcher.sh"
+    local desktop_src="$SCRIPT_DIR/scripts/gvrmod.desktop"
+    local app_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    local icon_dir="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
+    local desktop_dst="$app_dir/gvrmod.desktop"
+    local banner="$SCRIPT_DIR/docs/assets/banner.png"
+    local icon_name="gvrmod"
+
+    echo
+    echo "=== Installing desktop launcher ==="
+
+    if [[ ! -x "$launcher" ]]; then
+        if [[ -f "$launcher" ]]; then
+            chmod +x "$launcher"
+        else
+            echo "  WARNING: launcher missing at $launcher — skip desktop entry"
+            return 0
+        fi
+    fi
+
+    mkdir -p "$app_dir" "$icon_dir"
+
+    if [[ -f "$banner" ]]; then
+        cp -f "$banner" "$icon_dir/gvrmod.png"
+        icon_name="gvrmod"
+        echo "  icon: $icon_dir/gvrmod.png"
+    else
+        icon_name="steam_icon_4000"
+        echo "  icon: steam_icon_4000 (banner.png not found)"
+    fi
+
+    # Always write a fresh .desktop with absolute paths for this install tree
+    cat > "$desktop_dst" <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=gVRMod
+GenericName=Garry's Mod VR
+Comment=OpenXR Garry's Mod — WiVRn/Quest, Cube VR launcher
+Exec=$launcher
+Path=$SCRIPT_DIR
+Icon=$icon_name
+Terminal=true
+StartupNotify=true
+Categories=Game;ActionGame;
+Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;VRMod;
+StartupWMClass=gmod
+EOF
+    chmod +x "$desktop_dst" 2>/dev/null || true
+
+    # Keep repo template in sync (relative copy for git)
+    if [[ -d "$SCRIPT_DIR/scripts" ]]; then
+        cat > "$desktop_src" <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=gVRMod
+GenericName=Garry's Mod VR
+Comment=OpenXR Garry's Mod — WiVRn/Quest, Cube VR launcher
+Exec=$launcher
+Path=$SCRIPT_DIR
+Icon=$icon_name
+Terminal=true
+StartupNotify=true
+Categories=Game;ActionGame;
+Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;VRMod;
+StartupWMClass=gmod
+EOF
+    fi
+
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$app_dir" 2>/dev/null || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f -t "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor" 2>/dev/null || true
+    fi
+
+    echo "  desktop: $desktop_dst"
+    echo "  launch:  $launcher"
+}
+
+uninstall_desktop_entry() {
+    local app_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    local icon="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps/gvrmod.png"
+    local desktop_dst="$app_dir/gvrmod.desktop"
+    if [[ -f "$desktop_dst" ]]; then
+        rm -f "$desktop_dst"
+        echo "  removed desktop: $desktop_dst"
+    fi
+    if [[ -f "$icon" ]]; then
+        rm -f "$icon"
+        echo "  removed icon: $icon"
+    fi
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$app_dir" 2>/dev/null || true
+    fi
 }
 
 # Simple arg parser
@@ -305,6 +406,8 @@ if [[ "$UNINSTALL" == true ]]; then
         echo "  (no manifest was present)"
     fi
 
+    uninstall_desktop_entry
+
     echo "Uninstall complete."
     exit 0
 fi
@@ -415,16 +518,20 @@ else
     echo "  WARNING: No addon at $ADDON_SRC — run: git submodule update --init --recursive"
 fi
 
+install_desktop_entry
+
 echo
 echo "Installation successful!"
 echo "  Module installed to:      $LUA_BIN_DIR"
 echo "  OpenXR libs installed to: $ENGINE_BIN_DIR"
 echo "  Client addon installed to: $ADDONS_DIR/$ADDON_INSTALL_NAME"
+echo "  Desktop launcher:         ~/.local/share/applications/gvrmod.desktop"
 echo
 echo "A manifest was written to:"
 echo "    $MANIFEST"
 echo
 echo "You can now start Garry's Mod and use vrmod."
+echo "App menu: search for \"gVRMod\" (runs scripts/gvrmod_launcher.sh)."
 echo "If you ever want to remove everything this script installed, run:"
 echo "    $0 --uninstall"
 echo
@@ -433,6 +540,6 @@ echo "  Binaries: OpenXR = gmcl_vrmod_xr_* ; OpenVR = gmcl_vrmod_* (both may coe
 echo "  Prefer:   vrmod_prefer_backend auto|openxr|openvr"
 echo "  Status:   vrmod_backend"
 echo "  OpenXR:   any active runtime (SteamVR OpenXR, Monado, ALVR, WiVRn, …)"
-echo "  Start:    vrmod_start"
+echo "  Start:    desktop \"gVRMod\" or vrmod_start"
 echo
 echo "Tip: re-run this installer after updating packages or the submodule."
