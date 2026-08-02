@@ -88,9 +88,18 @@ Desktop icon → cube_webui_launcher (OpenXR native)
 
 ## Controls (headset)
 - **Trigger** — click UI under laser
-- **Grip / squeeze** — grab and move the menu (stick Y/X fine-tunes while held)
+- **Grip / squeeze** — grab and move the **world-locked** menu (WayVR-style)
 - **Menu / A** — reset panel pose to `cube_webui.conf` defaults
 - **Thumbstick** — navigate when not grabbing
+
+## WayVR panel (default)
+`view_lock=0` — panel is seeded in front of you, then **frozen in LOCAL space**.
+It does **not** follow head turn/walk; grip repositions it. Optional `view_lock=1` is HUD head-follow.
+
+## Seamless StartGame (no black gap)
+Cube keeps the OpenXR session and shows a **STARTING GMOD** panel after Start.
+Lua writes `garrysmod/data/vrmod/cube_handoff.txt` (`phase=take_xr`) before claiming XR;
+native exits the session only then so GMod can take over without an early void.
 
 ## Config (no recompile)
 Project defaults: `native_launcher/cube_webui.conf` (copied to `install/native/`).
@@ -99,8 +108,8 @@ User override: `~/.config/gvrmod/cube_webui.conf`.
 | key | meaning |
 |-----|---------|
 | `panel_dist` / `panel_w` / `panel_h` | size & depth (m) |
-| `panel_x` / `panel_y` / `panel_z` | VIEW offsets |
-| `view_lock` | `1` head-follow, `0` world-lock after place |
+| `panel_x` / `panel_y` / `panel_z` | seed offsets |
+| `view_lock` | `0` world (default), `1` head-follow |
 | `passthrough` | prefer ALPHA_BLEND / FB passthrough |
 | `panel_alpha` | UI opacity over real world |
 | `grab_thresh` | squeeze threshold to grab |

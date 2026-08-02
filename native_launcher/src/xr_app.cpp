@@ -72,7 +72,8 @@ struct PanelConfig {
   float offsetX = 0.f;    // VIEW lateral (m)
   float offsetY = 0.f;    // VIEW vertical (m)
   float offsetZ = 0.f;    // extra depth (+ = further / more -Z)
-  bool viewLock = true;   // true: follow head; false: world-lock after grab release
+  // WayVR-style: world-locked floating panel (grab to place). Head-follow is optional.
+  bool viewLock = false;
   bool passthrough = true;
   float grabThresh = 0.55f;
   float panelAlpha = 0.96f; // UI opacity over passthrough
@@ -558,10 +559,11 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
   LoadPanelConfig(gmodRoot);
 
-  fprintf(stderr, "[cube_webui] OpenXR WebUI reverse launcher\n");
+  fprintf(stderr, "[cube_webui] OpenXR WebUI reverse launcher (WayVR world panel)\n");
   fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
-  fprintf(stderr, "[cube_webui] TRIGGER=click  GRIP=grab/move menu  STICK=nav  MENU=reset panel\n");
+  fprintf(stderr, "[cube_webui] TRIGGER=click  GRIP=move world panel  MENU=reset\n");
+  fprintf(stderr, "[cube_webui] seamless Start: hold XR until GMod take_xr (no gap)\n");
   fprintf(stderr, "[cube_webui] host: echo click|reset|start >/tmp/cube_webui_cmd\n");
 
   GlxCtx glx{};
@@ -737,9 +739,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
   WebUIState ui{};
   WebUI_Init(ui, gmodRoot);
-  ui.status = g_cfg.passthrough
-                  ? "TRIGGER click · GRIP move · MENU reset · passthrough"
-                  : "TRIGGER click · GRIP move menu · MENU reset pose";
+  ui.status = "WORLD PANEL · GRIP move · TRIGGER click · seamless Start";
   std::vector<unsigned char> panelBuf(UI_W * UI_H * 4);
   WebUI_Rasterize(ui, panelBuf.data(), nullptr);
   GLuint panelTex = MakeTex(UI_W, UI_H, panelBuf.data());
@@ -809,7 +809,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     pollCmdFile();
     if (ui.wantQuit) break;
 
-    if (ui.wantStart) {
+    // --- StartGame: spawn GMod but KEEP OpenXR until handoff (Cube hates gaps) ---
+    if (ui.wantStart && !ui.handoff) {
       LaunchRequest lr;
       lr.gmodRoot = gmodRoot;
       lr.map = WebUI_SelectedMap(ui);
@@ -820,14 +821,57 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       lr.p2pFriends = ui.p2pFriends;
       lr.gamemode = ui.gamemode;
       if (const char* xr = getenv("XR_RUNTIME_JSON")) lr.xrRuntimeJson = xr;
+      ClearCubeHandoffMarkers(gmodRoot);
       std::string err;
       int rc = SpawnGModFromWebUI(lr, err);
       fprintf(stderr, "[cube_webui] StartGame map=%s rc=%d %s\n", lr.map.c_str(), rc, err.c_str());
-      ui.status = rc == 0 ? "SPAWNED GMOD" : ("SPAWN FAIL: " + err);
       ui.wantStart = false;
       if (rc == 0) {
-        sleep(1);
-        break;
+        ui.handoff = true;
+        ui.handoffMap = lr.map;
+        ui.handoffPhase = "SPAWNED";
+        ui.handoffDetail = "holding OpenXR · GMod booting";
+        ui.handoffElapsed = 0.f;
+        ui.status = "HANDOFF — STAY IN VR";
+        fprintf(stderr, "[cube_webui] seamless handoff: keep XR UI until GMod take_xr\n");
+      } else {
+        ui.status = "SPAWN FAIL: " + err;
+      }
+    }
+
+    if (ui.handoff) {
+      ui.handoffElapsed += 1.f / 72.f;
+      const bool gmodUp = GModProcessRunning();
+      std::string phase = ReadCubeHandoffPhase(gmodRoot);
+      if (phase.empty()) phase = gmodUp ? "gmod_process" : "waiting_process";
+      ui.handoffPhase = phase;
+      if (gmodUp)
+        ui.handoffDetail = "GMod process up · waiting take_xr";
+      else
+        ui.handoffDetail = "waiting for GMod process…";
+
+      // Lua writes phase=take_xr before VRUtilClientStart — then we release XR
+      bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
+      // Soft fallback only if Lua never signals (old addon) — still late enough to cover boot
+      bool softHandoff = gmodUp && ui.handoffElapsed > 40.f;
+      // Absolute timeout
+      bool timeout = ui.handoffElapsed > 180.f;
+      // Session lost (another app / runtime switched) — exit clean
+      bool sessionGone = !sessionRunning && ui.handoffElapsed > 1.f;
+
+      if (takeXr || softHandoff || timeout || sessionGone) {
+        fprintf(stderr,
+                "[cube_webui] handoff exit phase=%s gmod=%d t=%.1f take=%d soft=%d timeout=%d gone=%d\n",
+                phase.c_str(), gmodUp ? 1 : 0, ui.handoffElapsed,
+                takeXr ? 1 : 0, softHandoff ? 1 : 0, timeout ? 1 : 0, sessionGone ? 1 : 0);
+        ui.status = "HANDING OFF TO GMOD";
+        // Request clean session end so compositor can switch to GMod without a long void
+        if (sessionRunning) {
+          xrRequestExitSession(session);
+        }
+        // One more frame path optional; exit loop promptly
+        running = false;
+        continue;
       }
     }
 

@@ -4,6 +4,7 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <string>
 #include <sys/stat.h>
 #include <ctime>
 #include <unistd.h>
@@ -100,6 +101,11 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " >/tmp/cube_webui_gmod.log 2>&1 &";
   }
 
+  // Handoff: native launcher keeps OpenXR until GMod signals take_xr
+  WriteFile(dataDir + "/cube_handoff.txt",
+            "phase=spawned\nts=" + std::to_string((long)time(nullptr)) + "\n");
+  unlink((dataDir + "/cube_ready.txt").c_str());
+
   fprintf(stderr, "[cube_webui] StartGame → %s\n", cmd.str().c_str());
   int rc = system(cmd.str().c_str());
   if (rc != 0) {
@@ -107,4 +113,37 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
     return 4;
   }
   return 0;
+}
+
+bool GModProcessRunning() {
+  // hl2_linux / gmod — exclude our own cube_webui_launcher
+  FILE* p = popen("pgrep -af 'hl2_linux|garrysmod' 2>/dev/null | grep -v cube_webui | head -1", "r");
+  if (!p) return false;
+  char buf[256] = {};
+  bool ok = (fgets(buf, sizeof(buf), p) != nullptr) && buf[0] != 0;
+  pclose(p);
+  return ok;
+}
+
+std::string ReadCubeHandoffPhase(const std::string& gmodRoot) {
+  if (gmodRoot.empty()) return {};
+  std::ifstream f(gmodRoot + "/garrysmod/data/vrmod/cube_handoff.txt");
+  if (!f) return {};
+  std::string line, phase;
+  while (std::getline(f, line)) {
+    if (line.rfind("phase=", 0) == 0) {
+      phase = line.substr(6);
+      // trim
+      while (!phase.empty() && (phase.back() == '\r' || phase.back() == ' '))
+        phase.pop_back();
+    }
+  }
+  return phase;
+}
+
+void ClearCubeHandoffMarkers(const std::string& gmodRoot) {
+  if (gmodRoot.empty()) return;
+  const std::string d = gmodRoot + "/garrysmod/data/vrmod/";
+  unlink((d + "cube_handoff.txt").c_str());
+  unlink((d + "cube_ready.txt").c_str());
 }

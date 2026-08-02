@@ -18,5 +18,15 @@ struct LaunchRequest {
 };
 
 // Write openxr_launch marker + gvrmod_cube.cfg, then spawn GMod (WebUI StartGame reverse).
-// Returns 0 on spawn success.
+// Returns 0 on spawn success. Does not take OpenXR — caller keeps session until handoff.
 int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut);
+
+// True if a GMod/hl2 client process is running (for seamless handoff wait).
+bool GModProcessRunning();
+
+// Read Lua handoff phase from garrysmod/data/vrmod/cube_handoff.txt (phase=...).
+// Returns empty if missing.
+std::string ReadCubeHandoffPhase(const std::string& gmodRoot);
+
+// Clear prior handoff markers before StartGame.
+void ClearCubeHandoffMarkers(const std::string& gmodRoot);

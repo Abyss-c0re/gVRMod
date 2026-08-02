@@ -1,5 +1,6 @@
 #include "ui_panel.hpp"
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -330,6 +331,39 @@ static void DrawNav(unsigned char* rgba, WebUIPage page) {
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
+  // Full-panel seamless handoff (no black gap while GMod boots)
+  if (s.handoff) {
+    FillRect(rgba, 0, 0, UI_W, UI_H, 8, 4, 10, 255);
+    FillRect(rgba, 0, 0, UI_W, 52, 196, 30, 58, 255);
+    DrawText(rgba, 24, 16, "CUBE  ·  STARTING GMOD", 255, 240, 244, 2);
+    DrawText(rgba, 24, 80, "NO GAPS  ·  HOLDING OPENXR", 200, 150, 165, 1);
+
+    char line[160];
+    snprintf(line, sizeof(line), "MAP  %s", s.handoffMap.empty() ? "..." : s.handoffMap.c_str());
+    DrawText(rgba, 24, 130, line, 255, 240, 244, 2);
+
+    snprintf(line, sizeof(line), "PHASE  %s",
+             s.handoffPhase.empty() ? "SPAWNING" : s.handoffPhase.c_str());
+    DrawText(rgba, 24, 180, line, 255, 70, 100, 2);
+
+    if (!s.handoffDetail.empty())
+      DrawText(rgba, 24, 220, s.handoffDetail.c_str(), 200, 180, 190, 1);
+
+    // Progress bar from elapsed (soft, not a hard %)
+    float t = s.handoffElapsed;
+    float pulse = 0.35f + 0.65f * (0.5f + 0.5f * std::sin(t * 2.2f));
+    int barW = UI_W - 48;
+    int fill = (int)(barW * std::min(0.92f, 0.12f + t / 45.f));
+    FillRect(rgba, 24, 300, barW, 28, 40, 16, 24, 255);
+    FillRect(rgba, 24, 300, std::max(8, fill), 28, (int)(196 * pulse), 30, 58, 255);
+
+    snprintf(line, sizeof(line), "%.0fs  ·  STAY IN VR UNTIL GMOD TAKES SESSION", t);
+    DrawText(rgba, 24, 350, line, 200, 150, 165, 1);
+    DrawText(rgba, 24, 400, "PASSTHROUGH STAYS  ·  WORLD PANEL STAYS", 160, 120, 130, 1);
+    DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 255, 200, 210, 1);
+    return;
+  }
+
   FillRect(rgba, 0, 0, UI_W, UI_H, 12, 6, 10, 255);
   DrawNav(rgba, s.page);
 

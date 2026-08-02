@@ -37,6 +37,13 @@ struct WebUIState {
   bool wantStart = false;
   bool wantQuit = false;
 
+  // Seamless StartGame handoff — keep XR UI until GMod is ready (no black gap)
+  bool handoff = false;
+  std::string handoffMap;
+  std::string handoffPhase; // spawning | waiting | gmod_up | take_xr | ...
+  std::string handoffDetail;
+  float handoffElapsed = 0.f;
+
   // Laser cursor (panel pixels)
   bool cursorVisible = false;
   int cursorX = 0, cursorY = 0;
