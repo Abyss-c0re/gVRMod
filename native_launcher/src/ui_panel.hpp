@@ -4,11 +4,39 @@
 #include <string>
 #include <vector>
 
-// Reversed WebUI shell: New Game (control.NewGame) + Addons (control.Addons)
+// Reversed WebUI shell: New Game + Addons + GMod native Settings
 
 enum class WebUIPage {
   NewGame = 0,
   Addons = 1,
+  Settings = 2,
+};
+
+// GMod / Source graphics + window (applied via cfg + launch args)
+struct GModGfxSettings {
+  // 0=Low 1=Med 2=High 3=Ultra (cycles; tweaking a field sets "Custom" display via preset=-1)
+  int preset = 2; // High
+
+  // Desktop mirror window (Source still needs a window for OpenXR path)
+  int resIdx = 0; // indexes WinRes table
+  int winW = 720;
+  int winH = 480;
+  bool noborder = true;
+  bool windowed = true;
+
+  // Source cvars
+  int matPicmip = -1;       // -1 best … 2 worst
+  int rRootLod = 0;         // 0 high … 2 low
+  int matAntialias = 4;    // 0,2,4,8
+  int matForceAniso = 8;    // 0,2,4,8,16
+  int matHdrLevel = 2;      // 0 off, 1 bloom, 2 full
+  bool shadows = true;
+  bool flashlightShadows = true;
+  bool specular = true;
+  bool bumpmap = true;
+  bool waterExpensive = true;
+  bool multicore = true;
+  int fpsMax = 0;           // 0 unlimited, else 60/90/120/144/240
 };
 
 struct WebUIState {
@@ -27,24 +55,28 @@ struct WebUIState {
   bool p2p = false;
   bool p2pFriends = false;
   std::string gamemode = "sandbox";
-  int focusCol = 0; // 0=cat 1=map 2=settings 3=start
+  int focusCol = 0; // NewGame: 0=cat 1=map 2=server 3=start
   int settingsRow = 0;
+  int settingsScroll = 0;
 
-  // --- Addons (WebUI reverse) ---
+  // GMod native graphics / window (not VRMod-only)
+  GModGfxSettings gfx;
+
+  // --- Addons ---
   AddonManager addons;
 
   std::string status;
   bool wantStart = false;
   bool wantQuit = false;
 
-  // Seamless StartGame handoff — keep XR UI until GMod is ready (no black gap)
+  // Seamless StartGame handoff
   bool handoff = false;
   std::string handoffMap;
-  std::string handoffPhase; // spawning | waiting | gmod_up | take_xr | ...
+  std::string handoffPhase;
   std::string handoffDetail;
   float handoffElapsed = 0.f;
 
-  // Laser cursor (panel pixels)
+  // Laser cursor
   bool cursorVisible = false;
   int cursorX = 0, cursorY = 0;
 };
@@ -53,19 +85,19 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot);
 const std::string& WebUI_SelectedMap(const WebUIState& s);
 int WebUI_MaxPlayers(const WebUIState& s);
 
-// stickX/Y -1/0/1, triggerEdge = select/toggle, backEdge = quit / back
-void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge);
+// Cycle a settings row (trigger / laser click). dir = +1 or -1.
+void WebUI_CycleSetting(WebUIState& s, int row, int dir = 1);
+// Apply quality preset 0..3 into individual gfx fields.
+void WebUI_ApplyGfxPreset(WebUIState& s, int preset);
+int WebUI_SettingsRowCount();
 
-// Laser pointer on panel (pixel coords). Returns true if hit.
-// Click when triggerEdge: hit-test UI widgets.
+void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge);
 void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible);
 bool WebUI_PointerClick(WebUIState& s, int px, int py);
 
-// Panel size
 constexpr int UI_W = 960;
 constexpr int UI_H = 540;
 
-// Optional cursor drawn on raster (laser hit)
 struct WebUICursor {
   bool visible = false;
   int x = 0, y = 0;

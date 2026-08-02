@@ -32,29 +32,54 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   mkdir((req.gmodRoot + "/garrysmod/data").c_str(), 0755);
   mkdir(dataDir.c_str(), 0755);
 
-  // Cube OpenXR boot cfg (in-game module autostart — after native StartGame)
-  const std::string cfg =
-      "// written by cube_webui_launcher (reversed WebUI StartGame)\n"
-      "vrmod_prefer_backend openxr\n"
-      "vrmod_autostart 1\n"
-      "vrmod_hub 1\n"
-      "vrmod_menu_vr 0\n"
-      "vrmod_require_window_focus 0\n"
-      "vrmod_laserpointer 1\n"
-      "engine_no_focus_sleep 0\n"
-      "snd_mute_losefocus 0\n"
-      "fps_max 0\n"
-      "sv_pausable 0\n"
-      "sv_lan " + std::string(req.svLan ? "1" : "0") + "\n"
-      "hostname " + req.hostname + "\n"
-      "vrmod_start force\n";
+  // Cube boot cfg: GMod/Source graphics + OpenXR autostart
+  const auto& g = req.gfx;
+  std::ostringstream cfg;
+  cfg << "// written by cube_webui_launcher — GMod native graphics + Cube OpenXR\n"
+      << "// --- Source / GMod graphics (from Cube SETTINGS tab) ---\n"
+      << "mat_picmip " << g.matPicmip << "\n"
+      << "r_rootlod " << g.rRootLod << "\n"
+      << "r_lod " << g.rRootLod << "\n"
+      << "mat_antialias " << g.matAntialias << "\n"
+      << "mat_aaquality 0\n"
+      << "mat_forceaniso " << g.matForceAniso << "\n"
+      << "mat_hdr_level " << g.matHdrLevel << "\n"
+      << "r_shadows " << (g.shadows ? 1 : 0) << "\n"
+      << "r_shadowrendertotexture " << (g.shadows ? 1 : 0) << "\n"
+      << "r_flashlightdepthtexture " << (g.flashlightShadows ? 1 : 0) << "\n"
+      << "mat_specular " << (g.specular ? 1 : 0) << "\n"
+      << "mat_bumpmap " << (g.bumpmap ? 1 : 0) << "\n"
+      << "r_waterforceexpensive " << (g.waterExpensive ? 1 : 0) << "\n"
+      << "r_waterforcereflectentities " << (g.waterExpensive ? 1 : 0) << "\n"
+      << "fps_max " << g.fpsMax << "\n"
+      << "mat_queue_mode " << (g.multicore ? 2 : 0) << "\n"
+      << "cl_threaded_bone_setup " << (g.multicore ? 1 : 0) << "\n"
+      << "r_threaded_particles " << (g.multicore ? 1 : 0) << "\n"
+      << "r_threaded_renderables " << (g.multicore ? 1 : 0) << "\n"
+      << "cl_forcepreload 1\n"
+      << "engine_no_focus_sleep 0\n"
+      << "snd_mute_losefocus 0\n"
+      << "sv_pausable 0\n"
+      << "sv_lan " << (req.svLan ? 1 : 0) << "\n"
+      << "hostname \"" << req.hostname << "\"\n"
+      << "// --- Cube VRMod ---\n"
+      << "vrmod_prefer_backend openxr\n"
+      << "vrmod_autostart 1\n"
+      << "vrmod_hub 1\n"
+      << "vrmod_menu_vr 0\n"
+      << "vrmod_require_window_focus 0\n"
+      << "vrmod_laserpointer 1\n"
+      << "vrmod_start force\n";
 
-  if (!WriteFile(cfgDir + "/gvrmod_cube.cfg", cfg)) {
+  const std::string cfgBody = cfg.str();
+  if (!WriteFile(cfgDir + "/gvrmod_cube.cfg", cfgBody)) {
     errOut = "failed to write gvrmod_cube.cfg";
     return 2;
   }
-  WriteFile(cfgDir + "/gvrmod_hub.cfg", cfg);
-  WriteFile(cfgDir + "/gvrmod_menu.cfg", cfg);
+  WriteFile(cfgDir + "/gvrmod_hub.cfg", cfgBody);
+  WriteFile(cfgDir + "/gvrmod_menu.cfg", cfgBody);
+  // Also drop a pure graphics snippet for manual +exec
+  WriteFile(cfgDir + "/gvrmod_graphics.cfg", cfgBody);
 
   // Marker for openxr_launch.lua
   std::ostringstream mark;
@@ -69,14 +94,20 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   // Steam appid
   WriteFile(req.gmodRoot + "/steam_appid.txt", "4000\n");
 
-  // Build command — reverse of control.NewGame.js StartGame + OpenXR wrapper
+  // Build command — reverse of control.NewGame.js StartGame + window size from Settings
+  std::ostringstream win;
+  if (req.windowed) win << " -windowed";
+  else win << " -fullscreen";
+  win << " -w " << req.winW << " -h " << req.winH;
+  if (req.noborder) win << " -noborder";
+
   std::ostringstream cmd;
   if (req.useSteam && system("command -v steam >/dev/null 2>&1") == 0) {
     cmd << "env -u LD_LIBRARY_PATH";
     if (!req.xrRuntimeJson.empty())
       cmd << " XR_RUNTIME_JSON='" << req.xrRuntimeJson << "'";
     cmd << " steam -applaunch 4000 -novid"
-        << " -windowed -w " << req.winW << " -h " << req.winH << " -noborder"
+        << win.str()
         << " +maxplayers " << req.maxPlayers
         << " +sv_lan " << (req.svLan ? 1 : 0)
         << " +hostname \"" << req.hostname << "\""
@@ -91,7 +122,7 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
     if (!req.xrRuntimeJson.empty())
       cmd << " XR_RUNTIME_JSON='" << req.xrRuntimeJson << "'";
     cmd << " \"" << req.gmodRoot << "/hl2.sh\" -game garrysmod -novid"
-        << " -windowed -w " << req.winW << " -h " << req.winH << " -noborder"
+        << win.str()
         << " +maxplayers " << req.maxPlayers
         << " +sv_lan " << (req.svLan ? 1 : 0)
         << " +hostname \"" << req.hostname << "\""

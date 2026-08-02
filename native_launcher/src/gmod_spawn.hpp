@@ -1,6 +1,22 @@
 #pragma once
 #include <string>
 
+// GMod/Source graphics applied via +exec cfg (not VRMod-only)
+struct GfxLaunch {
+  int matPicmip = 0;
+  int rRootLod = 0;
+  int matAntialias = 4;
+  int matForceAniso = 8;
+  int matHdrLevel = 2;
+  bool shadows = true;
+  bool flashlightShadows = true;
+  bool specular = true;
+  bool bumpmap = true;
+  bool waterExpensive = true;
+  bool multicore = true;
+  int fpsMax = 0; // 0 = unlimited
+};
+
 struct LaunchRequest {
   std::string gmodRoot;
   std::string map = "gm_construct";
@@ -12,21 +28,18 @@ struct LaunchRequest {
   std::string gamemode = "sandbox";
   int winW = 720;
   int winH = 480;
+  bool windowed = true;
+  bool noborder = true;
   bool useSteam = true;
-  std::string xrRuntimeJson; // XR_RUNTIME_JSON
+  std::string xrRuntimeJson;
   std::string cubeCfg = "gvrmod_cube";
+  GfxLaunch gfx;
 };
 
-// Write openxr_launch marker + gvrmod_cube.cfg, then spawn GMod (WebUI StartGame reverse).
+// Write openxr_launch marker + gvrmod_cube.cfg (VR + GMod graphics), spawn GMod.
 // Returns 0 on spawn success. Does not take OpenXR — caller keeps session until handoff.
 int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut);
 
-// True if a GMod/hl2 client process is running (for seamless handoff wait).
 bool GModProcessRunning();
-
-// Read Lua handoff phase from garrysmod/data/vrmod/cube_handoff.txt (phase=...).
-// Returns empty if missing.
 std::string ReadCubeHandoffPhase(const std::string& gmodRoot);
-
-// Clear prior handoff markers before StartGame.
 void ClearCubeHandoffMarkers(const std::string& gmodRoot);

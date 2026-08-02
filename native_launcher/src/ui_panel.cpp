@@ -89,6 +89,202 @@ static void DrawText(unsigned char* rgba, int x, int y, const char* s, int r, in
   }
 }
 
+// --- Settings row IDs (GMod native + server) ---
+enum SetRow : int {
+  SR_PRESET = 0,
+  SR_RES,
+  SR_TEX,
+  SR_MODELS,
+  SR_AA,
+  SR_AF,
+  SR_HDR,
+  SR_SHADOWS,
+  SR_FL_SHADOWS,
+  SR_SPECULAR,
+  SR_BUMP,
+  SR_WATER,
+  SR_FPS,
+  SR_MULTICORE,
+  SR_PLAYERS,
+  SR_LAN,
+  SR_P2P,
+  SR_P2P_FRIENDS,
+  SR_COUNT
+};
+
+int WebUI_SettingsRowCount() { return SR_COUNT; }
+
+struct WinRes { int w, h; const char* label; };
+static const WinRes kRes[] = {
+  {720, 480, "720x480"},
+  {960, 540, "960x540"},
+  {1280, 720, "1280x720"},
+  {1600, 900, "1600x900"},
+  {1920, 1080, "1920x1080"},
+  {2560, 1440, "2560x1440"},
+};
+static constexpr int kResN = 6;
+static const int kAa[] = {0, 2, 4, 8};
+static const int kAf[] = {0, 2, 4, 8, 16};
+static const int kFps[] = {0, 60, 90, 120, 144, 240};
+
+static int IndexOf(const int* a, int n, int v) {
+  for (int i = 0; i < n; ++i) if (a[i] == v) return i;
+  return 0;
+}
+
+void WebUI_ApplyGfxPreset(WebUIState& s, int preset) {
+  preset = std::clamp(preset, 0, 3);
+  s.gfx.preset = preset;
+  // Low / Med / High / Ultra → Source-ish defaults
+  if (preset == 0) {
+    s.gfx.matPicmip = 2; s.gfx.rRootLod = 2; s.gfx.matAntialias = 0; s.gfx.matForceAniso = 0;
+    s.gfx.matHdrLevel = 0; s.gfx.shadows = false; s.gfx.flashlightShadows = false;
+    s.gfx.specular = false; s.gfx.bumpmap = true; s.gfx.waterExpensive = false;
+    s.gfx.multicore = true; s.gfx.fpsMax = 60;
+  } else if (preset == 1) {
+    s.gfx.matPicmip = 1; s.gfx.rRootLod = 1; s.gfx.matAntialias = 2; s.gfx.matForceAniso = 4;
+    s.gfx.matHdrLevel = 1; s.gfx.shadows = true; s.gfx.flashlightShadows = false;
+    s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = false;
+    s.gfx.multicore = true; s.gfx.fpsMax = 90;
+  } else if (preset == 2) {
+    s.gfx.matPicmip = 0; s.gfx.rRootLod = 0; s.gfx.matAntialias = 4; s.gfx.matForceAniso = 8;
+    s.gfx.matHdrLevel = 2; s.gfx.shadows = true; s.gfx.flashlightShadows = true;
+    s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = true;
+    s.gfx.multicore = true; s.gfx.fpsMax = 0;
+  } else {
+    s.gfx.matPicmip = -1; s.gfx.rRootLod = 0; s.gfx.matAntialias = 8; s.gfx.matForceAniso = 16;
+    s.gfx.matHdrLevel = 2; s.gfx.shadows = true; s.gfx.flashlightShadows = true;
+    s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = true;
+    s.gfx.multicore = true; s.gfx.fpsMax = 0;
+  }
+}
+
+static void SyncResFromIdx(GModGfxSettings& g) {
+  int i = std::clamp(g.resIdx, 0, kResN - 1);
+  g.resIdx = i;
+  g.winW = kRes[i].w;
+  g.winH = kRes[i].h;
+}
+
+void WebUI_CycleSetting(WebUIState& s, int row, int dir) {
+  if (dir == 0) dir = 1;
+  auto& g = s.gfx;
+  switch (row) {
+    case SR_PRESET:
+      g.preset = (g.preset + dir + 4) % 4;
+      WebUI_ApplyGfxPreset(s, g.preset);
+      break;
+    case SR_RES:
+      g.resIdx = (g.resIdx + dir + kResN) % kResN;
+      SyncResFromIdx(g);
+      g.preset = -1;
+      break;
+    case SR_TEX:
+      g.matPicmip = std::clamp(g.matPicmip - dir, -1, 2); // higher quality = lower picmip
+      g.preset = -1;
+      break;
+    case SR_MODELS:
+      g.rRootLod = std::clamp(g.rRootLod - dir, 0, 2);
+      g.preset = -1;
+      break;
+    case SR_AA: {
+      int i = IndexOf(kAa, 4, g.matAntialias);
+      i = (i + dir + 4) % 4;
+      g.matAntialias = kAa[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_AF: {
+      int i = IndexOf(kAf, 5, g.matForceAniso);
+      i = (i + dir + 5) % 5;
+      g.matForceAniso = kAf[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_HDR:
+      g.matHdrLevel = (g.matHdrLevel + dir + 3) % 3;
+      g.preset = -1;
+      break;
+    case SR_SHADOWS: g.shadows = !g.shadows; g.preset = -1; break;
+    case SR_FL_SHADOWS: g.flashlightShadows = !g.flashlightShadows; g.preset = -1; break;
+    case SR_SPECULAR: g.specular = !g.specular; g.preset = -1; break;
+    case SR_BUMP: g.bumpmap = !g.bumpmap; g.preset = -1; break;
+    case SR_WATER: g.waterExpensive = !g.waterExpensive; g.preset = -1; break;
+    case SR_FPS: {
+      int i = IndexOf(kFps, 6, g.fpsMax);
+      i = (i + dir + 6) % 6;
+      g.fpsMax = kFps[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_MULTICORE: g.multicore = !g.multicore; g.preset = -1; break;
+    case SR_PLAYERS:
+      s.maxPlayersIdx = (s.maxPlayersIdx + dir + 8) % 8;
+      break;
+    case SR_LAN: s.svLan = !s.svLan; break;
+    case SR_P2P: s.p2p = !s.p2p; break;
+    case SR_P2P_FRIENDS: s.p2pFriends = !s.p2pFriends; break;
+    default: break;
+  }
+}
+
+static const char* PresetLabel(int p) {
+  if (p < 0) return "CUSTOM";
+  static const char* n[] = {"LOW", "MEDIUM", "HIGH", "ULTRA"};
+  return n[std::clamp(p, 0, 3)];
+}
+static const char* PicmipLabel(int p) {
+  if (p <= -1) return "VERY HIGH";
+  if (p == 0) return "HIGH";
+  if (p == 1) return "MEDIUM";
+  return "LOW";
+}
+static const char* LodLabel(int p) {
+  if (p <= 0) return "HIGH";
+  if (p == 1) return "MEDIUM";
+  return "LOW";
+}
+static const char* HdrLabel(int p) {
+  if (p <= 0) return "OFF";
+  if (p == 1) return "BLOOM";
+  return "FULL";
+}
+
+static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) {
+  const auto& g = s.gfx;
+  switch (row) {
+    case SR_PRESET: snprintf(out, outN, "PRESET          %s", PresetLabel(g.preset)); break;
+    case SR_RES: snprintf(out, outN, "WINDOW          %s", kRes[std::clamp(g.resIdx, 0, kResN - 1)].label); break;
+    case SR_TEX: snprintf(out, outN, "TEXTURES        %s", PicmipLabel(g.matPicmip)); break;
+    case SR_MODELS: snprintf(out, outN, "MODELS          %s", LodLabel(g.rRootLod)); break;
+    case SR_AA:
+      if (g.matAntialias <= 0) snprintf(out, outN, "ANTIALIAS       OFF");
+      else snprintf(out, outN, "ANTIALIAS       %dx", g.matAntialias);
+      break;
+    case SR_AF:
+      if (g.matForceAniso <= 0) snprintf(out, outN, "ANISOTROPIC     OFF");
+      else snprintf(out, outN, "ANISOTROPIC     %dx", g.matForceAniso);
+      break;
+    case SR_HDR: snprintf(out, outN, "HDR             %s", HdrLabel(g.matHdrLevel)); break;
+    case SR_SHADOWS: snprintf(out, outN, "SHADOWS         %s", g.shadows ? "ON" : "OFF"); break;
+    case SR_FL_SHADOWS: snprintf(out, outN, "FLASHLIGHT SHAD %s", g.flashlightShadows ? "ON" : "OFF"); break;
+    case SR_SPECULAR: snprintf(out, outN, "SPECULAR        %s", g.specular ? "ON" : "OFF"); break;
+    case SR_BUMP: snprintf(out, outN, "BUMP MAPS       %s", g.bumpmap ? "ON" : "OFF"); break;
+    case SR_WATER: snprintf(out, outN, "WATER QUALITY   %s", g.waterExpensive ? "HIGH" : "LOW"); break;
+    case SR_FPS:
+      if (g.fpsMax <= 0) snprintf(out, outN, "FPS CAP         UNLIMITED");
+      else snprintf(out, outN, "FPS CAP         %d", g.fpsMax);
+      break;
+    case SR_MULTICORE: snprintf(out, outN, "MULTICORE       %s", g.multicore ? "ON" : "OFF"); break;
+    case SR_PLAYERS: snprintf(out, outN, "MAX PLAYERS     %d", WebUI_MaxPlayers(s)); break;
+    case SR_LAN: snprintf(out, outN, "LAN SERVER      %s", s.svLan ? "ON" : "OFF"); break;
+    case SR_P2P: snprintf(out, outN, "P2P             %s", s.p2p ? "ON" : "OFF"); break;
+    case SR_P2P_FRIENDS: snprintf(out, outN, "P2P FRIENDS     %s", s.p2pFriends ? "ON" : "OFF"); break;
+    default: snprintf(out, outN, "?"); break;
+  }
+}
+
 void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s = WebUIState{};
   s.gmodRoot = gmodRoot;
@@ -114,8 +310,10 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
       break;
     }
   }
+  WebUI_ApplyGfxPreset(s, 2); // High defaults
+  SyncResFromIdx(s.gfx);
   Addons_Load(s.addons, gmodRoot);
-  s.status = "WEBUI REVERSE: NEW GAME + ADDONS — START SPAWNS GMOD";
+  s.status = "NEW GAME · ADDONS · SETTINGS (GMOD GRAPHICS)";
 }
 
 const std::string& WebUI_SelectedMap(const WebUIState& s) {
@@ -135,12 +333,6 @@ void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
   s.cursorX = px;
   s.cursorY = py;
   s.cursorVisible = visible;
-  if (visible) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "LASER %d,%d", px, py);
-    // keep short; status set by click handlers primarily
-    (void)s;
-  }
 }
 
 bool WebUI_PointerClick(WebUIState& s, int px, int py) {
@@ -156,10 +348,36 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
       s.status = "ADDON MANAGER — AIM + TRIGGER";
       return true;
     }
+    if (px >= 332 && px <= 500) {
+      s.page = WebUIPage::Settings;
+      s.status = "GMOD GRAPHICS + ENGINE SETTINGS";
+      return true;
+    }
+  }
+
+  if (s.page == WebUIPage::Settings) {
+    const int visible = 12;
+    const int rowH = 32;
+    int start = s.settingsScroll;
+    for (int n = 0; n < visible; ++n) {
+      int i = start + n;
+      if (i >= SR_COUNT) break;
+      int y = 72 + n * rowH;
+      if (px >= 24 && px <= UI_W - 24 && py >= y && py <= y + rowH - 4) {
+        s.settingsRow = i;
+        // Left half cycle down, right half cycle up (or always +1)
+        int dir = (px < UI_W / 2) ? -1 : 1;
+        WebUI_CycleSetting(s, i, dir);
+        char buf[96];
+        FormatSettingRow(s, i, buf, sizeof(buf));
+        s.status = buf;
+        return true;
+      }
+    }
+    return false;
   }
 
   if (s.page == WebUIPage::Addons) {
-    // list rows
     const int visible = 14;
     int start = s.addons.scroll;
     for (int n = 0; n < visible; ++n) {
@@ -182,7 +400,6 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   // New Game hit regions
   const int catW = 180, mapX = 188, mapW = 500, setX = 700, setW = 250;
 
-  // Categories
   for (int i = 0; i < (int)s.categories.size() && i < 12; ++i) {
     int y = 80 + i * 28;
     if (px >= 12 && px <= 8 + catW && py >= y - 2 && py <= y + 22) {
@@ -194,7 +411,6 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
     }
   }
 
-  // Maps
   if (!s.categories.empty()) {
     const auto& maps = s.categories[s.catIndex].maps;
     int visible = 12;
@@ -212,7 +428,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
     }
   }
 
-  // Settings rows
+  // Quick server rows (full settings on SETTINGS tab)
   for (int idx = 0; idx < 4; ++idx) {
     int y = 84 + idx * 36;
     if (px >= setX + 4 && px <= setX + setW - 4 && py >= y - 4 && py <= y + 26) {
@@ -222,12 +438,18 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
       else if (idx == 1) s.svLan = !s.svLan;
       else if (idx == 2) s.p2p = !s.p2p;
       else if (idx == 3) s.p2pFriends = !s.p2pFriends;
-      s.status = "SETTING TOGGLED";
+      s.status = "SERVER SETTING";
       return true;
     }
   }
 
-  // START GAME button
+  // Link to full settings
+  if (px >= setX + 8 && px <= setX + setW - 8 && py >= 240 && py <= 270) {
+    s.page = WebUIPage::Settings;
+    s.status = "GMOD GRAPHICS + ENGINE";
+    return true;
+  }
+
   int by = UI_H - 70;
   if (px >= setX + 12 && px <= setX + setW - 12 && py >= by && py <= by + 44) {
     s.focusCol = 3;
@@ -244,16 +466,25 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
     return;
   }
 
-  // Top-level page tabs: stick left/right when focusCol special? Use stickX at focus -1
-  // Simpler: stickX cycles pages when on NewGame focusCol wraps, or dedicated
-  // Page switch: stickX while holding "tab" — use stickX when focusCol is at edge with wrap to page
-  // Better: explicit focusCol -1 for tabs via stickY up from col0
-  // Commands: page_newgame / page_addons via file; also stickX from tab row
-
-  // Tab row navigation: if stickY up from top of list, enter tab mode (focusCol = -1)
-  // For simplicity: stickX with focusCol==0 and stickY==0 double... 
-  // Use: when stickX and focusCol==3 and stickX>0 -> Addons page
-  //      when on Addons stickX left at edge -> NewGame
+  if (s.page == WebUIPage::Settings) {
+    if (stickX < 0) {
+      s.page = WebUIPage::Addons;
+      s.status = "ADDONS";
+      return;
+    }
+    if (stickX > 0) {
+      s.page = WebUIPage::NewGame;
+      s.status = "NEW GAME";
+      return;
+    }
+    if (stickY < 0) s.settingsRow = std::max(0, s.settingsRow - 1);
+    if (stickY > 0) s.settingsRow = std::min(SR_COUNT - 1, s.settingsRow + 1);
+    // keep row visible
+    if (s.settingsRow < s.settingsScroll) s.settingsScroll = s.settingsRow;
+    if (s.settingsRow >= s.settingsScroll + 12) s.settingsScroll = s.settingsRow - 11;
+    if (triggerEdge) WebUI_CycleSetting(s, s.settingsRow, 1);
+    return;
+  }
 
   if (s.page == WebUIPage::NewGame) {
     if (s.categories.empty()) return;
@@ -262,7 +493,7 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
     if (stickX > 0) {
       if (s.focusCol >= 3) {
         s.page = WebUIPage::Addons;
-        s.status = "ADDON MANAGER (WEBUI SUBSCRIBED REVERSE)";
+        s.status = "ADDON MANAGER";
         return;
       }
       s.focusCol = std::min(3, s.focusCol + 1);
@@ -298,6 +529,11 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
     s.status = "NEW GAME";
     return;
   }
+  if (stickX > 0) {
+    s.page = WebUIPage::Settings;
+    s.status = "GMOD GRAPHICS + ENGINE";
+    return;
+  }
   if (s.addons.addons.empty()) return;
   if (stickY < 0) {
     s.addons.selected = std::max(0, s.addons.selected - 1);
@@ -320,14 +556,16 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
 
 static void DrawNav(unsigned char* rgba, WebUIPage page) {
   FillRect(rgba, 0, 0, UI_W, 44, 196, 30, 58, 255);
-  // Tabs like menu.html NavBar
   bool ng = page == WebUIPage::NewGame;
   bool ad = page == WebUIPage::Addons;
+  bool st = page == WebUIPage::Settings;
   FillRect(rgba, 8, 6, 160, 32, ng ? 40 : 120, ng ? 12 : 20, ng ? 18 : 40, 255);
   DrawText(rgba, 20, 14, "NEW GAME", 255, 240, 244, 2);
   FillRect(rgba, 180, 6, 140, 32, ad ? 40 : 120, ad ? 12 : 20, ad ? 18 : 40, 255);
   DrawText(rgba, 196, 14, "ADDONS", 255, 240, 244, 2);
-  DrawText(rgba, 340, 14, "CUBE WEBUI NATIVE", 255, 200, 210, 1);
+  FillRect(rgba, 332, 6, 160, 32, st ? 40 : 120, st ? 12 : 20, st ? 18 : 40, 255);
+  DrawText(rgba, 348, 14, "SETTINGS", 255, 240, 244, 2);
+  DrawText(rgba, 520, 14, "GMOD NATIVE GFX", 255, 200, 210, 1);
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
@@ -415,7 +653,37 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     return;
   }
 
-  // --- New Game page (existing 3-col) ---
+  // --- Settings page (GMod native graphics + engine) ---
+  if (s.page == WebUIPage::Settings) {
+    FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, 28, 10, 16, 255);
+    DrawText(rgba, 20, 58, "GMOD / SOURCE GRAPHICS  ·  TRIGGER CYCLES  ·  L/R CLICK", 200, 150, 165, 1);
+    char line[96];
+    const int visible = 12;
+    const int rowH = 32;
+    int start = std::max(0, std::min(s.settingsScroll, SR_COUNT - 1));
+    for (int n = 0; n < visible; ++n) {
+      int i = start + n;
+      if (i >= SR_COUNT) break;
+      int y = 72 + n * rowH;
+      bool foc = (i == s.settingsRow);
+      if (foc) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 100, 24, 40, 255);
+      else if (n % 2) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 36, 12, 18, 255);
+      FormatSettingRow(s, i, line, sizeof(line));
+      DrawText(rgba, 28, y + 8, line, 255, 240, 244, 1);
+    }
+    snprintf(line, sizeof(line), "APPLIED ON START VIA gvrmod_cube.cfg + -w/-h");
+    DrawText(rgba, 20, UI_H - 48, line, 160, 120, 130, 1);
+    DrawText(rgba, 20, UI_H - 28, s.status.c_str(), 200, 150, 165, 1);
+    if ((cursor && cursor->visible) || s.cursorVisible) {
+      int cx = cursor ? cursor->x : s.cursorX;
+      int cy = cursor ? cursor->y : s.cursorY;
+      FillRect(rgba, cx - 10, cy - 2, 20, 4, 255, 70, 100, 255);
+      FillRect(rgba, cx - 2, cy - 10, 4, 20, 255, 70, 100, 255);
+    }
+    return;
+  }
+
+  // --- New Game page (3-col) ---
   const int catW = 180, mapX = 188, mapW = 500, setX = 700, setW = 250;
   FillRect(rgba, 8, 52, catW, UI_H - 60, 28, 10, 16, 255);
   FillRect(rgba, mapX, 52, mapW, UI_H - 60, 36, 12, 18, 255);
@@ -446,7 +714,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     }
   }
 
-  DrawText(rgba, setX + 8, 60, "SETTINGS", 200, 150, 165, 1);
+  DrawText(rgba, setX + 8, 60, "SERVER", 200, 150, 165, 1);
   char line[96];
   auto row = [&](int idx, const char* label) {
     int y = 84 + idx * 36;
@@ -460,6 +728,13 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   row(2, s.p2p ? "P2P ON" : "P2P OFF");
   row(3, s.p2pFriends ? "P2P FRIENDS ON" : "P2P FRIENDS OFF");
 
+  // Graphics summary + jump to Settings
+  FillRect(rgba, setX + 8, 236, setW - 16, 56, 60, 16, 28, 255);
+  snprintf(line, sizeof(line), "GFX %s", PresetLabel(s.gfx.preset));
+  DrawText(rgba, setX + 16, 244, line, 255, 200, 210, 1);
+  snprintf(line, sizeof(line), "%dx%d  AA%d", s.gfx.winW, s.gfx.winH, s.gfx.matAntialias);
+  DrawText(rgba, setX + 16, 266, line, 200, 150, 165, 1);
+
   int by = UI_H - 70;
   bool startFoc = (s.focusCol == 3);
   FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? 255 : 196, startFoc ? 60 : 30, 58, 255);
@@ -467,10 +742,9 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
 
   DrawText(rgba, 12, UI_H - 22, s.status.c_str(), 200, 150, 165, 1);
   char sel[128];
-  snprintf(sel, sizeof(sel), "SEL %s  | AIM LASER + TRIGGER", WebUI_SelectedMap(s).c_str());
+  snprintf(sel, sizeof(sel), "SEL %s  | SETTINGS TAB = GRAPHICS", WebUI_SelectedMap(s).c_str());
   DrawText(rgba, mapX + 8, UI_H - 22, sel, 255, 70, 100, 1);
 
-  // Laser crosshair on panel
   if ((cursor && cursor->visible) || s.cursorVisible) {
     int cx = cursor ? cursor->x : s.cursorX;
     int cy = cursor ? cursor->y : s.cursorY;

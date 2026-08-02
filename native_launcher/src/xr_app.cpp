@@ -764,6 +764,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (std::strncmp(buf, "quit", 4) == 0) ui.wantQuit = true;
       if (std::strncmp(buf, "addons", 6) == 0) { ui.page = WebUIPage::Addons; }
       if (std::strncmp(buf, "newgame", 7) == 0) { ui.page = WebUIPage::NewGame; }
+      if (std::strncmp(buf, "settings", 8) == 0) { ui.page = WebUIPage::Settings; }
       if (std::strncmp(buf, "reset", 5) == 0) {
         ResetPanelPoseFromConfig();
         grabbing = false;
@@ -820,6 +821,22 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       lr.p2p = ui.p2p;
       lr.p2pFriends = ui.p2pFriends;
       lr.gamemode = ui.gamemode;
+      lr.winW = ui.gfx.winW;
+      lr.winH = ui.gfx.winH;
+      lr.windowed = ui.gfx.windowed;
+      lr.noborder = ui.gfx.noborder;
+      lr.gfx.matPicmip = ui.gfx.matPicmip;
+      lr.gfx.rRootLod = ui.gfx.rRootLod;
+      lr.gfx.matAntialias = ui.gfx.matAntialias;
+      lr.gfx.matForceAniso = ui.gfx.matForceAniso;
+      lr.gfx.matHdrLevel = ui.gfx.matHdrLevel;
+      lr.gfx.shadows = ui.gfx.shadows;
+      lr.gfx.flashlightShadows = ui.gfx.flashlightShadows;
+      lr.gfx.specular = ui.gfx.specular;
+      lr.gfx.bumpmap = ui.gfx.bumpmap;
+      lr.gfx.waterExpensive = ui.gfx.waterExpensive;
+      lr.gfx.multicore = ui.gfx.multicore;
+      lr.gfx.fpsMax = ui.gfx.fpsMax;
       if (const char* xr = getenv("XR_RUNTIME_JSON")) lr.xrRuntimeJson = xr;
       ClearCubeHandoffMarkers(gmodRoot);
       std::string err;
