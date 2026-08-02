@@ -2,24 +2,25 @@
 # =============================================================================
 # gVRMod OpenXR launcher  (HL2VR-inspired: bg map + auto VR)
 #
-# Crash fixes:
-#   • NEVER put garrysmod/lua/bin on LD_LIBRARY_PATH (install.sh's private
-#     libc.so.6 there → SIGSEGV at SDL/GL init).
-#   • Native hl2.sh needs Steam Runtime x86_64 libs for libssl.so.1.0.0.
-#   • OpenXR: XR_RUNTIME_JSON + ~/.config/openxr/1/active_runtime.json
-#   • Lua force-start: data/vrmod/openxr_launch.txt marker
+# Default: steam -applaunch (correct GPU/GLX under Wayland/X11).
+# Native hl2.sh is --native only (fragile; needs ssl-only path, no RT GL libs).
+#
+# Crash lessons:
+#   • Never put garrysmod/lua/bin on LD_LIBRARY_PATH (private libc → SIGSEGV).
+#   • Never put steam-runtime/usr/lib on LD_LIBRARY_PATH (old GLX → no visual).
+#   • Forced SDL_VIDEODRIVER=x11 on Wayland → "Couldn't find matching GLX visual".
+#   • OpenXR works via active_runtime.json even when Steam drops env.
+#   • Lua force-start via data/vrmod/openxr_launch.txt marker.
 #
 # Usage:
-#   ./scripts/gvrmod_launcher.sh                 # default: native hl2.sh
-#   ./scripts/gvrmod_launcher.sh --steam         # steam -applaunch (reliable)
+#   ./scripts/gvrmod_launcher.sh                 # steam + bg map gm_construct
+#   ./scripts/gvrmod_launcher.sh --native        # hl2.sh (advanced)
 #   ./scripts/gvrmod_launcher.sh --map gm_flatgrass
-#   ./scripts/gvrmod_launcher.sh --play-map      # full +map (not background)
+#   ./scripts/gvrmod_launcher.sh --play-map
 #   ./scripts/gvrmod_launcher.sh --hub
 #   ./scripts/gvrmod_launcher.sh -- %command%    # Steam Launch Options wrapper
 # =============================================================================
 set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 resolve_gmod() {
   local c
@@ -35,8 +36,9 @@ resolve_gmod() {
   return 1
 }
 
-resolve_steam_runtime_x64() {
-  local base lib usr
+# Only the directory that holds OpenSSL 1.0 — NOT usr/lib (breaks GLX)
+resolve_ssl_libdir() {
+  local base lib
   for base in \
     "$HOME/.local/share/Steam/ubuntu12_32/steam-runtime" \
     "$HOME/.steam/steam/ubuntu12_32/steam-runtime" \
@@ -44,13 +46,24 @@ resolve_steam_runtime_x64() {
     "$HOME/.local/share/Steam/steamapps/common/SteamLinuxRuntime/steam-runtime"
   do
     lib="$base/lib/x86_64-linux-gnu"
-    usr="$base/usr/lib/x86_64-linux-gnu"
-    if [[ -f "$lib/libssl.so.1.0.0" || -f "$usr/libssl.so.1.0.0" ]]; then
-      echo "$lib:$usr"
+    if [[ -f "$lib/libssl.so.1.0.0" && -f "$lib/libcrypto.so.1.0.0" ]]; then
+      echo "$lib"
       return 0
     fi
   done
   return 1
+}
+
+# Stage only ssl/crypto into GMod data so we never pull RT libGL/libX11
+stage_ssl_only() {
+  local src="$1" dest="$2"
+  mkdir -p "$dest"
+  ln -sfn "$src/libssl.so.1.0.0" "$dest/libssl.so.1.0.0"
+  ln -sfn "$src/libcrypto.so.1.0.0" "$dest/libcrypto.so.1.0.0"
+  # common soname aliases some loaders probe
+  [[ -e "$src/libssl.so.1.0" ]] && ln -sfn "$src/libssl.so.1.0" "$dest/libssl.so.1.0" || true
+  [[ -e "$src/libcrypto.so.1.0" ]] && ln -sfn "$src/libcrypto.so.1.0" "$dest/libcrypto.so.1.0" || true
+  echo "$dest"
 }
 
 GMOD="$(resolve_gmod)" || {
@@ -61,9 +74,10 @@ GMOD="$(resolve_gmod)" || {
 APPID=4000
 MAP="gm_construct"
 USE_MAP=1
-MAP_MODE="background"   # background | full | none
-MODE="menu"             # menu | hub
-FORCE_STEAM=0
+MAP_MODE="background"
+MODE="menu"
+# Default STEAM: reliable display stack. --native for hl2.sh.
+USE_STEAM=1
 NO_WIVRN=0
 EXTRA_ARGS=()
 WRAPPER=0
@@ -75,19 +89,14 @@ while [[ $# -gt 0 ]]; do
     --play-map|--full-map) MAP_MODE="full"; USE_MAP=1; MAP="${MAP:-gm_construct}"; shift ;;
     --background|--bg) MAP_MODE="background"; USE_MAP=1; MAP="${MAP:-gm_construct}"; shift ;;
     --hub)
-      MODE="hub"
-      MAP_MODE="full"
-      USE_MAP=1
-      MAP="${MAP:-gm_construct}"
-      shift
-      ;;
+      MODE="hub"; MAP_MODE="full"; USE_MAP=1; MAP="${MAP:-gm_construct}"; shift ;;
     --menu) MODE="menu"; MAP_MODE="background"; shift ;;
-    --steam) FORCE_STEAM=1; shift ;;
-    --native) FORCE_STEAM=0; shift ;;
+    --steam) USE_STEAM=1; shift ;;
+    --native) USE_STEAM=0; shift ;;
     --no-wivrn) NO_WIVRN=1; shift ;;
     --gmod-dir) GMOD="$2"; shift 2 ;;
     --) shift; EXTRA_ARGS+=("$@"); WRAPPER=1; break ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
@@ -99,7 +108,7 @@ if [[ "$MODE" == "hub" ]]; then
   MAP_MODE="full"; MAP="${MAP:-gm_construct}"; USE_MAP=1
 fi
 
-# ── OpenXR ──────────────────────────────────────────────────────────────────
+# ── OpenXR (works without process env if active_runtime is set) ─────────────
 XR_JSON="${XR_RUNTIME_JSON:-}"
 if [[ -z "$XR_JSON" ]]; then
   for c in \
@@ -118,54 +127,38 @@ export XR_RUNTIME_JSON="$XR_JSON"
 mkdir -p "$HOME/.config/openxr/1"
 ln -sfn "$XR_RUNTIME_JSON" "$HOME/.config/openxr/1/active_runtime.json"
 
-# ── LD_LIBRARY_PATH: steam openssl ONLY — never lua/bin, never bare /usr/lib ─
-# lua/bin has private libc → SIGSEGV. OpenXR runtime is found via JSON path.
-STEAM_RT_X64="$(resolve_steam_runtime_x64 || true)"
-LIB_PATHS=()
-# Only WiVRn dir if needed for non-JSON side deps (loader still uses JSON path)
-[[ -d /usr/lib/wivrn ]] && LIB_PATHS+=("/usr/lib/wivrn")
-[[ -d /usr/lib64/wivrn ]] && LIB_PATHS+=("/usr/lib64/wivrn")
-if [[ -n "$STEAM_RT_X64" ]]; then
-  # append so bin/linux64 (from hl2.sh) still wins for game libs
-  LIB_PATHS+=("${STEAM_RT_X64//:/ }")
-  # re-split properly
-  LIB_PATHS=()
-  [[ -d /usr/lib/wivrn ]] && LIB_PATHS+=("/usr/lib/wivrn")
-  [[ -d /usr/lib64/wivrn ]] && LIB_PATHS+=("/usr/lib64/wivrn")
-  IFS=':' read -r -a _sr <<< "$STEAM_RT_X64"
-  for p in "${_sr[@]}"; do
-    [[ -d "$p" ]] && LIB_PATHS+=("$p")
-  done
+# ── LD_LIBRARY_PATH: minimal (native only). Never lua/bin, never RT usr/lib ─
+# Clear any inherited garbage from a previous failed launch in this shell.
+if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+  case ":$LD_LIBRARY_PATH:" in
+    *"/garrysmod/lua/bin:"*|*"steam-runtime/usr/lib"*)
+      echo "[gVRMod] stripping unsafe paths from inherited LD_LIBRARY_PATH"
+      unset LD_LIBRARY_PATH
+      ;;
+  esac
 fi
 
-# Strip any caller-supplied bad paths
-CLEAN_LD="${LD_LIBRARY_PATH:-}"
-if [[ -n "$CLEAN_LD" ]]; then
-  CLEAN_LD="$(echo ":$CLEAN_LD:" | sed \
-    -e "s|:$GMOD/garrysmod/lua/bin:|:|g" \
-    -e "s|:${GMOD//\//\\/}/garrysmod/lua/bin:|:|g" \
-    -e 's|^:||;s|:$||;s|::*| :|g' | tr -s ':' | sed 's/^://;s/:$//')"
+SSL_LIBDIR="$(resolve_ssl_libdir || true)"
+SSL_STAGE=""
+if [[ -n "$SSL_LIBDIR" ]]; then
+  SSL_STAGE="$(stage_ssl_only "$SSL_LIBDIR" "$GMOD/garrysmod/data/vrmod/native_ssl")"
 fi
 
-NEW_LD=""
-if [[ ${#LIB_PATHS[@]} -gt 0 ]]; then
-  NEW_LD="$(IFS=:; echo "${LIB_PATHS[*]}")"
+# Native-only path: ssl stage only (OpenXR JSON finds wivrn without LD path)
+NATIVE_LD=""
+if [[ -n "$SSL_STAGE" ]]; then
+  NATIVE_LD="$SSL_STAGE"
 fi
-if [[ -n "$CLEAN_LD" ]]; then
-  NEW_LD="${NEW_LD:+$NEW_LD:}$CLEAN_LD"
-fi
-export LD_LIBRARY_PATH="${NEW_LD:-}"
 
 export SteamAppId="$APPID"
 export SteamGameId="$APPID"
 export SteamOverlayGameId="$APPID"
 echo "$APPID" > "$GMOD/steam_appid.txt" 2>/dev/null || true
 
-# Wayland SDL often crashes Source — prefer X11
-if [[ "${GVMOD_ALLOW_WAYLAND:-0}" != "1" ]]; then
-  if [[ "${XDG_SESSION_TYPE:-}" == "wayland" || -n "${WAYLAND_DISPLAY:-}" ]]; then
-    export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}"
-  fi
+# Do NOT force SDL_VIDEODRIVER=x11 — that caused "Couldn't find matching GLX visual"
+# under Wayland. Let SDL/Steam pick (wayland or x11). Override: GVMOD_SDL_VIDEODRIVER=x11
+if [[ -n "${GVMOD_SDL_VIDEODRIVER:-}" ]]; then
+  export SDL_VIDEODRIVER="$GVMOD_SDL_VIDEODRIVER"
 fi
 
 # ── WiVRn ───────────────────────────────────────────────────────────────────
@@ -224,6 +217,12 @@ CFG
   MARKER_MODE="menu"
 fi
 
+# Also pin into autoexec so Steam dropping +exec still loads menu cfg once
+if [[ ! -f "$CFG_DIR/autoexec.cfg" ]] || ! grep -q 'gvrmod_menu\|gvrmod_hub' "$CFG_DIR/autoexec.cfg" 2>/dev/null; then
+  # Don't permanently force — use a one-shot companion file executed by marker only
+  :
+fi
+
 cat > "$DATA_DIR/openxr_launch.txt" <<EOF
 mode=${MARKER_MODE}
 prefer_backend=openxr
@@ -250,16 +249,15 @@ echo "[gVRMod] OpenXR launcher"
 echo "  GMOD=$GMOD"
 echo "  XR_RUNTIME_JSON=$XR_RUNTIME_JSON"
 echo "  mode=$MODE map=$MAP map_mode=$MAP_MODE"
+echo "  launch=$( [[ "$USE_STEAM" == "1" ]] && echo steam || echo native )"
 echo "  marker=$DATA_DIR/openxr_launch.txt"
-echo "  LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-<empty>}"
-echo "  SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-<default>}"
-echo "  steam_rt_ssl=${STEAM_RT_X64:-MISSING — native may fail to load engine}"
+echo "  SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-<auto>}"
+echo "  ssl_stage=${SSL_STAGE:-none}"
 
 if [[ ! -f "$GMOD/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll" ]]; then
   echo "[gVRMod] WARN: gmcl_vrmod_xr_linux64.dll missing — run ./install.sh" >&2
 fi
 
-# Drop stale Source lock from prior crashes
 rm -f /tmp/source_engine_*.lock 2>/dev/null || true
 
 # ── Steam Launch Options wrapper ────────────────────────────────────────────
@@ -272,39 +270,58 @@ if [[ "$WRAPPER" == "1" || ${#EXTRA_ARGS[@]} -gt 0 ]]; then
   [[ "$has_exec" == "0" ]] && CMD+=(+exec "$EXEC_CFG")
   append_map_args CMD
   echo "[gVRMod] exec wrapper: ${CMD[*]}"
-  exec env \
+  # Wrapper: only XR env, no polluted LD_LIBRARY_PATH
+  exec env -u LD_LIBRARY_PATH \
     XR_RUNTIME_JSON="$XR_RUNTIME_JSON" \
-    ${LD_LIBRARY_PATH:+LD_LIBRARY_PATH="$LD_LIBRARY_PATH"} \
     ${SDL_VIDEODRIVER:+SDL_VIDEODRIVER="$SDL_VIDEODRIVER"} \
     SteamAppId="$APPID" \
     SteamGameId="$APPID" \
     "${CMD[@]}"
 fi
 
-# ── Native hl2.sh ───────────────────────────────────────────────────────────
-if [[ "$FORCE_STEAM" != "1" && -x "$GMOD/hl2.sh" ]]; then
-  if [[ -z "$STEAM_RT_X64" ]]; then
-    echo "[gVRMod] WARN: no Steam Runtime libssl.so.1.0.0 — falling back to steam -applaunch" >&2
-    FORCE_STEAM=1
-  else
-    cd "$GMOD"
-    NATIVE=(./hl2.sh -game garrysmod -novid -windowed -w 1280 -h 720 +exec "$EXEC_CFG")
-    append_map_args NATIVE
-    echo "[gVRMod] native: ${NATIVE[*]}"
-    exec env \
-      XR_RUNTIME_JSON="$XR_RUNTIME_JSON" \
-      LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
-      ${SDL_VIDEODRIVER:+SDL_VIDEODRIVER="$SDL_VIDEODRIVER"} \
-      SteamAppId="$APPID" \
-      SteamGameId="$APPID" \
-      SteamOverlayGameId="$APPID" \
-      "${NATIVE[@]}"
+# ── Default: steam -applaunch (correct GLX / Wayland / drivers) ─────────────
+if [[ "$USE_STEAM" == "1" ]]; then
+  if ! command -v steam >/dev/null 2>&1; then
+    echo "[gVRMod] steam not in PATH — trying native" >&2
+    USE_STEAM=0
   fi
 fi
 
-# ── steam -applaunch (marker + active_runtime still drive OpenXR/VR) ────────
-echo "[gVRMod] steam -applaunch (OpenXR via active_runtime.json; VR via marker)"
-LAUNCH=(steam -applaunch "$APPID" -novid +exec "$EXEC_CFG")
-append_map_args LAUNCH
-# Steam often ignores env; XR still works via active_runtime symlink
-exec "${LAUNCH[@]}"
+if [[ "$USE_STEAM" == "1" ]]; then
+  echo "[gVRMod] steam -applaunch (OpenXR via active_runtime.json; VR via marker)"
+  # Ensure Steam is up so applaunch doesn't hang silently
+  if ! pgrep -x steam >/dev/null 2>&1 && ! pgrep -f 'steam\.sh|ubuntu12_32/steam' >/dev/null 2>&1; then
+    echo "[gVRMod] starting Steam…"
+    steam -silent >/tmp/gvrmod-steam.log 2>&1 &
+    sleep 3
+  fi
+  LAUNCH=(steam -applaunch "$APPID" -novid +exec "$EXEC_CFG")
+  append_map_args LAUNCH
+  echo "[gVRMod] cmd: ${LAUNCH[*]}"
+  # Do not pass LD_LIBRARY_PATH into Steam (corrupts client + game)
+  exec env -u LD_LIBRARY_PATH \
+    XR_RUNTIME_JSON="$XR_RUNTIME_JSON" \
+    "${LAUNCH[@]}"
+fi
+
+# ── Native hl2.sh (--native) ────────────────────────────────────────────────
+if [[ ! -x "$GMOD/hl2.sh" ]]; then
+  echo "[gVRMod] ERROR: no hl2.sh and steam path failed" >&2
+  exit 1
+fi
+
+cd "$GMOD"
+# No fixed -w/-h (can break GLX visual). Let engine choose.
+NATIVE=(./hl2.sh -game garrysmod -novid +exec "$EXEC_CFG")
+append_map_args NATIVE
+echo "[gVRMod] native: ${NATIVE[*]}"
+echo "[gVRMod] native LD_LIBRARY_PATH=${NATIVE_LD:-<empty>}"
+
+exec env -u LD_LIBRARY_PATH \
+  XR_RUNTIME_JSON="$XR_RUNTIME_JSON" \
+  ${NATIVE_LD:+LD_LIBRARY_PATH="$NATIVE_LD"} \
+  ${SDL_VIDEODRIVER:+SDL_VIDEODRIVER="$SDL_VIDEODRIVER"} \
+  SteamAppId="$APPID" \
+  SteamGameId="$APPID" \
+  SteamOverlayGameId="$APPID" \
+  "${NATIVE[@]}"
