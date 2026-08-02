@@ -4,6 +4,8 @@
 #include <GL/glx.h>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <vector>
 
 static PFNGLGENFRAMEBUFFERSPROC glGenFramebuffers_ = nullptr;
 static PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer_ = nullptr;
@@ -36,13 +38,23 @@ GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
   glBindTexture(GL_TEXTURE_2D, t);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  // Allocate empty then upload flipped via GlUpdateRgbaTex
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  if (rgba) GlUpdateRgbaTex(t, w, h, rgba);
   return t;
 }
 
 void GlUpdateRgbaTex(GLuint tex, int w, int h, const void* rgba) {
+  // Flip Y on upload: CPU buffer y=0 is top; GL expects first row at bottom
+  // without flip, UI appears inverted in headset (ADB-confirmed).
+  static std::vector<unsigned char> flip;
+  const size_t row = (size_t)w * 4;
+  flip.resize(row * (size_t)h);
+  const auto* src = static_cast<const unsigned char*>(rgba);
+  for (int y = 0; y < h; ++y)
+    std::memcpy(flip.data() + (size_t)(h - 1 - y) * row, src + (size_t)y * row, row);
   glBindTexture(GL_TEXTURE_2D, tex);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, flip.data());
 }
 
 // View matrix from OpenXR eye pose (pose = eye in WORLD).
@@ -121,8 +133,7 @@ void GlDrawWorldPanel(GLuint tex) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // CPU raster y=0 is top of UI. glTexImage2D: first row is V=0.
-  // Top panel edge (tl/tr, +up) samples UI top → V=0.
+  // After Y-flip upload: V=0 is UI top. Panel top (tl/tr) → V=0.
   glBegin(GL_QUADS);
   glTexCoord2f(0.f, 1.f);
   glVertex3f(bl.x, bl.y, bl.z);
