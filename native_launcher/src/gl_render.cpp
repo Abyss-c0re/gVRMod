@@ -89,12 +89,15 @@ void GlDrawWorldPanel(GLuint tex) {
   const auto& wp = WorldPanelState();
   if (!wp.ready) return;
   const auto& cfg = PanelCfgConst();
-  const float hw = cfg.halfW, hh = cfg.halfH;
+  // Prefer frozen panel size (meters); fall back to conf
+  const float hw = (wp.widthM > 0.05f) ? wp.widthM * 0.5f : cfg.halfW;
+  const float hh = (wp.heightM > 0.05f) ? wp.heightM * 0.5f : cfg.halfH;
   Vec3 bl = wp.c - wp.right * hw - wp.up * hh;
   Vec3 br = wp.c + wp.right * hw - wp.up * hh;
   Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
   Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
   glDisable(GL_CULL_FACE);
+  glDisable(GL_DEPTH_TEST); // always on top of clear, never lost behind floor
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_TEXTURE_2D);
@@ -109,6 +112,7 @@ void GlDrawWorldPanel(GLuint tex) {
   glDisable(GL_TEXTURE_2D);
   glColor4f(1, 1, 1, 1);
   glDisable(GL_BLEND);
+  glEnable(GL_DEPTH_TEST);
 }
 
 void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb) {

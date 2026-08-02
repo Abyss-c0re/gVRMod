@@ -160,7 +160,19 @@ bool ShellInputLocateAim(const XrApi& api, XrSession session, const ShellInput& 
   XrResult r = api.locateSpace ? api.locateSpace(in.aimSpace, base, time, &loc)
                                : xrLocateSpace(in.aimSpace, base, time, &loc);
   if (r != XR_SUCCESS) return false;
-  if (!(loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)) return false;
+  // Untracked often returns origin (0,0,0) — ray from room center. Reject that.
+  const XrSpaceLocationFlags need =
+      XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT |
+      XR_SPACE_LOCATION_POSITION_TRACKED_BIT | XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+  if ((loc.locationFlags & need) != need) {
+    // Soft fallback: valid only (some runtimes omit TRACKED briefly)
+    const XrSpaceLocationFlags soft =
+        XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+    if ((loc.locationFlags & soft) != soft) return false;
+    // Still reject near-origin untracked junk
+    float px = loc.pose.position.x, py = loc.pose.position.y, pz = loc.pose.position.z;
+    if (px * px + py * py + pz * pz < 1e-6f) return false;
+  }
   *outPose = loc.pose;
   return true;
 }
