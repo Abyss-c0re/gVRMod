@@ -23,13 +23,33 @@ bool GlBindSwapchainFbo(GLuint colorTex, GLuint* fboOut) {
   if (!glGenFramebuffers_ || !glBindFramebuffer_ || !glFramebufferTexture2D_) return false;
   if (fboOut && !*fboOut) glGenFramebuffers_(1, fboOut);
   if (!fboOut || !*fboOut) return false;
-  glBindFramebuffer_((GLenum)0x8D40 /*GL_FRAMEBUFFER*/, *fboOut);
-  glFramebufferTexture2D_((GLenum)0x8D40, (GLenum)0x8CE0 /*COLOR0*/, GL_TEXTURE_2D, colorTex, 0);
+  glBindFramebuffer_((GLenum)0x8D40, *fboOut);
+  glFramebufferTexture2D_((GLenum)0x8D40, (GLenum)0x8CE0, GL_TEXTURE_2D, colorTex, 0);
   return true;
 }
 
 void GlUnbindFbo() {
   if (glBindFramebuffer_) glBindFramebuffer_((GLenum)0x8D40, 0);
+}
+
+// ADB Quest: UI appeared 180° rotated on panel. Rotate buffer 180 on every upload.
+static void UploadRgbaRotated180(GLuint tex, int w, int h, const void* rgba) {
+  static std::vector<unsigned char> rot;
+  const size_t n = (size_t)w * (size_t)h * 4;
+  rot.resize(n);
+  const auto* s = static_cast<const unsigned char*>(rgba);
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      const int si = (y * w + x) * 4;
+      const int di = ((h - 1 - y) * w + (w - 1 - x)) * 4;
+      rot[di + 0] = s[si + 0];
+      rot[di + 1] = s[si + 1];
+      rot[di + 2] = s[si + 2];
+      rot[di + 3] = s[si + 3];
+    }
+  }
+  glBindTexture(GL_TEXTURE_2D, tex);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rot.data());
 }
 
 GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
@@ -38,23 +58,20 @@ GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
   glBindTexture(GL_TEXTURE_2D, t);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  if (rgba) UploadRgbaRotated180(t, w, h, rgba);
   return t;
 }
 
 void GlUpdateRgbaTex(GLuint tex, int w, int h, const void* rgba) {
-  glBindTexture(GL_TEXTURE_2D, tex);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  UploadRgbaRotated180(tex, w, h, rgba);
 }
 
-// View matrix from OpenXR eye pose (pose = eye in WORLD).
-// world_from_eye = T(p) * R(q);  view = inverse = R^T * T(-p)
 void GlLoadModelviewLocal(const XrPosef& eyeWorld) {
   const float x = eyeWorld.orientation.x;
   const float y = eyeWorld.orientation.y;
   const float z = eyeWorld.orientation.z;
   const float w = eyeWorld.orientation.w;
-  // R = rotation world ← eye (columns = eye axes in world)
   const float r00 = 1.f - 2.f * (y * y + z * z);
   const float r01 = 2.f * (x * y - z * w);
   const float r02 = 2.f * (x * z + y * w);
@@ -64,24 +81,14 @@ void GlLoadModelviewLocal(const XrPosef& eyeWorld) {
   const float r20 = 2.f * (x * z - y * w);
   const float r21 = 2.f * (y * z + x * w);
   const float r22 = 1.f - 2.f * (x * x + y * y);
-
   const float px = eyeWorld.position.x;
   const float py = eyeWorld.position.y;
   const float pz = eyeWorld.position.z;
-  // -R^T * p
   const float tx = -(r00 * px + r10 * py + r20 * pz);
   const float ty = -(r01 * px + r11 * py + r21 * pz);
   const float tz = -(r02 * px + r12 * py + r22 * pz);
-
-  // Column-major OpenGL: upper 3x3 = R^T
-  // R^T = | r00 r10 r20 |
-  //       | r01 r11 r21 |
-  //       | r02 r12 r22 |
   const float M[16] = {
-      r00, r01, r02, 0.f, // col0
-      r10, r11, r12, 0.f, // col1
-      r20, r21, r22, 0.f, // col2
-      tx,  ty,  tz,  1.f,
+      r00, r01, r02, 0.f, r10, r11, r12, 0.f, r20, r21, r22, 0.f, tx, ty, tz, 1.f,
   };
   glMatrixMode(GL_MODELVIEW);
   glLoadMatrixf(M);
@@ -90,39 +97,30 @@ void GlLoadModelviewLocal(const XrPosef& eyeWorld) {
 void GlLoadProjectionFov(const XrFovf& fov, float nearZ, float farZ) {
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  // OpenXR FOV angles: tan of half-angles from optical axis (can be asymmetric)
-  const float tanL = tanf(fov.angleLeft);
-  const float tanR = tanf(fov.angleRight);
-  const float tanU = tanf(fov.angleUp);
-  const float tanD = tanf(fov.angleDown);
-  // angleLeft is typically negative; use as OpenXR specifies
-  const float L = tanL * nearZ;
-  const float Rgt = tanR * nearZ;
-  float B = tanD * nearZ;
-  float T = tanU * nearZ;
+  const float L = tanf(fov.angleLeft) * nearZ;
+  const float Rgt = tanf(fov.angleRight) * nearZ;
+  float B = tanf(fov.angleDown) * nearZ;
+  float T = tanf(fov.angleUp) * nearZ;
   if (B > T) {
     const float tmp = B;
     B = T;
     T = tmp;
   }
-  // ADB Quest: UI Y-inverted vs passthrough — flip frustum Y
-  glFrustum(L, Rgt, T, B, nearZ, farZ);
+  // Standard OpenXR→GL frustum (no Y flip — 180° handled in texture)
+  glFrustum(L, Rgt, B, T, nearZ, farZ);
 }
 
 void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
+  (void)eyeWorld;
   const auto& wp = WorldPanelState();
   if (!wp.ready) return;
   const auto& cfg = PanelCfgConst();
   const float hw = (wp.widthM > 0.05f) ? wp.widthM * 0.5f : cfg.halfW;
   const float hh = (wp.heightM > 0.05f) ? wp.heightM * 0.5f : cfg.halfH;
-  // ADB Quest: with up=+Y, UI was still inverted on screen — swap geometric top/bottom.
-  const Vec3 bl = wp.c - wp.right * hw + wp.up * hh; // world-higher edge holds UI bottom after swap
-  const Vec3 br = wp.c + wp.right * hw + wp.up * hh;
-  const Vec3 tr = wp.c + wp.right * hw - wp.up * hh;
-  const Vec3 tl = wp.c - wp.right * hw - wp.up * hh;
-
-  const Vec3 eyeP = {eyeWorld.position.x, eyeWorld.position.y, eyeWorld.position.z};
-  const bool backFace = Dot(wp.c - eyeP, wp.normal) > 0.f;
+  const Vec3 bl = wp.c - wp.right * hw - wp.up * hh;
+  const Vec3 br = wp.c + wp.right * hw - wp.up * hh;
+  const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
+  const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
 
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
@@ -131,17 +129,16 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-
-  auto emit = [&](float u, float v, const Vec3& p) {
-    glTexCoord2f(backFace ? (1.f - u) : u, v);
-    glVertex3f(p.x, p.y, p.z);
-  };
-  // CPU y=0 top → GL V=0 first row. bl=UI bottom V=1, tl=UI top V=0 after geo swap.
+  // Texture is pre-rotated 180° on upload — standard mapping
   glBegin(GL_QUADS);
-  emit(0.f, 1.f, bl);
-  emit(1.f, 1.f, br);
-  emit(1.f, 0.f, tr);
-  emit(0.f, 0.f, tl);
+  glTexCoord2f(0.f, 0.f);
+  glVertex3f(bl.x, bl.y, bl.z);
+  glTexCoord2f(1.f, 0.f);
+  glVertex3f(br.x, br.y, br.z);
+  glTexCoord2f(1.f, 1.f);
+  glVertex3f(tr.x, tr.y, tr.z);
+  glTexCoord2f(0.f, 1.f);
+  glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
   glDisable(GL_TEXTURE_2D);
   glColor4f(1.f, 1.f, 1.f, 1.f);
