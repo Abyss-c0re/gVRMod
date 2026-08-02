@@ -489,7 +489,7 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.lastCursorQx = -9999;
   s.lastCursorQy = -9999;
   s.lastCursorVis = false;
-  s.paintSoftCursor = false; // laser is primary reticle
+  s.paintSoftCursor = true; // laser + soft crosshair (Quest feedback)
   s.categories = ScanGModMaps(gmodRoot);
   if (s.categories.empty()) {
     MapCategory c;
@@ -996,30 +996,30 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
 }
 
 static void DrawNav(unsigned char* rgba, WebUIPage page) {
-  FillRect(rgba, 0, 0, UI_W, 44, 196, 30, 58, 255);
+  FillRect(rgba, 0, 0, UI_W, 44, 36, 44, 62, 255);
   bool ng = page == WebUIPage::NewGame;
   bool ad = page == WebUIPage::Addons;
   bool st = page == WebUIPage::Settings;
   bool bd = page == WebUIPage::Bindings;
-  FillRect(rgba, 8, 6, 110, 32, ng ? 40 : 120, ng ? 12 : 20, ng ? 18 : 40, 255);
+  FillRect(rgba, 8, 6, 110, 32, ng ? 28 : 0, ng ? 34 : 140, ng ? 46 : 190, 255);
   DrawText(rgba, 16, 14, "NEW GAME", 255, 240, 244, 1);
-  FillRect(rgba, 128, 6, 100, 32, ad ? 40 : 120, ad ? 12 : 20, ad ? 18 : 40, 255);
+  FillRect(rgba, 128, 6, 100, 32, ad ? 28 : 0, ad ? 34 : 140, ad ? 46 : 190, 255);
   DrawText(rgba, 144, 14, "ADDONS", 255, 240, 244, 1);
-  FillRect(rgba, 238, 6, 120, 32, st ? 40 : 120, st ? 12 : 20, st ? 18 : 40, 255);
+  FillRect(rgba, 238, 6, 120, 32, st ? 28 : 0, st ? 34 : 140, st ? 46 : 190, 255);
   DrawText(rgba, 250, 14, "SETTINGS", 255, 240, 244, 1);
-  FillRect(rgba, 368, 6, 128, 32, bd ? 40 : 120, bd ? 12 : 20, bd ? 18 : 40, 255);
+  FillRect(rgba, 368, 6, 128, 32, bd ? 28 : 0, bd ? 34 : 140, bd ? 46 : 190, 255);
   DrawText(rgba, 384, 14, "BINDINGS", 255, 240, 244, 1);
-  FillRect(rgba, UI_W - 110, 6, 100, 32, 180, 20, 40, 255);
+  FillRect(rgba, UI_W - 110, 6, 100, 32, 180, 55, 55, 255);
   DrawText(rgba, UI_W - 92, 14, "CLOSE", 255, 255, 255, 2);
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
   // Full-panel seamless handoff (no black gap while GMod boots)
   if (s.handoff) {
-    FillRect(rgba, 0, 0, UI_W, UI_H, 8, 4, 10, 255);
-    FillRect(rgba, 0, 0, UI_W, 52, 196, 30, 58, 255);
+    FillRect(rgba, 0, 0, UI_W, UI_H, 14, 16, 22, 255);
+    FillRect(rgba, 0, 0, UI_W, 52, 36, 44, 62, 255);
     DrawText(rgba, 24, 16, "CUBE  ·  STARTING GMOD", 255, 240, 244, 2);
-    DrawText(rgba, 24, 80, "NO GAPS  ·  HOLDING OPENXR", 200, 150, 165, 1);
+    DrawText(rgba, 24, 80, "NO GAPS  ·  HOLDING OPENXR", 150, 165, 185, 1);
 
     char line[160];
     snprintf(line, sizeof(line), "MAP  %s", s.handoffMap.empty() ? "..." : s.handoffMap.c_str());
@@ -1027,7 +1027,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
 
     snprintf(line, sizeof(line), "PHASE  %s",
              s.handoffPhase.empty() ? "SPAWNING" : s.handoffPhase.c_str());
-    DrawText(rgba, 24, 180, line, 255, 70, 100, 2);
+    DrawText(rgba, 24, 180, line, 0, 220, 255, 2);
 
     if (!s.handoffDetail.empty())
       DrawText(rgba, 24, 220, s.handoffDetail.c_str(), 200, 180, 190, 1);
@@ -1037,31 +1037,31 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     float pulse = 0.35f + 0.65f * (0.5f + 0.5f * std::sin(t * 2.2f));
     int barW = UI_W - 48;
     int fill = (int)(barW * std::min(0.92f, 0.12f + t / 45.f));
-    FillRect(rgba, 24, 300, barW, 28, 40, 16, 24, 255);
-    FillRect(rgba, 24, 300, std::max(8, fill), 28, (int)(196 * pulse), 30, 58, 255);
+    FillRect(rgba, 24, 300, barW, 28, 42, 48, 62, 255);
+    FillRect(rgba, 24, 300, std::max(8, fill), 28, (int)(0 * pulse), (int)(180 * pulse), (int)(220 * pulse), 255);
 
     snprintf(line, sizeof(line), "%.0fs  ·  STAY IN VR UNTIL GMOD TAKES SESSION", t);
-    DrawText(rgba, 24, 350, line, 200, 150, 165, 1);
-    DrawText(rgba, 24, 400, "PASSTHROUGH STAYS  ·  WORLD PANEL STAYS", 160, 120, 130, 1);
-    DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 255, 200, 210, 1);
+    DrawText(rgba, 24, 350, line, 150, 165, 185, 1);
+    DrawText(rgba, 24, 400, "PASSTHROUGH STAYS  ·  WORLD PANEL STAYS", 120, 135, 155, 1);
+    DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 200, 230, 245, 1);
     return;
   }
 
-  FillRect(rgba, 0, 0, UI_W, UI_H, 12, 6, 10, 255);
+  FillRect(rgba, 0, 0, UI_W, UI_H, 18, 20, 26, 255);
   DrawNav(rgba, s.page);
 
   if (s.page == WebUIPage::Bindings) {
-    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 28, 10, 16, 255);
+    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 30, 34, 46, 255);
     const char* filters[] = {"ALL", "FOOT", "VEHICLE", "CUSTOM"};
     for (int f = 0; f < 4; ++f) {
       int x0 = 16 + f * 88;
       bool on = (s.bindings.filter == f);
-      FillRect(rgba, x0, 52, 82, 22, on ? 90 : 50, on ? 22 : 14, on ? 36 : 22, 255);
+      FillRect(rgba, x0, 52, 82, 22, on ? 0 : 50, on ? 130 : 58, on ? 180 : 74, 255);
       DrawText(rgba, x0 + 10, 56, filters[f], 255, 240, 244, 1);
     }
-    FillRect(rgba, UI_W - 320, 52, 100, 22, 60, 20, 40, 255);
+    FillRect(rgba, UI_W - 320, 52, 100, 22, 48, 56, 72, 255);
     DrawText(rgba, UI_W - 300, 56, "SAVE", 255, 240, 244, 1);
-    FillRect(rgba, UI_W - 200, 52, 180, 22, 80, 20, 30, 255);
+    FillRect(rgba, UI_W - 200, 52, 180, 22, 50, 70, 90, 255);
     DrawText(rgba, UI_W - 188, 56, "RESET DEFAULTS", 255, 240, 244, 1);
 
     std::vector<int> idx;
@@ -1078,7 +1078,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       if (it != s.bindings.actions.end()) rule = it->second;
       int y = 84 + n * rowH;
       bool sel = (k == s.bindings.selected);
-      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 100 : 40, sel ? 24 : 12, sel ? 40 : 18, 255);
+      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 20 : 42, sel ? 95 : 48, sel ? 130 : 62, 255);
       char line[96];
       snprintf(line, sizeof(line), "%.22s", info.label.c_str());
       DrawText(rgba, 20, y + 6, line, 255, 240, 244, 1);
@@ -1089,11 +1089,11 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       if (s1.size() > 14) s1 = s1.substr(0, 12) + "..";
       bool slot0 = (s.bindings.editSlot == 0 && sel);
       bool slot1 = (s.bindings.editSlot == 1 && sel);
-      FillRect(rgba, 20, y + 26, 140, 18, slot0 ? 120 : 55, slot0 ? 30 : 16, slot0 ? 50 : 28, 255);
+      FillRect(rgba, 20, y + 26, 140, 18, slot0 ? 0 : 55, slot0 ? 140 : 62, slot0 ? 190 : 80, 255);
       DrawText(rgba, 26, y + 28, s0.c_str(), 255, 240, 244, 1);
       const char* joiner = (rule.mode == "all") ? "+" : "|";
-      DrawText(rgba, 164, y + 28, joiner, 200, 150, 165, 1);
-      FillRect(rgba, 180, y + 26, 140, 18, slot1 ? 120 : 55, slot1 ? 30 : 16, slot1 ? 50 : 28, 255);
+      DrawText(rgba, 164, y + 28, joiner, 150, 165, 185, 1);
+      FillRect(rgba, 180, y + 26, 140, 18, slot1 ? 0 : 55, slot1 ? 140 : 62, slot1 ? 190 : 80, 255);
       DrawText(rgba, 186, y + 28, s1.c_str(), 255, 240, 244, 1);
       const char* setL = rule.set.empty() ? "BOTH" : (rule.set == "driving" ? "VEH" : "FOOT");
       DrawText(rgba, UI_W - 400, y + 16, setL, 160, 180, 200, 1);
@@ -1103,38 +1103,38 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       DrawText(rgba, UI_W - 252, y + 18, rule.mode == "all" ? "ALL" : "ANY", 255, 240, 244, 1);
       FillRect(rgba, UI_W - 180, y + 12, 64, 24, 50, 30, 50, 255);
       DrawText(rgba, UI_W - 168, y + 18, "DEF", 255, 240, 244, 1);
-      FillRect(rgba, UI_W - 100, y + 12, 80, 24, 90, 20, 30, 255);
+      FillRect(rgba, UI_W - 100, y + 12, 80, 24, 160, 50, 55, 255);
       DrawText(rgba, UI_W - 84, y + 18, "CLR", 255, 240, 244, 1);
     }
     int pc = Bindings_PageCount(s.bindings);
     char page[96];
     snprintf(page, sizeof(page), "P%d/%d slot%d %s%s", s.bindings.page + 1, std::max(1, pc),
              s.bindings.editSlot + 1, s.bindings.dirty ? "* " : "", s.bindings.status.c_str());
-    FillRect(rgba, 16, UI_H - 48, 100, 32, 80, 20, 36, 255);
+    FillRect(rgba, 16, UI_H - 48, 100, 32, 40, 85, 115, 255);
     DrawText(rgba, 36, UI_H - 38, "PREV", 255, 240, 244, 2);
-    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 80, 20, 36, 255);
+    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 40, 85, 115, 255);
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
-    DrawText(rgba, 130, UI_H - 36, page, 200, 150, 165, 1);
+    DrawText(rgba, 130, UI_H - 36, page, 150, 165, 185, 1);
     DrawText(rgba, 130, UI_H - 20,
              "S1/S2=CHORD  +CHD  ANY=OR ALL=AND  DEF  CLR  |  SYNC data/vrmod/vrmod_openxr_bindings.json",
-             160, 120, 130, 1);
+             120, 135, 155, 1);
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
-      FillRect(rgba, cx - 8, cy - 2, 16, 4, 255, 70, 100, 255);
-      FillRect(rgba, cx - 2, cy - 8, 4, 16, 255, 70, 100, 255);
+      FillRect(rgba, cx - 8, cy - 2, 16, 4, 0, 220, 255, 255);
+      FillRect(rgba, cx - 2, cy - 8, 4, 16, 0, 220, 255, 255);
     }
     return;
   }
 
   if (s.page == WebUIPage::Addons) {
-    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 28, 10, 16, 255);
+    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 30, 34, 46, 255);
     // Filters
     const char* filters[] = {"ALL", "ON", "OFF", "WS", "LOCAL"};
     for (int f = 0; f < 5; ++f) {
       int x0 = 16 + f * 90;
       bool on = (s.addons.filter == f);
-      FillRect(rgba, x0, 52, 84, 22, on ? 90 : 50, on ? 22 : 14, on ? 36 : 22, 255);
+      FillRect(rgba, x0, 52, 84, 22, on ? 0 : 50, on ? 130 : 58, on ? 180 : 74, 255);
       DrawText(rgba, x0 + 12, 56, filters[f], 255, 240, 244, 1);
     }
     char cnt[96];
@@ -1145,7 +1145,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
              idx.size(), s.addons.addons.size(),
              Addons_EnabledCount(s.addons), Addons_DisabledCount(s.addons),
              s.addons.page + 1, std::max(1, pc));
-    DrawText(rgba, 480, 56, cnt, 200, 150, 165, 1);
+    DrawText(rgba, 480, 56, cnt, 150, 165, 185, 1);
 
     int start = s.addons.page * s.addons.pageSize;
     const int rowH = 48;
@@ -1156,7 +1156,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       const auto& a = s.addons.addons[ai];
       int y = 84 + n * rowH;
       bool sel = (ai == s.addons.selected);
-      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 100 : 40, sel ? 24 : 12, sel ? 40 : 18, 255);
+      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 20 : 42, sel ? 95 : 48, sel ? 130 : 62, 255);
       // Thumb 40x40
       int tx = 18, ty = y + 4;
       if (a.thumbW > 0 && (int)a.thumbRgba.size() >= a.thumbW * a.thumbH * 4) {
@@ -1186,30 +1186,30 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       snprintf(line, sizeof(line), "%.52s", a.title.c_str());
       DrawText(rgba, 120, y + 10, line, 255, 240, 244, 1);
       snprintf(line, sizeof(line), "%s  %s", a.kind.c_str(), a.id.c_str());
-      DrawText(rgba, 120, y + 28, line, 160, 120, 130, 1);
+      DrawText(rgba, 120, y + 28, line, 120, 135, 155, 1);
     }
 
     // Page buttons
-    FillRect(rgba, 16, UI_H - 48, 100, 32, 80, 20, 36, 255);
+    FillRect(rgba, 16, UI_H - 48, 100, 32, 40, 85, 115, 255);
     DrawText(rgba, 36, UI_H - 38, "PREV", 255, 240, 244, 2);
-    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 80, 20, 36, 255);
+    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 40, 85, 115, 255);
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
-    DrawText(rgba, 140, UI_H - 36, s.addons.status.c_str(), 200, 150, 165, 1);
-    DrawText(rgba, 140, UI_H - 20, "TRIGGER = TOGGLE MOUNT  ·  CLOSE = EXIT", 160, 120, 130, 1);
+    DrawText(rgba, 140, UI_H - 36, s.addons.status.c_str(), 150, 165, 185, 1);
+    DrawText(rgba, 140, UI_H - 20, "TRIGGER = TOGGLE MOUNT  ·  CLOSE = EXIT", 120, 135, 155, 1);
 
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
-      FillRect(rgba, cx - 8, cy - 2, 16, 4, 255, 70, 100, 255);
-      FillRect(rgba, cx - 2, cy - 8, 4, 16, 255, 70, 100, 255);
+      FillRect(rgba, cx - 8, cy - 2, 16, 4, 0, 220, 255, 255);
+      FillRect(rgba, cx - 2, cy - 8, 4, 16, 0, 220, 255, 255);
     }
     return;
   }
 
   // --- Settings page (GMod native graphics + engine) ---
   if (s.page == WebUIPage::Settings) {
-    FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, 28, 10, 16, 255);
-    DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER CYCLES  ·  XR SS NEEDS VR RESTART", 200, 150, 165, 1);
+    FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, 30, 34, 46, 255);
+    DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER CYCLES  ·  XR SS NEEDS VR RESTART", 150, 165, 185, 1);
     char line[96];
     const int visible = 12;
     const int rowH = 32;
@@ -1219,39 +1219,39 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       if (i >= SR_COUNT) break;
       int y = 72 + n * rowH;
       bool foc = (i == s.settingsRow);
-      if (foc) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 100, 24, 40, 255);
-      else if (n % 2) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 36, 12, 18, 255);
+      if (foc) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 20, 95, 130, 255);
+      else if (n % 2) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 38, 42, 56, 255);
       FormatSettingRow(s, i, line, sizeof(line));
       DrawText(rgba, 28, y + 8, line, 255, 240, 244, 1);
     }
     snprintf(line, sizeof(line), "APPLIED ON START VIA gvrmod_cube.cfg + -w/-h");
-    DrawText(rgba, 20, UI_H - 48, line, 160, 120, 130, 1);
-    DrawText(rgba, 20, UI_H - 28, s.status.c_str(), 200, 150, 165, 1);
+    DrawText(rgba, 20, UI_H - 48, line, 120, 135, 155, 1);
+    DrawText(rgba, 20, UI_H - 28, s.status.c_str(), 150, 165, 185, 1);
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
-      FillRect(rgba, cx - 10, cy - 2, 20, 4, 255, 70, 100, 255);
-      FillRect(rgba, cx - 2, cy - 10, 4, 20, 255, 70, 100, 255);
+      FillRect(rgba, cx - 10, cy - 2, 20, 4, 0, 220, 255, 255);
+      FillRect(rgba, cx - 2, cy - 10, 4, 20, 0, 220, 255, 255);
     }
     return;
   }
 
   // --- New Game page (3-col) ---
   const int catW = 180, mapX = 188, mapW = 500, setX = 700, setW = 250;
-  FillRect(rgba, 8, 52, catW, UI_H - 60, 28, 10, 16, 255);
-  FillRect(rgba, mapX, 52, mapW, UI_H - 60, 36, 12, 18, 255);
-  FillRect(rgba, setX, 52, setW, UI_H - 60, 28, 10, 16, 255);
+  FillRect(rgba, 8, 52, catW, UI_H - 60, 30, 34, 46, 255);
+  FillRect(rgba, mapX, 52, mapW, UI_H - 60, 38, 42, 56, 255);
+  FillRect(rgba, setX, 52, setW, UI_H - 60, 30, 34, 46, 255);
 
-  DrawText(rgba, 16, 60, "CATEGORY", 200, 150, 165, 1);
+  DrawText(rgba, 16, 60, "CATEGORY", 150, 165, 185, 1);
   for (int i = 0; i < (int)s.categories.size() && i < 12; ++i) {
     bool sel = (i == s.catIndex);
     bool foc = (s.focusCol == 0 && sel);
     int y = 80 + i * 28;
-    if (sel) FillRect(rgba, 12, y - 2, catW - 8, 24, foc ? 120 : 80, 20, 36, 255);
+    if (sel) FillRect(rgba, 12, y - 2, catW - 8, 24, foc ? 30 : 50, foc ? 120 : 70, foc ? 160 : 95, 255);
     DrawText(rgba, 18, y + 2, s.categories[i].name.c_str(), 255, 240, 244, 1);
   }
 
-  DrawText(rgba, mapX + 8, 60, "MAPS", 200, 150, 165, 1);
+  DrawText(rgba, mapX + 8, 60, "MAPS", 150, 165, 185, 1);
   if (!s.categories.empty()) {
     const auto& maps = s.categories[s.catIndex].maps;
     int visible = 12;
@@ -1262,17 +1262,17 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       bool sel = (i == s.mapIndex);
       bool foc = (s.focusCol == 1 && sel);
       int y = 80 + n * 28;
-      if (sel) FillRect(rgba, mapX + 4, y - 2, mapW - 8, 24, foc ? 120 : 80, 22, 36, 255);
+      if (sel) FillRect(rgba, mapX + 4, y - 2, mapW - 8, 24, foc ? 30 : 50, foc ? 120 : 70, foc ? 160 : 95, 255);
       DrawText(rgba, mapX + 12, y + 2, maps[i].c_str(), 255, 240, 244, 1);
     }
   }
 
-  DrawText(rgba, setX + 8, 60, "SERVER", 200, 150, 165, 1);
+  DrawText(rgba, setX + 8, 60, "SERVER", 150, 165, 185, 1);
   char line[96];
   auto row = [&](int idx, const char* label) {
     int y = 84 + idx * 36;
     bool foc = (s.focusCol == 2 && s.settingsRow == idx);
-    if (foc) FillRect(rgba, setX + 4, y - 4, setW - 8, 30, 90, 22, 36, 255);
+    if (foc) FillRect(rgba, setX + 4, y - 4, setW - 8, 30, 24, 100, 140, 255);
     DrawText(rgba, setX + 12, y, label, 255, 240, 244, 1);
   };
   snprintf(line, sizeof(line), "PLAYERS %d", WebUI_MaxPlayers(s));
@@ -1282,28 +1282,28 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   row(3, s.p2pFriends ? "P2P FRIENDS ON" : "P2P FRIENDS OFF");
 
   // Graphics + OpenXR summary → Settings tab
-  FillRect(rgba, setX + 8, 236, setW - 16, 56, 60, 16, 28, 255);
+  FillRect(rgba, setX + 8, 236, setW - 16, 56, 48, 56, 72, 255);
   snprintf(line, sizeof(line), "GFX %s", PresetLabel(s.gfx.preset));
-  DrawText(rgba, setX + 16, 244, line, 255, 200, 210, 1);
+  DrawText(rgba, setX + 16, 244, line, 200, 230, 245, 1);
   float ss = kSs[std::clamp(s.gfx.xr.ssIdx, 0, kSsN - 1)];
   snprintf(line, sizeof(line), "XR SS %.2f  AA%d", ss, s.gfx.matAntialias);
-  DrawText(rgba, setX + 16, 266, line, 200, 150, 165, 1);
+  DrawText(rgba, setX + 16, 266, line, 150, 165, 185, 1);
 
   int by = UI_H - 70;
   bool startFoc = (s.focusCol == 3);
-  FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? 255 : 196, startFoc ? 60 : 30, 58, 255);
+  FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? 0 : 0, startFoc ? 200 : 160, startFoc ? 140 : 100, 255);
   DrawText(rgba, setX + 36, by + 14, "START GAME", 255, 255, 255, 2);
 
-  DrawText(rgba, 12, UI_H - 22, s.status.c_str(), 200, 150, 165, 1);
+  DrawText(rgba, 12, UI_H - 22, s.status.c_str(), 150, 165, 185, 1);
   char sel[128];
   snprintf(sel, sizeof(sel), "SEL %s  | SETTINGS TAB = GRAPHICS", WebUI_SelectedMap(s).c_str());
-  DrawText(rgba, mapX + 8, UI_H - 22, sel, 255, 70, 100, 1);
+  DrawText(rgba, mapX + 8, UI_H - 22, sel, 0, 220, 255, 1);
 
   if ((cursor && cursor->visible) || s.cursorVisible) {
     int cx = cursor ? cursor->x : s.cursorX;
     int cy = cursor ? cursor->y : s.cursorY;
-    FillRect(rgba, cx - 10, cy - 2, 20, 4, 255, 70, 100, 255);
-    FillRect(rgba, cx - 2, cy - 10, 4, 20, 255, 70, 100, 255);
+    FillRect(rgba, cx - 10, cy - 2, 20, 4, 0, 220, 255, 255);
+    FillRect(rgba, cx - 2, cy - 10, 4, 20, 0, 220, 255, 255);
     FillRect(rgba, cx - 3, cy - 3, 6, 6, 255, 255, 255, 255);
   }
 }

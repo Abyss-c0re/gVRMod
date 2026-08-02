@@ -148,16 +148,32 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
 void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb) {
   glDisable(GL_TEXTURE_2D);
   glDisable(GL_DEPTH_TEST);
-  glLineWidth(3.f);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  // Thick outer glow + core (Quest Meta Cam: thin laser was hard to track)
+  glLineWidth(8.f);
   glBegin(GL_LINES);
-  glColor3f(cr, cg, cb);
+  glColor4f(cr, cg, cb, 0.35f);
   glVertex3f(a.x, a.y, a.z);
   glVertex3f(b.x, b.y, b.z);
   glEnd();
-  glPointSize(12.f);
-  glBegin(GL_POINTS);
-  glColor3f(1.f, 1.f, 1.f);
+  glLineWidth(3.f);
+  glBegin(GL_LINES);
+  glColor4f(cr, cg, cb, 1.f);
+  glVertex3f(a.x, a.y, a.z);
   glVertex3f(b.x, b.y, b.z);
   glEnd();
-  glColor3f(1.f, 1.f, 1.f);
+  // Large hit reticle at tip
+  glPointSize(22.f);
+  glBegin(GL_POINTS);
+  glColor4f(1.f, 1.f, 1.f, 1.f);
+  glVertex3f(b.x, b.y, b.z);
+  glEnd();
+  glPointSize(10.f);
+  glBegin(GL_POINTS);
+  glColor4f(cr, cg, cb, 1.f);
+  glVertex3f(b.x, b.y, b.z);
+  glEnd();
+  glColor4f(1.f, 1.f, 1.f, 1.f);
+  glDisable(GL_BLEND);
 }
