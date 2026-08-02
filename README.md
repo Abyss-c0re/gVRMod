@@ -165,3 +165,24 @@ OpenXR is **runtime-agnostic** (not WiVRn-only).
 ## License
 
 **CUBECHAIN** — see [LICENSE](LICENSE).
+
+---
+
+## VR Hub launcher (main menu in VR)
+
+Stock GMod **main menu VGUI cannot be fully stereo-rendered** before a map loads (unlike HL2VR’s engine fork).  
+gVRMod ships a **VR Hub** shell instead — same job: maps, settings, bindings, disconnect, quit — with **auto VRMod**.
+
+```bash
+# Standalone (loads gm_construct + auto VR + hub)
+./scripts/gvrmod_launcher.sh
+
+# Choose map
+./scripts/gvrmod_launcher.sh --map gm_flatgrass
+
+# Steam → Launch Options
+/path/to/gVRMod/scripts/gvrmod_launcher.sh -- %command%
+```
+
+Writes `garrysmod/cfg/gvrmod_hub.cfg` (`vrmod_autostart 1`, `vrmod_hub 1`, prefer OpenXR).  
+In headset: hub opens after VR starts. Toggle: `vrmod_hub` / `vrmod_hub_open`.

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=gVRMod (VR Hub)
+Comment=Garry's Mod with OpenXR auto VR hub
+Exec=/home/voldemar/Dev/GMod/gVRMod/scripts/gvrmod_launcher.sh
+Icon=steam_icon_4000
+Terminal=false
+Type=Application
+Categories=Game;
