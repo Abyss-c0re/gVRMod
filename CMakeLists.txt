@@ -22,10 +22,15 @@ set(CORE_SOURCES
 
 set(INPUT_SOURCES
     src/input/xr_input.cpp
+    src/input/vkeyboard.cpp
 )
 
 set(RENDER_XR_SESSION
     src/rendering/openxr/xr_session.cpp
+)
+
+set(VDISPLAY_SOURCES
+    src/rendering/vdisplay/vdisplay.cpp
 )
 
 set(LUA_SOURCES
@@ -61,6 +66,7 @@ add_library(vrmod_release SHARED
     ${INPUT_SOURCES}
     ${RENDER_PLATFORM_SOURCES}
     ${RENDER_XR_SESSION}
+    ${VDISPLAY_SOURCES}
     ${LUA_SOURCES}
 )
 

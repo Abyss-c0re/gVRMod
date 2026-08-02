@@ -1,14 +1,14 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=gVRMod
-GenericName=Garry's Mod VR
-Comment=OpenXR Garry's Mod — WiVRn/Quest, Cube VR launcher
-Exec=/home/voldemar/Dev/GMod/gVRMod/scripts/gvrmod_launcher.sh
+Name=gVRMod Cube
+GenericName=Native VR Launcher for GMod
+Comment=OpenXR reversed WebUI New Game — starts GMod only when you press Start
+Exec=/home/voldemar/Dev/GMod/gVRMod/scripts/cube_webui_launcher.sh
 Path=/home/voldemar/Dev/GMod/gVRMod
 Icon=gvrmod
 Terminal=true
 StartupNotify=true
 Categories=Game;ActionGame;
-Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;VRMod;
-StartupWMClass=gmod
+Keywords=GMod;VR;OpenXR;WiVRn;Cube;WebUI;
+StartupWMClass=cube_webui_glx

@@ -27,6 +27,8 @@
 #include "rendering/texture_hooks.h"
 #include "rendering/openxr/xr_session.h"
 #include "rendering/openxr/xr_render.h"
+#include "rendering/vdisplay/vdisplay.h"
+#include "input/vkeyboard.h"
 
 // ── Lua-side state ──
 static char g_errorString[MAX_STR_LEN];
@@ -101,8 +103,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v44: linear RGBA8 swapchain (brighter); mode 2 no mat_* thrash + forced single-pass.
-    LUA->PushNumber(44);
+    // v46: VR Keyboard driver (layout + buffer + hit-test) shared launcher/in-game.
+    LUA->PushNumber(46);
     return 1;
 }
 
@@ -1033,6 +1035,261 @@ LUA_FUNCTION(GetTrackedDeviceNames) {
     return 1;
 }
 
+// ── Virtual Display (reusable launcher + pause panel surface) ──
+
+LUA_FUNCTION(VirtualDisplayIsSupported) {
+    LUA->PushBool(VDisplay_IsSupported());
+    return 1;
+}
+
+LUA_FUNCTION(VirtualDisplayCreate) {
+    uint32_t w = (uint32_t)LUA->CheckNumber(1);
+    uint32_t h = (uint32_t)LUA->CheckNumber(2);
+    int hint = 0;
+    if (LUA->IsType(3, GarrysMod::Lua::Type::NUMBER))
+        hint = (int)LUA->GetNumber(3);
+    char err[MAX_STR_LEN] = {};
+    int id = VDisplay_Create(w, h, hint, err, sizeof(err));
+    if (id <= 0) {
+        LUA->PushBool(false);
+        LUA->PushString(err[0] ? err : "VDisplay create failed");
+        return 2;
+    }
+    LUA->PushNumber(id);
+    return 1;
+}
+
+LUA_FUNCTION(VirtualDisplayResize) {
+    int id = (int)LUA->CheckNumber(1);
+    uint32_t w = (uint32_t)LUA->CheckNumber(2);
+    uint32_t h = (uint32_t)LUA->CheckNumber(3);
+    char err[MAX_STR_LEN] = {};
+    if (!VDisplay_Resize(id, w, h, err, sizeof(err))) {
+        LUA->PushBool(false);
+        LUA->PushString(err[0] ? err : "VDisplay resize failed");
+        return 2;
+    }
+    LUA->PushBool(true);
+    return 1;
+}
+
+LUA_FUNCTION(VirtualDisplayDestroy) {
+    int id = 0;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER))
+        id = (int)LUA->GetNumber(1);
+    VDisplay_Destroy(id);
+    return 0;
+}
+
+LUA_FUNCTION(VirtualDisplayGetInfo) {
+    int id = (int)LUA->CheckNumber(1);
+    VDisplayInfo info = {};
+    if (!VDisplay_GetInfo(id, &info)) {
+        LUA->PushNil();
+        return 1;
+    }
+    LUA->CreateTable();
+    LUA->PushNumber(info.id);
+    LUA->SetField(-2, "id");
+    LUA->PushNumber(info.width);
+    LUA->SetField(-2, "width");
+    LUA->PushNumber(info.height);
+    LUA->SetField(-2, "height");
+    LUA->PushNumber(info.glTexture);
+    LUA->SetField(-2, "glTexture");
+    LUA->PushNumber(info.glFBO);
+    LUA->SetField(-2, "glFBO");
+    LUA->PushBool(info.valid);
+    LUA->SetField(-2, "valid");
+    LUA->PushBool(info.hasCapture);
+    LUA->SetField(-2, "hasCapture");
+    return 1;
+}
+
+LUA_FUNCTION(VirtualDisplayCaptureWindow) {
+    int id = (int)LUA->CheckNumber(1);
+    char err[MAX_STR_LEN] = {};
+    if (!VDisplay_CaptureWindow(id, err, sizeof(err))) {
+        LUA->PushBool(false);
+        LUA->PushString(err[0] ? err : "capture failed");
+        return 2;
+    }
+    LUA->PushBool(true);
+    return 1;
+}
+
+LUA_FUNCTION(VirtualDisplayClear) {
+    int id = (int)LUA->CheckNumber(1);
+    float r = LUA->IsType(2, GarrysMod::Lua::Type::NUMBER) ? (float)LUA->GetNumber(2) : 0.f;
+    float g = LUA->IsType(3, GarrysMod::Lua::Type::NUMBER) ? (float)LUA->GetNumber(3) : 0.f;
+    float b = LUA->IsType(4, GarrysMod::Lua::Type::NUMBER) ? (float)LUA->GetNumber(4) : 0.f;
+    float a = LUA->IsType(5, GarrysMod::Lua::Type::NUMBER) ? (float)LUA->GetNumber(5) : 1.f;
+    LUA->PushBool(VDisplay_Clear(id, r, g, b, a));
+    return 1;
+}
+
+// ── VR Keyboard driver (shared launcher + GMod) ──
+
+LUA_FUNCTION(KeyboardIsSupported) {
+    LUA->PushBool(VKB_IsSupported());
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardSystemAvailable) {
+    LUA->PushBool(VKB_SystemKeyboardAvailable());
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardOpen) {
+    const char* title = LUA->IsType(1, GarrysMod::Lua::Type::STRING) ? LUA->GetString(1) : "KEYBOARD";
+    const char* initial = LUA->IsType(2, GarrysMod::Lua::Type::STRING) ? LUA->GetString(2) : "";
+    int w = LUA->IsType(3, GarrysMod::Lua::Type::NUMBER) ? (int)LUA->GetNumber(3) : 555;
+    int h = LUA->IsType(4, GarrysMod::Lua::Type::NUMBER) ? (int)LUA->GetNumber(4) : 300;
+    int hint = LUA->IsType(5, GarrysMod::Lua::Type::NUMBER) ? (int)LUA->GetNumber(5) : 0;
+    char err[MAX_STR_LEN] = {};
+    int id = VKB_Open(title, initial, w, h, hint, err, sizeof(err));
+    if (id <= 0) {
+        LUA->PushBool(false);
+        LUA->PushString(err[0] ? err : "KeyboardOpen failed");
+        return 2;
+    }
+    LUA->PushNumber(id);
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardClose) {
+    int id = LUA->IsType(1, GarrysMod::Lua::Type::NUMBER) ? (int)LUA->GetNumber(1) : 0;
+    if (id > 0)
+        VKB_Close(id);
+    else
+        VKB_Shutdown();
+    return 0;
+}
+
+LUA_FUNCTION(KeyboardIsOpen) {
+    int id = LUA->IsType(1, GarrysMod::Lua::Type::NUMBER) ? (int)LUA->GetNumber(1) : 0;
+    if (id > 0) {
+        LUA->PushBool(VKB_IsOpen(id));
+    } else {
+        LUA->PushBool(VKB_FirstOpen() > 0);
+    }
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardGetInfo) {
+    int id = (int)LUA->CheckNumber(1);
+    VKeyboardInfo info = {};
+    if (!VKB_GetInfo(id, &info)) {
+        LUA->PushNil();
+        return 1;
+    }
+    LUA->CreateTable();
+    LUA->PushNumber(info.id); LUA->SetField(-2, "id");
+    LUA->PushBool(info.open); LUA->SetField(-2, "open");
+    LUA->PushBool(info.upper); LUA->SetField(-2, "upper");
+    LUA->PushNumber(info.width); LUA->SetField(-2, "width");
+    LUA->PushNumber(info.height); LUA->SetField(-2, "height");
+    LUA->PushNumber(info.headerH); LUA->SetField(-2, "headerH");
+    LUA->PushNumber(info.keyCount); LUA->SetField(-2, "keyCount");
+    LUA->PushString(info.title); LUA->SetField(-2, "title");
+    LUA->PushString(info.text); LUA->SetField(-2, "text");
+    LUA->PushNumber(info.lastAction); LUA->SetField(-2, "lastAction");
+    LUA->PushString(info.lastChar); LUA->SetField(-2, "lastChar");
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardGetText) {
+    int id = (int)LUA->CheckNumber(1);
+    LUA->PushString(VKB_GetText(id));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardSetText) {
+    int id = (int)LUA->CheckNumber(1);
+    const char* t = LUA->IsType(2, GarrysMod::Lua::Type::STRING) ? LUA->GetString(2) : "";
+    LUA->PushBool(VKB_SetText(id, t));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardAppend) {
+    int id = (int)LUA->CheckNumber(1);
+    const char* t = LUA->IsType(2, GarrysMod::Lua::Type::STRING) ? LUA->GetString(2) : "";
+    LUA->PushBool(VKB_Append(id, t));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardBackspace) {
+    int id = (int)LUA->CheckNumber(1);
+    LUA->PushBool(VKB_Backspace(id));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardGetShift) {
+    int id = (int)LUA->CheckNumber(1);
+    LUA->PushBool(VKB_GetShift(id));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardSetShift) {
+    int id = (int)LUA->CheckNumber(1);
+    bool upper = LUA->IsType(2, GarrysMod::Lua::Type::BOOL) && LUA->GetBool(2);
+    LUA->PushBool(VKB_SetShift(id, upper));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardSetTitle) {
+    int id = (int)LUA->CheckNumber(1);
+    const char* t = LUA->IsType(2, GarrysMod::Lua::Type::STRING) ? LUA->GetString(2) : "KEYBOARD";
+    LUA->PushBool(VKB_SetTitle(id, t));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardHitTest) {
+    int id = (int)LUA->CheckNumber(1);
+    float px = (float)LUA->CheckNumber(2);
+    float py = (float)LUA->CheckNumber(3);
+    LUA->PushNumber(VKB_HitTest(id, px, py));
+    return 1;
+}
+
+LUA_FUNCTION(KeyboardPointerClick) {
+    int id = (int)LUA->CheckNumber(1);
+    float px = (float)LUA->CheckNumber(2);
+    float py = (float)LUA->CheckNumber(3);
+    int act = VKB_PointerClick(id, px, py);
+    LUA->PushNumber(act);
+    // second return: text after mutation
+    LUA->PushString(VKB_GetText(id));
+    // third: lastChar
+    VKeyboardInfo info = {};
+    if (VKB_GetInfo(id, &info))
+        LUA->PushString(info.lastChar);
+    else
+        LUA->PushString("");
+    return 3;
+}
+
+LUA_FUNCTION(KeyboardGetKeys) {
+    int id = (int)LUA->CheckNumber(1);
+    int n = VKB_GetKeyCount(id);
+    LUA->CreateTable();
+    for (int i = 0; i < n; ++i) {
+        VKeyInfo k = {};
+        if (!VKB_GetKey(id, i, &k)) continue;
+        LUA->PushNumber(i + 1);
+        LUA->CreateTable();
+        LUA->PushNumber(k.x); LUA->SetField(-2, "x");
+        LUA->PushNumber(k.y); LUA->SetField(-2, "y");
+        LUA->PushNumber(k.w); LUA->SetField(-2, "w");
+        LUA->PushNumber(k.h); LUA->SetField(-2, "h");
+        LUA->PushNumber(k.action); LUA->SetField(-2, "action");
+        LUA->PushString(k.label); LUA->SetField(-2, "label");
+        LUA->PushBool(k.special); LUA->SetField(-2, "special");
+        LUA->SetTable(-3);
+    }
+    return 1;
+}
+
 // ── Module entry points ──
 
 GMOD_MODULE_OPEN() {
@@ -1102,14 +1359,63 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "TriggerHaptic");
     LUA->PushCFunction(GetTrackedDeviceNames);
     LUA->SetField(-2, "GetTrackedDeviceNames");
+    LUA->PushCFunction(VirtualDisplayIsSupported);
+    LUA->SetField(-2, "VirtualDisplayIsSupported");
+    LUA->PushCFunction(VirtualDisplayCreate);
+    LUA->SetField(-2, "VirtualDisplayCreate");
+    LUA->PushCFunction(VirtualDisplayResize);
+    LUA->SetField(-2, "VirtualDisplayResize");
+    LUA->PushCFunction(VirtualDisplayDestroy);
+    LUA->SetField(-2, "VirtualDisplayDestroy");
+    LUA->PushCFunction(VirtualDisplayGetInfo);
+    LUA->SetField(-2, "VirtualDisplayGetInfo");
+    LUA->PushCFunction(VirtualDisplayCaptureWindow);
+    LUA->SetField(-2, "VirtualDisplayCaptureWindow");
+    LUA->PushCFunction(VirtualDisplayClear);
+    LUA->SetField(-2, "VirtualDisplayClear");
+    LUA->PushCFunction(KeyboardIsSupported);
+    LUA->SetField(-2, "KeyboardIsSupported");
+    LUA->PushCFunction(KeyboardSystemAvailable);
+    LUA->SetField(-2, "KeyboardSystemAvailable");
+    LUA->PushCFunction(KeyboardOpen);
+    LUA->SetField(-2, "KeyboardOpen");
+    LUA->PushCFunction(KeyboardClose);
+    LUA->SetField(-2, "KeyboardClose");
+    LUA->PushCFunction(KeyboardIsOpen);
+    LUA->SetField(-2, "KeyboardIsOpen");
+    LUA->PushCFunction(KeyboardGetInfo);
+    LUA->SetField(-2, "KeyboardGetInfo");
+    LUA->PushCFunction(KeyboardGetText);
+    LUA->SetField(-2, "KeyboardGetText");
+    LUA->PushCFunction(KeyboardSetText);
+    LUA->SetField(-2, "KeyboardSetText");
+    LUA->PushCFunction(KeyboardAppend);
+    LUA->SetField(-2, "KeyboardAppend");
+    LUA->PushCFunction(KeyboardBackspace);
+    LUA->SetField(-2, "KeyboardBackspace");
+    LUA->PushCFunction(KeyboardGetShift);
+    LUA->SetField(-2, "KeyboardGetShift");
+    LUA->PushCFunction(KeyboardSetShift);
+    LUA->SetField(-2, "KeyboardSetShift");
+    LUA->PushCFunction(KeyboardSetTitle);
+    LUA->SetField(-2, "KeyboardSetTitle");
+    LUA->PushCFunction(KeyboardHitTest);
+    LUA->SetField(-2, "KeyboardHitTest");
+    LUA->PushCFunction(KeyboardPointerClick);
+    LUA->SetField(-2, "KeyboardPointerClick");
+    LUA->PushCFunction(KeyboardGetKeys);
+    LUA->SetField(-2, "KeyboardGetKeys");
     LUA->SetField(-2, "vrmod");
 
-    VRMOD_LOG_INFO("Module loaded (OpenXR).");
+    VRMOD_LOG_INFO("Module loaded (OpenXR + VirtualDisplay + Keyboard).");
     return 0;
 }
 
 GMOD_MODULE_CLOSE() {
     VRMOD_LOG_INFO("Module closing.");
+
+    VKB_Shutdown();
+    VDisplay_Shutdown();
 
     // Real unload only — destroy OpenXR instance/loader (not a soft VR pause).
     XR_SetSubmitEnabled(false);

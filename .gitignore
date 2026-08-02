@@ -4,3 +4,10 @@ build_tests/
 deps/
 install/
 legacy/
+
+.loop/
+vrmod_test.log
+build/
+build_release/
+build_debug/
+native_launcher/build/
