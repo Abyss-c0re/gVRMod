@@ -24,6 +24,7 @@ set(CUBE_WEBUI_SOURCES
   src/xr_app.cpp
   src/maps_scan.cpp
   src/addons_mgr.cpp
+  src/bindings_mgr.cpp
   src/gmod_spawn.cpp
   src/ui_panel.cpp
   ${CUBE_SHARED_OPENXR}

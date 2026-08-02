@@ -454,7 +454,19 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   WebUI_ApplyGfxPreset(s, 2); // High defaults
   SyncResFromIdx(s.gfx);
   Addons_Load(s.addons, gmodRoot);
-  s.status = "NEW GAME · ADDONS · SETTINGS (GMOD GRAPHICS)";
+  Bindings_Load(s.bindings, gmodRoot);
+  s.status = "NEW GAME · ADDONS · SETTINGS · BINDINGS";
+}
+
+bool WebUI_SaveBindingsIfDirty(WebUIState& s) {
+  if (!s.bindings.dirty) return true;
+  std::string err;
+  if (!Bindings_Save(s.bindings, err)) {
+    s.status = "BIND SAVE FAIL: " + err;
+    return false;
+  }
+  s.status = s.bindings.status;
+  return true;
 }
 
 const std::string& WebUI_SelectedMap(const WebUIState& s) {
@@ -479,28 +491,107 @@ void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
 bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   // Always: CLOSE / QUIT top-right
   if (py >= 4 && py <= 40 && px >= UI_W - 110 && px <= UI_W - 8) {
+    WebUI_SaveBindingsIfDirty(s);
     s.wantQuit = true;
     s.status = "CLOSING";
     return true;
   }
 
-  // Nav tabs
+  // Nav tabs (compact)
   if (py >= 6 && py <= 38) {
-    if (px >= 8 && px <= 150) {
+    auto leave = [&]() { WebUI_SaveBindingsIfDirty(s); };
+    if (px >= 8 && px <= 120) {
+      leave();
       s.page = WebUIPage::NewGame;
       s.status = "NEW GAME";
       return true;
     }
-    if (px >= 158 && px <= 290) {
+    if (px >= 128 && px <= 230) {
+      leave();
       s.page = WebUIPage::Addons;
-      s.status = "ADDONS — toggle mount · pages";
+      s.status = "ADDONS";
       return true;
     }
-    if (px >= 298 && px <= 450) {
+    if (px >= 238 && px <= 360) {
+      leave();
       s.page = WebUIPage::Settings;
-      s.status = "GMOD GRAPHICS + ENGINE";
+      s.status = "SETTINGS";
       return true;
     }
+    if (px >= 368 && px <= 500) {
+      s.page = WebUIPage::Bindings;
+      s.status = "CONTROLLER BINDINGS (OpenXR)";
+      return true;
+    }
+  }
+
+  if (s.page == WebUIPage::Bindings) {
+    // Filters ALL / FOOT / VEHICLE
+    const char* filters[] = {"ALL", "FOOT", "VEHICLE"};
+    for (int f = 0; f < 3; ++f) {
+      int x0 = 16 + f * 100;
+      if (px >= x0 && px <= x0 + 92 && py >= 50 && py <= 74) {
+        s.bindings.filter = f;
+        s.bindings.page = 0;
+        Bindings_ClampPage(s.bindings);
+        s.status = filters[f];
+        return true;
+      }
+    }
+    // RESET ALL
+    if (px >= UI_W - 200 && px <= UI_W - 16 && py >= 50 && py <= 74) {
+      Bindings_ResetDefaults(s.bindings);
+      s.status = s.bindings.status;
+      return true;
+    }
+    // SAVE
+    if (px >= UI_W - 320 && px <= UI_W - 210 && py >= 50 && py <= 74) {
+      std::string err;
+      if (!Bindings_Save(s.bindings, err)) s.status = err;
+      else s.status = "SAVED BINDINGS";
+      return true;
+    }
+    // Prev/next
+    if (py >= UI_H - 48 && py <= UI_H - 12) {
+      if (px >= 16 && px <= 120) {
+        s.bindings.page = std::max(0, s.bindings.page - 1);
+        return true;
+      }
+      if (px >= UI_W - 130 && px <= UI_W - 16) {
+        s.bindings.page++;
+        Bindings_ClampPage(s.bindings);
+        return true;
+      }
+    }
+    std::vector<int> idx;
+    Bindings_Filtered(s.bindings, idx);
+    int start = s.bindings.page * s.bindings.pageSize;
+    const int rowH = 48;
+    for (int n = 0; n < s.bindings.pageSize; ++n) {
+      int k = start + n;
+      if (k >= (int)idx.size()) break;
+      int y = 84 + n * rowH;
+      if (py < y || py > y + rowH - 4) continue;
+      s.bindings.selected = k;
+      // Right side buttons: MODE / DEF
+      if (px >= UI_W - 200 && px <= UI_W - 110) {
+        Bindings_ToggleMode(s.bindings, k);
+        s.status = s.bindings.status;
+        return true;
+      }
+      if (px >= UI_W - 100 && px <= UI_W - 16) {
+        const auto& info = Bindings_LogicalActions()[idx[k]];
+        Bindings_RestoreAction(s.bindings, info.id);
+        s.status = s.bindings.status;
+        return true;
+      }
+      // Main row: cycle primary source (left half back, right half forward)
+      int dir = (px < UI_W / 2) ? -1 : 1;
+      Bindings_CyclePrimarySource(s.bindings, k, dir);
+      s.status = s.bindings.status;
+      return true;
+    }
+    return false;
   }
 
   if (s.page == WebUIPage::Settings) {
@@ -639,7 +730,37 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
 
 void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge) {
   if (backEdge) {
+    WebUI_SaveBindingsIfDirty(s);
     s.wantQuit = true;
+    return;
+  }
+
+  if (s.page == WebUIPage::Bindings) {
+    if (stickX < 0) {
+      if (s.bindings.page > 0) { s.bindings.page--; return; }
+      WebUI_SaveBindingsIfDirty(s);
+      s.page = WebUIPage::Settings;
+      s.status = "SETTINGS";
+      return;
+    }
+    if (stickX > 0) {
+      int pc = Bindings_PageCount(s.bindings);
+      if (s.bindings.page + 1 < pc) { s.bindings.page++; return; }
+      WebUI_SaveBindingsIfDirty(s);
+      s.page = WebUIPage::NewGame;
+      return;
+    }
+    std::vector<int> idx;
+    Bindings_Filtered(s.bindings, idx);
+    if (idx.empty()) return;
+    if (stickY < 0) s.bindings.selected = std::max(0, s.bindings.selected - 1);
+    if (stickY > 0) s.bindings.selected = std::min((int)idx.size() - 1, s.bindings.selected + 1);
+    s.bindings.page = s.bindings.selected / s.bindings.pageSize;
+    Bindings_ClampPage(s.bindings);
+    if (triggerEdge) {
+      Bindings_CyclePrimarySource(s.bindings, s.bindings.selected, 1);
+      s.status = s.bindings.status;
+    }
     return;
   }
 
@@ -650,8 +771,8 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
       return;
     }
     if (stickX > 0) {
-      s.page = WebUIPage::NewGame;
-      s.status = "NEW GAME";
+      s.page = WebUIPage::Bindings;
+      s.status = "BINDINGS";
       return;
     }
     if (stickY < 0) s.settingsRow = std::max(0, s.settingsRow - 1);
@@ -718,7 +839,7 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
       return;
     }
     s.page = WebUIPage::Settings;
-    s.status = "GMOD GRAPHICS + ENGINE";
+    s.status = "SETTINGS";
     return;
   }
   std::vector<int> idx;
@@ -747,13 +868,15 @@ static void DrawNav(unsigned char* rgba, WebUIPage page) {
   bool ng = page == WebUIPage::NewGame;
   bool ad = page == WebUIPage::Addons;
   bool st = page == WebUIPage::Settings;
-  FillRect(rgba, 8, 6, 140, 32, ng ? 40 : 120, ng ? 12 : 20, ng ? 18 : 40, 255);
-  DrawText(rgba, 18, 14, "NEW GAME", 255, 240, 244, 2);
-  FillRect(rgba, 158, 6, 128, 32, ad ? 40 : 120, ad ? 12 : 20, ad ? 18 : 40, 255);
-  DrawText(rgba, 176, 14, "ADDONS", 255, 240, 244, 2);
-  FillRect(rgba, 298, 6, 148, 32, st ? 40 : 120, st ? 12 : 20, st ? 18 : 40, 255);
-  DrawText(rgba, 312, 14, "SETTINGS", 255, 240, 244, 2);
-  // CLOSE — always visible
+  bool bd = page == WebUIPage::Bindings;
+  FillRect(rgba, 8, 6, 110, 32, ng ? 40 : 120, ng ? 12 : 20, ng ? 18 : 40, 255);
+  DrawText(rgba, 16, 14, "NEW GAME", 255, 240, 244, 1);
+  FillRect(rgba, 128, 6, 100, 32, ad ? 40 : 120, ad ? 12 : 20, ad ? 18 : 40, 255);
+  DrawText(rgba, 144, 14, "ADDONS", 255, 240, 244, 1);
+  FillRect(rgba, 238, 6, 120, 32, st ? 40 : 120, st ? 12 : 20, st ? 18 : 40, 255);
+  DrawText(rgba, 250, 14, "SETTINGS", 255, 240, 244, 1);
+  FillRect(rgba, 368, 6, 128, 32, bd ? 40 : 120, bd ? 12 : 20, bd ? 18 : 40, 255);
+  DrawText(rgba, 384, 14, "BINDINGS", 255, 240, 244, 1);
   FillRect(rgba, UI_W - 110, 6, 100, 32, 180, 20, 40, 255);
   DrawText(rgba, UI_W - 92, 14, "CLOSE", 255, 255, 255, 2);
 }
@@ -794,6 +917,67 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
 
   FillRect(rgba, 0, 0, UI_W, UI_H, 12, 6, 10, 255);
   DrawNav(rgba, s.page);
+
+  if (s.page == WebUIPage::Bindings) {
+    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 28, 10, 16, 255);
+    const char* filters[] = {"ALL", "FOOT", "VEHICLE"};
+    for (int f = 0; f < 3; ++f) {
+      int x0 = 16 + f * 100;
+      bool on = (s.bindings.filter == f);
+      FillRect(rgba, x0, 52, 92, 22, on ? 90 : 50, on ? 22 : 14, on ? 36 : 22, 255);
+      DrawText(rgba, x0 + 16, 56, filters[f], 255, 240, 244, 1);
+    }
+    FillRect(rgba, UI_W - 320, 52, 100, 22, 60, 20, 40, 255);
+    DrawText(rgba, UI_W - 300, 56, "SAVE", 255, 240, 244, 1);
+    FillRect(rgba, UI_W - 200, 52, 180, 22, 80, 20, 30, 255);
+    DrawText(rgba, UI_W - 188, 56, "RESET DEFAULTS", 255, 240, 244, 1);
+
+    std::vector<int> idx;
+    Bindings_Filtered(s.bindings, idx);
+    int start = s.bindings.page * s.bindings.pageSize;
+    const int rowH = 48;
+    for (int n = 0; n < s.bindings.pageSize; ++n) {
+      int k = start + n;
+      if (k >= (int)idx.size()) break;
+      const auto& info = Bindings_LogicalActions()[idx[k]];
+      BindRule rule{};
+      auto it = s.bindings.actions.find(info.id);
+      if (it != s.bindings.actions.end()) rule = it->second;
+      int y = 84 + n * rowH;
+      bool sel = (k == s.bindings.selected);
+      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 100 : 40, sel ? 24 : 12, sel ? 40 : 18, 255);
+      char line[96];
+      snprintf(line, sizeof(line), "%.22s", info.label.c_str());
+      DrawText(rgba, 20, y + 8, line, 255, 240, 244, 1);
+      std::string ruleTxt = Bindings_FormatRule(rule);
+      if (ruleTxt.size() > 40) ruleTxt = ruleTxt.substr(0, 37) + "...";
+      DrawText(rgba, 20, y + 26, ruleTxt.c_str(), 200, 150, 165, 1);
+      // set badge
+      const char* setL = rule.set.empty() ? "BOTH" : (rule.set == "driving" ? "VEH" : "FOOT");
+      DrawText(rgba, UI_W - 280, y + 16, setL, 160, 180, 200, 1);
+      FillRect(rgba, UI_W - 200, y + 10, 80, 24, 70, 20, 40, 255);
+      DrawText(rgba, UI_W - 188, y + 16, rule.mode == "all" ? "CHORD" : "ANY", 255, 240, 244, 1);
+      FillRect(rgba, UI_W - 100, y + 10, 80, 24, 50, 30, 50, 255);
+      DrawText(rgba, UI_W - 80, y + 16, "DEF", 255, 240, 244, 1);
+    }
+    int pc = Bindings_PageCount(s.bindings);
+    char page[64];
+    snprintf(page, sizeof(page), "P%d/%d  %s%s", s.bindings.page + 1, std::max(1, pc),
+             s.bindings.dirty ? "* " : "", s.bindings.status.c_str());
+    FillRect(rgba, 16, UI_H - 48, 100, 32, 80, 20, 36, 255);
+    DrawText(rgba, 36, UI_H - 38, "PREV", 255, 240, 244, 2);
+    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 80, 20, 36, 255);
+    DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
+    DrawText(rgba, 130, UI_H - 36, page, 200, 150, 165, 1);
+    DrawText(rgba, 130, UI_H - 20, "CLICK=CYCLE SOURCE  MODE=ANY/CHORD  DEF=DEFAULT", 160, 120, 130, 1);
+    if ((cursor && cursor->visible) || s.cursorVisible) {
+      int cx = cursor ? cursor->x : s.cursorX;
+      int cy = cursor ? cursor->y : s.cursorY;
+      FillRect(rgba, cx - 8, cy - 2, 16, 4, 255, 70, 100, 255);
+      FillRect(rgba, cx - 2, cy - 8, 4, 16, 255, 70, 100, 255);
+    }
+    return;
+  }
 
   if (s.page == WebUIPage::Addons) {
     FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 28, 10, 16, 255);

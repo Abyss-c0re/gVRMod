@@ -14,6 +14,7 @@ bool HostCmdPoll(WebUIState& ui, bool* outResetPanel) {
     if (std::strncmp(buf, "addons", 6) == 0) ui.page = WebUIPage::Addons;
     if (std::strncmp(buf, "newgame", 7) == 0) ui.page = WebUIPage::NewGame;
     if (std::strncmp(buf, "settings", 8) == 0) ui.page = WebUIPage::Settings;
+    if (std::strncmp(buf, "bindings", 8) == 0) ui.page = WebUIPage::Bindings;
     if (std::strncmp(buf, "reset", 5) == 0) {
       if (outResetPanel) *outResetPanel = true;
       ui.status = "PANEL RESET";

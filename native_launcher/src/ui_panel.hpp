@@ -1,15 +1,17 @@
 #pragma once
 #include "maps_scan.hpp"
 #include "addons_mgr.hpp"
+#include "bindings_mgr.hpp"
 #include <string>
 #include <vector>
 
-// Reversed WebUI shell: New Game + Addons + GMod native Settings
+// Cube native menu: New Game + Addons + Settings + Bindings
 
 enum class WebUIPage {
   NewGame = 0,
   Addons = 1,
   Settings = 2,
+  Bindings = 3,
 };
 
 // OpenXR backend render (vrmod_* cvars applied via +exec on Start)
@@ -85,6 +87,9 @@ struct WebUIState {
   // --- Addons ---
   AddonManager addons;
 
+  // --- Controller bindings (OpenXR remaps → vrmod_openxr_bindings.json) ---
+  BindingsManager bindings;
+
   std::string status;
   bool wantStart = false;
   bool wantQuit = false;
@@ -114,6 +119,8 @@ int WebUI_SettingsRowCount();
 void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge);
 void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible);
 bool WebUI_PointerClick(WebUIState& s, int px, int py);
+// Persist dirty bindings to garrysmod/data/vrmod/vrmod_openxr_bindings.json
+bool WebUI_SaveBindingsIfDirty(WebUIState& s);
 
 constexpr int UI_W = 960;
 constexpr int UI_H = 540;

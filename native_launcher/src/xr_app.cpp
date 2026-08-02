@@ -257,6 +257,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     // StartGame → keep XR until take_xr handoff
     if (ui.wantStart && !ui.handoff) {
+      WebUI_SaveBindingsIfDirty(ui);
       LaunchRequest lr = LaunchRequestFromUI(ui, gmodRoot);
       ClearCubeHandoffMarkers(gmodRoot);
       std::string err;
