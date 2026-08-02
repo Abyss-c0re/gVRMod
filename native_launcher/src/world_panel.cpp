@@ -60,27 +60,26 @@ static XrQuaternionf QuatFromAxes(Vec3 xAxis, Vec3 yAxis, Vec3 zAxis) {
 }
 
 XrPosef WorldPanelMakePose(Vec3 center, Vec3 normalTowardUser) {
-  // n = panel normal toward user (OpenXR quad -Z)
+  // Standard look-at basis (OpenXR: +X right, +Y up, -Z faces user)
+  // n = toward user; zAxis = away from user = -n
   Vec3 n = normalTowardUser;
   n.y = 0.f;
   if (Dot(n, n) < 1e-8f) n = V3(0, 0, 1);
   n = Normalize(n);
   Vec3 worldUp = V3(0, 1, 0);
-  // right = worldUp × n  (user's right when facing the panel)
-  Vec3 right = Cross(worldUp, n);
-  if (Dot(right, right) < 1e-8f) right = V3(1, 0, 0);
-  right = Normalize(right);
-  // up = right × n  — MUST be +Y (was n×right which flipped the UI upside-down)
-  Vec3 up = Normalize(Cross(right, n));
-  if (up.y < 0.f) {
-    // Guarantee upright
-    up = up * -1.f;
-    right = right * -1.f;
+  Vec3 zAxis = n * -1.f;                 // +Z = panel back
+  Vec3 xAxis = Cross(worldUp, zAxis);    // +X = right
+  if (Dot(xAxis, xAxis) < 1e-8f) xAxis = V3(1, 0, 0);
+  xAxis = Normalize(xAxis);
+  Vec3 yAxis = Cross(zAxis, xAxis);      // +Y = up (right-handed)
+  if (yAxis.y < 0.f) {
+    // Keep upright without mirroring content
+    yAxis = yAxis * -1.f;
+    xAxis = xAxis * -1.f;
   }
-  Vec3 zAxis = n * -1.f; // pose +Z = away from user
   XrPosef p{};
   p.position = {center.x, center.y, center.z};
-  p.orientation = QuatFromAxes(right, up, zAxis);
+  p.orientation = QuatFromAxes(xAxis, yAxis, zAxis);
   return p;
 }
 
