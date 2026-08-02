@@ -13,10 +13,10 @@
 #   • Lua force-start via data/vrmod/openxr_launch.txt marker.
 #
 # Usage:
-#   ./scripts/gvrmod_launcher.sh                 # steam + bg map gm_construct
+#   ./scripts/gvrmod_launcher.sh                 # steam + gm_construct @ 720x480
 #   ./scripts/gvrmod_launcher.sh --native        # hl2.sh (advanced)
 #   ./scripts/gvrmod_launcher.sh --map gm_flatgrass
-#   ./scripts/gvrmod_launcher.sh --play-map
+#   ./scripts/gvrmod_launcher.sh --background    # map_background (menu under world)
 #   ./scripts/gvrmod_launcher.sh --hub
 #   ./scripts/gvrmod_launcher.sh -- %command%    # Steam Launch Options wrapper
 # =============================================================================
@@ -74,8 +74,12 @@ GMOD="$(resolve_gmod)" || {
 APPID=4000
 MAP="gm_construct"
 USE_MAP=1
-MAP_MODE="background"
+# Full map by default — map_background leaves desktop stuck on CEF main menu.
+MAP_MODE="full"
 MODE="menu"
+# Tiny desktop mirror (HMD is primary)
+WIN_W=720
+WIN_H=480
 # Default STEAM: reliable display stack. --native for hl2.sh.
 USE_STEAM=1
 NO_WIVRN=0
@@ -90,7 +94,14 @@ while [[ $# -gt 0 ]]; do
     --background|--bg) MAP_MODE="background"; USE_MAP=1; MAP="${MAP:-gm_construct}"; shift ;;
     --hub)
       MODE="hub"; MAP_MODE="full"; USE_MAP=1; MAP="${MAP:-gm_construct}"; shift ;;
-    --menu) MODE="menu"; MAP_MODE="background"; shift ;;
+    --menu) MODE="menu"; MAP_MODE="full"; shift ;;
+    --res)
+      # e.g. --res 720x480
+      if [[ "${2:-}" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+        WIN_W="${BASH_REMATCH[1]}"; WIN_H="${BASH_REMATCH[2]}"
+      fi
+      shift 2
+      ;;
     --steam) USE_STEAM=1; shift ;;
     --native) USE_STEAM=0; shift ;;
     --no-wivrn) NO_WIVRN=1; shift ;;
@@ -102,7 +113,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$MODE" == "menu" && "$MAP_MODE" != "none" && -z "$MAP" ]]; then
-  MAP="gm_construct"; USE_MAP=1; MAP_MODE="background"
+  MAP="gm_construct"; USE_MAP=1; MAP_MODE="full"
 fi
 if [[ "$MODE" == "hub" ]]; then
   MAP_MODE="full"; MAP="${MAP:-gm_construct}"; USE_MAP=1
@@ -203,15 +214,15 @@ CFG
   MARKER_MODE="hub"
 else
   cat > "$CFG_DIR/gvrmod_menu.cfg" <<CFG
-// gVRMod menu-first — HL2VR-style bg map under GameUI
-// default: +map_background gm_construct
+// gVRMod launcher — full map + auto VR + hub (New Game / Settings)
+// Desktop: tiny window; HMD is primary. Not map_background (that stuck CEF menu).
 vrmod_prefer_backend openxr
 vrmod_autostart 1
 vrmod_menu_vr 1
-vrmod_hub 0
+vrmod_hub 1
 vrmod_require_window_focus 0
 ${HLVR_PINS}
-echo "[gVRMod] menu-first — bg map + freefloat MainMenu"
+echo "[gVRMod] launcher cfg — map + auto VR + hub"
 CFG
   EXEC_CFG="gvrmod_menu"
   MARKER_MODE="menu"
@@ -245,10 +256,17 @@ append_map_args() {
   fi
 }
 
+# Tiny desktop window (HMD primary) — Source: -windowed -w -h
+append_window_args() {
+  local -n arr=$1
+  arr+=(-windowed -w "$WIN_W" -h "$WIN_H")
+}
+
 echo "[gVRMod] OpenXR launcher"
 echo "  GMOD=$GMOD"
 echo "  XR_RUNTIME_JSON=$XR_RUNTIME_JSON"
 echo "  mode=$MODE map=$MAP map_mode=$MAP_MODE"
+echo "  desktop=${WIN_W}x${WIN_H} windowed"
 echo "  launch=$( [[ "$USE_STEAM" == "1" ]] && echo steam || echo native )"
 echo "  marker=$DATA_DIR/openxr_launch.txt"
 echo "  SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-<auto>}"
@@ -268,6 +286,7 @@ if [[ "$WRAPPER" == "1" || ${#EXTRA_ARGS[@]} -gt 0 ]]; then
     [[ "$a" == "+exec" || "$a" == *gvrmod_* ]] && has_exec=1
   done
   [[ "$has_exec" == "0" ]] && CMD+=(+exec "$EXEC_CFG")
+  append_window_args CMD
   append_map_args CMD
   echo "[gVRMod] exec wrapper: ${CMD[*]}"
   # Wrapper: only XR env, no polluted LD_LIBRARY_PATH
@@ -295,7 +314,9 @@ if [[ "$USE_STEAM" == "1" ]]; then
     steam -silent >/tmp/gvrmod-steam.log 2>&1 &
     sleep 3
   fi
-  LAUNCH=(steam -applaunch "$APPID" -novid +exec "$EXEC_CFG")
+  LAUNCH=(steam -applaunch "$APPID" -novid)
+  append_window_args LAUNCH
+  LAUNCH+=(+exec "$EXEC_CFG")
   append_map_args LAUNCH
   echo "[gVRMod] cmd: ${LAUNCH[*]}"
   # Do not pass LD_LIBRARY_PATH into Steam (corrupts client + game)
@@ -311,8 +332,9 @@ if [[ ! -x "$GMOD/hl2.sh" ]]; then
 fi
 
 cd "$GMOD"
-# No fixed -w/-h (can break GLX visual). Let engine choose.
-NATIVE=(./hl2.sh -game garrysmod -novid +exec "$EXEC_CFG")
+NATIVE=(./hl2.sh -game garrysmod -novid)
+append_window_args NATIVE
+NATIVE+=(+exec "$EXEC_CFG")
 append_map_args NATIVE
 echo "[gVRMod] native: ${NATIVE[*]}"
 echo "[gVRMod] native LD_LIBRARY_PATH=${NATIVE_LD:-<empty>}"
