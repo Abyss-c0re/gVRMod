@@ -57,6 +57,10 @@ VRActionHandle XR_FindActionHandleByName(const char* name, const action* actions
 // then attaches. Call XR_SetActionCache first so bindings can resolve actions.
 bool XR_AttachActionSets();
 
+// Reset input SoT so a full VR restart can re-parse the manifest and re-attach.
+// Call from Lua Shutdown before XR_Shutdown (destroys session/instance).
+void XR_ResetInputState();
+
 // Cache the parsed action table for binding suggestion + analog→boolean synthesis.
 void XR_SetActionCache(const action* actions, int count);
 

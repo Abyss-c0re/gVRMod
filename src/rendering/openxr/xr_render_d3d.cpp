@@ -351,6 +351,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int /*stolenTexture*/, const floa
     fei.layers = layers;
 
     res = g_xrEndFrame(g_xrSession, &fei);
+    XR_MarkFrameEnded();
     if (res != XR_SUCCESS) {
         result.errCode = (int)res;
         snprintf(result.errMsg, sizeof(result.errMsg), "xrEndFrame failed: %s",

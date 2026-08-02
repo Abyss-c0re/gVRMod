@@ -686,6 +686,8 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
             srcTex, g_xrSwapchainWidth, g_xrSwapchainHeight, (unsigned long long)g_xrSwapchainFormat);
     }
     res = g_xrEndFrame(g_xrSession, &fei);
+    // Frame is closed whether EndFrame succeeded or not (do not double-end).
+    XR_MarkFrameEnded();
     if (res != XR_SUCCESS) {
         result.errCode = (int)res;
         snprintf(result.errMsg, sizeof(result.errMsg), "xrEndFrame failed: %s",

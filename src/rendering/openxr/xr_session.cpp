@@ -93,6 +93,8 @@ uint32_t         g_xrRecommendedHeight = 0;
 // Submit allowed while VR is live. Cleared first on exit so Submit no-ops
 // before swapchain/session teardown (avoids GLX/worker races under mat_queue 2).
 static bool      g_xrSubmitEnabled = true;
+// True after successful xrBeginFrame until xrEndFrame (orphan-begin safety).
+static bool      g_xrFrameBegun = false;
 
 #ifdef _WIN32
 static HMODULE g_loaderLib = nullptr;
@@ -573,10 +575,14 @@ bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
 #include "input/xr_input.h"
 
 void XR_SetSubmitEnabled(bool enabled) {
-    g_xrSubmitEnabled = enabled;
-    if (!enabled) {
-        VRMOD_LOG_INFO("OpenXR submit disabled (async exit / teardown)");
+    if (!enabled && g_xrSubmitEnabled) {
+        // Close any open frame before teardown (prevents stuck session on restart).
+        if (g_xrFrameBegun && g_xrSessionRunning) {
+            XR_EndFrame();
+        }
+        VRMOD_LOG_INFO("OpenXR submit disabled (exit / teardown)");
     }
+    g_xrSubmitEnabled = enabled;
 }
 
 bool XR_IsSubmitEnabled() {
@@ -677,7 +683,12 @@ bool XR_PollEvents() {
 }
 
 bool XR_WaitAndBeginFrame() {
-    if (!g_xrSessionRunning) return false;
+    if (!g_xrSessionRunning || !g_xrSubmitEnabled) return false;
+
+    // Close orphan begin (exit mid-frame / missed submit) before waiting again.
+    if (g_xrFrameBegun) {
+        XR_EndFrame();
+    }
 
     XrFrameWaitInfo fwi = {XR_TYPE_FRAME_WAIT_INFO};
     g_xrFrameState = {XR_TYPE_FRAME_STATE};
@@ -693,11 +704,16 @@ bool XR_WaitAndBeginFrame() {
         VRMOD_LOG_WARN("xrBeginFrame failed: %s", XR_ResultToString(res));
         return false;
     }
+    g_xrFrameBegun = true;
 
     return g_xrFrameState.shouldRender;
 }
 
 void XR_EndFrame() {
+    if (!g_xrSession || !g_xrEndFrame) {
+        g_xrFrameBegun = false;
+        return;
+    }
     // This is a no-render EndFrame (actual submission goes through xr_render.cpp)
     XrFrameEndInfo fei = {XR_TYPE_FRAME_END_INFO};
     fei.displayTime = g_xrFrameState.predictedDisplayTime;
@@ -705,6 +721,11 @@ void XR_EndFrame() {
     fei.layerCount = 0;
     fei.layers = nullptr;
     g_xrEndFrame(g_xrSession, &fei);
+    g_xrFrameBegun = false;
+}
+
+void XR_MarkFrameEnded() {
+    g_xrFrameBegun = false;
 }
 
 // Build a projection matrix from OpenXR fov angles
@@ -800,6 +821,10 @@ bool XR_GetDisplayInfo(float nearZ, float farZ, XrDisplayInfo* out) {
 void XR_Shutdown() {
     VRMOD_LOG_INFO("Shutting down OpenXR...");
     g_xrSubmitEnabled = false;
+    if (g_xrFrameBegun && g_xrSession && g_xrEndFrame) {
+        XR_EndFrame();
+    }
+    g_xrFrameBegun = false;
 
     if (g_xrStageSpace != XR_NULL_HANDLE && g_xrDestroySpace) {
         g_xrDestroySpace(g_xrStageSpace);

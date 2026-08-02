@@ -15,6 +15,20 @@ int               g_xrActionSpaceCount = 0;
 bool              g_xrActionsAttached = false;
 PoseResult        g_xrHMDPose;
 
+void XR_ResetInputState() {
+    // Session/instance are about to die — do not destroy XrAction handles here
+    // (instance destruction owns them). Clear all Lua-facing / attach SoT.
+    g_xrActionSetCount = 0;
+    memset(g_xrActionSets, 0, sizeof(g_xrActionSets));
+    memset(g_xrActionSetNames, 0, sizeof(g_xrActionSetNames));
+    g_xrActionSpaceCount = 0;
+    memset(g_xrActionSpaces, 0, sizeof(g_xrActionSpaces));
+    g_xrActionsAttached = false;
+    memset(&g_xrHMDPose, 0, sizeof(g_xrHMDPose));
+    XR_SetActionCache(nullptr, 0);
+    VRMOD_LOG_INFO("OpenXR input state reset (ready for restart)");
+}
+
 // Map from our internal action index to XrAction handle
 // We store XrAction as VRActionHandle (uint64_t)
 
