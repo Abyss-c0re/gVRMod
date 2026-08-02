@@ -121,16 +121,16 @@ void GlDrawWorldPanel(GLuint tex) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // ADB Quest: only V was inverted (180° around horizontal). Flip V only.
-  // CPU y=0 top → after glTexImage, flip so top verts get UI top.
+  // CPU raster y=0 is top of UI. glTexImage2D: first row is V=0.
+  // Top panel edge (tl/tr, +up) samples UI top → V=0.
   glBegin(GL_QUADS);
-  glTexCoord2f(0.f, 0.f);
-  glVertex3f(bl.x, bl.y, bl.z);
-  glTexCoord2f(1.f, 0.f);
-  glVertex3f(br.x, br.y, br.z);
-  glTexCoord2f(1.f, 1.f);
-  glVertex3f(tr.x, tr.y, tr.z);
   glTexCoord2f(0.f, 1.f);
+  glVertex3f(bl.x, bl.y, bl.z);
+  glTexCoord2f(1.f, 1.f);
+  glVertex3f(br.x, br.y, br.z);
+  glTexCoord2f(1.f, 0.f);
+  glVertex3f(tr.x, tr.y, tr.z);
+  glTexCoord2f(0.f, 0.f);
   glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
   glDisable(GL_TEXTURE_2D);

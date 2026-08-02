@@ -90,6 +90,17 @@ void WorldPanelSyncAxes() {
   g_wp.up = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 1, 0)));
   g_wp.normal = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 0, -1))); // -Z toward user
   g_wp.c = {g_wp.pose.position.x, g_wp.pose.position.y, g_wp.pose.position.z};
+  // Hard law: panel +Y must point skyward or text is upside-down in headset
+  if (g_wp.up.y < 0.f) {
+    g_wp.up = g_wp.up * -1.f;
+    g_wp.right = g_wp.right * -1.f;
+    g_wp.pose = WorldPanelMakePose(g_wp.c, g_wp.normal);
+    g_wp.right = Normalize(QuatRotate(g_wp.pose.orientation, V3(1, 0, 0)));
+    g_wp.up = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 1, 0)));
+    g_wp.normal = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 0, -1)));
+    if (g_wp.up.y < 0.f) g_wp.up = V3(0, 1, 0); // last resort
+    fprintf(stderr, "[cube_webui] panel axes re-uprighted up.y=%.2f\n", g_wp.up.y);
+  }
 }
 
 bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
@@ -120,8 +131,10 @@ bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
   g_wp.ready = true;
   g_wp.frozen = true;
   g_wp.seedCount++;
-  fprintf(stderr, "[cube_webui] panel seed #%d at (%.2f, %.2f, %.2f) size %.2fx%.2f\n",
-          g_wp.seedCount, g_wp.c.x, g_wp.c.y, g_wp.c.z, g_wp.widthM, g_wp.heightM);
+  fprintf(stderr,
+          "[cube_webui] panel seed #%d pos=(%.2f,%.2f,%.2f) up=(%.2f,%.2f,%.2f) n=(%.2f,%.2f,%.2f)\n",
+          g_wp.seedCount, g_wp.c.x, g_wp.c.y, g_wp.c.z, g_wp.up.x, g_wp.up.y, g_wp.up.z,
+          g_wp.normal.x, g_wp.normal.y, g_wp.normal.z);
   return true;
 }
 
