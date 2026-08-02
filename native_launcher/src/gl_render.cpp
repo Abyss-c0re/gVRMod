@@ -108,11 +108,13 @@ void GlDrawWorldPanel(GLuint tex) {
   const auto& cfg = PanelCfgConst();
   const float hw = (wp.widthM > 0.05f) ? wp.widthM * 0.5f : cfg.halfW;
   const float hh = (wp.heightM > 0.05f) ? wp.heightM * 0.5f : cfg.halfH;
-  // Quad in WORLD meters, same space as xrLocateViews
-  const Vec3 bl = wp.c - wp.right * hw - wp.up * hh;
-  const Vec3 br = wp.c + wp.right * hw - wp.up * hh;
-  const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
-  const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
+  // Quest ADB: content was 180° in view — flip right+up so CLOSE is top-right upright
+  const Vec3 R = wp.right * -1.f;
+  const Vec3 U = wp.up * -1.f;
+  const Vec3 bl = wp.c - R * hw - U * hh;
+  const Vec3 br = wp.c + R * hw - U * hh;
+  const Vec3 tr = wp.c + R * hw + U * hh;
+  const Vec3 tl = wp.c - R * hw + U * hh;
 
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
@@ -121,7 +123,6 @@ void GlDrawWorldPanel(GLuint tex) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // CPU y=0 = UI top. glTexImage row0 → V=0. Map panel top → V=0.
   glBegin(GL_QUADS);
   glTexCoord2f(0.f, 1.f);
   glVertex3f(bl.x, bl.y, bl.z);
