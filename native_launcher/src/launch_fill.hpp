@@ -30,6 +30,24 @@ inline LaunchRequest LaunchRequestFromUI(const WebUIState& ui, const std::string
   lr.gfx.waterExpensive = ui.gfx.waterExpensive;
   lr.gfx.multicore = ui.gfx.multicore;
   lr.gfx.fpsMax = ui.gfx.fpsMax;
+  // OpenXR backend (ladder indices → float)
+  static const float kSs[] = {0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
+  int ssi = ui.gfx.xr.ssIdx;
+  if (ssi < 0) ssi = 0;
+  if (ssi > 5) ssi = 5;
+  lr.gfx.xrSupersample = kSs[ssi];
+  lr.gfx.xrViewScale = ui.gfx.xr.viewScale;
+  lr.gfx.xrFovScale = ui.gfx.xr.fovScale;
+  lr.gfx.xrScaleFactor = ui.gfx.xr.scaleFactor;
+  lr.gfx.xrEyeScale = ui.gfx.xr.eyeScale;
+  lr.gfx.xrZNear = ui.gfx.xr.zNear;
+  lr.gfx.xrDesktopView = ui.gfx.xr.desktopView;
+  lr.gfx.xrPostProcess = ui.gfx.xr.postProcess;
+  lr.gfx.xrSwapEyes = ui.gfx.xr.swapEyes;
+  lr.gfx.xrSkybox = ui.gfx.xr.skybox;
+  lr.gfx.xrMq2SinglePass = ui.gfx.xr.mq2SinglePass;
+  lr.gfx.xrRenderOffset = ui.gfx.xr.renderOffset;
+  lr.gfx.xrRequireFocus = ui.gfx.xr.requireFocus;
   if (const char* xr = getenv("XR_RUNTIME_JSON")) lr.xrRuntimeJson = xr;
   return lr;
 }

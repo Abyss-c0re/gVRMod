@@ -62,13 +62,26 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "sv_pausable 0\n"
       << "sv_lan " << (req.svLan ? 1 : 0) << "\n"
       << "hostname \"" << req.hostname << "\"\n"
-      << "// --- Cube VRMod ---\n"
+      << "// --- OpenXR backend (Cube launcher SETTINGS) ---\n"
       << "vrmod_prefer_backend openxr\n"
       << "vrmod_autostart 1\n"
       << "vrmod_hub 1\n"
       << "vrmod_menu_vr 0\n"
-      << "vrmod_require_window_focus 0\n"
       << "vrmod_laserpointer 1\n"
+      << "vrmod_supersample " << g.xrSupersample << "\n"
+      << "vrmod_viewscale " << g.xrViewScale << "\n"
+      << "vrmod_fovscale_x " << g.xrFovScale << "\n"
+      << "vrmod_fovscale_y " << g.xrFovScale << "\n"
+      << "vrmod_scalefactor " << g.xrScaleFactor << "\n"
+      << "vrmod_eyescale " << g.xrEyeScale << "\n"
+      << "vrmod_znear " << g.xrZNear << "\n"
+      << "vrmod_desktopview " << g.xrDesktopView << "\n"
+      << "vrmod_postprocess " << (g.xrPostProcess ? 1 : 0) << "\n"
+      << "vrmod_swap_eyes " << (g.xrSwapEyes ? 1 : 0) << "\n"
+      << "vrmod_skybox " << (g.xrSkybox ? 1 : 0) << "\n"
+      << "vrmod_mq2_single_pass " << (g.xrMq2SinglePass ? 1 : 0) << "\n"
+      << "vrmod_renderoffset " << (g.xrRenderOffset ? 1 : 0) << "\n"
+      << "vrmod_require_window_focus " << (g.xrRequireFocus ? 1 : 0) << "\n"
       << "vrmod_start force\n";
 
   const std::string cfgBody = cfg.str();
@@ -85,7 +98,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   std::ostringstream mark;
   mark << "mode=hub\nprefer_backend=openxr\nautostart=1\nmenu_vr=0\nhub=1\n"
        << "bg_map=" << req.map << "\nmap_mode=full\nnative_wrapper=1\n"
-       << "webui_reversed=1\nts=" << (long)time(nullptr) << "\n";
+       << "supersample=" << g.xrSupersample << "\n"
+       << "ts=" << (long)time(nullptr) << "\n";
   if (!WriteFile(dataDir + "/openxr_launch.txt", mark.str())) {
     errOut = "failed to write openxr_launch.txt";
     return 3;

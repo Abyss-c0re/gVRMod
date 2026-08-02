@@ -89,7 +89,7 @@ static void DrawText(unsigned char* rgba, int x, int y, const char* s, int r, in
   }
 }
 
-// --- Settings row IDs (GMod native + server) ---
+// --- Settings row IDs: Source gfx → OpenXR → server ---
 enum SetRow : int {
   SR_PRESET = 0,
   SR_RES,
@@ -105,6 +105,21 @@ enum SetRow : int {
   SR_WATER,
   SR_FPS,
   SR_MULTICORE,
+  // OpenXR backend (vrmod_*)
+  SR_XR_SS,
+  SR_XR_VIEWSCALE,
+  SR_XR_FOVSCALE,
+  SR_XR_SCALEFACTOR,
+  SR_XR_EYESCALE,
+  SR_XR_ZNEAR,
+  SR_XR_DESKTOP,
+  SR_XR_POST,
+  SR_XR_SWAP,
+  SR_XR_SKYBOX,
+  SR_XR_MQ2,
+  SR_XR_RENDEROFFSET,
+  SR_XR_FOCUS,
+  // Server
   SR_PLAYERS,
   SR_LAN,
   SR_P2P,
@@ -127,36 +142,67 @@ static constexpr int kResN = 6;
 static const int kAa[] = {0, 2, 4, 8};
 static const int kAf[] = {0, 2, 4, 8, 16};
 static const int kFps[] = {0, 60, 90, 120, 144, 240};
+// OpenXR supersample ladder (vrmod_supersample)
+static const float kSs[] = {0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
+static constexpr int kSsN = 6;
+static const float kViewSc[] = {0.85f, 0.9f, 1.0f, 1.1f, 1.25f};
+static constexpr int kViewScN = 5;
+static const float kFovSc[] = {0.9f, 0.95f, 1.0f, 1.05f, 1.1f};
+static constexpr int kFovScN = 5;
+static const float kScaleF[] = {0.9f, 0.95f, 1.0f, 1.05f, 1.1f};
+static constexpr int kScaleFN = 5;
+static const float kEyeSc[] = {0.35f, 0.45f, 0.5f, 0.55f, 0.65f};
+static constexpr int kEyeScN = 5;
+static const float kZNear[] = {0.5f, 1.0f, 1.5f, 2.0f, 3.0f};
+static constexpr int kZNearN = 5;
 
 static int IndexOf(const int* a, int n, int v) {
   for (int i = 0; i < n; ++i) if (a[i] == v) return i;
   return 0;
 }
+static int IndexOfF(const float* a, int n, float v) {
+  int best = 0;
+  float bd = 1e9f;
+  for (int i = 0; i < n; ++i) {
+    float d = std::fabs(a[i] - v);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
 
 void WebUI_ApplyGfxPreset(WebUIState& s, int preset) {
   preset = std::clamp(preset, 0, 3);
   s.gfx.preset = preset;
-  // Low / Med / High / Ultra → Source-ish defaults
+  auto& x = s.gfx.xr;
+  // Low / Med / High / Ultra → Source + OpenXR defaults
   if (preset == 0) {
     s.gfx.matPicmip = 2; s.gfx.rRootLod = 2; s.gfx.matAntialias = 0; s.gfx.matForceAniso = 0;
     s.gfx.matHdrLevel = 0; s.gfx.shadows = false; s.gfx.flashlightShadows = false;
     s.gfx.specular = false; s.gfx.bumpmap = true; s.gfx.waterExpensive = false;
     s.gfx.multicore = true; s.gfx.fpsMax = 60;
+    x.ssIdx = 1; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
+    x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
   } else if (preset == 1) {
     s.gfx.matPicmip = 1; s.gfx.rRootLod = 1; s.gfx.matAntialias = 2; s.gfx.matForceAniso = 4;
     s.gfx.matHdrLevel = 1; s.gfx.shadows = true; s.gfx.flashlightShadows = false;
     s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = false;
     s.gfx.multicore = true; s.gfx.fpsMax = 90;
+    x.ssIdx = 2; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
+    x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
   } else if (preset == 2) {
     s.gfx.matPicmip = 0; s.gfx.rRootLod = 0; s.gfx.matAntialias = 4; s.gfx.matForceAniso = 8;
     s.gfx.matHdrLevel = 2; s.gfx.shadows = true; s.gfx.flashlightShadows = true;
     s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = true;
     s.gfx.multicore = true; s.gfx.fpsMax = 0;
+    x.ssIdx = 3; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
+    x.postProcess = false; x.skybox = false; x.mq2SinglePass = true;
   } else {
     s.gfx.matPicmip = -1; s.gfx.rRootLod = 0; s.gfx.matAntialias = 8; s.gfx.matForceAniso = 16;
     s.gfx.matHdrLevel = 2; s.gfx.shadows = true; s.gfx.flashlightShadows = true;
     s.gfx.specular = true; s.gfx.bumpmap = true; s.gfx.waterExpensive = true;
     s.gfx.multicore = true; s.gfx.fpsMax = 0;
+    x.ssIdx = 5; x.viewScale = 1.0f; x.fovScale = 1.0f; x.scaleFactor = 1.0f;
+    x.postProcess = true; x.skybox = true; x.mq2SinglePass = true;
   }
 }
 
@@ -219,6 +265,56 @@ void WebUI_CycleSetting(WebUIState& s, int row, int dir) {
       break;
     }
     case SR_MULTICORE: g.multicore = !g.multicore; g.preset = -1; break;
+    case SR_XR_SS:
+      g.xr.ssIdx = (g.xr.ssIdx + dir + kSsN) % kSsN;
+      g.preset = -1;
+      break;
+    case SR_XR_VIEWSCALE: {
+      int i = IndexOfF(kViewSc, kViewScN, g.xr.viewScale);
+      i = (i + dir + kViewScN) % kViewScN;
+      g.xr.viewScale = kViewSc[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_XR_FOVSCALE: {
+      int i = IndexOfF(kFovSc, kFovScN, g.xr.fovScale);
+      i = (i + dir + kFovScN) % kFovScN;
+      g.xr.fovScale = kFovSc[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_XR_SCALEFACTOR: {
+      int i = IndexOfF(kScaleF, kScaleFN, g.xr.scaleFactor);
+      i = (i + dir + kScaleFN) % kScaleFN;
+      g.xr.scaleFactor = kScaleF[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_XR_EYESCALE: {
+      int i = IndexOfF(kEyeSc, kEyeScN, g.xr.eyeScale);
+      i = (i + dir + kEyeScN) % kEyeScN;
+      g.xr.eyeScale = kEyeSc[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_XR_ZNEAR: {
+      int i = IndexOfF(kZNear, kZNearN, g.xr.zNear);
+      i = (i + dir + kZNearN) % kZNearN;
+      g.xr.zNear = kZNear[i];
+      g.preset = -1;
+      break;
+    }
+    case SR_XR_DESKTOP:
+      // cycle 1..3
+      g.xr.desktopView = 1 + ((g.xr.desktopView - 1 + dir + 3) % 3);
+      g.preset = -1;
+      break;
+    case SR_XR_POST: g.xr.postProcess = !g.xr.postProcess; g.preset = -1; break;
+    case SR_XR_SWAP: g.xr.swapEyes = !g.xr.swapEyes; g.preset = -1; break;
+    case SR_XR_SKYBOX: g.xr.skybox = !g.xr.skybox; g.preset = -1; break;
+    case SR_XR_MQ2: g.xr.mq2SinglePass = !g.xr.mq2SinglePass; g.preset = -1; break;
+    case SR_XR_RENDEROFFSET: g.xr.renderOffset = !g.xr.renderOffset; g.preset = -1; break;
+    case SR_XR_FOCUS: g.xr.requireFocus = !g.xr.requireFocus; g.preset = -1; break;
     case SR_PLAYERS:
       s.maxPlayersIdx = (s.maxPlayersIdx + dir + 8) % 8;
       break;
@@ -277,6 +373,51 @@ static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) 
       else snprintf(out, outN, "FPS CAP         %d", g.fpsMax);
       break;
     case SR_MULTICORE: snprintf(out, outN, "MULTICORE       %s", g.multicore ? "ON" : "OFF"); break;
+    case SR_XR_SS: {
+      float ss = kSs[std::clamp(g.xr.ssIdx, 0, kSsN - 1)];
+      snprintf(out, outN, "XR SUPERSAMPLE  %.2f", ss);
+      break;
+    }
+    case SR_XR_VIEWSCALE:
+      snprintf(out, outN, "XR VIEW SCALE   %.2f", g.xr.viewScale);
+      break;
+    case SR_XR_FOVSCALE:
+      snprintf(out, outN, "XR FOV SCALE    %.2f", g.xr.fovScale);
+      break;
+    case SR_XR_SCALEFACTOR:
+      snprintf(out, outN, "XR UV SCALE     %.2f", g.xr.scaleFactor);
+      break;
+    case SR_XR_EYESCALE:
+      snprintf(out, outN, "XR EYE OFFSET   %.2f", g.xr.eyeScale);
+      break;
+    case SR_XR_ZNEAR:
+      snprintf(out, outN, "XR ZNEAR        %.1f", g.xr.zNear);
+      break;
+    case SR_XR_DESKTOP: {
+      const char* dv = "RIGHT";
+      if (g.xr.desktopView == 1) dv = "NONE";
+      else if (g.xr.desktopView == 2) dv = "LEFT";
+      snprintf(out, outN, "XR DESKTOP VIEW %s", dv);
+      break;
+    }
+    case SR_XR_POST:
+      snprintf(out, outN, "XR POSTPROCESS  %s", g.xr.postProcess ? "ON" : "OFF");
+      break;
+    case SR_XR_SWAP:
+      snprintf(out, outN, "XR SWAP EYES    %s", g.xr.swapEyes ? "ON" : "OFF");
+      break;
+    case SR_XR_SKYBOX:
+      snprintf(out, outN, "XR 3D SKYBOX    %s", g.xr.skybox ? "ON" : "OFF");
+      break;
+    case SR_XR_MQ2:
+      snprintf(out, outN, "XR MQ2 1-PASS   %s", g.xr.mq2SinglePass ? "ON" : "OFF");
+      break;
+    case SR_XR_RENDEROFFSET:
+      snprintf(out, outN, "XR RENDER OFFSET%s", g.xr.renderOffset ? " ON" : " OFF");
+      break;
+    case SR_XR_FOCUS:
+      snprintf(out, outN, "XR NEED FOCUS   %s", g.xr.requireFocus ? "ON" : "OFF");
+      break;
     case SR_PLAYERS: snprintf(out, outN, "MAX PLAYERS     %d", WebUI_MaxPlayers(s)); break;
     case SR_LAN: snprintf(out, outN, "LAN SERVER      %s", s.svLan ? "ON" : "OFF"); break;
     case SR_P2P: snprintf(out, outN, "P2P             %s", s.p2p ? "ON" : "OFF"); break;
@@ -737,7 +878,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   // --- Settings page (GMod native graphics + engine) ---
   if (s.page == WebUIPage::Settings) {
     FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, 28, 10, 16, 255);
-    DrawText(rgba, 20, 58, "GMOD / SOURCE GRAPHICS  ·  TRIGGER CYCLES  ·  L/R CLICK", 200, 150, 165, 1);
+    DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER CYCLES  ·  XR SS NEEDS VR RESTART", 200, 150, 165, 1);
     char line[96];
     const int visible = 12;
     const int rowH = 32;
@@ -809,11 +950,12 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   row(2, s.p2p ? "P2P ON" : "P2P OFF");
   row(3, s.p2pFriends ? "P2P FRIENDS ON" : "P2P FRIENDS OFF");
 
-  // Graphics summary + jump to Settings
+  // Graphics + OpenXR summary → Settings tab
   FillRect(rgba, setX + 8, 236, setW - 16, 56, 60, 16, 28, 255);
   snprintf(line, sizeof(line), "GFX %s", PresetLabel(s.gfx.preset));
   DrawText(rgba, setX + 16, 244, line, 255, 200, 210, 1);
-  snprintf(line, sizeof(line), "%dx%d  AA%d", s.gfx.winW, s.gfx.winH, s.gfx.matAntialias);
+  float ss = kSs[std::clamp(s.gfx.xr.ssIdx, 0, kSsN - 1)];
+  snprintf(line, sizeof(line), "XR SS %.2f  AA%d", ss, s.gfx.matAntialias);
   DrawText(rgba, setX + 16, 266, line, 200, 150, 165, 1);
 
   int by = UI_H - 70;

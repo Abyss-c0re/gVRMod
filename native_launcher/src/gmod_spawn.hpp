@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-// GMod/Source graphics applied via +exec cfg (not VRMod-only)
+// GMod/Source graphics + OpenXR (vrmod_*) applied via +exec cfg
 struct GfxLaunch {
   int matPicmip = 0;
   int rRootLod = 0;
@@ -15,6 +15,21 @@ struct GfxLaunch {
   bool waterExpensive = true;
   bool multicore = true;
   int fpsMax = 0; // 0 = unlimited
+
+  // OpenXR backend (vrmod module convars)
+  float xrSupersample = 1.5f;
+  float xrViewScale = 1.0f;
+  float xrFovScale = 1.0f;
+  float xrScaleFactor = 1.0f;
+  float xrEyeScale = 0.5f;
+  float xrZNear = 1.0f;
+  int xrDesktopView = 3; // 1 none, 2 left, 3 right
+  bool xrPostProcess = false;
+  bool xrSwapEyes = false;
+  bool xrSkybox = false;
+  bool xrMq2SinglePass = true;
+  bool xrRenderOffset = true;
+  bool xrRequireFocus = false;
 };
 
 struct LaunchRequest {
