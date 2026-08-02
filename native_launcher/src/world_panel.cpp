@@ -11,43 +11,49 @@ WorldPanel& WorldPanelState() { return g_wp; }
 
 void WorldPanelReset() { g_wp = WorldPanel{}; }
 
-static void BuildAxesFacing(Vec3 headP, Vec3 center, Vec3 headU) {
-  g_wp.normal = Normalize(headP - center);
+// Room-vertical axes: yaw-only facing (ignore head pitch/roll) so panel is not HMD-tilted.
+static void BuildAxesYawOnly(Vec3 headP, Vec3 center) {
+  Vec3 toHead = headP - center;
+  toHead.y = 0.f;
+  if (Dot(toHead, toHead) < 1e-8f) toHead = V3(0, 0, 1);
+  g_wp.normal = Normalize(toHead); // points toward head on XZ
   Vec3 worldUp = V3(0, 1, 0);
-  g_wp.right = Cross(worldUp, g_wp.normal);
-  if (Dot(g_wp.right, g_wp.right) < 1e-8f)
-    g_wp.right = Normalize(Cross(headU, g_wp.normal));
-  else
-    g_wp.right = Normalize(g_wp.right);
+  g_wp.right = Normalize(Cross(worldUp, g_wp.normal));
   g_wp.up = Normalize(Cross(g_wp.normal, g_wp.right));
 }
 
-void WorldPanelSeed(const XrPosef& headInWorld) {
+bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
+  if (g_wp.frozen && !force) {
+    // Hard law: never re-seed from HMD after freeze (would look like head-follow)
+    static int warn = 0;
+    if (warn++ < 3)
+      fprintf(stderr, "[cube_webui] PANEL seed REJECTED (frozen) — not head-following\n");
+    return false;
+  }
+
   const auto& cfg = PanelCfgConst();
   Vec3 headP = {headInWorld.position.x, headInWorld.position.y, headInWorld.position.z};
-  Vec3 fwd = Normalize(QuatRotate(headInWorld.orientation, V3(0, 0, -1)));
-  Vec3 headR = Normalize(QuatRotate(headInWorld.orientation, V3(1, 0, 0)));
-  Vec3 headU = Normalize(QuatRotate(headInWorld.orientation, V3(0, 1, 0)));
-  // Offset in head frame at seed only
-  g_wp.c = headP + fwd * (cfg.dist + cfg.offsetZ) + headR * cfg.offsetX + headU * cfg.offsetY;
-  BuildAxesFacing(headP, g_wp.c, headU);
+  // Yaw-only forward in world XZ (OpenXR -Z is forward in view, map to world via quat)
+  Vec3 fwd = QuatRotate(headInWorld.orientation, V3(0, 0, -1));
+  fwd.y = 0.f;
+  if (Dot(fwd, fwd) < 1e-8f) fwd = V3(0, 0, -1);
+  fwd = Normalize(fwd);
+  Vec3 headR = Normalize(Cross(V3(0, 1, 0), fwd * -1.f)); // right from yaw forward
+  if (Dot(headR, headR) < 1e-8f) headR = V3(1, 0, 0);
+  // Place once: world position from head at THIS moment, then freeze forever
+  g_wp.c = headP + fwd * (cfg.dist + cfg.offsetZ) + headR * cfg.offsetX + V3(0, 1, 0) * cfg.offsetY;
+  BuildAxesYawOnly(headP, g_wp.c);
   g_wp.ready = true;
+  g_wp.frozen = true;
+  g_wp.seedCount++;
   fprintf(stderr,
-          "[cube_webui] PANEL ANCHOR seed c=(%.3f,%.3f,%.3f) n=(%.2f,%.2f,%.2f) FROZEN\n",
-          g_wp.c.x, g_wp.c.y, g_wp.c.z, g_wp.normal.x, g_wp.normal.y, g_wp.normal.z);
-}
-
-void WorldPanelReface(const XrPosef& headInWorld) {
-  if (!g_wp.ready) return;
-  Vec3 headP = {headInWorld.position.x, headInWorld.position.y, headInWorld.position.z};
-  Vec3 headU = Normalize(QuatRotate(headInWorld.orientation, V3(0, 1, 0)));
-  BuildAxesFacing(headP, g_wp.c, headU);
-  fprintf(stderr, "[cube_webui] PANEL REFACE (orientation only) n=(%.2f,%.2f,%.2f)\n",
-          g_wp.normal.x, g_wp.normal.y, g_wp.normal.z);
+          "[cube_webui] PANEL ANCHOR #%d c=(%.3f,%.3f,%.3f) FROZEN world (force=%d)\n",
+          g_wp.seedCount, g_wp.c.x, g_wp.c.y, g_wp.c.z, force ? 1 : 0);
+  return true;
 }
 
 void WorldPanelTranslate(Vec3 delta) {
-  if (!g_wp.ready) return;
+  if (!g_wp.ready || !g_wp.frozen) return;
   g_wp.c = g_wp.c + delta;
 }
 

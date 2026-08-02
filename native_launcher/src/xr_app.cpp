@@ -177,8 +177,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     spaceName = "LOCAL";
   }
-  fprintf(stderr, "[cube_webui] world space=%s (panel %s)\n", spaceName,
-          cfg.viewLock ? "VIEW_LOCK hud" : "WORLD-ANCHORED frozen");
+  fprintf(stderr, "[cube_webui] world space=%s panel=WORLD-FROZEN (view_lock ignored)\n", spaceName);
+  if (cfg.viewLock)
+    fprintf(stderr, "[cube_webui] WARN: view_lock conf ignored — head-follow is disabled by law\n");
   XrSpace viewSpace = XR_NULL_HANDLE;
   rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
   xrCreateReferenceSpace(session, &rsci, &viewSpace);
@@ -341,7 +342,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     XrInputSync(session, input);
 
-    // Head pose in WORLD space (STAGE/LOCAL) — seed / MENU re-anchor / optional view_lock
+    // Head pose in WORLD (STAGE/LOCAL) — used ONLY for first seed + MENU re-place.
+    // NEVER call WorldPanelSeed every frame (that is HMD-driven flight heresy).
     XrPosef headWorld = IdentityPose();
     bool headOk = false;
     if (viewSpace) {
@@ -355,18 +357,17 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         }
       }
     }
-    if (cfg.viewLock && headOk) {
-      // Explicit HUD mode only (view_lock=1). Product default is world-lock.
-      WorldPanelSeed(headWorld);
-      worldInitPending = false;
-    } else if (worldInitPending && headOk) {
-      // Seed ONCE — pose freezes in STAGE/LOCAL; never tracks HMD after this.
-      WorldPanelSeed(headWorld);
-      worldInitPending = false;
-      WorldPanelState().usedStage = (strcmp(spaceName, "STAGE") == 0);
-      ui.status = "WORLD LOCK — grip move · menu re-place · not head-follow";
-      WebUI_MarkDirty(ui);
-      fprintf(stderr, "[cube_webui] WORLD LOCK engaged space=%s\n", spaceName);
+    // Product law: view_lock is disabled. World freeze only.
+    // (cfg.viewLock ignored — head-follow is not Cube quality.)
+    if (worldInitPending && headOk) {
+      if (WorldPanelSeed(headWorld, /*force=*/false)) {
+        worldInitPending = false;
+        WorldPanelState().usedStage = (strcmp(spaceName, "STAGE") == 0);
+        ui.status = "WORLD LOCK — frozen in room · grip=move · menu=re-place";
+        WebUI_MarkDirty(ui);
+        fprintf(stderr, "[cube_webui] WORLD LOCK engaged space=%s seed#%d\n",
+                spaceName, WorldPanelState().seedCount);
+      }
     }
 
     auto& wp = WorldPanelState();
@@ -389,25 +390,21 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (!panelHit) aimD = dNeg;
     }
 
-    // Grab: translate center only — orientation stays frozen (no HMD reface)
+    // Grab: only while gripping AND ray hits panel (no proximity auto-grab)
     float grabVal = XrInputReadGrab(session, input);
     const bool grabHeld = grabVal >= cfg.grabThresh;
-    if (grabHeld && aimValid && wp.ready) {
+    if (grabHeld && aimValid && wp.ready && wp.frozen) {
       if (!grabbing) {
-        bool canStart = panelHit;
-        if (!canStart) {
-          Vec3 dlt = wp.c - aimO;
-          canStart = Dot(dlt, dlt) < 2.25f;
-        }
-        if (canStart) {
+        if (panelHit) {
           grabbing = true;
           grabOff = wp.c - aimO;
-          ui.status = "MOVING (orientation frozen)";
+          ui.status = "MOVING panel (world freeze kept)";
           WebUI_MarkDirty(ui);
         }
       }
       if (grabbing) {
-        wp.c = aimO + grabOff; // position only — right/up/normal unchanged
+        // Translate in world space only — never re-face to HMD
+        wp.c = aimO + grabOff;
         panelHit = WorldPanelRayHit(aimO, aimD, &hitPx, &hitPy, &hitPt);
       }
     } else if (grabbing) {
@@ -441,13 +438,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     bool trig = XrInputReadTrigger(session, input);
     bool menuBtn = XrInputReadMenu(session, input);
-    if (menuBtn && !prevMenu) {
+    // MENU re-place: edge + cooldown so chatter cannot re-seed every frame (HMD flight)
+    static float menuReseedCd = 0.f;
+    if (menuReseedCd > 0.f) menuReseedCd -= 1.f / 72.f;
+    if (menuBtn && !prevMenu && menuReseedCd <= 0.f && headOk) {
       grabbing = false;
-      // MENU = re-anchor in front of head (only intentional re-place)
-      if (headOk) {
-        WorldPanelSeed(headWorld);
-        ui.status = "PANEL RE-ANCHORED in front of you";
+      if (WorldPanelSeed(headWorld, /*force=*/true)) {
+        ui.status = "PANEL RE-ANCHORED (intentional)";
         WebUI_MarkDirty(ui);
+        menuReseedCd = 1.5f;
       }
     }
     prevMenu = menuBtn;
