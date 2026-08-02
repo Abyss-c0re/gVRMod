@@ -110,12 +110,12 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   const auto& cfg = PanelCfgConst();
   const float hw = (wp.widthM > 0.05f) ? wp.widthM * 0.5f : cfg.halfW;
   const float hh = (wp.heightM > 0.05f) ? wp.heightM * 0.5f : cfg.halfH;
-  const Vec3 bl = wp.c - wp.right * hw - wp.up * hh;
-  const Vec3 br = wp.c + wp.right * hw - wp.up * hh;
-  const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
-  const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
+  // ADB Quest: with up=+Y, UI was still inverted on screen — swap geometric top/bottom.
+  const Vec3 bl = wp.c - wp.right * hw + wp.up * hh; // world-higher edge holds UI bottom after swap
+  const Vec3 br = wp.c + wp.right * hw + wp.up * hh;
+  const Vec3 tr = wp.c + wp.right * hw - wp.up * hh;
+  const Vec3 tl = wp.c - wp.right * hw - wp.up * hh;
 
-  // Which side of the panel is the eye on?
   const Vec3 eyeP = {eyeWorld.position.x, eyeWorld.position.y, eyeWorld.position.z};
   const bool backFace = Dot(wp.c - eyeP, wp.normal) > 0.f;
 
@@ -127,19 +127,16 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
 
-  // CPU y=0 = UI top. Raw glTexImage: row0 → V=0.
-  // Empirical ADB on Quest/WiVRn: treat V=0 as UI top on panel TOP.
-  // If backFace, flip U so we don't read mirrored.
   auto emit = [&](float u, float v, const Vec3& p) {
     glTexCoord2f(backFace ? (1.f - u) : u, v);
     glVertex3f(p.x, p.y, p.z);
   };
-  // ADB series showed inverted text with (bl=V1,tl=V0). Swap V.
+  // CPU y=0 top → GL V=0 first row. bl=UI bottom V=1, tl=UI top V=0 after geo swap.
   glBegin(GL_QUADS);
-  emit(0.f, 0.f, bl);
-  emit(1.f, 0.f, br);
-  emit(1.f, 1.f, tr);
-  emit(0.f, 1.f, tl);
+  emit(0.f, 1.f, bl);
+  emit(1.f, 1.f, br);
+  emit(1.f, 0.f, tr);
+  emit(0.f, 0.f, tl);
   glEnd();
   glDisable(GL_TEXTURE_2D);
   glColor4f(1.f, 1.f, 1.f, 1.f);
