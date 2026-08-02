@@ -168,21 +168,32 @@ OpenXR is **runtime-agnostic** (not WiVRn-only).
 
 ---
 
-## VR Hub launcher (main menu in VR)
+## Menu-first VR launcher (main menu in the headset)
 
-Stock GMod **main menu VGUI cannot be fully stereo-rendered** before a map loads (unlike HL2VR’s engine fork).  
-gVRMod ships a **VR Hub** shell instead — same job: maps, settings, bindings, disconnect, quit — with **auto VRMod**.
+**Default path:** freefloat the **real** GMod MainMenu / GameUI into a full-view cinema plane (HL2VR-style intent) — laser + trigger, auto VRMod. No forced `gm_construct`.
 
 ```bash
-# Standalone (loads gm_construct + auto VR + hub)
+# Standalone — menu-first (no +map)
 ./scripts/gvrmod_launcher.sh
 
-# Choose map
+# Optional: load a map too
 ./scripts/gvrmod_launcher.sh --map gm_flatgrass
+
+# Legacy hub surface after construct (fallback)
+./scripts/gvrmod_launcher.sh --hub
 
 # Steam → Launch Options
 /path/to/gVRMod/scripts/gvrmod_launcher.sh -- %command%
 ```
 
-Writes `garrysmod/cfg/gvrmod_hub.cfg` (`vrmod_autostart 1`, `vrmod_hub 1`, prefer OpenXR).  
-In headset: hub opens after VR starts. Toggle: `vrmod_hub` / `vrmod_hub_open`.
+Writes `garrysmod/cfg/gvrmod_menu.cfg`:
+
+| Convar | Value |
+|--------|--------|
+| `vrmod_prefer_backend` | `openxr` |
+| `vrmod_autostart` | `1` |
+| `vrmod_menu_vr` | `1` |
+| `vrmod_hub` | `0` |
+
+In headset: real main menu binds as freefloat cinema. If stock VGUI is missing, Cube hub surface opens as fallback.  
+Manual: `vrmod_menu_vr_bind` · `vrmod_menu_vr_status` · `vrmod_hub`.
