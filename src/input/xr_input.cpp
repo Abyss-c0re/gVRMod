@@ -507,6 +507,10 @@ static const float kTriggerClickThreshold = 0.55f;
 // ── Physical controller sources for Lua rebinding UI ──
 // These mirror hardware paths so Lua can map any button/chord → logical action
 // without SteamVR. Logical OpenXR action bindings remain as defaults/fallback.
+//
+// QUEST 3 GOLD: id strings must stay stable — DefaultMap() in
+// cl_openxr_bindings.lua keys off these (right_trigger, left_thumbrest, …).
+// Do not rename without a Lua migration.
 enum { kMaxCtrlSources = 32 };
 // stickAxis: 0 = real OpenXR action; 1..4 = synthetic stick dpad from *stickVec
 //   1=north(+y), 2=south(-y), 3=east(+x), 4=west(-x)
