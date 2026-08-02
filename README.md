@@ -168,29 +168,23 @@ OpenXR is **runtime-agnostic** (not WiVRn-only).
 
 ---
 
-## OpenXR native launcher (menu-first VR)
+## OpenXR native launcher (HL2VR-style bg map)
 
-**Does not** rely on bare `steam -applaunch` (that drops `XR_RUNTIME_JSON` / `LD_LIBRARY_PATH` and often drops `+exec`).
+Like HL2VR’s `background0x` maps: always load a **world under the menu**.
+
+Default: **`map_background gm_construct`** + OpenXR + auto VR + freefloat MainMenu.
 
 ```bash
-# Native: hl2.sh + WiVRn OpenXR + force VR start
-./scripts/gvrmod_launcher.sh
-
-# Optional map / hub fallback
-./scripts/gvrmod_launcher.sh --map gm_flatgrass
-./scripts/gvrmod_launcher.sh --hub
-
-# Steam Launch Options (env preserved around %command%)
-/path/to/gVRMod/scripts/gvrmod_launcher.sh -- %command%
+./scripts/gvrmod_launcher.sh                      # bg map = gm_construct
+./scripts/gvrmod_launcher.sh --map gm_flatgrass   # other bg map
+./scripts/gvrmod_launcher.sh --play-map           # full +map (not background)
+./scripts/gvrmod_launcher.sh --hub                # hub + full construct
 ```
 
-What it does:
+Native line (conceptually):
 
-1. Points `XR_RUNTIME_JSON` + `active_runtime.json` at WiVRn/Monado
-2. Puts `lua/bin` + WiVRn + engine on `LD_LIBRARY_PATH`
-3. Starts `wivrn-server` if needed
-4. Writes `garrysmod/data/vrmod/openxr_launch.txt` (Lua **must** see this → `VRUtilClientStart`)
-5. Runs **`./hl2.sh -game garrysmod +exec gvrmod_menu`** (not Steam alone)
-
-In headset: freefloat real MainMenu cinema. Console: `vrmod_openxr_launch_status` · `vrmod_start force`.
+```text
+hl2.sh -game garrysmod -windowed -w 1280 -h 720 \
+  +exec gvrmod_menu +map_background gm_construct
+```
 
