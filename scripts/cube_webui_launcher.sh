@@ -27,12 +27,18 @@ if [[ ! -x "$BIN" ]]; then
   exit 1
 fi
 
+# Ensure project defaults sit next to the binary
+if [[ -f "$ROOT/native_launcher/cube_webui.conf" ]]; then
+  mkdir -p "$ROOT/install/native"
+  cp -n "$ROOT/native_launcher/cube_webui.conf" "$ROOT/install/native/cube_webui.conf" 2>/dev/null || \
+    cp "$ROOT/native_launcher/cube_webui.conf" "$ROOT/install/native/cube_webui.conf"
+fi
+
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║  Cube native WebUI launcher (OpenXR)                       ║"
-echo "║  GMod starts only after START GAME in the headset          ║"
-echo "║  Tabs: NEW GAME · ADDONS (manager / mount toggle)          ║"
-echo "║  Host: echo start|addons|newgame|up|down|left|right|toggle ║"
-echo "║        > /tmp/cube_webui_cmd                               ║"
+echo "║  TRIGGER click · GRIP move menu · MENU reset pose          ║"
+echo "║  passthrough + flexible panel (cube_webui.conf)            ║"
+echo "║  Host: echo start|reset|click|addons >/tmp/cube_webui_cmd  ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 
 exec "$BIN" "$@"

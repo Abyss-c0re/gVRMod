@@ -130,6 +130,113 @@ int WebUI_MaxPlayers(const WebUIState& s) {
   return s.maxPlayersOpts[std::clamp(s.maxPlayersIdx, 0, 7)];
 }
 
+void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
+  s.cursorX = px;
+  s.cursorY = py;
+  s.cursorVisible = visible;
+  if (visible) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "LASER %d,%d", px, py);
+    // keep short; status set by click handlers primarily
+    (void)s;
+  }
+}
+
+bool WebUI_PointerClick(WebUIState& s, int px, int py) {
+  // Nav tabs
+  if (py >= 6 && py <= 38) {
+    if (px >= 8 && px <= 168) {
+      s.page = WebUIPage::NewGame;
+      s.status = "NEW GAME";
+      return true;
+    }
+    if (px >= 180 && px <= 320) {
+      s.page = WebUIPage::Addons;
+      s.status = "ADDON MANAGER — AIM + TRIGGER";
+      return true;
+    }
+  }
+
+  if (s.page == WebUIPage::Addons) {
+    // list rows
+    const int visible = 14;
+    int start = s.addons.scroll;
+    for (int n = 0; n < visible; ++n) {
+      int i = start + n;
+      if (i >= (int)s.addons.addons.size()) break;
+      int y = 92 + n * 28;
+      if (px >= 244 && px <= UI_W - 16 && py >= y - 2 && py <= y + 22) {
+        s.addons.selected = i;
+        std::string err;
+        if (!Addons_ToggleSelected(s.addons, err))
+          s.status = "TOGGLE FAIL: " + err;
+        else
+          s.status = s.addons.status;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // New Game hit regions
+  const int catW = 180, mapX = 188, mapW = 500, setX = 700, setW = 250;
+
+  // Categories
+  for (int i = 0; i < (int)s.categories.size() && i < 12; ++i) {
+    int y = 80 + i * 28;
+    if (px >= 12 && px <= 8 + catW && py >= y - 2 && py <= y + 22) {
+      s.catIndex = i;
+      s.mapIndex = 0;
+      s.focusCol = 0;
+      s.status = "CAT " + s.categories[i].name;
+      return true;
+    }
+  }
+
+  // Maps
+  if (!s.categories.empty()) {
+    const auto& maps = s.categories[s.catIndex].maps;
+    int visible = 12;
+    int start = std::max(0, s.mapIndex - visible / 2);
+    for (int n = 0; n < visible; ++n) {
+      int i = start + n;
+      if (i >= (int)maps.size()) break;
+      int y = 80 + n * 28;
+      if (px >= mapX + 4 && px <= mapX + mapW - 4 && py >= y - 2 && py <= y + 22) {
+        s.mapIndex = i;
+        s.focusCol = 1;
+        s.status = "MAP " + maps[i];
+        return true;
+      }
+    }
+  }
+
+  // Settings rows
+  for (int idx = 0; idx < 4; ++idx) {
+    int y = 84 + idx * 36;
+    if (px >= setX + 4 && px <= setX + setW - 4 && py >= y - 4 && py <= y + 26) {
+      s.focusCol = 2;
+      s.settingsRow = idx;
+      if (idx == 0) s.maxPlayersIdx = (s.maxPlayersIdx + 1) % 8;
+      else if (idx == 1) s.svLan = !s.svLan;
+      else if (idx == 2) s.p2p = !s.p2p;
+      else if (idx == 3) s.p2pFriends = !s.p2pFriends;
+      s.status = "SETTING TOGGLED";
+      return true;
+    }
+  }
+
+  // START GAME button
+  int by = UI_H - 70;
+  if (px >= setX + 12 && px <= setX + setW - 12 && py >= by && py <= by + 44) {
+    s.focusCol = 3;
+    s.wantStart = true;
+    s.status = "START GAME";
+    return true;
+  }
+  return false;
+}
+
 void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge) {
   if (backEdge) {
     s.wantQuit = true;
@@ -222,7 +329,7 @@ static void DrawNav(unsigned char* rgba, WebUIPage page) {
   DrawText(rgba, 340, 14, "CUBE WEBUI NATIVE", 255, 200, 210, 1);
 }
 
-void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba) {
+void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
   FillRect(rgba, 0, 0, UI_W, UI_H, 12, 6, 10, 255);
   DrawNav(rgba, s.page);
 
@@ -265,6 +372,12 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba) {
       DrawText(rgba, 292, y + 3, line, 255, 240, 244, 1);
     }
     DrawText(rgba, 16, UI_H - 22, s.status.c_str(), 200, 150, 165, 1);
+    if ((cursor && cursor->visible) || s.cursorVisible) {
+      int cx = cursor ? cursor->x : s.cursorX;
+      int cy = cursor ? cursor->y : s.cursorY;
+      FillRect(rgba, cx - 8, cy - 2, 16, 4, 255, 70, 100, 255);
+      FillRect(rgba, cx - 2, cy - 8, 4, 16, 255, 70, 100, 255);
+    }
     return;
   }
 
@@ -320,6 +433,15 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba) {
 
   DrawText(rgba, 12, UI_H - 22, s.status.c_str(), 200, 150, 165, 1);
   char sel[128];
-  snprintf(sel, sizeof(sel), "SEL %s  (RIGHT TO ADDONS)", WebUI_SelectedMap(s).c_str());
+  snprintf(sel, sizeof(sel), "SEL %s  | AIM LASER + TRIGGER", WebUI_SelectedMap(s).c_str());
   DrawText(rgba, mapX + 8, UI_H - 22, sel, 255, 70, 100, 1);
+
+  // Laser crosshair on panel
+  if ((cursor && cursor->visible) || s.cursorVisible) {
+    int cx = cursor ? cursor->x : s.cursorX;
+    int cy = cursor ? cursor->y : s.cursorY;
+    FillRect(rgba, cx - 10, cy - 2, 20, 4, 255, 70, 100, 255);
+    FillRect(rgba, cx - 2, cy - 10, 4, 20, 255, 70, 100, 255);
+    FillRect(rgba, cx - 3, cy - 3, 6, 6, 255, 255, 255, 255);
+  }
 }

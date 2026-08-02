@@ -85,6 +85,27 @@ Rendered as a **stereo OpenGL panel** in OpenXR (not CEF, not GMod VGUI).
 
 ```
 Desktop icon → cube_webui_launcher (OpenXR native)
+
+## Controls (headset)
+- **Trigger** — click UI under laser
+- **Grip / squeeze** — grab and move the menu (stick Y/X fine-tunes while held)
+- **Menu / A** — reset panel pose to `cube_webui.conf` defaults
+- **Thumbstick** — navigate when not grabbing
+
+## Config (no recompile)
+Project defaults: `native_launcher/cube_webui.conf` (copied to `install/native/`).
+User override: `~/.config/gvrmod/cube_webui.conf`.
+
+| key | meaning |
+|-----|---------|
+| `panel_dist` / `panel_w` / `panel_h` | size & depth (m) |
+| `panel_x` / `panel_y` / `panel_z` | VIEW offsets |
+| `view_lock` | `1` head-follow, `0` world-lock after place |
+| `passthrough` | prefer ALPHA_BLEND / FB passthrough |
+| `panel_alpha` | UI opacity over real world |
+| `grab_thresh` | squeeze threshold to grab |
+
+Env: `CUBE_PANEL_*`, `CUBE_PASSTHROUGH`, `CUBE_VIEW_LOCK`.
                     │
                     ├─ browse maps (scan garrysmod/maps/*.bsp)
                     ├─ pick players / LAN

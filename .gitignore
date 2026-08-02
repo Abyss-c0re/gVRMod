@@ -11,3 +11,9 @@ build/
 build_release/
 build_debug/
 native_launcher/build/
+
+# Local scratch (screenshots, temp dumps) — not product
+.scratch/
+
+# Runtime binary next to cwd only; project conf in native_launcher/ is tracked
+/cube_webui_launcher

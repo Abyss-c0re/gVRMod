@@ -40,4 +40,13 @@ set_target_properties(cube_webui_launcher PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../install/native"
 )
 
+# Ship good defaults next to the binary (project conf, not only ~/.config)
+add_custom_command(TARGET cube_webui_launcher POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/cube_webui.conf"
+    "${CMAKE_SOURCE_DIR}/../install/native/cube_webui.conf"
+  COMMENT "Install cube_webui.conf next to binary"
+)
+
 install(TARGETS cube_webui_launcher RUNTIME DESTINATION bin)
+install(FILES cube_webui.conf cube_webui.conf.example DESTINATION share/gvrmod)

@@ -36,6 +36,10 @@ struct WebUIState {
   std::string status;
   bool wantStart = false;
   bool wantQuit = false;
+
+  // Laser cursor (panel pixels)
+  bool cursorVisible = false;
+  int cursorX = 0, cursorY = 0;
 };
 
 void WebUI_Init(WebUIState& s, const std::string& gmodRoot);
@@ -43,11 +47,20 @@ const std::string& WebUI_SelectedMap(const WebUIState& s);
 int WebUI_MaxPlayers(const WebUIState& s);
 
 // stickX/Y -1/0/1, triggerEdge = select/toggle, backEdge = quit / back
-// pageSwitch: when on top tab row
 void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge);
+
+// Laser pointer on panel (pixel coords). Returns true if hit.
+// Click when triggerEdge: hit-test UI widgets.
+void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible);
+bool WebUI_PointerClick(WebUIState& s, int px, int py);
 
 // Panel size
 constexpr int UI_W = 960;
 constexpr int UI_H = 540;
 
-void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba);
+// Optional cursor drawn on raster (laser hit)
+struct WebUICursor {
+  bool visible = false;
+  int x = 0, y = 0;
+};
+void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor = nullptr);

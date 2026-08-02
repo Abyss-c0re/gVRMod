@@ -1,0 +1,20 @@
+# Copy to ~/.config/gvrmod/cube_webui.conf to override project defaults.
+# Also installed next to the binary: install/native/cube_webui.conf
+#
+# panel_dist / panel_w / panel_h — meters (full width/height)
+# panel_x / panel_y / panel_z   — VIEW offsets (m)
+# view_lock=1                   — head-follow; 0 = world-lock after grab
+# passthrough=1                 — alpha-blend / FB passthrough when available
+# panel_alpha=0.96              — UI opacity
+# grab_thresh=0.55              — squeeze to move menu
+
+panel_dist=1.05
+panel_w=0.84
+panel_h=0.48
+panel_x=0.0
+panel_y=0.0
+panel_z=0.0
+view_lock=1
+passthrough=1
+panel_alpha=0.96
+grab_thresh=0.55
