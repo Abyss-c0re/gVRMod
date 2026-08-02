@@ -159,27 +159,28 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
   }
 
-  // World-anchored UI: prefer STAGE (room-fixed), else LOCAL.
-  // VIEW is ONLY for head pose at seed / optional view_lock — never layer.space
-  // when world-locked (drawing in VIEW is what made the menu "follow HMD").
+  // One reference space for eyes + panel + aim. LOCAL first (stable on WiVRn);
+  // STAGE if available for room-scale. Never VIEW for content.
   XrReferenceSpaceCreateInfo rsci{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
   rsci.poseInReferenceSpace = IdentityPose();
   XrSpace space = XR_NULL_HANDLE;
   const char* spaceName = "LOCAL";
-  rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-  if (XR_SUCCEEDED(xrCreateReferenceSpace(session, &rsci, &space))) {
-    spaceName = "STAGE";
-  } else {
-    rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
-    if (XR_FAILED(xrCreateReferenceSpace(session, &rsci, &space))) {
-      Die("xrCreateReferenceSpace failed");
-      return 4;
-    }
-    spaceName = "LOCAL";
+  rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+  if (XR_FAILED(xrCreateReferenceSpace(session, &rsci, &space))) {
+    Die("xrCreateReferenceSpace LOCAL failed");
+    return 4;
   }
-  fprintf(stderr, "[cube_webui] world space=%s panel=WORLD-FROZEN (view_lock ignored)\n", spaceName);
-  if (cfg.viewLock)
-    fprintf(stderr, "[cube_webui] WARN: view_lock conf ignored — head-follow is disabled by law\n");
+  // Prefer STAGE when it works (true room origin)
+  {
+    XrSpace stage = XR_NULL_HANDLE;
+    rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    if (XR_SUCCEEDED(xrCreateReferenceSpace(session, &rsci, &stage))) {
+      xrDestroySpace(space);
+      space = stage;
+      spaceName = "STAGE";
+    }
+  }
+  fprintf(stderr, "[cube_webui] content space=%s (panel+laser+eyes same space)\n", spaceName);
   XrSpace viewSpace = XR_NULL_HANDLE;
   rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
   xrCreateReferenceSpace(session, &rsci, &viewSpace);
@@ -218,32 +219,6 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     eyes[i].images.resize(nImg, {XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR});
     xrEnumerateSwapchainImages(eyes[i].swap, nImg, &nImg,
                                (XrSwapchainImageBaseHeader*)eyes[i].images.data());
-  }
-
-  // UI swapchain for world-locked QUAD layer (not drawn under each eye — room static)
-  XrSwapchain uiSwap = XR_NULL_HANDLE;
-  std::vector<XrSwapchainImageOpenGLKHR> uiImages;
-  {
-    XrSwapchainCreateInfo sc{XR_TYPE_SWAPCHAIN_CREATE_INFO};
-    sc.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-    sc.format = 0x8058;
-    sc.sampleCount = 1;
-    sc.width = UI_W;
-    sc.height = UI_H;
-    sc.faceCount = 1;
-    sc.arraySize = 1;
-    sc.mipCount = 1;
-    if (XR_FAILED(xrCreateSwapchain(session, &sc, &uiSwap))) {
-      Die("UI swapchain failed");
-      return 5;
-    }
-    uint32_t nImg = 0;
-    xrEnumerateSwapchainImages(uiSwap, 0, &nImg, nullptr);
-    uiImages.resize(nImg, {XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR});
-    xrEnumerateSwapchainImages(uiSwap, nImg, &nImg,
-                               (XrSwapchainImageBaseHeader*)uiImages.data());
-    fprintf(stderr, "[cube_webui] UI QUAD swapchain %dx%d images=%u (STAGE-locked)\n",
-            UI_W, UI_H, nImg);
   }
 
   XrSessionBeginInfo sbi{XR_TYPE_SESSION_BEGIN_INFO};
@@ -607,7 +582,6 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
   for (int i = 0; i < 2; ++i)
     if (eyes[i].swap) xrDestroySwapchain(eyes[i].swap);
-  if (uiSwap) xrDestroySwapchain(uiSwap);
   if (ptLayerHandle != XR_NULL_HANDLE && pfnDestroyPtLayer) pfnDestroyPtLayer(ptLayerHandle);
   if (passthrough != XR_NULL_HANDLE) {
     if (pfnPausePt) pfnPausePt(passthrough);

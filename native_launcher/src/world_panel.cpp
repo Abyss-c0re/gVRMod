@@ -15,14 +15,12 @@ void WorldPanelReset() {
   g_wp.pose.orientation.w = 1.f;
 }
 
-// Rotation matrix columns = +X +Y +Z of pose; OpenGL/OpenXR column-major quat.
 static XrQuaternionf QuatFromAxes(Vec3 xAxis, Vec3 yAxis, Vec3 zAxis) {
-  // R = [x y z] as columns
   float m00 = xAxis.x, m01 = yAxis.x, m02 = zAxis.x;
   float m10 = xAxis.y, m11 = yAxis.y, m12 = zAxis.y;
   float m20 = xAxis.z, m21 = yAxis.z, m22 = zAxis.z;
   XrQuaternionf q{};
-  float tr = m00 + m11 + m22;
+  const float tr = m00 + m11 + m22;
   if (tr > 0.f) {
     float s = std::sqrt(tr + 1.f) * 2.f;
     q.w = 0.25f * s;
@@ -63,16 +61,15 @@ static XrQuaternionf QuatFromAxes(Vec3 xAxis, Vec3 yAxis, Vec3 zAxis) {
 
 XrPosef WorldPanelMakePose(Vec3 center, Vec3 normalTowardUser) {
   Vec3 n = normalTowardUser;
-  n.y = 0.f; // keep panel upright in room
+  n.y = 0.f;
   if (Dot(n, n) < 1e-8f) n = V3(0, 0, 1);
   n = Normalize(n);
   Vec3 worldUp = V3(0, 1, 0);
-  Vec3 right = Cross(worldUp, n); // +X
+  Vec3 right = Cross(worldUp, n);
   if (Dot(right, right) < 1e-8f) right = V3(1, 0, 0);
   right = Normalize(right);
-  Vec3 up = Normalize(Cross(n, right)); // +Y
-  // OpenXR quad: +X right, +Y up, -Z faces user → +Z = -normal
-  Vec3 zAxis = n * -1.f;
+  Vec3 up = Normalize(Cross(n, right));
+  Vec3 zAxis = n * -1.f; // pose +Z = away from user
   XrPosef p{};
   p.position = {center.x, center.y, center.z};
   p.orientation = QuatFromAxes(right, up, zAxis);
@@ -80,52 +77,42 @@ XrPosef WorldPanelMakePose(Vec3 center, Vec3 normalTowardUser) {
 }
 
 void WorldPanelSyncAxes() {
-  // Extract axes from pose orientation
-  Vec3 x = QuatRotate(g_wp.pose.orientation, V3(1, 0, 0));
-  Vec3 y = QuatRotate(g_wp.pose.orientation, V3(0, 1, 0));
-  Vec3 z = QuatRotate(g_wp.pose.orientation, V3(0, 0, 1));
-  g_wp.right = Normalize(x);
-  g_wp.up = Normalize(y);
-  g_wp.normal = Normalize(z * -1.f); // -Z faces user
+  g_wp.right = Normalize(QuatRotate(g_wp.pose.orientation, V3(1, 0, 0)));
+  g_wp.up = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 1, 0)));
+  g_wp.normal = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 0, -1))); // -Z toward user
   g_wp.c = {g_wp.pose.position.x, g_wp.pose.position.y, g_wp.pose.position.z};
 }
 
 bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
-  if (g_wp.frozen && !force) {
-    static int w = 0;
-    if (w++ < 2)
-      fprintf(stderr, "[cube_webui] seed blocked (static frozen) — grab/MENU only\n");
-    return false;
-  }
+  if (g_wp.frozen && !force) return false;
+
   const auto& cfg = PanelCfgConst();
   g_wp.widthM = cfg.halfW * 2.f;
   g_wp.heightM = cfg.halfH * 2.f;
 
-  Vec3 headP = {headInWorld.position.x, headInWorld.position.y, headInWorld.position.z};
-  // Place dead ahead at eye height: horizontal yaw only so panel is room-upright and centered
+  const Vec3 headP = {headInWorld.position.x, headInWorld.position.y, headInWorld.position.z};
+  // Look direction (OpenXR eye: -Z)
   Vec3 fwd = QuatRotate(headInWorld.orientation, V3(0, 0, -1));
+  // Keep upright: flatten pitch for placement only
   fwd.y = 0.f;
   if (Dot(fwd, fwd) < 1e-8f) fwd = V3(0, 0, -1);
   fwd = Normalize(fwd);
 
-  // Center: same height as HMD, distance along look yaw (no lateral unless conf)
-  Vec3 center = headP + fwd * (cfg.dist + cfg.offsetZ);
-  center.y = headP.y + cfg.offsetY; // eye height
-  Vec3 yawRight = Normalize(Cross(V3(0, 1, 0), fwd * -1.f));
-  if (Dot(yawRight, yawRight) > 1e-8f) center = center + yawRight * cfg.offsetX;
+  // Dead ahead, eye height, conf distance
+  Vec3 center = headP + fwd * cfg.dist;
+  center.y = headP.y + cfg.offsetY;
+  center = center + Normalize(Cross(V3(0, 1, 0), fwd * -1.f)) * cfg.offsetX;
 
-  // Face the user
-  Vec3 normalTowardUser = Normalize(headP - center);
-  if (Dot(normalTowardUser, normalTowardUser) < 1e-8f) normalTowardUser = fwd * -1.f;
+  Vec3 toHead = headP - center;
+  if (Dot(toHead, toHead) < 1e-8f) toHead = fwd * -1.f;
 
-  g_wp.pose = WorldPanelMakePose(center, normalTowardUser);
+  g_wp.pose = WorldPanelMakePose(center, toHead);
   WorldPanelSyncAxes();
   g_wp.ready = true;
   g_wp.frozen = true;
   g_wp.seedCount++;
-  fprintf(stderr,
-          "[cube_webui] STATIC panel #%d pos=(%.2f,%.2f,%.2f) size=%.2fx%.2f FROZEN (force=%d)\n",
-          g_wp.seedCount, g_wp.c.x, g_wp.c.y, g_wp.c.z, g_wp.widthM, g_wp.heightM, force ? 1 : 0);
+  fprintf(stderr, "[cube_webui] panel seed #%d at (%.2f, %.2f, %.2f) size %.2fx%.2f\n",
+          g_wp.seedCount, g_wp.c.x, g_wp.c.y, g_wp.c.z, g_wp.widthM, g_wp.heightM);
   return true;
 }
 
@@ -143,18 +130,15 @@ bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHi
   float denom = Dot(d, g_wp.normal);
   if (std::fabs(denom) < 1e-5f) return false;
   float t = Dot(g_wp.c - origin, g_wp.normal) / denom;
-  if (t < 0.02f || t > 12.f) return false;
+  if (t < 0.05f || t > 8.f) return false;
   Vec3 hit = origin + d * t;
   float u = Dot(hit - g_wp.c, g_wp.right);
   float v = Dot(hit - g_wp.c, g_wp.up);
   const float hw = g_wp.widthM * 0.5f;
   const float hh = g_wp.heightM * 0.5f;
-  const float margin = 1.05f;
-  if (std::fabs(u) > hw * margin || std::fabs(v) > hh * margin) return false;
-  float cu = std::max(-hw, std::min(hw, u));
-  float cv = std::max(-hh, std::min(hh, v));
-  int px = (int)((cu / hw * 0.5f + 0.5f) * (float)UI_W);
-  int py = (int)((0.5f - cv / hh * 0.5f) * (float)UI_H);
+  if (std::fabs(u) > hw || std::fabs(v) > hh) return false;
+  int px = (int)((u / hw * 0.5f + 0.5f) * (float)UI_W);
+  int py = (int)((0.5f - v / hh * 0.5f) * (float)UI_H);
   px = std::max(0, std::min(UI_W - 1, px));
   py = std::max(0, std::min(UI_H - 1, py));
   if (outPx) *outPx = px;
