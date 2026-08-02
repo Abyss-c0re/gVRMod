@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Abyss-c0re/gVRMod/releases"><img src="https://img.shields.io/github/v/release/Abyss-c0re/gVRMod?label=release" alt="release" /></a>
+  <a href="https://github.com/Abyss-c0re/gVRMod"><img src="https://img.shields.io/github/last-commit/Abyss-c0re/gVRMod?label=gVRMod" alt="last commit" /></a>
   <a href="https://github.com/Abyss-c0re/vrmod-x64"><img src="https://img.shields.io/badge/Lua%20addon-vrmod--x64-c41e3a" alt="addon" /></a>
   <a href="https://github.com/Abyss-c0re/vrmod-module-master"><img src="https://img.shields.io/badge/OpenVR%20module-vrmod--module--master-2f6fed" alt="openvr" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-CUBECHAIN-8B0000" alt="license" /></a>
