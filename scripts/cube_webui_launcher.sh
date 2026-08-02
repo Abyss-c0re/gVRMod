@@ -9,6 +9,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$ROOT/install/native/cube_webui_launcher"
 
+# Keep monorepo + addon tracking remotes (never hard-reset). Opt out: GVMOD_NO_SYNC=1
+if [[ "${GVMOD_NO_SYNC:-0}" != "1" && -x "$ROOT/scripts/sync_repos.sh" ]]; then
+  # status-only is fast; full push on every launch is noisy — fetch/ff when clean
+  env -u LD_LIBRARY_PATH "$ROOT/scripts/sync_repos.sh" --pull-only 2>/dev/null || true
+fi
+
 if [[ ! -x "$BIN" ]]; then
   echo "[cube_webui] building native launcher…"
   mkdir -p "$ROOT/native_launcher/build"
