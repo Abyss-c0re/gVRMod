@@ -1,7 +1,20 @@
-// Cube WebUI OpenXR host — world-locked panel + controller laser + trigger
+// Cube WebUI OpenXR host — orchestration only (logic lives in modules).
+#include "xr_app.hpp"
+
+#include "panel_config.hpp"
+#include "world_panel.hpp"
+#include "glx_context.hpp"
+#include "gl_render.hpp"
+#include "xr_input.hpp"
+#include "xr_util.hpp"
+#include "host_cmd.hpp"
+#include "launch_fill.hpp"
+#include "gmod_spawn.hpp"
+#include "ui_panel.hpp"
+#include "math3d.hpp"
+
 #include <X11/Xlib.h>
 #include <GL/gl.h>
-#include <GL/glext.h>
 #include <GL/glx.h>
 
 #define XR_USE_PLATFORM_XLIB
@@ -9,572 +22,34 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
-#include "xr_app.hpp"
-#include "gmod_spawn.hpp"
-#include "ui_panel.hpp"
-
-#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
 #include <unistd.h>
 
-// FBO
-static PFNGLGENFRAMEBUFFERSPROC glGenFramebuffers_ = nullptr;
-static PFNGLBINDFRAMEBUFFERPROC glBindFramebuffer_ = nullptr;
-static PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D_ = nullptr;
-static void LoadFBO() {
-  if (glGenFramebuffers_) return;
-  glGenFramebuffers_ = (PFNGLGENFRAMEBUFFERSPROC)glXGetProcAddress((const GLubyte*)"glGenFramebuffers");
-  glBindFramebuffer_ = (PFNGLBINDFRAMEBUFFERPROC)glXGetProcAddress((const GLubyte*)"glBindFramebuffer");
-  glFramebufferTexture2D_ = (PFNGLFRAMEBUFFERTEXTURE2DPROC)glXGetProcAddress((const GLubyte*)"glFramebufferTexture2D");
-}
-
 static void Die(const char* m) { fprintf(stderr, "[cube_webui] FATAL: %s\n", m); }
-
-// --- math ---
-struct Vec3 { float x, y, z; };
-static Vec3 V3(float x, float y, float z) { return {x, y, z}; }
-static Vec3 operator+(Vec3 a, Vec3 b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
-static Vec3 operator-(Vec3 a, Vec3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
-static Vec3 operator*(Vec3 a, float s) { return {a.x * s, a.y * s, a.z * s}; }
-static float Dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-static Vec3 Cross(Vec3 a, Vec3 b) {
-  return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
-}
-static Vec3 Normalize(Vec3 v) {
-  float l = std::sqrt(Dot(v, v));
-  if (l < 1e-8f) return {0, 0, -1};
-  return v * (1.f / l);
-}
-static Vec3 QuatRotate(XrQuaternionf q, Vec3 v) {
-  // q * (0,v) * q^-1
-  Vec3 u = {q.x, q.y, q.z};
-  float s = q.w;
-  return u * (2.f * Dot(u, v)) + v * (s * s - Dot(u, u)) + Cross(u, v) * (2.f * s);
-}
-static XrPosef IdentityPose() {
-  XrPosef p{};
-  p.orientation.w = 1.f;
-  return p;
-}
-
-// Flexible head-facing menu. Tunable without recompile (project conf ships defaults):
-//   project:  install/native/cube_webui.conf  or  native_launcher/cube_webui.conf
-//   user:     ~/.config/gvrmod/cube_webui.conf
-//   gmod:     $GMOD/garrysmod/data/vrmod/cube_webui.conf
-//   env:      CUBE_PANEL_*  CUBE_PASSTHROUGH  CUBE_VIEW_LOCK
-struct PanelConfig {
-  float dist = 1.05f;     // default depth meters (center z = -dist + offset_z)
-  float halfW = 0.42f;    // full width 0.84m
-  float halfH = 0.24f;    // full height 0.48m
-  float offsetX = 0.f;    // VIEW lateral (m)
-  float offsetY = 0.f;    // VIEW vertical (m)
-  float offsetZ = 0.f;    // extra depth (+ = further / more -Z)
-  // World-locked floating panel (grab to place). Head-follow is optional.
-  bool viewLock = false;
-  bool passthrough = true;
-  float grabThresh = 0.55f;
-  float panelAlpha = 0.96f; // UI opacity over passthrough
-};
-
-// World panel in LOCAL space (position + frozen orientation). Does NOT billboard to HMD.
-struct WorldPanel {
-  Vec3 c{0, 0, -1.05f};
-  Vec3 right{1, 0, 0};
-  Vec3 up{0, 1, 0};
-  Vec3 normal{0, 0, 1}; // faces user at seed/place
-  bool ready = false;
-};
-
-static PanelConfig g_cfg{};
-static WorldPanel g_wp{};
-
-static std::string Dirname(const std::string& p) {
-  auto s = p.find_last_of('/');
-  if (s == std::string::npos) return ".";
-  if (s == 0) return "/";
-  return p.substr(0, s);
-}
-
-static std::string ExeDir() {
-  char buf[4096];
-  ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-  if (n <= 0) return {};
-  buf[n] = 0;
-  return Dirname(buf);
-}
-
-static void ApplyConfigKey(const char* key, float val) {
-  if (strcmp(key, "panel_dist") == 0 || strcmp(key, "dist") == 0) {
-    if (val >= 0.25f && val <= 4.f) g_cfg.dist = val;
-  } else if (strcmp(key, "panel_w") == 0) {
-    if (val > 0.2f && val < 4.f) g_cfg.halfW = val * 0.5f;
-  } else if (strcmp(key, "panel_h") == 0) {
-    if (val > 0.15f && val < 3.f) g_cfg.halfH = val * 0.5f;
-  } else if (strcmp(key, "panel_half_w") == 0 || strcmp(key, "half_w") == 0) {
-    if (val > 0.1f && val < 2.f) g_cfg.halfW = val;
-  } else if (strcmp(key, "panel_half_h") == 0 || strcmp(key, "half_h") == 0) {
-    if (val > 0.08f && val < 1.5f) g_cfg.halfH = val;
-  } else if (strcmp(key, "panel_x") == 0 || strcmp(key, "offset_x") == 0) {
-    if (val > -2.f && val < 2.f) g_cfg.offsetX = val;
-  } else if (strcmp(key, "panel_y") == 0 || strcmp(key, "offset_y") == 0) {
-    if (val > -2.f && val < 2.f) g_cfg.offsetY = val;
-  } else if (strcmp(key, "panel_z") == 0 || strcmp(key, "offset_z") == 0) {
-    if (val > -2.f && val < 2.f) g_cfg.offsetZ = val;
-  } else if (strcmp(key, "grab_thresh") == 0 || strcmp(key, "grab_threshold") == 0) {
-    if (val >= 0.2f && val <= 1.f) g_cfg.grabThresh = val;
-  } else if (strcmp(key, "panel_alpha") == 0) {
-    if (val >= 0.4f && val <= 1.f) g_cfg.panelAlpha = val;
-  } else if (strcmp(key, "passthrough") == 0 || strcmp(key, "ar") == 0) {
-    g_cfg.passthrough = (val != 0.f);
-  } else if (strcmp(key, "view_lock") == 0 || strcmp(key, "viewlock") == 0 ||
-             strcmp(key, "head_lock") == 0) {
-    g_cfg.viewLock = (val != 0.f);
-  } else if (strcmp(key, "world_lock") == 0) {
-    g_cfg.viewLock = (val == 0.f); // world_lock=1 → viewLock false
-  }
-}
-
-static bool LoadConfigFile(const std::string& path) {
-  FILE* f = fopen(path.c_str(), "r");
-  if (!f) return false;
-  char line[256];
-  while (fgets(line, sizeof(line), f)) {
-    if (line[0] == '#' || line[0] == ';' || line[0] == '\n') continue;
-    char key[64] = {};
-    float val = 0.f;
-    if (sscanf(line, " %63[^=]=%f", key, &val) != 2) continue;
-    ApplyConfigKey(key, val);
-  }
-  fclose(f);
-  fprintf(stderr, "[cube_webui] config %s\n", path.c_str());
-  return true;
-}
-
-static void LoadPanelConfig(const std::string& gmodRoot) {
-  g_cfg = PanelConfig{};
-  // 1) Project defaults next to binary / source tree
-  std::string exe = ExeDir();
-  if (!exe.empty()) {
-    LoadConfigFile(exe + "/cube_webui.conf");
-    // install/native → ../../native_launcher/cube_webui.conf
-    LoadConfigFile(Dirname(Dirname(exe)) + "/native_launcher/cube_webui.conf");
-  }
-  LoadConfigFile("cube_webui.conf");
-  // 2) User override
-  if (const char* home = getenv("HOME")) {
-    LoadConfigFile(std::string(home) + "/.config/gvrmod/cube_webui.conf");
-  }
-  // 3) GMod data
-  if (!gmodRoot.empty()) {
-    LoadConfigFile(gmodRoot + "/garrysmod/data/vrmod/cube_webui.conf");
-  }
-  // 4) Env wins
-  auto tryEnvF = [](const char* k, float& out, float lo, float hi) {
-    if (const char* v = getenv(k)) {
-      float f = strtof(v, nullptr);
-      if (f > lo && f < hi) out = f;
-    }
-  };
-  auto tryEnvB = [](const char* k, bool& out) {
-    if (const char* v = getenv(k)) out = !(v[0] == '0' && v[1] == 0);
-  };
-  if (const char* v = getenv("CUBE_PANEL_W")) {
-    float f = strtof(v, nullptr);
-    if (f > 0.3f && f < 4.f) g_cfg.halfW = f * 0.5f;
-  }
-  if (const char* v = getenv("CUBE_PANEL_H")) {
-    float f = strtof(v, nullptr);
-    if (f > 0.2f && f < 3.f) g_cfg.halfH = f * 0.5f;
-  }
-  tryEnvF("CUBE_PANEL_DIST", g_cfg.dist, 0.25f, 4.f);
-  tryEnvF("CUBE_PANEL_HALF_W", g_cfg.halfW, 0.1f, 2.f);
-  tryEnvF("CUBE_PANEL_HALF_H", g_cfg.halfH, 0.08f, 1.5f);
-  tryEnvF("CUBE_PANEL_X", g_cfg.offsetX, -2.f, 2.f);
-  tryEnvF("CUBE_PANEL_Y", g_cfg.offsetY, -2.f, 2.f);
-  tryEnvF("CUBE_PANEL_Z", g_cfg.offsetZ, -2.f, 2.f);
-  tryEnvF("CUBE_PANEL_ALPHA", g_cfg.panelAlpha, 0.4f, 1.01f);
-  tryEnvF("CUBE_GRAB_THRESH", g_cfg.grabThresh, 0.2f, 1.01f);
-  tryEnvB("CUBE_PASSTHROUGH", g_cfg.passthrough);
-  tryEnvB("CUBE_VIEW_LOCK", g_cfg.viewLock);
-  if (const char* v = getenv("CUBE_WORLD_LOCK")) {
-    if (!(v[0] == '0' && v[1] == 0)) g_cfg.viewLock = false;
-  }
-
-  // Product default: world lock. Only CUBE_VIEW_LOCK=1 enables HUD follow.
-  if (!getenv("CUBE_VIEW_LOCK"))
-    g_cfg.viewLock = false;
-  g_wp = WorldPanel{};
-  g_cfg.grabThresh = std::min(g_cfg.grabThresh, 0.40f);
-  fprintf(stderr,
-          "[cube_webui] panel size=%.2fx%.2fm dist=%.2f "
-          "world_lock=%d passthrough=%d grab>=%.2f\n",
-          g_cfg.halfW * 2.f, g_cfg.halfH * 2.f, g_cfg.dist,
-          g_cfg.viewLock ? 0 : 1, g_cfg.passthrough ? 1 : 0, g_cfg.grabThresh);
-}
-
-// Seed / re-place panel in LOCAL: fixed pos + orientation (faces head at this moment only).
-static void SeedWorldPanel(const XrPosef& headLocal) {
-  Vec3 headP = {headLocal.position.x, headLocal.position.y, headLocal.position.z};
-  Vec3 fwd = Normalize(QuatRotate(headLocal.orientation, V3(0, 0, -1)));
-  Vec3 headR = Normalize(QuatRotate(headLocal.orientation, V3(1, 0, 0)));
-  Vec3 headU = Normalize(QuatRotate(headLocal.orientation, V3(0, 1, 0)));
-  g_wp.c = headP + fwd * g_cfg.dist + headR * g_cfg.offsetX + headU * g_cfg.offsetY +
-           fwd * g_cfg.offsetZ;
-  // Face user now; then freeze (no per-frame billboard)
-  g_wp.normal = Normalize(headP - g_wp.c);
-  Vec3 worldUp = V3(0, 1, 0);
-  g_wp.right = Cross(worldUp, g_wp.normal);
-  if (Dot(g_wp.right, g_wp.right) < 1e-8f)
-    g_wp.right = Normalize(Cross(headU, g_wp.normal));
-  else
-    g_wp.right = Normalize(g_wp.right);
-  g_wp.up = Normalize(Cross(g_wp.normal, g_wp.right));
-  g_wp.ready = true;
-  fprintf(stderr, "[cube_webui] world panel seeded LOCAL c=(%.2f,%.2f,%.2f)\n",
-          g_wp.c.x, g_wp.c.y, g_wp.c.z);
-}
-
-// Ray vs world panel plane in LOCAL. UV matches texture top-left.
-static bool RayHitWorldPanel(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit) {
-  if (!g_wp.ready) return false;
-  Vec3 d = Normalize(dir);
-  float denom = Dot(d, g_wp.normal);
-  if (std::fabs(denom) < 1e-5f) return false;
-  float t = Dot(g_wp.c - origin, g_wp.normal) / denom;
-  if (t < 0.02f || t > 10.f) return false;
-  Vec3 hit = origin + d * t;
-  float u = Dot(hit - g_wp.c, g_wp.right);
-  float v = Dot(hit - g_wp.c, g_wp.up);
-  const float hw = g_cfg.halfW, hh = g_cfg.halfH;
-  const float margin = 1.08f;
-  if (std::fabs(u) > hw * margin || std::fabs(v) > hh * margin) return false;
-  float cu = std::max(-hw, std::min(hw, u));
-  float cv = std::max(-hh, std::min(hh, v));
-  int px = (int)((cu / hw * 0.5f + 0.5f) * (float)UI_W);
-  int py = (int)((0.5f - cv / hh * 0.5f) * (float)UI_H);
-  px = std::max(0, std::min(UI_W - 1, px));
-  py = std::max(0, std::min(UI_H - 1, py));
-  if (outPx) *outPx = px;
-  if (outPy) *outPy = py;
-  if (outHit) *outHit = hit;
-  return true;
-}
-
-// Column-major 4x4: parent_from_local
-static void PoseToMat(const XrPosef& pose, float M[16]) {
-  float x = pose.orientation.x, y = pose.orientation.y, z = pose.orientation.z, w = pose.orientation.w;
-  // row-major R then pack as columns
-  float r00 = 1 - 2*y*y - 2*z*z, r01 = 2*x*y - 2*z*w, r02 = 2*x*z + 2*y*w;
-  float r10 = 2*x*y + 2*z*w,     r11 = 1 - 2*x*x - 2*z*z, r12 = 2*y*z - 2*x*w;
-  float r20 = 2*x*z - 2*y*w,     r21 = 2*y*z + 2*x*w,     r22 = 1 - 2*x*x - 2*y*y;
-  M[0] = r00; M[1] = r10; M[2] = r20; M[3] = 0;
-  M[4] = r01; M[5] = r11; M[6] = r21; M[7] = 0;
-  M[8] = r02; M[9] = r12; M[10] = r22; M[11] = 0;
-  M[12] = pose.position.x; M[13] = pose.position.y; M[14] = pose.position.z; M[15] = 1;
-}
-static void MatMul4(const float A[16], const float B[16], float O[16]) {
-  float T[16];
-  for (int c = 0; c < 4; ++c) {
-    for (int r = 0; r < 4; ++r) {
-      T[c * 4 + r] = A[0 * 4 + r] * B[c * 4 + 0] + A[1 * 4 + r] * B[c * 4 + 1] +
-                     A[2 * 4 + r] * B[c * 4 + 2] + A[3 * 4 + r] * B[c * 4 + 3];
-    }
-  }
-  std::memcpy(O, T, sizeof(T));
-}
-// Modelview: LOCAL/world verts → eye camera (inv of eye pose in LOCAL)
-static void LoadModelviewLocal(const XrPosef& eyeLocal) {
-  Vec3 t = {eyeLocal.position.x, eyeLocal.position.y, eyeLocal.position.z};
-  float x = eyeLocal.orientation.x, y = eyeLocal.orientation.y, z = eyeLocal.orientation.z, w = eyeLocal.orientation.w;
-  float R[9] = {
-    1 - 2*y*y - 2*z*z, 2*x*y - 2*z*w, 2*x*z + 2*y*w,
-    2*x*y + 2*z*w, 1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w,
-    2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x*x - 2*y*y
-  };
-  float M[16] = {
-    R[0], R[3], R[6], 0,
-    R[1], R[4], R[7], 0,
-    R[2], R[5], R[8], 0,
-    -(R[0]*t.x + R[3]*t.y + R[6]*t.z),
-    -(R[1]*t.x + R[4]*t.y + R[7]*t.z),
-    -(R[2]*t.x + R[5]*t.y + R[8]*t.z),
-    1
-  };
-  glLoadMatrixf(M);
-}
-
-// --- GLX ---
-struct GlxCtx {
-  Display* dpy = nullptr;
-  Window win = 0;
-  GLXContext ctx = nullptr;
-  Colormap cmap = 0;
-};
-
-static bool MakeGlx(GlxCtx& g) {
-  g.dpy = XOpenDisplay(nullptr);
-  if (!g.dpy) return false;
-  int scr = DefaultScreen(g.dpy);
-  int attribs[] = {
-    GLX_RGBA, GLX_DOUBLEBUFFER,
-    GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 16,
-    None
-  };
-  XVisualInfo* vi = glXChooseVisual(g.dpy, scr, attribs);
-  if (!vi) return false;
-  g.cmap = XCreateColormap(g.dpy, RootWindow(g.dpy, scr), vi->visual, AllocNone);
-  XSetWindowAttributes swa{};
-  swa.colormap = g.cmap;
-  swa.event_mask = StructureNotifyMask;
-  g.win = XCreateWindow(g.dpy, RootWindow(g.dpy, scr), 0, 0, 64, 64, 0,
-                        vi->depth, InputOutput, vi->visual,
-                        CWColormap | CWEventMask, &swa);
-  XStoreName(g.dpy, g.win, "cube_webui_glx");
-  XMapWindow(g.dpy, g.win);
-  XFlush(g.dpy);
-  g.ctx = glXCreateContext(g.dpy, vi, nullptr, GL_TRUE);
-  XFree(vi);
-  if (!g.ctx) return false;
-  return glXMakeCurrent(g.dpy, g.win, g.ctx);
-}
-
-static void DestroyGlx(GlxCtx& g) {
-  if (g.dpy && g.ctx) {
-    glXMakeCurrent(g.dpy, None, nullptr);
-    glXDestroyContext(g.dpy, g.ctx);
-  }
-  if (g.dpy && g.win) XDestroyWindow(g.dpy, g.win);
-  if (g.dpy && g.cmap) XFreeColormap(g.dpy, g.cmap);
-  if (g.dpy) XCloseDisplay(g.dpy);
-  g = {};
-}
-
-static GLuint MakeTex(int w, int h, const void* rgba) {
-  GLuint t = 0;
-  glGenTextures(1, &t);
-  glBindTexture(GL_TEXTURE_2D, t);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
-  return t;
-}
-
-// Draw panel in LOCAL (modelview already inv(eye))
-static void DrawWorldPanel(GLuint tex) {
-  if (!g_wp.ready) return;
-  const float hw = g_cfg.halfW, hh = g_cfg.halfH;
-  Vec3 bl = g_wp.c - g_wp.right * hw - g_wp.up * hh;
-  Vec3 br = g_wp.c + g_wp.right * hw - g_wp.up * hh;
-  Vec3 tr = g_wp.c + g_wp.right * hw + g_wp.up * hh;
-  Vec3 tl = g_wp.c - g_wp.right * hw + g_wp.up * hh;
-  glDisable(GL_CULL_FACE);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glEnable(GL_TEXTURE_2D);
-  glBindTexture(GL_TEXTURE_2D, tex);
-  glColor4f(1.f, 1.f, 1.f, g_cfg.panelAlpha);
-  glBegin(GL_QUADS);
-  glTexCoord2f(0, 1); glVertex3f(bl.x, bl.y, bl.z);
-  glTexCoord2f(1, 1); glVertex3f(br.x, br.y, br.z);
-  glTexCoord2f(1, 0); glVertex3f(tr.x, tr.y, tr.z);
-  glTexCoord2f(0, 0); glVertex3f(tl.x, tl.y, tl.z);
-  glEnd();
-  glDisable(GL_TEXTURE_2D);
-  glColor4f(1, 1, 1, 1);
-  glDisable(GL_BLEND);
-}
-
-static void DrawLaserLocal(Vec3 a, Vec3 b, float cr, float cg, float cb) {
-  glDisable(GL_TEXTURE_2D);
-  glDisable(GL_DEPTH_TEST);
-  glLineWidth(4.f);
-  glBegin(GL_LINES);
-  glColor3f(cr, cg, cb);
-  glVertex3f(a.x, a.y, a.z);
-  glVertex3f(b.x, b.y, b.z);
-  glEnd();
-  glPointSize(10.f);
-  glBegin(GL_POINTS);
-  glColor3f(1.f, 1.f, 1.f);
-  glVertex3f(b.x, b.y, b.z);
-  glEnd();
-  glEnable(GL_DEPTH_TEST);
-  glColor3f(1, 1, 1);
-}
-
-// --- OpenXR actions (laser + grab) ---
-struct XrInput {
-  XrActionSet set = XR_NULL_HANDLE;
-  XrAction pose = XR_NULL_HANDLE;
-  XrAction trigger = XR_NULL_HANDLE;      // boolean click
-  XrAction triggerAxis = XR_NULL_HANDLE;  // float value (Touch/Index)
-  XrAction grab = XR_NULL_HANDLE;         // squeeze float — move menu
-  XrAction grabClick = XR_NULL_HANDLE;    // squeeze click bool fallback
-  XrAction stick = XR_NULL_HANDLE;
-  XrAction menu = XR_NULL_HANDLE;
-  XrSpace aimSpace = XR_NULL_HANDLE;
-  bool attached = false;
-};
-
-static bool SetupInput(XrInstance instance, XrSession session, XrInput& in) {
-  XrActionSetCreateInfo asci{XR_TYPE_ACTION_SET_CREATE_INFO};
-  std::strncpy(asci.actionSetName, "cube_ui", XR_MAX_ACTION_SET_NAME_SIZE - 1);
-  std::strncpy(asci.localizedActionSetName, "Cube UI", XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE - 1);
-  if (XR_FAILED(xrCreateActionSet(instance, &asci, &in.set))) return false;
-
-  auto mk = [&](const char* name, const char* loc, XrActionType ty, XrAction* out) {
-    XrActionCreateInfo aci{XR_TYPE_ACTION_CREATE_INFO};
-    aci.actionType = ty;
-    std::strncpy(aci.actionName, name, XR_MAX_ACTION_NAME_SIZE - 1);
-    std::strncpy(aci.localizedActionName, loc, XR_MAX_LOCALIZED_ACTION_NAME_SIZE - 1);
-    return XR_SUCCEEDED(xrCreateAction(in.set, &aci, out));
-  };
-  if (!mk("aim_pose", "Aim Pose", XR_ACTION_TYPE_POSE_INPUT, &in.pose)) return false;
-  if (!mk("trigger", "Trigger Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.trigger)) return false;
-  if (!mk("trigger_axis", "Trigger Axis", XR_ACTION_TYPE_FLOAT_INPUT, &in.triggerAxis)) return false;
-  if (!mk("grab", "Grab Move Menu", XR_ACTION_TYPE_FLOAT_INPUT, &in.grab)) return false;
-  if (!mk("grab_click", "Grab Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.grabClick)) return false;
-  if (!mk("stick", "Thumbstick", XR_ACTION_TYPE_VECTOR2F_INPUT, &in.stick)) return false;
-  if (!mk("menu", "Menu", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.menu)) return false;
-
-  auto suggest = [&](const char* profile, std::vector<XrActionSuggestedBinding> binds) {
-    XrPath prof{};
-    if (XR_FAILED(xrStringToPath(instance, profile, &prof))) return;
-    XrInteractionProfileSuggestedBinding sp{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
-    sp.interactionProfile = prof;
-    sp.suggestedBindings = binds.data();
-    sp.countSuggestedBindings = (uint32_t)binds.size();
-    xrSuggestInteractionProfileBindings(instance, &sp);
-  };
-
-  XrPath pPose{}, pTrigClick{}, pTrigVal{}, pSqueeze{}, pSqueezeClick{}, pThumb{}, pMenu{}, pA{};
-  XrPath pLPose{}, pLSqueeze{}, pLSqueezeClick{};
-  xrStringToPath(instance, "/user/hand/right/input/aim/pose", &pPose);
-  xrStringToPath(instance, "/user/hand/right/input/trigger/click", &pTrigClick);
-  xrStringToPath(instance, "/user/hand/right/input/trigger/value", &pTrigVal);
-  xrStringToPath(instance, "/user/hand/right/input/squeeze/value", &pSqueeze);
-  xrStringToPath(instance, "/user/hand/right/input/squeeze/click", &pSqueezeClick);
-  xrStringToPath(instance, "/user/hand/right/input/thumbstick", &pThumb);
-  xrStringToPath(instance, "/user/hand/right/input/menu/click", &pMenu);
-  xrStringToPath(instance, "/user/hand/right/input/a/click", &pA);
-  xrStringToPath(instance, "/user/hand/left/input/aim/pose", &pLPose);
-  xrStringToPath(instance, "/user/hand/left/input/squeeze/value", &pLSqueeze);
-  xrStringToPath(instance, "/user/hand/left/input/squeeze/click", &pLSqueezeClick);
-
-  suggest("/interaction_profiles/oculus/touch_controller", {
-    {in.pose, pPose},
-    {in.trigger, pTrigClick},
-    {in.triggerAxis, pTrigVal},
-    {in.grab, pSqueeze},
-    {in.grabClick, pSqueezeClick},
-    {in.stick, pThumb},
-    {in.menu, pMenu},
-  });
-  suggest("/interaction_profiles/valve/index_controller", {
-    {in.pose, pPose},
-    {in.trigger, pTrigClick},
-    {in.triggerAxis, pTrigVal},
-    {in.grab, pSqueeze},
-    {in.grabClick, pSqueezeClick},
-    {in.stick, pThumb},
-    {in.menu, pA},
-  });
-  suggest("/interaction_profiles/facebook/touch_controller_pro", {
-    {in.pose, pPose},
-    {in.trigger, pTrigClick},
-    {in.triggerAxis, pTrigVal},
-    {in.grab, pSqueeze},
-    {in.grabClick, pSqueezeClick},
-    {in.stick, pThumb},
-    {in.menu, pMenu},
-  });
-  XrPath pSelect{};
-  xrStringToPath(instance, "/user/hand/right/input/select/click", &pSelect);
-  suggest("/interaction_profiles/khr/simple_controller", {
-    {in.pose, pPose},
-    {in.trigger, pSelect},
-  });
-
-  XrSessionActionSetsAttachInfo attach{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
-  attach.countActionSets = 1;
-  attach.actionSets = &in.set;
-  if (XR_FAILED(xrAttachSessionActionSets(session, &attach))) {
-    fprintf(stderr, "[cube_webui] warn: attach action sets failed\n");
-    return false;
-  }
-
-  XrActionSpaceCreateInfo spaceCi{XR_TYPE_ACTION_SPACE_CREATE_INFO};
-  spaceCi.action = in.pose;
-  spaceCi.poseInActionSpace = IdentityPose();
-  if (XR_FAILED(xrCreateActionSpace(session, &spaceCi, &in.aimSpace))) {
-    fprintf(stderr, "[cube_webui] warn: aim space failed\n");
-    return false;
-  }
-  in.attached = true;
-  fprintf(stderr, "[cube_webui] actions: aim + trigger + GRAB(squeeze) + stick\n");
-  return true;
-}
-
-// Prefer ALPHA_BLEND for passthrough; fall back to OPAQUE / ADDITIVE.
-static XrEnvironmentBlendMode PickBlendMode(XrInstance instance, XrSystemId systemId, bool wantPassthrough) {
-  uint32_t n = 0;
-  xrEnumerateEnvironmentBlendModes(instance, systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-                                   0, &n, nullptr);
-  std::vector<XrEnvironmentBlendMode> modes(n);
-  if (n)
-    xrEnumerateEnvironmentBlendModes(instance, systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-                                     n, &n, modes.data());
-  auto has = [&](XrEnvironmentBlendMode m) {
-    for (auto x : modes) if (x == m) return true;
-    return false;
-  };
-  if (wantPassthrough && has(XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND)) {
-    fprintf(stderr, "[cube_webui] blend=ALPHA_BLEND (passthrough)\n");
-    return XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND;
-  }
-  if (wantPassthrough && has(XR_ENVIRONMENT_BLEND_MODE_ADDITIVE)) {
-    fprintf(stderr, "[cube_webui] blend=ADDITIVE (passthrough-ish)\n");
-    return XR_ENVIRONMENT_BLEND_MODE_ADDITIVE;
-  }
-  fprintf(stderr, "[cube_webui] blend=OPAQUE%s\n",
-          wantPassthrough ? " (runtime has no alpha/additive passthrough)" : "");
-  return XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-}
-
-static bool ExtensionAvailable(const char* name) {
-  uint32_t n = 0;
-  xrEnumerateInstanceExtensionProperties(nullptr, 0, &n, nullptr);
-  std::vector<XrExtensionProperties> props(n, {XR_TYPE_EXTENSION_PROPERTIES});
-  if (n) xrEnumerateInstanceExtensionProperties(nullptr, n, &n, props.data());
-  for (auto& p : props)
-    if (std::strcmp(p.extensionName, name) == 0) return true;
-  return false;
-}
 
 int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson) {
   if (!xrJson.empty())
     setenv("XR_RUNTIME_JSON", xrJson.c_str(), 1);
 
   LoadPanelConfig(gmodRoot);
+  const auto& cfg = PanelCfgConst();
 
-  fprintf(stderr, "[cube_webui] OpenXR WebUI reverse launcher (world-locked panel)\n");
+  fprintf(stderr, "[cube_webui] OpenXR WebUI (modular host)\n");
   fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
-  fprintf(stderr, "[cube_webui] TRIGGER=click  GRIP=move world panel  MENU=reset\n");
-  fprintf(stderr, "[cube_webui] seamless Start: hold XR until GMod take_xr (no gap)\n");
-  fprintf(stderr, "[cube_webui] host: echo click|reset|start >/tmp/cube_webui_cmd\n");
+  fprintf(stderr, "[cube_webui] TRIGGER=click GRIP=move CLOSE=exit MENU=reseed\n");
 
-  GlxCtx glx{};
-  if (!MakeGlx(glx)) {
+  GlxContext glx{};
+  if (!GlxCreate(glx)) {
     Die("GLX context failed");
     return 1;
   }
 
-  std::vector<const char*> extList = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME };
-  bool wantFbPt = g_cfg.passthrough && ExtensionAvailable(XR_FB_PASSTHROUGH_EXTENSION_NAME);
+  std::vector<const char*> extList = {XR_KHR_OPENGL_ENABLE_EXTENSION_NAME};
+  bool wantFbPt = cfg.passthrough && XrExtensionAvailable(XR_FB_PASSTHROUGH_EXTENSION_NAME);
   if (wantFbPt) {
     extList.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
     fprintf(stderr, "[cube_webui] enabling %s\n", XR_FB_PASSTHROUGH_EXTENSION_NAME);
@@ -584,24 +59,23 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   std::strncpy(ici.applicationInfo.applicationName, "CubeWebUILauncher", XR_MAX_APPLICATION_NAME_SIZE - 1);
   ici.applicationInfo.applicationVersion = 1;
   std::strncpy(ici.applicationInfo.engineName, "gVRMod", XR_MAX_ENGINE_NAME_SIZE - 1);
-  ici.applicationInfo.engineVersion = 2;
+  ici.applicationInfo.engineVersion = 3;
   ici.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
   ici.enabledExtensionCount = (uint32_t)extList.size();
   ici.enabledExtensionNames = extList.data();
 
   XrInstance instance = XR_NULL_HANDLE;
   if (XR_FAILED(xrCreateInstance(&ici, &instance))) {
-    // Retry without optional FB passthrough
     if (wantFbPt) {
-      fprintf(stderr, "[cube_webui] instance create failed with FB passthrough; retrying without\n");
+      fprintf(stderr, "[cube_webui] retry without FB passthrough\n");
       extList.resize(1);
       wantFbPt = false;
       ici.enabledExtensionCount = 1;
       ici.enabledExtensionNames = extList.data();
     }
     if (XR_FAILED(xrCreateInstance(&ici, &instance))) {
-      Die("xrCreateInstance failed — WiVRn/Monado + headset?");
-      DestroyGlx(glx);
+      Die("xrCreateInstance failed");
+      GlxDestroy(glx);
       return 2;
     }
   }
@@ -612,7 +86,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   if (XR_FAILED(xrGetSystem(instance, &sgi, &systemId))) {
     Die("xrGetSystem failed");
     xrDestroyInstance(instance);
-    DestroyGlx(glx);
+    GlxDestroy(glx);
     return 3;
   }
 
@@ -637,19 +111,18 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   if (XR_FAILED(xrCreateSession(instance, &sci, &session))) {
     Die("xrCreateSession failed");
     xrDestroyInstance(instance);
-    DestroyGlx(glx);
+    GlxDestroy(glx);
     return 4;
   }
 
-  XrInput input{};
-  SetupInput(instance, session, input);
+  XrInputState input{};
+  XrInputSetup(instance, session, input);
 
-  XrEnvironmentBlendMode blendMode = PickBlendMode(instance, systemId, g_cfg.passthrough);
+  XrEnvironmentBlendMode blendMode = XrPickBlendMode(instance, systemId, cfg.passthrough);
   const bool useAlphaClear =
-      (blendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) ||
-      (blendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE);
+      blendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND ||
+      blendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE;
 
-  // Optional XR_FB_passthrough reconstruction layer under the UI
   XrPassthroughFB passthrough = XR_NULL_HANDLE;
   XrPassthroughLayerFB ptLayerHandle = XR_NULL_HANDLE;
   PFN_xrCreatePassthroughFB pfnCreatePt = nullptr;
@@ -676,13 +149,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         if (XR_SUCCEEDED(pfnCreatePtLayer(session, &lci, &ptLayerHandle))) {
           pfnStartPt(passthrough);
           fprintf(stderr, "[cube_webui] FB passthrough layer active\n");
-        } else {
-          fprintf(stderr, "[cube_webui] warn: create passthrough layer failed\n");
-          if (pfnDestroyPt) pfnDestroyPt(passthrough);
+        } else if (pfnDestroyPt) {
+          pfnDestroyPt(passthrough);
           passthrough = XR_NULL_HANDLE;
         }
-      } else {
-        fprintf(stderr, "[cube_webui] warn: create passthrough failed (use blend only)\n");
       }
     }
   }
@@ -692,14 +162,13 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   rsci.poseInReferenceSpace = IdentityPose();
   XrSpace space = XR_NULL_HANDLE;
   xrCreateReferenceSpace(session, &rsci, &space);
-
-  // Also view space for HMD place
   XrSpace viewSpace = XR_NULL_HANDLE;
   rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
   xrCreateReferenceSpace(session, &rsci, &viewSpace);
 
   uint32_t viewCount = 0;
-  xrEnumerateViewConfigurationViews(instance, systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &viewCount, nullptr);
+  xrEnumerateViewConfigurationViews(instance, systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+                                    0, &viewCount, nullptr);
   std::vector<XrViewConfigurationView> viewConfigs(viewCount, {XR_TYPE_VIEW_CONFIGURATION_VIEW});
   xrEnumerateViewConfigurationViews(instance, systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
                                     viewCount, &viewCount, viewConfigs.data());
@@ -715,7 +184,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     eyes[i].h = viewConfigs[i].recommendedImageRectHeight;
     XrSwapchainCreateInfo sc{XR_TYPE_SWAPCHAIN_CREATE_INFO};
     sc.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-    sc.format = 0x8058;
+    sc.format = 0x8058; // GL_RGBA8
     sc.sampleCount = 1;
     sc.width = eyes[i].w;
     sc.height = eyes[i].h;
@@ -729,7 +198,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     uint32_t nImg = 0;
     xrEnumerateSwapchainImages(eyes[i].swap, 0, &nImg, nullptr);
     eyes[i].images.resize(nImg, {XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR});
-    xrEnumerateSwapchainImages(eyes[i].swap, nImg, &nImg, (XrSwapchainImageBaseHeader*)eyes[i].images.data());
+    xrEnumerateSwapchainImages(eyes[i].swap, nImg, &nImg,
+                               (XrSwapchainImageBaseHeader*)eyes[i].images.data());
   }
 
   XrSessionBeginInfo sbi{XR_TYPE_SESSION_BEGIN_INFO};
@@ -743,50 +213,18 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   ui.status = "GRIP=move · TRIGGER=click · CLOSE to exit";
   std::vector<unsigned char> panelBuf(UI_W * UI_H * 4);
   WebUI_Rasterize(ui, panelBuf.data(), nullptr);
-  GLuint panelTex = MakeTex(UI_W, UI_H, panelBuf.data());
+  GLuint panelTex = GlMakeRgbaTex(UI_W, UI_H, panelBuf.data());
+  GLuint fbo = 0;
 
   bool prevTrigger = false;
   bool prevMenu = false;
   bool grabbing = false;
   bool worldInitPending = true;
-  Vec3 grabOff{0, 0, 0}; // panel center - aim (LOCAL)
+  Vec3 grabOff{0, 0, 0};
   float stickCooldown = 0.f;
-  int frame = 0;
   Vec3 aimO{0, 0, 0}, aimD{0, 0, -1}, hitPt{0, 0, -1.f};
   bool aimValid = false;
   bool panelHit = false;
-
-  auto pollCmdFile = [&]() {
-    FILE* f = fopen("/tmp/cube_webui_cmd", "r");
-    if (!f) return;
-    char buf[64] = {};
-    if (fgets(buf, sizeof(buf), f)) {
-      if (std::strncmp(buf, "start", 5) == 0) ui.wantStart = true;
-      if (std::strncmp(buf, "quit", 4) == 0) ui.wantQuit = true;
-      if (std::strncmp(buf, "addons", 6) == 0) { ui.page = WebUIPage::Addons; }
-      if (std::strncmp(buf, "newgame", 7) == 0) { ui.page = WebUIPage::NewGame; }
-      if (std::strncmp(buf, "settings", 8) == 0) { ui.page = WebUIPage::Settings; }
-      if (std::strncmp(buf, "reset", 5) == 0) {
-        grabbing = false;
-        worldInitPending = true;
-        ui.status = "PANEL RESET";
-      }
-      if (std::strncmp(buf, "close", 5) == 0 || std::strncmp(buf, "exit", 4) == 0)
-        ui.wantQuit = true;
-      if (std::strncmp(buf, "up", 2) == 0) WebUI_Input(ui, 0, -1, false, false);
-      if (std::strncmp(buf, "down", 4) == 0) WebUI_Input(ui, 0, 1, false, false);
-      if (std::strncmp(buf, "left", 4) == 0) WebUI_Input(ui, -1, 0, false, false);
-      if (std::strncmp(buf, "right", 5) == 0) WebUI_Input(ui, 1, 0, false, false);
-      if (std::strncmp(buf, "click", 5) == 0 || std::strncmp(buf, "toggle", 6) == 0) {
-        if (ui.cursorVisible)
-          WebUI_PointerClick(ui, ui.cursorX, ui.cursorY);
-        else
-          WebUI_Input(ui, 0, 0, true, false);
-      }
-    }
-    fclose(f);
-    unlink("/tmp/cube_webui_cmd");
-  };
 
   while (running) {
     XrEventDataBuffer ev{XR_TYPE_EVENT_DATA_BUFFER};
@@ -809,37 +247,17 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ev = {XR_TYPE_EVENT_DATA_BUFFER};
     }
 
-    pollCmdFile();
+    bool resetPanel = false;
+    HostCmdPoll(ui, &resetPanel);
+    if (resetPanel) {
+      grabbing = false;
+      worldInitPending = true;
+    }
     if (ui.wantQuit) break;
 
-    // --- StartGame: spawn GMod but KEEP OpenXR until handoff (Cube hates gaps) ---
+    // StartGame → keep XR until take_xr handoff
     if (ui.wantStart && !ui.handoff) {
-      LaunchRequest lr;
-      lr.gmodRoot = gmodRoot;
-      lr.map = WebUI_SelectedMap(ui);
-      lr.maxPlayers = WebUI_MaxPlayers(ui);
-      lr.hostname = ui.hostname;
-      lr.svLan = ui.svLan;
-      lr.p2p = ui.p2p;
-      lr.p2pFriends = ui.p2pFriends;
-      lr.gamemode = ui.gamemode;
-      lr.winW = ui.gfx.winW;
-      lr.winH = ui.gfx.winH;
-      lr.windowed = ui.gfx.windowed;
-      lr.noborder = ui.gfx.noborder;
-      lr.gfx.matPicmip = ui.gfx.matPicmip;
-      lr.gfx.rRootLod = ui.gfx.rRootLod;
-      lr.gfx.matAntialias = ui.gfx.matAntialias;
-      lr.gfx.matForceAniso = ui.gfx.matForceAniso;
-      lr.gfx.matHdrLevel = ui.gfx.matHdrLevel;
-      lr.gfx.shadows = ui.gfx.shadows;
-      lr.gfx.flashlightShadows = ui.gfx.flashlightShadows;
-      lr.gfx.specular = ui.gfx.specular;
-      lr.gfx.bumpmap = ui.gfx.bumpmap;
-      lr.gfx.waterExpensive = ui.gfx.waterExpensive;
-      lr.gfx.multicore = ui.gfx.multicore;
-      lr.gfx.fpsMax = ui.gfx.fpsMax;
-      if (const char* xr = getenv("XR_RUNTIME_JSON")) lr.xrRuntimeJson = xr;
+      LaunchRequest lr = LaunchRequestFromUI(ui, gmodRoot);
       ClearCubeHandoffMarkers(gmodRoot);
       std::string err;
       int rc = SpawnGModFromWebUI(lr, err);
@@ -852,7 +270,6 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         ui.handoffDetail = "holding OpenXR · GMod booting";
         ui.handoffElapsed = 0.f;
         ui.status = "HANDOFF — STAY IN VR";
-        fprintf(stderr, "[cube_webui] seamless handoff: keep XR UI until GMod take_xr\n");
       } else {
         ui.status = "SPAWN FAIL: " + err;
       }
@@ -864,31 +281,14 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       std::string phase = ReadCubeHandoffPhase(gmodRoot);
       if (phase.empty()) phase = gmodUp ? "gmod_process" : "waiting_process";
       ui.handoffPhase = phase;
-      if (gmodUp)
-        ui.handoffDetail = "GMod process up · waiting take_xr";
-      else
-        ui.handoffDetail = "waiting for GMod process…";
-
-      // Lua writes phase=take_xr before VRUtilClientStart — then we release XR
+      ui.handoffDetail = gmodUp ? "GMod up · waiting take_xr" : "waiting for GMod process…";
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
-      // Soft fallback only if Lua never signals (old addon) — still late enough to cover boot
-      bool softHandoff = gmodUp && ui.handoffElapsed > 40.f;
-      // Absolute timeout
+      bool soft = gmodUp && ui.handoffElapsed > 40.f;
       bool timeout = ui.handoffElapsed > 180.f;
-      // Session lost (another app / runtime switched) — exit clean
-      bool sessionGone = !sessionRunning && ui.handoffElapsed > 1.f;
-
-      if (takeXr || softHandoff || timeout || sessionGone) {
-        fprintf(stderr,
-                "[cube_webui] handoff exit phase=%s gmod=%d t=%.1f take=%d soft=%d timeout=%d gone=%d\n",
-                phase.c_str(), gmodUp ? 1 : 0, ui.handoffElapsed,
-                takeXr ? 1 : 0, softHandoff ? 1 : 0, timeout ? 1 : 0, sessionGone ? 1 : 0);
-        ui.status = "HANDING OFF TO GMOD";
-        // Request clean session end so compositor can switch to GMod without a long void
-        if (sessionRunning) {
-          xrRequestExitSession(session);
-        }
-        // One more frame path optional; exit loop promptly
+      bool gone = !sessionRunning && ui.handoffElapsed > 1.f;
+      if (takeXr || soft || timeout || gone) {
+        fprintf(stderr, "[cube_webui] handoff exit phase=%s t=%.1f\n", phase.c_str(), ui.handoffElapsed);
+        if (sessionRunning) xrRequestExitSession(session);
         running = false;
         continue;
       }
@@ -905,16 +305,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     XrFrameBeginInfo fbi{XR_TYPE_FRAME_BEGIN_INFO};
     xrBeginFrame(session, &fbi);
 
-    // Sync actions
-    if (input.attached) {
-      XrActiveActionSet aas{input.set, XR_NULL_PATH};
-      XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};
-      sync.countActiveActionSets = 1;
-      sync.activeActionSets = &aas;
-      xrSyncActions(session, &sync);
-    }
+    XrInputSync(session, input);
 
-    // Head pose in LOCAL (seed only — panel does NOT track head after seed)
+    // Head (seed only)
     XrPosef headLocal = IdentityPose();
     bool headOk = false;
     if (viewSpace) {
@@ -929,102 +322,64 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       }
     }
     if (worldInitPending && headOk) {
-      SeedWorldPanel(headLocal);
+      WorldPanelSeed(headLocal);
       worldInitPending = false;
     }
 
-    // Controller aim in LOCAL (same space as world panel)
+    auto& wp = WorldPanelState();
     aimValid = false;
     panelHit = false;
     int hitPx = 0, hitPy = 0;
-    hitPt = g_wp.c;
-    if (input.attached && input.aimSpace) {
-      XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
-      if (XR_SUCCEEDED(xrLocateSpace(input.aimSpace, space, fs.predictedDisplayTime, &loc))) {
-        if (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) {
-          aimO = {loc.pose.position.x, loc.pose.position.y, loc.pose.position.z};
-          aimValid = true;
-          Vec3 dNeg = Normalize(QuatRotate(loc.pose.orientation, V3(0, 0, -1)));
-          Vec3 dPos = Normalize(QuatRotate(loc.pose.orientation, V3(0, 0, 1)));
-          aimD = dNeg;
-          panelHit = RayHitWorldPanel(aimO, dNeg, &hitPx, &hitPy, &hitPt);
-          if (!panelHit) {
-            aimD = dPos;
-            panelHit = RayHitWorldPanel(aimO, dPos, &hitPx, &hitPy, &hitPt);
-          }
-          if (!panelHit) aimD = dNeg;
-        }
+    hitPt = wp.c;
+    XrPosef aimPose{};
+    if (XrInputLocateAim(session, input, space, fs.predictedDisplayTime, &aimPose)) {
+      aimO = {aimPose.position.x, aimPose.position.y, aimPose.position.z};
+      aimValid = true;
+      Vec3 dNeg = Normalize(QuatRotate(aimPose.orientation, V3(0, 0, -1)));
+      Vec3 dPos = Normalize(QuatRotate(aimPose.orientation, V3(0, 0, 1)));
+      aimD = dNeg;
+      panelHit = WorldPanelRayHit(aimO, dNeg, &hitPx, &hitPy, &hitPt);
+      if (!panelHit) {
+        aimD = dPos;
+        panelHit = WorldPanelRayHit(aimO, dPos, &hitPx, &hitPy, &hitPt);
       }
+      if (!panelHit) aimD = dNeg;
     }
 
-    // Grip grab — move panel center in LOCAL; orientation frozen (re-face on release)
-    float grabVal = 0.f;
-    bool grabClick = false;
-    if (input.attached) {
-      XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
-      if (input.grab) {
-        XrActionStateFloat ft{XR_TYPE_ACTION_STATE_FLOAT};
-        gi.action = input.grab;
-        if (XR_SUCCEEDED(xrGetActionStateFloat(session, &gi, &ft)) && ft.isActive)
-          grabVal = ft.currentState;
-      }
-      if (input.grabClick) {
-        XrActionStateBoolean st{XR_TYPE_ACTION_STATE_BOOLEAN};
-        gi.action = input.grabClick;
-        if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &gi, &st)) && st.isActive)
-          grabClick = st.currentState;
-      }
-    }
-    const bool grabHeld = grabClick || (grabVal >= g_cfg.grabThresh);
-    if (grabHeld && aimValid && g_wp.ready) {
+    float grabVal = XrInputReadGrab(session, input);
+    const bool grabHeld = grabVal >= cfg.grabThresh;
+    if (grabHeld && aimValid && wp.ready) {
       if (!grabbing) {
         bool canStart = panelHit;
         if (!canStart) {
-          // near panel center (1.5m) still allows grab
-          Vec3 dlt = g_wp.c - aimO;
+          Vec3 dlt = wp.c - aimO;
           canStart = Dot(dlt, dlt) < 2.25f;
         }
         if (canStart) {
           grabbing = true;
-          grabOff = g_wp.c - aimO;
+          grabOff = wp.c - aimO;
           ui.status = "MOVING — release grip to place";
         }
       }
       if (grabbing) {
-        g_wp.c = aimO + grabOff;
-        panelHit = RayHitWorldPanel(aimO, aimD, &hitPx, &hitPy, &hitPt);
+        wp.c = aimO + grabOff;
+        panelHit = WorldPanelRayHit(aimO, aimD, &hitPx, &hitPy, &hitPt);
       }
     } else if (grabbing) {
       grabbing = false;
-      // Re-face head once on place so panel stays readable, still world-fixed after
-      if (headOk) {
-        Vec3 headP = {headLocal.position.x, headLocal.position.y, headLocal.position.z};
-        g_wp.normal = Normalize(headP - g_wp.c);
-        Vec3 worldUp = V3(0, 1, 0);
-        g_wp.right = Cross(worldUp, g_wp.normal);
-        if (Dot(g_wp.right, g_wp.right) < 1e-8f)
-          g_wp.right = V3(1, 0, 0);
-        else
-          g_wp.right = Normalize(g_wp.right);
-        g_wp.up = Normalize(Cross(g_wp.normal, g_wp.right));
-      }
+      if (headOk) WorldPanelReface(headLocal);
       ui.status = "PLACED (world)";
-      fprintf(stderr, "[cube_webui] panel placed LOCAL c=(%.2f,%.2f,%.2f)\n",
-              g_wp.c.x, g_wp.c.y, g_wp.c.z);
+      fprintf(stderr, "[cube_webui] panel placed LOCAL c=(%.2f,%.2f,%.2f)\n", wp.c.x, wp.c.y, wp.c.z);
     }
 
     if (aimValid && panelHit && !grabbing)
       WebUI_SetCursor(ui, hitPx, hitPy, true);
-    else if (grabbing)
-      WebUI_SetCursor(ui, 0, 0, false);
     else
       WebUI_SetCursor(ui, 0, 0, false);
 
-    // Thumbs for current addon page (rate-limited network)
     if (ui.page == WebUIPage::Addons)
       Addons_EnsureThumbsForPage(ui.addons);
 
-    // Eye poses (LOCAL) for projection + VIEW→eye modelview
     XrViewLocateInfo vli0{XR_TYPE_VIEW_LOCATE_INFO};
     vli0.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
     vli0.displayTime = fs.predictedDisplayTime;
@@ -1034,68 +389,43 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     XrView views0[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
     xrLocateViews(session, &vli0, &vs0, 2, &vc0, views0);
 
-    bool trig = false;
-    bool menuBtn = false;
-    if (input.attached) {
-      XrActionStateBoolean st{XR_TYPE_ACTION_STATE_BOOLEAN};
-      XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
-      gi.action = input.trigger;
-      if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &gi, &st)) && st.isActive)
-        trig = st.currentState;
-      XrActionStateFloat ft{XR_TYPE_ACTION_STATE_FLOAT};
-      gi.action = input.triggerAxis;
-      if (XR_SUCCEEDED(xrGetActionStateFloat(session, &gi, &ft)) && ft.isActive)
-        trig = trig || (ft.currentState > 0.55f);
-      gi.action = input.menu;
-      if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &gi, &st)) && st.isActive)
-        menuBtn = st.currentState;
-    }
-    // MENU edge = re-seed panel in front of head (world place)
+    bool trig = XrInputReadTrigger(session, input);
+    bool menuBtn = XrInputReadMenu(session, input);
     if (menuBtn && !prevMenu) {
       grabbing = false;
-      if (headOk) SeedWorldPanel(headLocal);
+      if (headOk) WorldPanelSeed(headLocal);
       else worldInitPending = true;
       ui.status = "PANEL RE-SEEDED";
-      fprintf(stderr, "[cube_webui] panel re-seeded in front of head\n");
     }
     prevMenu = menuBtn;
 
     if (trig && !prevTrigger && !grabbing) {
-      if (panelHit) {
+      if (panelHit)
         WebUI_PointerClick(ui, hitPx, hitPy);
-        fprintf(stderr, "[cube_webui] click %d,%d\n", hitPx, hitPy);
-      } else if (ui.cursorVisible) {
+      else if (ui.cursorVisible)
         WebUI_PointerClick(ui, ui.cursorX, ui.cursorY);
-      } else {
+      else
         WebUI_Input(ui, 0, 0, true, false);
-      }
     }
     prevTrigger = trig;
 
-    if (input.attached) {
-      XrActionStateVector2f st{XR_TYPE_ACTION_STATE_VECTOR2F};
-      XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
-      gi.action = input.stick;
-      if (XR_SUCCEEDED(xrGetActionStateVector2f(session, &gi, &st)) && st.isActive) {
-        if (grabbing && aimValid) {
-          // Nudge panel along head axes while gripping
-          const float spd = 0.015f;
-          if (headOk) {
-            Vec3 headR = Normalize(QuatRotate(headLocal.orientation, V3(1, 0, 0)));
-            Vec3 headF = Normalize(QuatRotate(headLocal.orientation, V3(0, 0, -1)));
-            g_wp.c = g_wp.c + headR * (st.currentState.x * spd) + headF * (st.currentState.y * spd);
-            grabOff = g_wp.c - aimO;
-          }
-        } else if (stickCooldown <= 0.f) {
-          int sx = 0, sy = 0;
-          if (st.currentState.x < -0.55f) sx = -1;
-          if (st.currentState.x > 0.55f) sx = 1;
-          if (st.currentState.y < -0.55f) sy = 1;
-          if (st.currentState.y > 0.55f) sy = -1;
-          if (sx || sy) {
-            WebUI_Input(ui, sx, sy, false, false);
-            stickCooldown = 0.18f;
-          }
+    float sx = 0.f, sy = 0.f;
+    if (XrInputReadStick(session, input, &sx, &sy)) {
+      if (grabbing && aimValid && headOk) {
+        const float spd = 0.015f;
+        Vec3 headR = Normalize(QuatRotate(headLocal.orientation, V3(1, 0, 0)));
+        Vec3 headF = Normalize(QuatRotate(headLocal.orientation, V3(0, 0, -1)));
+        wp.c = wp.c + headR * (sx * spd) + headF * (sy * spd);
+        grabOff = wp.c - aimO;
+      } else if (stickCooldown <= 0.f) {
+        int isx = 0, isy = 0;
+        if (sx < -0.55f) isx = -1;
+        if (sx > 0.55f) isx = 1;
+        if (sy < -0.55f) isy = 1;
+        if (sy > 0.55f) isy = -1;
+        if (isx || isy) {
+          WebUI_Input(ui, isx, isy, false, false);
+          stickCooldown = 0.18f;
         }
       }
     }
@@ -1118,11 +448,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (fs.shouldRender) {
       WebUICursor cur{ui.cursorVisible, ui.cursorX, ui.cursorY};
       WebUI_Rasterize(ui, panelBuf.data(), &cur);
-      glBindTexture(GL_TEXTURE_2D, panelTex);
-      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, UI_W, UI_H, GL_RGBA, GL_UNSIGNED_BYTE, panelBuf.data());
-
-      XrView views[2] = {views0[0], views0[1]};
-      uint32_t vc = vc0;
+      GlUpdateRgbaTex(panelTex, UI_W, UI_H, panelBuf.data());
 
       projViews.resize(2);
       for (int eye = 0; eye < 2; ++eye) {
@@ -1134,72 +460,43 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         xrWaitSwapchainImage(eyes[eye].swap, &wi);
 
         GLuint color = eyes[eye].images[idx].image;
-        LoadFBO();
-        static GLuint fbo = 0;
-        if (!fbo && glGenFramebuffers_) glGenFramebuffers_(1, &fbo);
-        if (glBindFramebuffer_ && glFramebufferTexture2D_ && fbo) {
-          glBindFramebuffer_(GL_FRAMEBUFFER, fbo);
-          glFramebufferTexture2D_(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
-        }
+        GlBindSwapchainFbo(color, &fbo);
         glViewport(0, 0, eyes[eye].w, eyes[eye].h);
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
         if (useAlphaClear)
-          glClearColor(0.f, 0.f, 0.f, 0.f); // see-through
+          glClearColor(0.f, 0.f, 0.f, 0.f);
         else
           glClearColor(0.04f, 0.02f, 0.03f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        const float tanL = tanf(views[eye].fov.angleLeft);
-        const float tanR = tanf(views[eye].fov.angleRight);
-        const float tanU = tanf(views[eye].fov.angleUp);
-        const float tanD = tanf(views[eye].fov.angleDown);
-        const float n = 0.05f, farZ = 50.f;
-        float m[16] = {};
-        const float invRL = 1.f / (tanR - tanL);
-        const float invUD = 1.f / (tanU - tanD);
-        m[0]  = 2.f * invRL;
-        m[5]  = 2.f * invUD;
-        m[8]  = (tanR + tanL) * invRL;
-        m[9]  = (tanU + tanD) * invUD;
-        m[10] = -(farZ + n) / (farZ - n);
-        m[11] = -1.f;
-        m[14] = -(2.f * farZ * n) / (farZ - n);
-        glLoadMatrixf(m);
-
+        GlLoadProjectionFov(views0[eye].fov);
         glMatrixMode(GL_MODELVIEW);
-        LoadModelviewLocal(views[eye].pose);
-
-        DrawWorldPanel(panelTex);
-
+        GlLoadModelviewLocal(views0[eye].pose);
+        GlDrawWorldPanel(panelTex);
         if (aimValid) {
           Vec3 tip = panelHit ? hitPt : (aimO + aimD * 2.5f);
           float cr = grabbing ? 0.3f : (panelHit ? 1.f : 0.45f);
           float cg = grabbing ? 0.9f : (panelHit ? 0.2f : 0.45f);
           float cb = grabbing ? 0.4f : (panelHit ? 0.35f : 0.5f);
-          DrawLaserLocal(aimO, tip, cr, cg, cb);
+          GlDrawLaser(aimO, tip, cr, cg, cb);
         }
-
-        if (glBindFramebuffer_) glBindFramebuffer_(GL_FRAMEBUFFER, 0);
+        GlUnbindFbo();
         glDisable(GL_DEPTH_TEST);
 
         XrSwapchainImageReleaseInfo ri{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
         xrReleaseSwapchainImage(eyes[eye].swap, &ri);
 
         projViews[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
-        projViews[eye].pose = views[eye].pose;
-        projViews[eye].fov = views[eye].fov;
+        projViews[eye].pose = views0[eye].pose;
+        projViews[eye].fov = views0[eye].fov;
         projViews[eye].subImage.swapchain = eyes[eye].swap;
         projViews[eye].subImage.imageRect.offset = {0, 0};
         projViews[eye].subImage.imageRect.extent = {(int32_t)eyes[eye].w, (int32_t)eyes[eye].h};
       }
       layer.viewCount = 2;
       layer.views = projViews.data();
-      (void)vc;
     }
-    ++frame;
 
     XrFrameEndInfo fei{XR_TYPE_FRAME_END_INFO};
     fei.displayTime = fs.predictedDisplayTime;
@@ -1223,14 +520,13 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (pfnPausePt) pfnPausePt(passthrough);
     if (pfnDestroyPt) pfnDestroyPt(passthrough);
   }
-  if (input.aimSpace) xrDestroySpace(input.aimSpace);
+  XrInputDestroy(input);
   if (viewSpace) xrDestroySpace(viewSpace);
   if (space) xrDestroySpace(space);
   if (session) xrDestroySession(session);
-  if (input.set) xrDestroyActionSet(input.set);
   if (instance) xrDestroyInstance(instance);
   if (panelTex) glDeleteTextures(1, &panelTex);
-  DestroyGlx(glx);
+  GlxDestroy(glx);
   fprintf(stderr, "[cube_webui] exit\n");
   return 0;
 }

@@ -4,14 +4,25 @@ project(cube_webui_launcher LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(cube_webui_launcher
+# Modular layout — see src/README.md / WEBUI_REVERSE.md
+set(CUBE_WEBUI_SOURCES
   src/main.cpp
+  src/paths.cpp
+  src/panel_config.cpp
+  src/world_panel.cpp
+  src/glx_context.cpp
+  src/gl_render.cpp
+  src/xr_input.cpp
+  src/xr_util.cpp
+  src/host_cmd.cpp
+  src/xr_app.cpp
   src/maps_scan.cpp
   src/addons_mgr.cpp
   src/gmod_spawn.cpp
   src/ui_panel.cpp
-  src/xr_app.cpp
 )
+
+add_executable(cube_webui_launcher ${CUBE_WEBUI_SOURCES})
 
 target_include_directories(cube_webui_launcher PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -41,7 +52,6 @@ set_target_properties(cube_webui_launcher PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../install/native"
 )
 
-# Ship good defaults next to the binary (project conf, not only ~/.config)
 add_custom_command(TARGET cube_webui_launcher POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${CMAKE_CURRENT_SOURCE_DIR}/cube_webui.conf"
