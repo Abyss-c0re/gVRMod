@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v35: OpenVR-compatible GetSkeletalSummaryData for finger curls
-    LUA->PushNumber(35);
+    // v36: mat_queue 2 harden — no GL tex query / glFinish; no mcore pin
+    LUA->PushNumber(36);
     return 1;
 }
 
@@ -809,10 +809,13 @@ LUA_FUNCTION(SetRTTextureFlip) {
     return 0;
 }
 
-// Optional GPU drain (prefer not to call under mat_queue_mode 2 — races workers).
+// Optional GPU drain. NEVER glFinish — mat_queue_mode 2 workers die
+// ("Illegal termination of worker thread"). glFlush is the safe upper bound.
 LUA_FUNCTION(GLFinish) {
 #ifndef _WIN32
-    glFinish();
+    if (glXGetCurrentContext()) {
+        glFlush();
+    }
 #endif
     return 0;
 }

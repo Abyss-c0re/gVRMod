@@ -409,28 +409,17 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         }
     }
 
-    // Dimensions: prefer Lua/ShareTexture known size FIRST.
-    // Under mat_queue_mode=2, glGetTexLevelParameteriv on live engine RTs often
-    // returns 0x0 even when the texture name is valid for blit (private builds that
-    // "made 2 work" never trusted GL size queries mid-frame).
-    // Prefer known size; never require glIsTexture (false negatives under mat_queue 2).
+    // Dimensions: Lua/ShareTexture known size FIRST — never glGetTexLevel on live
+    // engine RTs (mat_queue_mode 2 races workers; glBindTexture mid-frame can SEGV).
+    // Never glIsTexture (false negatives under mode 2).
     GLuint dimProbe = perEyeSrc[0] ? perEyeSrc[0] : (perEyeSrc[1] ? perEyeSrc[1] : srcTex);
     GLint srcWidth = g_knownSubmitSrcW;
     GLint srcHeight = g_knownSubmitSrcH;
-    if ((srcWidth <= 0 || srcHeight <= 0) && dimProbe != 0) {
-        // Best-effort GL query only when Lua has not supplied size yet.
-        glBindTexture(GL_TEXTURE_2D, dimProbe);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &srcWidth);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &srcHeight);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        if (srcWidth > 0 && srcHeight > 0) {
-            VRMOD_SetKnownSubmitSize((uint32_t)srcWidth, (uint32_t)srcHeight);
-        }
-    }
     if (srcWidth <= 0 || srcHeight <= 0) {
         if (g_xrRecommendedWidth > 0 && g_xrRecommendedHeight > 0) {
             srcWidth = (GLint)(g_xrRecommendedWidth * 2);
             srcHeight = (GLint)g_xrRecommendedHeight;
+            VRMOD_SetKnownSubmitSize((uint32_t)srcWidth, (uint32_t)srcHeight);
         }
     }
     static int s_zeroDimStreak = 0;
@@ -453,11 +442,10 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
     }
     s_zeroDimStreak = 0;
 
-    // No glFinish — mat workers die ("Illegal termination of worker thread").
-    glFlush();
+    // No glFinish / no pre-blit glFlush — both stall mat_queue 2 workers.
+    // Compositor sees completed images after the end-of-submit glFlush.
 
-    // Direct path (modeled on backup xr_render.cpp): attach srcTex (g_captureTexture preferred) and blit.
-    // No s_capture/Get/TexSub in the submitted data path. Locate was already done; we will submit layer with g_views.
+    // Direct path: attach srcTex and blit. Locate already done; submit g_views.
 
     GLint prevReadFBO = 0, prevDrawFBO = 0;
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevReadFBO);
