@@ -193,10 +193,11 @@ CFG_DIR="$GMOD/garrysmod/cfg"
 DATA_DIR="$GMOD/garrysmod/data/vrmod"
 mkdir -p "$CFG_DIR" "$DATA_DIR"
 
-HLVR_PINS=$'// soft pins (HL2VR-inspired)
+HLVR_PINS=$'// soft pins (HL2VR-inspired) — never SP-pause while in VR
 engine_no_focus_sleep 0
 snd_mute_losefocus 0
 fps_max 0
+sv_pausable 0
 '
 
 if [[ "$MODE" == "hub" ]]; then
