@@ -336,21 +336,28 @@ void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
 }
 
 bool WebUI_PointerClick(WebUIState& s, int px, int py) {
+  // Always: CLOSE / QUIT top-right
+  if (py >= 4 && py <= 40 && px >= UI_W - 110 && px <= UI_W - 8) {
+    s.wantQuit = true;
+    s.status = "CLOSING";
+    return true;
+  }
+
   // Nav tabs
   if (py >= 6 && py <= 38) {
-    if (px >= 8 && px <= 168) {
+    if (px >= 8 && px <= 150) {
       s.page = WebUIPage::NewGame;
       s.status = "NEW GAME";
       return true;
     }
-    if (px >= 180 && px <= 320) {
+    if (px >= 158 && px <= 290) {
       s.page = WebUIPage::Addons;
-      s.status = "ADDON MANAGER — AIM + TRIGGER";
+      s.status = "ADDONS — toggle mount · pages";
       return true;
     }
-    if (px >= 332 && px <= 500) {
+    if (px >= 298 && px <= 450) {
       s.page = WebUIPage::Settings;
-      s.status = "GMOD GRAPHICS + ENGINE SETTINGS";
+      s.status = "GMOD GRAPHICS + ENGINE";
       return true;
     }
   }
@@ -365,7 +372,6 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
       int y = 72 + n * rowH;
       if (px >= 24 && px <= UI_W - 24 && py >= y && py <= y + rowH - 4) {
         s.settingsRow = i;
-        // Left half cycle down, right half cycle up (or always +1)
         int dir = (px < UI_W / 2) ? -1 : 1;
         WebUI_CycleSetting(s, i, dir);
         char buf[96];
@@ -378,16 +384,46 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   }
 
   if (s.page == WebUIPage::Addons) {
-    const int visible = 14;
-    int start = s.addons.scroll;
-    for (int n = 0; n < visible; ++n) {
-      int i = start + n;
-      if (i >= (int)s.addons.addons.size()) break;
-      int y = 92 + n * 28;
-      if (px >= 244 && px <= UI_W - 16 && py >= y - 2 && py <= y + 22) {
-        s.addons.selected = i;
+    // Filter chips
+    const char* filters[] = {"ALL", "ON", "OFF", "WS", "LOCAL"};
+    for (int f = 0; f < 5; ++f) {
+      int x0 = 16 + f * 90;
+      if (px >= x0 && px <= x0 + 84 && py >= 50 && py <= 74) {
+        s.addons.filter = f;
+        s.addons.page = 0;
+        Addons_ClampPage(s.addons);
+        s.status = filters[f];
+        return true;
+      }
+    }
+    // Page prev / next
+    if (py >= UI_H - 48 && py <= UI_H - 12) {
+      if (px >= 16 && px <= 120) {
+        s.addons.page = std::max(0, s.addons.page - 1);
+        s.status = "PAGE " + std::to_string(s.addons.page + 1);
+        return true;
+      }
+      if (px >= UI_W - 130 && px <= UI_W - 16) {
+        s.addons.page++;
+        Addons_ClampPage(s.addons);
+        s.status = "PAGE " + std::to_string(s.addons.page + 1);
+        return true;
+      }
+    }
+    // Rows on current page
+    std::vector<int> idx;
+    Addons_FilteredIndices(s.addons, idx);
+    int start = s.addons.page * s.addons.pageSize;
+    const int rowH = 48;
+    for (int n = 0; n < s.addons.pageSize; ++n) {
+      int k = start + n;
+      if (k >= (int)idx.size()) break;
+      int y = 84 + n * rowH;
+      if (px >= 12 && px <= UI_W - 12 && py >= y && py <= y + rowH - 4) {
+        int abs = idx[k];
+        s.addons.selected = abs;
         std::string err;
-        if (!Addons_ToggleSelected(s.addons, err))
+        if (!Addons_ToggleIndex(s.addons, abs, err))
           s.status = "TOGGLE FAIL: " + err;
         else
           s.status = s.addons.status;
@@ -525,32 +561,43 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
 
   // --- Addons page ---
   if (stickX < 0) {
+    // page prev when on addons list, else New Game
+    if (s.addons.page > 0) {
+      s.addons.page--;
+      return;
+    }
     s.page = WebUIPage::NewGame;
     s.status = "NEW GAME";
     return;
   }
   if (stickX > 0) {
+    int pc = Addons_PageCount(s.addons);
+    if (s.addons.page + 1 < pc) {
+      s.addons.page++;
+      return;
+    }
     s.page = WebUIPage::Settings;
     s.status = "GMOD GRAPHICS + ENGINE";
     return;
   }
-  if (s.addons.addons.empty()) return;
-  if (stickY < 0) {
-    s.addons.selected = std::max(0, s.addons.selected - 1);
-    if (s.addons.selected < s.addons.scroll) s.addons.scroll = s.addons.selected;
-  }
-  if (stickY > 0) {
-    s.addons.selected = std::min((int)s.addons.addons.size() - 1, s.addons.selected + 1);
-    if (s.addons.selected >= s.addons.scroll + 12)
-      s.addons.scroll = s.addons.selected - 11;
-  }
+  std::vector<int> idx;
+  Addons_FilteredIndices(s.addons, idx);
+  if (idx.empty()) return;
+  // Find selected in filtered list
+  int pos = 0;
+  for (int i = 0; i < (int)idx.size(); ++i)
+    if (idx[i] == s.addons.selected) { pos = i; break; }
+  if (stickY < 0) pos = std::max(0, pos - 1);
+  if (stickY > 0) pos = std::min((int)idx.size() - 1, pos + 1);
+  s.addons.selected = idx[pos];
+  s.addons.page = pos / s.addons.pageSize;
+  Addons_ClampPage(s.addons);
   if (triggerEdge) {
     std::string err;
-    if (!Addons_ToggleSelected(s.addons, err)) {
+    if (!Addons_ToggleIndex(s.addons, s.addons.selected, err))
       s.status = "TOGGLE FAIL: " + err;
-    } else {
+    else
       s.status = s.addons.status;
-    }
   }
 }
 
@@ -559,13 +606,15 @@ static void DrawNav(unsigned char* rgba, WebUIPage page) {
   bool ng = page == WebUIPage::NewGame;
   bool ad = page == WebUIPage::Addons;
   bool st = page == WebUIPage::Settings;
-  FillRect(rgba, 8, 6, 160, 32, ng ? 40 : 120, ng ? 12 : 20, ng ? 18 : 40, 255);
-  DrawText(rgba, 20, 14, "NEW GAME", 255, 240, 244, 2);
-  FillRect(rgba, 180, 6, 140, 32, ad ? 40 : 120, ad ? 12 : 20, ad ? 18 : 40, 255);
-  DrawText(rgba, 196, 14, "ADDONS", 255, 240, 244, 2);
-  FillRect(rgba, 332, 6, 160, 32, st ? 40 : 120, st ? 12 : 20, st ? 18 : 40, 255);
-  DrawText(rgba, 348, 14, "SETTINGS", 255, 240, 244, 2);
-  DrawText(rgba, 520, 14, "GMOD NATIVE GFX", 255, 200, 210, 1);
+  FillRect(rgba, 8, 6, 140, 32, ng ? 40 : 120, ng ? 12 : 20, ng ? 18 : 40, 255);
+  DrawText(rgba, 18, 14, "NEW GAME", 255, 240, 244, 2);
+  FillRect(rgba, 158, 6, 128, 32, ad ? 40 : 120, ad ? 12 : 20, ad ? 18 : 40, 255);
+  DrawText(rgba, 176, 14, "ADDONS", 255, 240, 244, 2);
+  FillRect(rgba, 298, 6, 148, 32, st ? 40 : 120, st ? 12 : 20, st ? 18 : 40, 255);
+  DrawText(rgba, 312, 14, "SETTINGS", 255, 240, 244, 2);
+  // CLOSE — always visible
+  FillRect(rgba, UI_W - 110, 6, 100, 32, 180, 20, 40, 255);
+  DrawText(rgba, UI_W - 92, 14, "CLOSE", 255, 255, 255, 2);
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
@@ -606,44 +655,76 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   DrawNav(rgba, s.page);
 
   if (s.page == WebUIPage::Addons) {
-    // Left: help / counts — Right: subscribed list (enable/disable)
-    FillRect(rgba, 8, 52, 220, UI_H - 60, 28, 10, 16, 255);
-    FillRect(rgba, 236, 52, UI_W - 244, UI_H - 60, 36, 12, 18, 255);
-
-    DrawText(rgba, 16, 60, "SUBSCRIBED", 200, 150, 165, 1);
-    char cnt[80];
-    snprintf(cnt, sizeof(cnt), "ON %d", Addons_EnabledCount(s.addons));
-    DrawText(rgba, 16, 88, cnt, 90, 220, 150, 1);
-    snprintf(cnt, sizeof(cnt), "OFF %d", Addons_DisabledCount(s.addons));
-    DrawText(rgba, 16, 108, cnt, 255, 100, 100, 1);
-    DrawText(rgba, 16, 140, "TRIGGER TOGGLE", 200, 150, 165, 1);
-    DrawText(rgba, 16, 160, "MOUNT VIA", 200, 150, 165, 1);
-    DrawText(rgba, 16, 180, "ADDONNOMOUNT", 200, 150, 165, 1);
-    DrawText(rgba, 16, 210, "LOCAL .DISABLED", 200, 150, 165, 1);
-    DrawText(rgba, 16, 250, "LEFT = NEW GAME", 255, 70, 100, 1);
-
-    DrawText(rgba, 248, 60, "ADDON MANAGER", 255, 70, 100, 2);
-    const int visible = 14;
-    int start = s.addons.scroll;
-    for (int n = 0; n < visible; ++n) {
-      int i = start + n;
-      if (i >= (int)s.addons.addons.size()) break;
-      const auto& a = s.addons.addons[i];
-      bool sel = (i == s.addons.selected);
-      int y = 92 + n * 28;
-      if (sel) FillRect(rgba, 244, y - 2, UI_W - 260, 24, 120, 22, 36, 255);
-      // status pill
-      if (a.enabled)
-        FillRect(rgba, 248, y, 36, 18, 40, 120, 70, 255);
-      else
-        FillRect(rgba, 248, y, 36, 18, 100, 30, 40, 255);
-      DrawText(rgba, 252, y + 3, a.enabled ? "ON" : "OFF", 255, 255, 255, 1);
-      // title truncated
-      char line[96];
-      snprintf(line, sizeof(line), "%.48s", a.title.c_str());
-      DrawText(rgba, 292, y + 3, line, 255, 240, 244, 1);
+    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 28, 10, 16, 255);
+    // Filters
+    const char* filters[] = {"ALL", "ON", "OFF", "WS", "LOCAL"};
+    for (int f = 0; f < 5; ++f) {
+      int x0 = 16 + f * 90;
+      bool on = (s.addons.filter == f);
+      FillRect(rgba, x0, 52, 84, 22, on ? 90 : 50, on ? 22 : 14, on ? 36 : 22, 255);
+      DrawText(rgba, x0 + 12, 56, filters[f], 255, 240, 244, 1);
     }
-    DrawText(rgba, 16, UI_H - 22, s.status.c_str(), 200, 150, 165, 1);
+    char cnt[96];
+    std::vector<int> idx;
+    Addons_FilteredIndices(s.addons, idx);
+    int pc = Addons_PageCount(s.addons);
+    snprintf(cnt, sizeof(cnt), "%zu SHOWN / %zu TOTAL  ON %d  OFF %d  P%d/%d",
+             idx.size(), s.addons.addons.size(),
+             Addons_EnabledCount(s.addons), Addons_DisabledCount(s.addons),
+             s.addons.page + 1, std::max(1, pc));
+    DrawText(rgba, 480, 56, cnt, 200, 150, 165, 1);
+
+    int start = s.addons.page * s.addons.pageSize;
+    const int rowH = 48;
+    for (int n = 0; n < s.addons.pageSize; ++n) {
+      int k = start + n;
+      if (k >= (int)idx.size()) break;
+      int ai = idx[k];
+      const auto& a = s.addons.addons[ai];
+      int y = 84 + n * rowH;
+      bool sel = (ai == s.addons.selected);
+      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 100 : 40, sel ? 24 : 12, sel ? 40 : 18, 255);
+      // Thumb 40x40
+      int tx = 18, ty = y + 4;
+      if (a.thumbW > 0 && (int)a.thumbRgba.size() >= a.thumbW * a.thumbH * 4) {
+        for (int j = 0; j < 40; ++j) {
+          for (int i = 0; i < 40; ++i) {
+            int sx = i * a.thumbW / 40;
+            int sy = j * a.thumbH / 40;
+            int si = (sy * a.thumbW + sx) * 4;
+            PutPx(rgba, tx + i, ty + j,
+                  a.thumbRgba[si], a.thumbRgba[si + 1], a.thumbRgba[si + 2], 255);
+          }
+        }
+      } else {
+        // Placeholder color by kind
+        int pr = a.kind == "workshop" ? 60 : 40;
+        int pg = a.kind == "workshop" ? 40 : 70;
+        int pb = 90;
+        FillRect(rgba, tx, ty, 40, 40, pr, pg, pb, 255);
+        DrawText(rgba, tx + 8, ty + 14, a.kind == "workshop" ? "WS" : "L", 255, 255, 255, 1);
+      }
+      // ON/OFF badge
+      if (a.enabled)
+        FillRect(rgba, 66, y + 12, 44, 20, 30, 120, 60, 255);
+      else
+        FillRect(rgba, 66, y + 12, 44, 20, 120, 30, 40, 255);
+      DrawText(rgba, 72, y + 16, a.enabled ? "ON" : "OFF", 255, 255, 255, 1);
+      char line[96];
+      snprintf(line, sizeof(line), "%.52s", a.title.c_str());
+      DrawText(rgba, 120, y + 10, line, 255, 240, 244, 1);
+      snprintf(line, sizeof(line), "%s  %s", a.kind.c_str(), a.id.c_str());
+      DrawText(rgba, 120, y + 28, line, 160, 120, 130, 1);
+    }
+
+    // Page buttons
+    FillRect(rgba, 16, UI_H - 48, 100, 32, 80, 20, 36, 255);
+    DrawText(rgba, 36, UI_H - 38, "PREV", 255, 240, 244, 2);
+    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 80, 20, 36, 255);
+    DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
+    DrawText(rgba, 140, UI_H - 36, s.addons.status.c_str(), 200, 150, 165, 1);
+    DrawText(rgba, 140, UI_H - 20, "TRIGGER = TOGGLE MOUNT  ·  CLOSE = EXIT", 160, 120, 130, 1);
+
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;

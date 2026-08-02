@@ -4,41 +4,47 @@
 #include <vector>
 #include <unordered_set>
 
-// Reversed WebUI Addons manager (control.Addons.js + addonnomount.txt)
-// Mount state for workshop = NOT listed in cfg/addonnomount.txt
+// GMod workshop/local addon manager (addonnomount.txt + local .disabled)
 
 struct AddonEntry {
   std::string id;       // workshop id or "local:<folder>"
   std::string title;
   std::string kind;     // "workshop" | "local"
-  bool enabled = true;  // mounted
-  uint64_t sizeHint = 0;
+  bool enabled = true;
+  std::string dirPath;  // absolute folder for previews
+  // Tiny RGBA thumb (optional). w/h 0 = none.
+  int thumbW = 0, thumbH = 0;
+  std::vector<unsigned char> thumbRgba; // thumbW*thumbH*4
 };
 
 struct AddonManager {
   std::string gmodRoot;
-  std::string workshopRoot; // .../steamapps/workshop/content/4000
+  std::string workshopRoot;
+  std::string thumbCache; // ~/.cache/gvrmod/thumbs
   std::vector<AddonEntry> addons;
-  std::unordered_set<std::string> nomount; // workshop ids disabled
+  std::unordered_set<std::string> nomount;
   int selected = 0;
-  int scroll = 0;
-  std::string filter; // optional search substring
+  int page = 0;
+  int pageSize = 8; // product grid: 8 rows per page
+  int filter = 0;   // 0=all 1=on 2=off 3=workshop 4=local
   std::string status;
 };
 
-// Resolve workshop content dir from GMod path
 std::string FindWorkshopContent4000(const std::string& gmodRoot);
-
-// Load nomount set + scan local + workshop dirs
 void Addons_Load(AddonManager& m, const std::string& gmodRoot);
 
-// Toggle mount for selected entry; writes addonnomount.txt for workshop.
-// Local folders: rename to name.disabled (GMod ignores) or restore.
-bool Addons_ToggleSelected(AddonManager& m, std::string& err);
+// Filtered index list (into m.addons)
+void Addons_FilteredIndices(const AddonManager& m, std::vector<int>& out);
+int Addons_PageCount(const AddonManager& m);
+void Addons_ClampPage(AddonManager& m);
 
-// Persist nomount VDF
+bool Addons_ToggleSelected(AddonManager& m, std::string& err);
+bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err);
 bool Addons_WriteNomount(const AddonManager& m, std::string& err);
 
-// Count helpers
 int Addons_EnabledCount(const AddonManager& m);
 int Addons_DisabledCount(const AddonManager& m);
+
+// Load local preview files + optional Steam CDN fetch for visible page.
+// safe to call each frame; rate-limited fetch (one request per call max).
+void Addons_EnsureThumbsForPage(AddonManager& m);

@@ -15,6 +15,7 @@ add_executable(cube_webui_launcher
 
 target_include_directories(cube_webui_launcher PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party
   /usr/include
 )
 

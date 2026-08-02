@@ -79,19 +79,17 @@ struct PanelConfig {
   float panelAlpha = 0.96f; // UI opacity over passthrough
 };
 
-// Runtime placement (meters). Space: VIEW when viewLock, else LOCAL after place.
-struct PanelPose {
-  float cx = 0.f, cy = 0.f, cz = -1.05f;
+// World panel in LOCAL space (position + frozen orientation). Does NOT billboard to HMD.
+struct WorldPanel {
+  Vec3 c{0, 0, -1.05f};
+  Vec3 right{1, 0, 0};
+  Vec3 up{0, 1, 0};
+  Vec3 normal{0, 0, 1}; // faces user at seed/place
+  bool ready = false;
 };
 
 static PanelConfig g_cfg{};
-static PanelPose g_pose{};
-
-static void ResetPanelPoseFromConfig() {
-  g_pose.cx = g_cfg.offsetX;
-  g_pose.cy = g_cfg.offsetY;
-  g_pose.cz = -g_cfg.dist + g_cfg.offsetZ;
-}
+static WorldPanel g_wp{};
 
 static std::string Dirname(const std::string& p) {
   auto s = p.find_last_of('/');
@@ -205,33 +203,58 @@ static void LoadPanelConfig(const std::string& gmodRoot) {
     if (!(v[0] == '0' && v[1] == 0)) g_cfg.viewLock = false;
   }
 
-  ResetPanelPoseFromConfig();
+  // Product default: world lock. Only CUBE_VIEW_LOCK=1 enables HUD follow.
+  if (!getenv("CUBE_VIEW_LOCK"))
+    g_cfg.viewLock = false;
+  g_wp = WorldPanel{};
+  g_cfg.grabThresh = std::min(g_cfg.grabThresh, 0.40f);
   fprintf(stderr,
-          "[cube_webui] panel size=%.2fx%.2fm dist=%.2f offset=(%.2f,%.2f,%.2f) "
-          "view_lock=%d passthrough=%d grab>=%.2f\n",
+          "[cube_webui] panel size=%.2fx%.2fm dist=%.2f "
+          "world_lock=%d passthrough=%d grab>=%.2f\n",
           g_cfg.halfW * 2.f, g_cfg.halfH * 2.f, g_cfg.dist,
-          g_cfg.offsetX, g_cfg.offsetY, g_cfg.offsetZ,
-          g_cfg.viewLock ? 1 : 0, g_cfg.passthrough ? 1 : 0, g_cfg.grabThresh);
+          g_cfg.viewLock ? 0 : 1, g_cfg.passthrough ? 1 : 0, g_cfg.grabThresh);
 }
 
-// Panel plane in the same space as the ray (VIEW head-lock, or converted VIEW for world).
-// Center (cx,cy,cz), faces -Z (head-on). UV: +X right, +Y up → image top-left.
-static bool RayPanelHit(Vec3 origin, Vec3 dir, const PanelPose& pose,
-                        int* outPx, int* outPy, Vec3* outHit) {
-  const float hw = g_cfg.halfW;
-  const float hh = g_cfg.halfH;
+// Seed / re-place panel in LOCAL: fixed pos + orientation (faces head at this moment only).
+static void SeedWorldPanel(const XrPosef& headLocal) {
+  Vec3 headP = {headLocal.position.x, headLocal.position.y, headLocal.position.z};
+  Vec3 fwd = Normalize(QuatRotate(headLocal.orientation, V3(0, 0, -1)));
+  Vec3 headR = Normalize(QuatRotate(headLocal.orientation, V3(1, 0, 0)));
+  Vec3 headU = Normalize(QuatRotate(headLocal.orientation, V3(0, 1, 0)));
+  g_wp.c = headP + fwd * g_cfg.dist + headR * g_cfg.offsetX + headU * g_cfg.offsetY +
+           fwd * g_cfg.offsetZ;
+  // Face user now; then freeze (no per-frame billboard)
+  g_wp.normal = Normalize(headP - g_wp.c);
+  Vec3 worldUp = V3(0, 1, 0);
+  g_wp.right = Cross(worldUp, g_wp.normal);
+  if (Dot(g_wp.right, g_wp.right) < 1e-8f)
+    g_wp.right = Normalize(Cross(headU, g_wp.normal));
+  else
+    g_wp.right = Normalize(g_wp.right);
+  g_wp.up = Normalize(Cross(g_wp.normal, g_wp.right));
+  g_wp.ready = true;
+  fprintf(stderr, "[cube_webui] world panel seeded LOCAL c=(%.2f,%.2f,%.2f)\n",
+          g_wp.c.x, g_wp.c.y, g_wp.c.z);
+}
+
+// Ray vs world panel plane in LOCAL. UV matches texture top-left.
+static bool RayHitWorldPanel(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit) {
+  if (!g_wp.ready) return false;
   Vec3 d = Normalize(dir);
-  if (std::fabs(d.z) < 1e-6f) return false;
-  float t = (pose.cz - origin.z) / d.z;
-  if (t < 0.01f || t > 8.f) return false;
+  float denom = Dot(d, g_wp.normal);
+  if (std::fabs(denom) < 1e-5f) return false;
+  float t = Dot(g_wp.c - origin, g_wp.normal) / denom;
+  if (t < 0.02f || t > 10.f) return false;
   Vec3 hit = origin + d * t;
-  const float margin = 1.05f;
-  if (std::fabs(hit.x - pose.cx) > hw * margin ||
-      std::fabs(hit.y - pose.cy) > hh * margin) return false;
-  float lx = std::max(-hw, std::min(hw, hit.x - pose.cx));
-  float ly = std::max(-hh, std::min(hh, hit.y - pose.cy));
-  int px = (int)((lx / hw * 0.5f + 0.5f) * (float)UI_W);
-  int py = (int)((0.5f - ly / hh * 0.5f) * (float)UI_H);
+  float u = Dot(hit - g_wp.c, g_wp.right);
+  float v = Dot(hit - g_wp.c, g_wp.up);
+  const float hw = g_cfg.halfW, hh = g_cfg.halfH;
+  const float margin = 1.08f;
+  if (std::fabs(u) > hw * margin || std::fabs(v) > hh * margin) return false;
+  float cu = std::max(-hw, std::min(hw, u));
+  float cv = std::max(-hh, std::min(hh, v));
+  int px = (int)((cu / hw * 0.5f + 0.5f) * (float)UI_W);
+  int py = (int)((0.5f - cv / hh * 0.5f) * (float)UI_H);
   px = std::max(0, std::min(UI_W - 1, px));
   py = std::max(0, std::min(UI_H - 1, py));
   if (outPx) *outPx = px;
@@ -262,10 +285,8 @@ static void MatMul4(const float A[16], const float B[16], float O[16]) {
   }
   std::memcpy(O, T, sizeof(T));
 }
-// inv(eye_local) * view_local → modelview that takes VIEW-space verts into eye camera space
-static void LoadModelviewViewSpace(const XrPosef& eyeLocal, const XrPosef& viewLocal) {
-  float invEye[16], viewM[16], mv[16];
-  // inv(eye) = local_from_parent for eye pose in LOCAL
+// Modelview: LOCAL/world verts → eye camera (inv of eye pose in LOCAL)
+static void LoadModelviewLocal(const XrPosef& eyeLocal) {
   Vec3 t = {eyeLocal.position.x, eyeLocal.position.y, eyeLocal.position.z};
   float x = eyeLocal.orientation.x, y = eyeLocal.orientation.y, z = eyeLocal.orientation.z, w = eyeLocal.orientation.w;
   float R[9] = {
@@ -273,16 +294,16 @@ static void LoadModelviewViewSpace(const XrPosef& eyeLocal, const XrPosef& viewL
     2*x*y + 2*z*w, 1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w,
     2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x*x - 2*y*y
   };
-  invEye[0] = R[0]; invEye[1] = R[3]; invEye[2] = R[6]; invEye[3] = 0;
-  invEye[4] = R[1]; invEye[5] = R[4]; invEye[6] = R[7]; invEye[7] = 0;
-  invEye[8] = R[2]; invEye[9] = R[5]; invEye[10] = R[8]; invEye[11] = 0;
-  invEye[12] = -(R[0]*t.x + R[3]*t.y + R[6]*t.z);
-  invEye[13] = -(R[1]*t.x + R[4]*t.y + R[7]*t.z);
-  invEye[14] = -(R[2]*t.x + R[5]*t.y + R[8]*t.z);
-  invEye[15] = 1;
-  PoseToMat(viewLocal, viewM);
-  MatMul4(invEye, viewM, mv);
-  glLoadMatrixf(mv);
+  float M[16] = {
+    R[0], R[3], R[6], 0,
+    R[1], R[4], R[7], 0,
+    R[2], R[5], R[8], 0,
+    -(R[0]*t.x + R[3]*t.y + R[6]*t.z),
+    -(R[1]*t.x + R[4]*t.y + R[7]*t.z),
+    -(R[2]*t.x + R[5]*t.y + R[8]*t.z),
+    1
+  };
+  glLoadMatrixf(M);
 }
 
 // --- GLX ---
@@ -341,10 +362,14 @@ static GLuint MakeTex(int w, int h, const void* rgba) {
   return t;
 }
 
-// Face-on panel at runtime pose (VIEW space verts)
-static void DrawPanelAt(GLuint tex, const PanelPose& pose) {
+// Draw panel in LOCAL (modelview already inv(eye))
+static void DrawWorldPanel(GLuint tex) {
+  if (!g_wp.ready) return;
   const float hw = g_cfg.halfW, hh = g_cfg.halfH;
-  const float cx = pose.cx, cy = pose.cy, cz = pose.cz;
+  Vec3 bl = g_wp.c - g_wp.right * hw - g_wp.up * hh;
+  Vec3 br = g_wp.c + g_wp.right * hw - g_wp.up * hh;
+  Vec3 tr = g_wp.c + g_wp.right * hw + g_wp.up * hh;
+  Vec3 tl = g_wp.c - g_wp.right * hw + g_wp.up * hh;
   glDisable(GL_CULL_FACE);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -352,50 +377,17 @@ static void DrawPanelAt(GLuint tex, const PanelPose& pose) {
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, g_cfg.panelAlpha);
   glBegin(GL_QUADS);
-  glTexCoord2f(0, 1); glVertex3f(cx - hw, cy - hh, cz);
-  glTexCoord2f(1, 1); glVertex3f(cx + hw, cy - hh, cz);
-  glTexCoord2f(1, 0); glVertex3f(cx + hw, cy + hh, cz);
-  glTexCoord2f(0, 0); glVertex3f(cx - hw, cy + hh, cz);
+  glTexCoord2f(0, 1); glVertex3f(bl.x, bl.y, bl.z);
+  glTexCoord2f(1, 1); glVertex3f(br.x, br.y, br.z);
+  glTexCoord2f(1, 0); glVertex3f(tr.x, tr.y, tr.z);
+  glTexCoord2f(0, 0); glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
   glDisable(GL_TEXTURE_2D);
   glColor4f(1, 1, 1, 1);
   glDisable(GL_BLEND);
 }
 
-// Local → VIEW (parent_from_child for vectors via inv view)
-static Vec3 PoseInvRotate(const XrPosef& pose, Vec3 v) {
-  XrQuaternionf q = pose.orientation;
-  q.x = -q.x; q.y = -q.y; q.z = -q.z;
-  return QuatRotate(q, v);
-}
-static Vec3 PoseInvTransform(const XrPosef& pose, Vec3 p) {
-  Vec3 t = {pose.position.x, pose.position.y, pose.position.z};
-  return PoseInvRotate(pose, p - t);
-}
-static Vec3 PoseTransform(const XrPosef& pose, Vec3 p) {
-  return QuatRotate(pose.orientation, p) +
-         V3(pose.position.x, pose.position.y, pose.position.z);
-}
-
-// World-lock: store LOCAL; hit/draw need VIEW. View-lock: pose already VIEW.
-static PanelPose PanelPoseInView(const XrPosef& viewLocal, bool viewPoseOk) {
-  if (g_cfg.viewLock || !viewPoseOk) return g_pose;
-  // g_pose is LOCAL center → VIEW
-  Vec3 local = V3(g_pose.cx, g_pose.cy, g_pose.cz);
-  Vec3 view = PoseInvTransform(viewLocal, local);
-  return PanelPose{view.x, view.y, view.z};
-}
-
-static void SetPanelFromView(const PanelPose& viewPose, const XrPosef& viewLocal, bool viewPoseOk) {
-  if (g_cfg.viewLock || !viewPoseOk) {
-    g_pose = viewPose;
-    return;
-  }
-  Vec3 local = PoseTransform(viewLocal, V3(viewPose.cx, viewPose.cy, viewPose.cz));
-  g_pose = {local.x, local.y, local.z};
-}
-
-static void DrawLaserView(Vec3 a, Vec3 b, float cr, float cg, float cb) {
+static void DrawLaserLocal(Vec3 a, Vec3 b, float cr, float cg, float cb) {
   glDisable(GL_TEXTURE_2D);
   glDisable(GL_DEPTH_TEST);
   glLineWidth(4.f);
@@ -420,6 +412,7 @@ struct XrInput {
   XrAction trigger = XR_NULL_HANDLE;      // boolean click
   XrAction triggerAxis = XR_NULL_HANDLE;  // float value (Touch/Index)
   XrAction grab = XR_NULL_HANDLE;         // squeeze float — move menu
+  XrAction grabClick = XR_NULL_HANDLE;    // squeeze click bool fallback
   XrAction stick = XR_NULL_HANDLE;
   XrAction menu = XR_NULL_HANDLE;
   XrSpace aimSpace = XR_NULL_HANDLE;
@@ -443,6 +436,7 @@ static bool SetupInput(XrInstance instance, XrSession session, XrInput& in) {
   if (!mk("trigger", "Trigger Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.trigger)) return false;
   if (!mk("trigger_axis", "Trigger Axis", XR_ACTION_TYPE_FLOAT_INPUT, &in.triggerAxis)) return false;
   if (!mk("grab", "Grab Move Menu", XR_ACTION_TYPE_FLOAT_INPUT, &in.grab)) return false;
+  if (!mk("grab_click", "Grab Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.grabClick)) return false;
   if (!mk("stick", "Thumbstick", XR_ACTION_TYPE_VECTOR2F_INPUT, &in.stick)) return false;
   if (!mk("menu", "Menu", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.menu)) return false;
 
@@ -456,20 +450,26 @@ static bool SetupInput(XrInstance instance, XrSession session, XrInput& in) {
     xrSuggestInteractionProfileBindings(instance, &sp);
   };
 
-  XrPath pPose{}, pTrigClick{}, pTrigVal{}, pSqueeze{}, pThumb{}, pMenu{}, pA{};
+  XrPath pPose{}, pTrigClick{}, pTrigVal{}, pSqueeze{}, pSqueezeClick{}, pThumb{}, pMenu{}, pA{};
+  XrPath pLPose{}, pLSqueeze{}, pLSqueezeClick{};
   xrStringToPath(instance, "/user/hand/right/input/aim/pose", &pPose);
   xrStringToPath(instance, "/user/hand/right/input/trigger/click", &pTrigClick);
   xrStringToPath(instance, "/user/hand/right/input/trigger/value", &pTrigVal);
   xrStringToPath(instance, "/user/hand/right/input/squeeze/value", &pSqueeze);
+  xrStringToPath(instance, "/user/hand/right/input/squeeze/click", &pSqueezeClick);
   xrStringToPath(instance, "/user/hand/right/input/thumbstick", &pThumb);
   xrStringToPath(instance, "/user/hand/right/input/menu/click", &pMenu);
   xrStringToPath(instance, "/user/hand/right/input/a/click", &pA);
+  xrStringToPath(instance, "/user/hand/left/input/aim/pose", &pLPose);
+  xrStringToPath(instance, "/user/hand/left/input/squeeze/value", &pLSqueeze);
+  xrStringToPath(instance, "/user/hand/left/input/squeeze/click", &pLSqueezeClick);
 
   suggest("/interaction_profiles/oculus/touch_controller", {
     {in.pose, pPose},
     {in.trigger, pTrigClick},
     {in.triggerAxis, pTrigVal},
     {in.grab, pSqueeze},
+    {in.grabClick, pSqueezeClick},
     {in.stick, pThumb},
     {in.menu, pMenu},
   });
@@ -478,15 +478,16 @@ static bool SetupInput(XrInstance instance, XrSession session, XrInput& in) {
     {in.trigger, pTrigClick},
     {in.triggerAxis, pTrigVal},
     {in.grab, pSqueeze},
+    {in.grabClick, pSqueezeClick},
     {in.stick, pThumb},
     {in.menu, pA},
   });
-  // Meta Quest Touch Pro / Plus often use same paths as Touch
   suggest("/interaction_profiles/facebook/touch_controller_pro", {
     {in.pose, pPose},
     {in.trigger, pTrigClick},
     {in.triggerAxis, pTrigVal},
     {in.grab, pSqueeze},
+    {in.grabClick, pSqueezeClick},
     {in.stick, pThumb},
     {in.menu, pMenu},
   });
@@ -739,7 +740,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
   WebUIState ui{};
   WebUI_Init(ui, gmodRoot);
-  ui.status = "WORLD PANEL · GRIP move · TRIGGER click · seamless Start";
+  ui.status = "GRIP=move · TRIGGER=click · CLOSE to exit";
   std::vector<unsigned char> panelBuf(UI_W * UI_H * 4);
   WebUI_Rasterize(ui, panelBuf.data(), nullptr);
   GLuint panelTex = MakeTex(UI_W, UI_H, panelBuf.data());
@@ -747,13 +748,13 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   bool prevTrigger = false;
   bool prevMenu = false;
   bool grabbing = false;
-  bool worldInitPending = !g_cfg.viewLock; // convert default VIEW pose → LOCAL once
-  Vec3 grabOff{0, 0, 0}; // panel center - aim origin at grab start (VIEW)
+  bool worldInitPending = true;
+  Vec3 grabOff{0, 0, 0}; // panel center - aim (LOCAL)
   float stickCooldown = 0.f;
   int frame = 0;
-  Vec3 viewAimO{0, 0, 0}, viewAimD{0, 0, -1}, viewHitPt{0, 0, -1.f};
-  bool viewAimValid = false;
-  bool viewHit = false;
+  Vec3 aimO{0, 0, 0}, aimD{0, 0, -1}, hitPt{0, 0, -1.f};
+  bool aimValid = false;
+  bool panelHit = false;
 
   auto pollCmdFile = [&]() {
     FILE* f = fopen("/tmp/cube_webui_cmd", "r");
@@ -766,11 +767,12 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (std::strncmp(buf, "newgame", 7) == 0) { ui.page = WebUIPage::NewGame; }
       if (std::strncmp(buf, "settings", 8) == 0) { ui.page = WebUIPage::Settings; }
       if (std::strncmp(buf, "reset", 5) == 0) {
-        ResetPanelPoseFromConfig();
         grabbing = false;
-        worldInitPending = !g_cfg.viewLock;
+        worldInitPending = true;
         ui.status = "PANEL RESET";
       }
+      if (std::strncmp(buf, "close", 5) == 0 || std::strncmp(buf, "exit", 4) == 0)
+        ui.wantQuit = true;
       if (std::strncmp(buf, "up", 2) == 0) WebUI_Input(ui, 0, -1, false, false);
       if (std::strncmp(buf, "down", 4) == 0) WebUI_Input(ui, 0, 1, false, false);
       if (std::strncmp(buf, "left", 4) == 0) WebUI_Input(ui, -1, 0, false, false);
@@ -912,116 +914,115 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       xrSyncActions(session, &sync);
     }
 
-    // Locate VIEW (head) pose in LOCAL — modelview for stereo panel
-    XrPosef viewPoseLocal = IdentityPose();
-    bool viewPoseOk = false;
+    // Head pose in LOCAL (seed only — panel does NOT track head after seed)
+    XrPosef headLocal = IdentityPose();
+    bool headOk = false;
     if (viewSpace) {
       XrSpaceLocation vloc{XR_TYPE_SPACE_LOCATION};
       if (XR_SUCCEEDED(xrLocateSpace(viewSpace, space, fs.predictedDisplayTime, &vloc))) {
         const XrSpaceLocationFlags need =
             XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
         if ((vloc.locationFlags & need) == need) {
-          viewPoseLocal = vloc.pose;
-          viewPoseOk = true;
+          headLocal = vloc.pose;
+          headOk = true;
         }
       }
     }
-
-    // World-lock: first valid head pose freezes default panel into LOCAL
-    if (worldInitPending && viewPoseOk) {
-      PanelPose viewDefaults = g_pose; // still VIEW-style from config
-      SetPanelFromView(viewDefaults, viewPoseLocal, true);
+    if (worldInitPending && headOk) {
+      SeedWorldPanel(headLocal);
       worldInitPending = false;
-      fprintf(stderr, "[cube_webui] world-lock seeded from default pose\n");
     }
 
-    // Panel pose in VIEW for this frame (world-lock converts LOCAL→VIEW)
-    PanelPose panelView = PanelPoseInView(viewPoseLocal, viewPoseOk);
-
-    // Aim in VIEW — same space as panel + laser
-    viewAimValid = false;
-    viewHit = false;
+    // Controller aim in LOCAL (same space as world panel)
+    aimValid = false;
+    panelHit = false;
     int hitPx = 0, hitPy = 0;
-    viewHitPt = V3(panelView.cx, panelView.cy, panelView.cz);
-    if (input.attached && input.aimSpace && viewSpace) {
+    hitPt = g_wp.c;
+    if (input.attached && input.aimSpace) {
       XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
-      if (XR_SUCCEEDED(xrLocateSpace(input.aimSpace, viewSpace, fs.predictedDisplayTime, &loc))) {
+      if (XR_SUCCEEDED(xrLocateSpace(input.aimSpace, space, fs.predictedDisplayTime, &loc))) {
         if (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) {
-          viewAimO = {loc.pose.position.x, loc.pose.position.y, loc.pose.position.z};
-          viewAimValid = true;
+          aimO = {loc.pose.position.x, loc.pose.position.y, loc.pose.position.z};
+          aimValid = true;
           Vec3 dNeg = Normalize(QuatRotate(loc.pose.orientation, V3(0, 0, -1)));
           Vec3 dPos = Normalize(QuatRotate(loc.pose.orientation, V3(0, 0, 1)));
-          viewAimD = dNeg;
-          viewHit = RayPanelHit(viewAimO, dNeg, panelView, &hitPx, &hitPy, &viewHitPt);
-          if (!viewHit) {
-            viewAimD = dPos;
-            viewHit = RayPanelHit(viewAimO, dPos, panelView, &hitPx, &hitPy, &viewHitPt);
+          aimD = dNeg;
+          panelHit = RayHitWorldPanel(aimO, dNeg, &hitPx, &hitPy, &hitPt);
+          if (!panelHit) {
+            aimD = dPos;
+            panelHit = RayHitWorldPanel(aimO, dPos, &hitPx, &hitPy, &hitPt);
           }
-          if (!viewHit) viewAimD = dNeg;
-          if (viewHit && (frame % 60) == 0)
-            fprintf(stderr, "[cube_webui] laser hit %d,%d tip=(%.2f,%.2f,%.2f) grab=%d\n",
-                    hitPx, hitPy, viewHitPt.x, viewHitPt.y, viewHitPt.z, grabbing ? 1 : 0);
+          if (!panelHit) aimD = dNeg;
         }
       }
     }
 
-    // Grip = grab/move menu (panel stays face-on; position follows controller)
+    // Grip grab — move panel center in LOCAL; orientation frozen (re-face on release)
     float grabVal = 0.f;
-    if (input.attached && input.grab) {
-      XrActionStateFloat ft{XR_TYPE_ACTION_STATE_FLOAT};
+    bool grabClick = false;
+    if (input.attached) {
       XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
-      gi.action = input.grab;
-      if (XR_SUCCEEDED(xrGetActionStateFloat(session, &gi, &ft)) && ft.isActive)
-        grabVal = ft.currentState;
+      if (input.grab) {
+        XrActionStateFloat ft{XR_TYPE_ACTION_STATE_FLOAT};
+        gi.action = input.grab;
+        if (XR_SUCCEEDED(xrGetActionStateFloat(session, &gi, &ft)) && ft.isActive)
+          grabVal = ft.currentState;
+      }
+      if (input.grabClick) {
+        XrActionStateBoolean st{XR_TYPE_ACTION_STATE_BOOLEAN};
+        gi.action = input.grabClick;
+        if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &gi, &st)) && st.isActive)
+          grabClick = st.currentState;
+      }
     }
-    const bool grabHeld = grabVal >= g_cfg.grabThresh;
-    if (grabHeld && viewAimValid) {
+    const bool grabHeld = grabClick || (grabVal >= g_cfg.grabThresh);
+    if (grabHeld && aimValid && g_wp.ready) {
       if (!grabbing) {
-        // Start grab when aiming at panel, or if already near center (re-grab)
-        bool canStart = viewHit;
+        bool canStart = panelHit;
         if (!canStart) {
-          float dx = viewAimO.x - panelView.cx;
-          float dy = viewAimO.y - panelView.cy;
-          float dz = viewAimO.z - panelView.cz;
-          float dist2 = dx * dx + dy * dy + dz * dz;
-          canStart = dist2 < 1.2f * 1.2f; // within ~1.2m of panel center
+          // near panel center (1.5m) still allows grab
+          Vec3 dlt = g_wp.c - aimO;
+          canStart = Dot(dlt, dlt) < 2.25f;
         }
         if (canStart) {
           grabbing = true;
-          grabOff = V3(panelView.cx, panelView.cy, panelView.cz) - viewAimO;
-          ui.status = "MOVING MENU — release grip to place";
+          grabOff = g_wp.c - aimO;
+          ui.status = "MOVING — release grip to place";
         }
       }
       if (grabbing) {
-        PanelPose np;
-        np.cx = viewAimO.x + grabOff.x;
-        np.cy = viewAimO.y + grabOff.y;
-        np.cz = viewAimO.z + grabOff.z;
-        // Keep panel in front of head, sensible range
-        if (np.cz > -0.35f) np.cz = -0.35f;
-        if (np.cz < -3.5f) np.cz = -3.5f;
-        if (np.cx < -1.8f) np.cx = -1.8f;
-        if (np.cx > 1.8f) np.cx = 1.8f;
-        if (np.cy < -1.5f) np.cy = -1.5f;
-        if (np.cy > 1.5f) np.cy = 1.5f;
-        SetPanelFromView(np, viewPoseLocal, viewPoseOk);
-        panelView = PanelPoseInView(viewPoseLocal, viewPoseOk);
-        // Refresh hit under new pose
-        viewHit = RayPanelHit(viewAimO, viewAimD, panelView, &hitPx, &hitPy, &viewHitPt);
+        g_wp.c = aimO + grabOff;
+        panelHit = RayHitWorldPanel(aimO, aimD, &hitPx, &hitPy, &hitPt);
       }
     } else if (grabbing) {
       grabbing = false;
-      ui.status = g_cfg.viewLock ? "PLACED (head-lock)" : "PLACED (world-lock)";
-      fprintf(stderr, "[cube_webui] panel placed view=(%.2f,%.2f,%.2f) view_lock=%d\n",
-              panelView.cx, panelView.cy, panelView.cz, g_cfg.viewLock ? 1 : 0);
+      // Re-face head once on place so panel stays readable, still world-fixed after
+      if (headOk) {
+        Vec3 headP = {headLocal.position.x, headLocal.position.y, headLocal.position.z};
+        g_wp.normal = Normalize(headP - g_wp.c);
+        Vec3 worldUp = V3(0, 1, 0);
+        g_wp.right = Cross(worldUp, g_wp.normal);
+        if (Dot(g_wp.right, g_wp.right) < 1e-8f)
+          g_wp.right = V3(1, 0, 0);
+        else
+          g_wp.right = Normalize(g_wp.right);
+        g_wp.up = Normalize(Cross(g_wp.normal, g_wp.right));
+      }
+      ui.status = "PLACED (world)";
+      fprintf(stderr, "[cube_webui] panel placed LOCAL c=(%.2f,%.2f,%.2f)\n",
+              g_wp.c.x, g_wp.c.y, g_wp.c.z);
     }
 
-    if (viewAimValid && viewHit && !grabbing)
+    if (aimValid && panelHit && !grabbing)
       WebUI_SetCursor(ui, hitPx, hitPy, true);
     else if (grabbing)
-      WebUI_SetCursor(ui, UI_W / 2, UI_H / 2, false);
+      WebUI_SetCursor(ui, 0, 0, false);
     else
       WebUI_SetCursor(ui, 0, 0, false);
+
+    // Thumbs for current addon page (rate-limited network)
+    if (ui.page == WebUIPage::Addons)
+      Addons_EnsureThumbsForPage(ui.addons);
 
     // Eye poses (LOCAL) for projection + VIEW→eye modelview
     XrViewLocateInfo vli0{XR_TYPE_VIEW_LOCATE_INFO};
@@ -1049,47 +1050,42 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &gi, &st)) && st.isActive)
         menuBtn = st.currentState;
     }
-    // MENU edge = reset panel to config defaults (not click)
+    // MENU edge = re-seed panel in front of head (world place)
     if (menuBtn && !prevMenu) {
-      ResetPanelPoseFromConfig();
       grabbing = false;
-      worldInitPending = !g_cfg.viewLock;
-      ui.status = "PANEL RESET";
-      fprintf(stderr, "[cube_webui] panel reset to config defaults\n");
+      if (headOk) SeedWorldPanel(headLocal);
+      else worldInitPending = true;
+      ui.status = "PANEL RE-SEEDED";
+      fprintf(stderr, "[cube_webui] panel re-seeded in front of head\n");
     }
     prevMenu = menuBtn;
 
-    // No clicks while grabbing
     if (trig && !prevTrigger && !grabbing) {
-      if (viewHit) {
+      if (panelHit) {
         WebUI_PointerClick(ui, hitPx, hitPy);
         fprintf(stderr, "[cube_webui] click %d,%d\n", hitPx, hitPy);
       } else if (ui.cursorVisible) {
         WebUI_PointerClick(ui, ui.cursorX, ui.cursorY);
       } else {
         WebUI_Input(ui, 0, 0, true, false);
-        fprintf(stderr, "[cube_webui] click without laser hit (stick/focus fallback)\n");
       }
     }
     prevTrigger = trig;
 
-    // Stick: while grab → fine depth/offset; else UI nav
     if (input.attached) {
       XrActionStateVector2f st{XR_TYPE_ACTION_STATE_VECTOR2F};
       XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
       gi.action = input.stick;
       if (XR_SUCCEEDED(xrGetActionStateVector2f(session, &gi, &st)) && st.isActive) {
-        if (grabbing) {
-          // Y: closer/farther, X: left/right nudge while holding
-          const float spd = 0.012f;
-          PanelPose np = panelView;
-          np.cz -= st.currentState.y * spd; // stick up → closer (less -Z)
-          np.cx += st.currentState.x * spd;
-          if (np.cz > -0.35f) np.cz = -0.35f;
-          if (np.cz < -3.5f) np.cz = -3.5f;
-          SetPanelFromView(np, viewPoseLocal, viewPoseOk);
-          panelView = PanelPoseInView(viewPoseLocal, viewPoseOk);
-          grabOff = V3(panelView.cx, panelView.cy, panelView.cz) - viewAimO;
+        if (grabbing && aimValid) {
+          // Nudge panel along head axes while gripping
+          const float spd = 0.015f;
+          if (headOk) {
+            Vec3 headR = Normalize(QuatRotate(headLocal.orientation, V3(1, 0, 0)));
+            Vec3 headF = Normalize(QuatRotate(headLocal.orientation, V3(0, 0, -1)));
+            g_wp.c = g_wp.c + headR * (st.currentState.x * spd) + headF * (st.currentState.y * spd);
+            grabOff = g_wp.c - aimO;
+          }
         } else if (stickCooldown <= 0.f) {
           int sx = 0, sy = 0;
           if (st.currentState.x < -0.55f) sx = -1;
@@ -1098,7 +1094,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           if (st.currentState.y > 0.55f) sy = -1;
           if (sx || sy) {
             WebUI_Input(ui, sx, sy, false, false);
-            stickCooldown = 0.22f;
+            stickCooldown = 0.18f;
           }
         }
       }
@@ -1174,20 +1170,16 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         glLoadMatrixf(m);
 
         glMatrixMode(GL_MODELVIEW);
-        if (viewPoseOk)
-          LoadModelviewViewSpace(views[eye].pose, viewPoseLocal);
-        else
-          glLoadIdentity();
+        LoadModelviewLocal(views[eye].pose);
 
-        DrawPanelAt(panelTex, panelView);
+        DrawWorldPanel(panelTex);
 
-        if (viewAimValid) {
-          Vec3 tip = viewHit ? viewHitPt : (viewAimO + viewAimD * 2.5f);
-          // Brighter laser while grabbing
-          float cr = grabbing ? 0.3f : (viewHit ? 1.f : 0.45f);
-          float cg = grabbing ? 0.9f : (viewHit ? 0.2f : 0.45f);
-          float cb = grabbing ? 0.4f : (viewHit ? 0.35f : 0.5f);
-          DrawLaserView(viewAimO, tip, cr, cg, cb);
+        if (aimValid) {
+          Vec3 tip = panelHit ? hitPt : (aimO + aimD * 2.5f);
+          float cr = grabbing ? 0.3f : (panelHit ? 1.f : 0.45f);
+          float cg = grabbing ? 0.9f : (panelHit ? 0.2f : 0.45f);
+          float cb = grabbing ? 0.4f : (panelHit ? 0.35f : 0.5f);
+          DrawLaserLocal(aimO, tip, cr, cg, cb);
         }
 
         if (glBindFramebuffer_) glBindFramebuffer_(GL_FRAMEBUFFER, 0);
