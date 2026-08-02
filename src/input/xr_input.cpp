@@ -597,6 +597,9 @@ static XrAction FindXrActionByName(const char* name) {
     return XR_NULL_HANDLE;
 }
 
+// Shared path constants (launcher + module SoT). Binding tables still local.
+#include "openxr_paths.hpp"
+
 // Forward decl — defined below with PushBinding.
 static bool PushBinding(XrActionSuggestedBinding* out, int* n, int max,
                         XrAction action, const char* pathStr);
@@ -675,106 +678,113 @@ static bool XR_SuggestAllInteractionBindings() {
     auto A = [](const char* name) -> XrAction { return FindXrActionByName(name); };
 
     // ── poses + haptics (base set) ──
-    PushBinding(binds, &n, kMax, A("pose_lefthand"),  "/user/hand/left/input/grip/pose");
-    PushBinding(binds, &n, kMax, A("pose_righthand"), "/user/hand/right/input/grip/pose");
-    PushBinding(binds, &n, kMax, A("vibration_left"),  "/user/hand/left/output/haptic");
-    PushBinding(binds, &n, kMax, A("vibration_right"), "/user/hand/right/output/haptic");
+    namespace path = cube_xr::path;
+    using cube_xr::kProfileIndex;
+    using cube_xr::kProfileOculusTouch;
+    using cube_xr::kProfileTouchPro;
+    using cube_xr::kProfileTouchPlus;
+    using cube_xr::kProfileKhrSimple;
+
+    PushBinding(binds, &n, kMax, A("pose_lefthand"),  path::leftGripPose);
+    PushBinding(binds, &n, kMax, A("pose_righthand"), path::rightGripPose);
+    PushBinding(binds, &n, kMax, A("vibration_left"),  path::leftHaptic);
+    PushBinding(binds, &n, kMax, A("vibration_right"), path::rightHaptic);
 
     // ── main + driving locomotion / combat (mirrors vrmod_bindings_oculus_touch.txt) ──
     // Manifest short names collide across main/driving (spawnmenu, reload, pickups, …).
     // PushBindingAllByName binds *every* XrAction with that short name so the active
     // action set always has a live binding (SteamVR scoped by full path; we cannot).
     // Logical bindings remain defaults; Lua binding UI remaps on top via sources.
-    PushBinding(binds, &n, kMax, A("vector2_walkdirection"), "/user/hand/left/input/thumbstick");
-    PushBinding(binds, &n, kMax, A("boolean_sprint"),        "/user/hand/left/input/thumbstick/click");
-    PushBinding(binds, &n, kMax, A("vector2_smoothturn"),    "/user/hand/right/input/thumbstick");
-    PushBindingAllByName(binds, &n, kMax, "boolean_changeweapon", "/user/hand/right/input/thumbstick/click");
+    PushBinding(binds, &n, kMax, A("vector2_walkdirection"), path::leftThumbstick);
+    PushBinding(binds, &n, kMax, A("boolean_sprint"),        path::leftThumbClick);
+    PushBinding(binds, &n, kMax, A("vector2_smoothturn"),    path::rightThumbstick);
+    PushBindingAllByName(binds, &n, kMax, "boolean_changeweapon", path::rightThumbClick);
     // Base-set sticks for dpad sources (always active with /actions/base)
-    PushBinding(binds, &n, kMax, g_xrLeftStickVec2,  "/user/hand/left/input/thumbstick");
-    PushBinding(binds, &n, kMax, g_xrRightStickVec2, "/user/hand/right/input/thumbstick");
+    PushBinding(binds, &n, kMax, g_xrLeftStickVec2,  path::leftThumbstick);
+    PushBinding(binds, &n, kMax, g_xrRightStickVec2, path::rightThumbstick);
 
     // Triggers (float). Boolean fire is synthesized via threshold in GetBooleanAction.
     // Prefer the manifest vector1_primaryfire for the right trigger when present.
     XrAction rightTrig = A("vector1_primaryfire");
     if (rightTrig == XR_NULL_HANDLE) rightTrig = g_xrRightTriggerFloat;
     else g_xrRightTriggerFloat = rightTrig; // so threshold synthesis reads the same action
-    PushBinding(binds, &n, kMax, rightTrig, "/user/hand/right/input/trigger/value");
-    PushBinding(binds, &n, kMax, g_xrLeftTriggerFloat, "/user/hand/left/input/trigger/value");
+    PushBinding(binds, &n, kMax, rightTrig, path::rightTriggerValue);
+    PushBinding(binds, &n, kMax, g_xrLeftTriggerFloat, path::leftTriggerValue);
 
     // Squeeze (float) → pickup threshold synthesis
-    PushBinding(binds, &n, kMax, g_xrLeftSqueezeFloat,  "/user/hand/left/input/squeeze/value");
-    PushBinding(binds, &n, kMax, g_xrRightSqueezeFloat, "/user/hand/right/input/squeeze/value");
+    PushBinding(binds, &n, kMax, g_xrLeftSqueezeFloat,  path::leftSqueezeValue);
+    PushBinding(binds, &n, kMax, g_xrRightSqueezeFloat, path::rightSqueezeValue);
 
     // Face buttons — bind all short-name duplicates (main + driving)
-    PushBinding(binds, &n, kMax, A("boolean_jump"),      "/user/hand/right/input/b/click");
-    PushBinding(binds, &n, kMax, A("boolean_crouch"),    "/user/hand/right/input/a/click");
-    PushBindingAllByName(binds, &n, kMax, "boolean_spawnmenu", "/user/hand/left/input/y/click");
-    PushBinding(binds, &n, kMax, A("boolean_use"),       "/user/hand/left/input/x/click");
-    PushBinding(binds, &n, kMax, A("boolean_flashlight"), "/user/hand/left/input/menu/click");
+    PushBinding(binds, &n, kMax, A("boolean_jump"),      path::rightBClick);
+    PushBinding(binds, &n, kMax, A("boolean_crouch"),    path::rightAClick);
+    PushBindingAllByName(binds, &n, kMax, "boolean_spawnmenu", path::leftYClick);
+    PushBinding(binds, &n, kMax, A("boolean_use"),       path::leftXClick);
+    PushBinding(binds, &n, kMax, A("boolean_flashlight"), path::leftMenuClick);
     // Pickups / reload: no direct path (float squeeze + dual-thumbrest chord synthesis)
 
     // Driving-unique actions from the action manifest / Quest 3 scheme
-    PushBinding(binds, &n, kMax, A("vector1_forward"),   "/user/hand/right/input/trigger/value");
-    PushBinding(binds, &n, kMax, A("vector1_reverse"),   "/user/hand/left/input/trigger/value");
-    PushBinding(binds, &n, kMax, A("vector2_steer"),     "/user/hand/left/input/thumbstick");
-    PushBinding(binds, &n, kMax, A("boolean_handbrake"), "/user/hand/right/input/a/click");
-    PushBinding(binds, &n, kMax, A("boolean_turbo"),     "/user/hand/right/input/b/click");
-    PushBinding(binds, &n, kMax, A("boolean_exit"),      "/user/hand/left/input/x/click");
-    PushBinding(binds, &n, kMax, A("boolean_turret"),    "/user/hand/right/input/thumbstick/click");
-    PushBinding(binds, &n, kMax, A("boolean_horn"),      "/user/hand/left/input/thumbstick/click");
+    PushBinding(binds, &n, kMax, A("vector1_forward"),   path::rightTriggerValue);
+    PushBinding(binds, &n, kMax, A("vector1_reverse"),   path::leftTriggerValue);
+    PushBinding(binds, &n, kMax, A("vector2_steer"),     path::leftThumbstick);
+    PushBinding(binds, &n, kMax, A("boolean_handbrake"), path::rightAClick);
+    PushBinding(binds, &n, kMax, A("boolean_turbo"),     path::rightBClick);
+    PushBinding(binds, &n, kMax, A("boolean_exit"),      path::leftXClick);
+    PushBinding(binds, &n, kMax, A("boolean_turret"),    path::rightThumbClick);
+    PushBinding(binds, &n, kMax, A("boolean_horn"),      path::leftThumbClick);
 
     // Physical sources for Lua rebinding (Index paths; no thumbrest).
     PushControllerSourceBindings(binds, &n, kMax, /*index*/1);
     const int nIndex = n;
     bool okIndex = SuggestBindingsForProfile(
-        "/interaction_profiles/valve/index_controller", binds, (uint32_t)nIndex);
+        kProfileIndex, binds, (uint32_t)nIndex);
 
     // Oculus / Quest: rebuild full Touch table (includes thumbrest sources).
     n = 0;
-    PushBinding(binds, &n, kMax, A("pose_lefthand"),  "/user/hand/left/input/grip/pose");
-    PushBinding(binds, &n, kMax, A("pose_righthand"), "/user/hand/right/input/grip/pose");
-    PushBinding(binds, &n, kMax, A("vibration_left"),  "/user/hand/left/output/haptic");
-    PushBinding(binds, &n, kMax, A("vibration_right"), "/user/hand/right/output/haptic");
-    PushBinding(binds, &n, kMax, A("vector2_walkdirection"), "/user/hand/left/input/thumbstick");
-    PushBinding(binds, &n, kMax, A("boolean_sprint"),        "/user/hand/left/input/thumbstick/click");
-    PushBinding(binds, &n, kMax, A("vector2_smoothturn"),    "/user/hand/right/input/thumbstick");
-    PushBindingAllByName(binds, &n, kMax, "boolean_changeweapon", "/user/hand/right/input/thumbstick/click");
-    PushBinding(binds, &n, kMax, g_xrLeftStickVec2,  "/user/hand/left/input/thumbstick");
-    PushBinding(binds, &n, kMax, g_xrRightStickVec2, "/user/hand/right/input/thumbstick");
+    PushBinding(binds, &n, kMax, A("pose_lefthand"),  path::leftGripPose);
+    PushBinding(binds, &n, kMax, A("pose_righthand"), path::rightGripPose);
+    PushBinding(binds, &n, kMax, A("vibration_left"),  path::leftHaptic);
+    PushBinding(binds, &n, kMax, A("vibration_right"), path::rightHaptic);
+    PushBinding(binds, &n, kMax, A("vector2_walkdirection"), path::leftThumbstick);
+    PushBinding(binds, &n, kMax, A("boolean_sprint"),        path::leftThumbClick);
+    PushBinding(binds, &n, kMax, A("vector2_smoothturn"),    path::rightThumbstick);
+    PushBindingAllByName(binds, &n, kMax, "boolean_changeweapon", path::rightThumbClick);
+    PushBinding(binds, &n, kMax, g_xrLeftStickVec2,  path::leftThumbstick);
+    PushBinding(binds, &n, kMax, g_xrRightStickVec2, path::rightThumbstick);
     rightTrig = A("vector1_primaryfire");
     if (rightTrig == XR_NULL_HANDLE) rightTrig = g_xrRightTriggerFloat;
     else g_xrRightTriggerFloat = rightTrig;
-    PushBinding(binds, &n, kMax, rightTrig, "/user/hand/right/input/trigger/value");
-    PushBinding(binds, &n, kMax, g_xrLeftTriggerFloat, "/user/hand/left/input/trigger/value");
-    PushBinding(binds, &n, kMax, g_xrLeftSqueezeFloat,  "/user/hand/left/input/squeeze/value");
-    PushBinding(binds, &n, kMax, g_xrRightSqueezeFloat, "/user/hand/right/input/squeeze/value");
-    PushBinding(binds, &n, kMax, A("boolean_jump"),      "/user/hand/right/input/b/click");
-    PushBinding(binds, &n, kMax, A("boolean_crouch"),    "/user/hand/right/input/a/click");
-    PushBindingAllByName(binds, &n, kMax, "boolean_spawnmenu", "/user/hand/left/input/y/click");
-    PushBinding(binds, &n, kMax, A("boolean_use"),       "/user/hand/left/input/x/click");
-    PushBinding(binds, &n, kMax, A("boolean_flashlight"), "/user/hand/left/input/menu/click");
-    PushBinding(binds, &n, kMax, A("vector1_forward"),   "/user/hand/right/input/trigger/value");
-    PushBinding(binds, &n, kMax, A("vector1_reverse"),   "/user/hand/left/input/trigger/value");
-    PushBinding(binds, &n, kMax, A("vector2_steer"),     "/user/hand/left/input/thumbstick");
-    PushBinding(binds, &n, kMax, A("boolean_handbrake"), "/user/hand/right/input/a/click");
-    PushBinding(binds, &n, kMax, A("boolean_turbo"),     "/user/hand/right/input/b/click");
-    PushBinding(binds, &n, kMax, A("boolean_exit"),      "/user/hand/left/input/x/click");
-    PushBinding(binds, &n, kMax, A("boolean_turret"),    "/user/hand/right/input/thumbstick/click");
-    PushBinding(binds, &n, kMax, A("boolean_horn"),      "/user/hand/left/input/thumbstick/click");
+    PushBinding(binds, &n, kMax, rightTrig, path::rightTriggerValue);
+    PushBinding(binds, &n, kMax, g_xrLeftTriggerFloat, path::leftTriggerValue);
+    PushBinding(binds, &n, kMax, g_xrLeftSqueezeFloat,  path::leftSqueezeValue);
+    PushBinding(binds, &n, kMax, g_xrRightSqueezeFloat, path::rightSqueezeValue);
+    PushBinding(binds, &n, kMax, A("boolean_jump"),      path::rightBClick);
+    PushBinding(binds, &n, kMax, A("boolean_crouch"),    path::rightAClick);
+    PushBindingAllByName(binds, &n, kMax, "boolean_spawnmenu", path::leftYClick);
+    PushBinding(binds, &n, kMax, A("boolean_use"),       path::leftXClick);
+    PushBinding(binds, &n, kMax, A("boolean_flashlight"), path::leftMenuClick);
+    PushBinding(binds, &n, kMax, A("vector1_forward"),   path::rightTriggerValue);
+    PushBinding(binds, &n, kMax, A("vector1_reverse"),   path::leftTriggerValue);
+    PushBinding(binds, &n, kMax, A("vector2_steer"),     path::leftThumbstick);
+    PushBinding(binds, &n, kMax, A("boolean_handbrake"), path::rightAClick);
+    PushBinding(binds, &n, kMax, A("boolean_turbo"),     path::rightBClick);
+    PushBinding(binds, &n, kMax, A("boolean_exit"),      path::leftXClick);
+    PushBinding(binds, &n, kMax, A("boolean_turret"),    path::rightThumbClick);
+    PushBinding(binds, &n, kMax, A("boolean_horn"),      path::leftThumbClick);
     PushControllerSourceBindings(binds, &n, kMax, /*touch*/0);
 
     bool okTouch = SuggestBindingsForProfile(
-        "/interaction_profiles/oculus/touch_controller", binds, (uint32_t)n);
+        kProfileOculusTouch, binds, (uint32_t)n);
 
     // Quest 3 / Touch Pro / WiVRn often report facebook/touch_controller_pro (or
     // meta/touch_controller_plus) rather than classic oculus/touch_controller.
     // Same path set as Oculus Touch for the common buttons we use — suggest the
     // identical table so controllers are not dead when the active profile differs.
     bool okTouchPro = SuggestBindingsForProfile(
-        "/interaction_profiles/facebook/touch_controller_pro", binds, (uint32_t)n);
+        kProfileTouchPro, binds, (uint32_t)n);
     // Optional Meta Touch Plus (Quest 3); ignore failure if runtime lacks extension.
     bool okTouchPlus = SuggestBindingsForProfile(
-        "/interaction_profiles/meta/touch_controller_plus", binds, (uint32_t)n);
+        kProfileTouchPlus, binds, (uint32_t)n);
     if (okTouchPro) VRMOD_LOG_INFO("Suggested Touch-compatible bindings for facebook/touch_controller_pro");
     if (okTouchPlus) VRMOD_LOG_INFO("Suggested Touch-compatible bindings for meta/touch_controller_plus");
     okTouch = okTouch || okTouchPro || okTouchPlus;
@@ -784,29 +794,29 @@ static bool XR_SuggestAllInteractionBindings() {
     if (!okTouch) {
         XrActionSuggestedBinding core[24];
         int cn = 0;
-        PushBinding(core, &cn, 24, A("pose_lefthand"),  "/user/hand/left/input/grip/pose");
-        PushBinding(core, &cn, 24, A("pose_righthand"), "/user/hand/right/input/grip/pose");
-        PushBinding(core, &cn, 24, A("vibration_left"),  "/user/hand/left/output/haptic");
-        PushBinding(core, &cn, 24, A("vibration_right"), "/user/hand/right/output/haptic");
-        PushBinding(core, &cn, 24, A("vector2_walkdirection"), "/user/hand/left/input/thumbstick");
-        PushBinding(core, &cn, 24, A("vector2_smoothturn"),    "/user/hand/right/input/thumbstick");
-        PushBinding(core, &cn, 24, g_xrLeftStickVec2,  "/user/hand/left/input/thumbstick");
-        PushBinding(core, &cn, 24, g_xrRightStickVec2, "/user/hand/right/input/thumbstick");
+        PushBinding(core, &cn, 24, A("pose_lefthand"),  path::leftGripPose);
+        PushBinding(core, &cn, 24, A("pose_righthand"), path::rightGripPose);
+        PushBinding(core, &cn, 24, A("vibration_left"),  path::leftHaptic);
+        PushBinding(core, &cn, 24, A("vibration_right"), path::rightHaptic);
+        PushBinding(core, &cn, 24, A("vector2_walkdirection"), path::leftThumbstick);
+        PushBinding(core, &cn, 24, A("vector2_smoothturn"),    path::rightThumbstick);
+        PushBinding(core, &cn, 24, g_xrLeftStickVec2,  path::leftThumbstick);
+        PushBinding(core, &cn, 24, g_xrRightStickVec2, path::rightThumbstick);
         XrAction rt = A("vector1_primaryfire");
         if (rt == XR_NULL_HANDLE) rt = g_xrRightTriggerFloat;
-        PushBinding(core, &cn, 24, rt, "/user/hand/right/input/trigger/value");
-        PushBinding(core, &cn, 24, g_xrLeftTriggerFloat, "/user/hand/left/input/trigger/value");
-        PushBinding(core, &cn, 24, g_xrLeftSqueezeFloat,  "/user/hand/left/input/squeeze/value");
-        PushBinding(core, &cn, 24, g_xrRightSqueezeFloat, "/user/hand/right/input/squeeze/value");
-        PushBinding(core, &cn, 24, A("boolean_jump"),      "/user/hand/right/input/b/click");
-        PushBinding(core, &cn, 24, A("boolean_crouch"),    "/user/hand/right/input/a/click");
-        PushBinding(core, &cn, 24, A("boolean_spawnmenu"), "/user/hand/left/input/y/click");
-        PushBinding(core, &cn, 24, A("boolean_use"),       "/user/hand/left/input/x/click");
+        PushBinding(core, &cn, 24, rt, path::rightTriggerValue);
+        PushBinding(core, &cn, 24, g_xrLeftTriggerFloat, path::leftTriggerValue);
+        PushBinding(core, &cn, 24, g_xrLeftSqueezeFloat,  path::leftSqueezeValue);
+        PushBinding(core, &cn, 24, g_xrRightSqueezeFloat, path::rightSqueezeValue);
+        PushBinding(core, &cn, 24, A("boolean_jump"),      path::rightBClick);
+        PushBinding(core, &cn, 24, A("boolean_crouch"),    path::rightAClick);
+        PushBinding(core, &cn, 24, A("boolean_spawnmenu"), path::leftYClick);
+        PushBinding(core, &cn, 24, A("boolean_use"),       path::leftXClick);
         okTouch = SuggestBindingsForProfile(
-            "/interaction_profiles/oculus/touch_controller", core, (uint32_t)cn);
+            kProfileOculusTouch, core, (uint32_t)cn);
         if (!okTouch) {
             okTouch = SuggestBindingsForProfile(
-                "/interaction_profiles/facebook/touch_controller_pro", core, (uint32_t)cn);
+                kProfileTouchPro, core, (uint32_t)cn);
         }
         if (okTouch) VRMOD_LOG_INFO("Touch-class profile accepted reduced core binding set");
     }
@@ -815,15 +825,15 @@ static bool XR_SuggestAllInteractionBindings() {
     {
         XrActionSuggestedBinding simple[16];
         int sn = 0;
-        PushBinding(simple, &sn, 16, A("pose_lefthand"),  "/user/hand/left/input/grip/pose");
-        PushBinding(simple, &sn, 16, A("pose_righthand"), "/user/hand/right/input/grip/pose");
-        PushBinding(simple, &sn, 16, A("vibration_left"),  "/user/hand/left/output/haptic");
-        PushBinding(simple, &sn, 16, A("vibration_right"), "/user/hand/right/output/haptic");
-        PushBinding(simple, &sn, 16, A("boolean_primaryfire"), "/user/hand/right/input/select/click");
-        PushBinding(simple, &sn, 16, A("boolean_use"),         "/user/hand/left/input/select/click");
-        PushBinding(simple, &sn, 16, A("boolean_spawnmenu"),   "/user/hand/left/input/menu/click");
+        PushBinding(simple, &sn, 16, A("pose_lefthand"),  path::leftGripPose);
+        PushBinding(simple, &sn, 16, A("pose_righthand"), path::rightGripPose);
+        PushBinding(simple, &sn, 16, A("vibration_left"),  path::leftHaptic);
+        PushBinding(simple, &sn, 16, A("vibration_right"), path::rightHaptic);
+        PushBinding(simple, &sn, 16, A("boolean_primaryfire"), path::rightSelectClick);
+        PushBinding(simple, &sn, 16, A("boolean_use"),         path::leftSelectClick);
+        PushBinding(simple, &sn, 16, A("boolean_spawnmenu"),   path::leftMenuClick);
         SuggestBindingsForProfile(
-            "/interaction_profiles/khr/simple_controller", simple, (uint32_t)sn);
+            kProfileKhrSimple, simple, (uint32_t)sn);
     }
 
     if (!okTouch && !okIndex) {

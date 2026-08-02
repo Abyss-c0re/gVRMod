@@ -11,7 +11,8 @@ Modular C++ OpenXR host. Each unit has a **header** (API) and usually a **.cpp**
 | **math** | `math3d.hpp` | Vec3, quat, pose helpers (header-only) |
 | **GLX** | `glx_context.hpp` / `.cpp` | Hidden GLX context for OpenXR GL |
 | **GL draw** | `gl_render.hpp` / `.cpp` | FBO, textures, projection, panel/laser draw |
-| **XR input** | `xr_input.hpp` / `.cpp` | Actions: aim, trigger, grab, stick, menu |
+| **XR input** | `xr_input.hpp` / `.cpp` | Thin façade → `shared/openxr` shell input |
+| **shared XR** | `../shared/openxr/*` | Paths + bindings + shell set (also for vrmod) |
 | **XR util** | `xr_util.hpp` / `.cpp` | Extensions, blend mode |
 | **host cmds** | `host_cmd.hpp` / `.cpp` | `/tmp/cube_webui_cmd` |
 | **UI** | `ui_panel.hpp` / `.cpp` | Raster WebUI (New Game / Addons / Settings) |

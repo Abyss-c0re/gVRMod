@@ -10,9 +10,11 @@ set(DEPS_DIR "${CMAKE_SOURCE_DIR}/deps")
 set(OUTPUT_DIR "${CMAKE_SOURCE_DIR}/install/GarrysMod/garrysmod/lua/bin")
 
 # ── Include dirs (used by both targets) ──
+# shared/openxr = path SoT with native_launcher (cube_xr::path / profiles)
 set(VRMOD_INCLUDE_DIRS
     ${DEPS_DIR}
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/shared/openxr
 )
 
 # ── Sources by module ──

@@ -4,7 +4,13 @@ project(cube_webui_launcher LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Modular layout — see src/README.md / WEBUI_REVERSE.md
+# Modular layout — see src/README.md
+# Shared OpenXR with vrmod: ../shared/openxr
+set(CUBE_SHARED_OPENXR
+  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/openxr/openxr_bindings.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/openxr/openxr_shell_input.cpp
+)
+
 set(CUBE_WEBUI_SOURCES
   src/main.cpp
   src/paths.cpp
@@ -20,6 +26,7 @@ set(CUBE_WEBUI_SOURCES
   src/addons_mgr.cpp
   src/gmod_spawn.cpp
   src/ui_panel.cpp
+  ${CUBE_SHARED_OPENXR}
 )
 
 add_executable(cube_webui_launcher ${CUBE_WEBUI_SOURCES})
@@ -27,6 +34,7 @@ add_executable(cube_webui_launcher ${CUBE_WEBUI_SOURCES})
 target_include_directories(cube_webui_launcher PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+  ${CMAKE_CURRENT_SOURCE_DIR}/../shared/openxr
   /usr/include
 )
 
