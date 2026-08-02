@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v32: restore OpenXR→Source rotation basis change (hands/HMD tilt orbit)
-    LUA->PushNumber(32);
+    // v33: HMD keeps raw pose convert; grip-only -90°X for hands (no view tilt)
+    LUA->PushNumber(33);
     return 1;
 }
 
