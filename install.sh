@@ -11,6 +11,7 @@
 #     * OpenXR loader + all its dependencies → bin/linux64/
 #   (overwrites existing files)
 # - Supports --uninstall to cleanly remove what was installed
+- Installs a desktop launcher (gVRMod.desktop) for the OpenXR launcher script
 #
 # Usage:
 #   ./install.sh                 # build + install (or update)
