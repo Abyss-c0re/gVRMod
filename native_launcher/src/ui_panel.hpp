@@ -101,9 +101,19 @@ struct WebUIState {
   std::string handoffDetail;
   float handoffElapsed = 0.f;
 
-  // Laser cursor
+  // Laser cursor (software reticle — optional; laser usually enough)
   bool cursorVisible = false;
   int cursorX = 0, cursorY = 0;
+
+  // Paint law (research-2 / VRMod MenuShouldRepaint):
+  // full CPU raster + GL upload only when dirty or idle heartbeat — never every stereo eye.
+  bool paintDirty = true;
+  int paintFrame = 0;          // frames since last full paint
+  int lastCursorQx = -9999;    // quantized cursor (÷4) for dirty gating
+  int lastCursorQy = -9999;
+  bool lastCursorVis = false;
+  // When true, draw software cursor into buffer (else laser-only, skip soft cursor)
+  bool paintSoftCursor = false;
 };
 
 void WebUI_Init(WebUIState& s, const std::string& gmodRoot);
@@ -122,6 +132,13 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py);
 // Persist dirty bindings to garrysmod/data/vrmod/vrmod_openxr_bindings.json
 bool WebUI_SaveBindingsIfDirty(WebUIState& s);
 
+// Mark content dirty (input, meta apply, page change, handoff anim).
+void WebUI_MarkDirty(WebUIState& s);
+// True if full CPU raster + tex upload should run this frame.
+bool WebUI_ShouldRepaint(WebUIState& s);
+// After a successful repaint/upload, clear dirty + reset frame counter.
+void WebUI_DidRepaint(WebUIState& s);
+
 constexpr int UI_W = 960;
 constexpr int UI_H = 540;
 
@@ -129,4 +146,5 @@ struct WebUICursor {
   bool visible = false;
   int x = 0, y = 0;
 };
+// Full panel paint (content). Soft cursor only if s.paintSoftCursor && cursor.
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor = nullptr);

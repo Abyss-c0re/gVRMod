@@ -67,10 +67,32 @@ static void PutPx(unsigned char* rgba, int x, int y, int r, int g, int b, int a 
   rgba[i + 3] = (unsigned char)a;
 }
 
+// Row-wise fill — research-2: nested PutPx full-panel clear was the structural bottleneck.
 static void FillRect(unsigned char* rgba, int x, int y, int w, int h, int r, int g, int b, int a = 255) {
-  for (int j = 0; j < h; ++j)
-    for (int i = 0; i < w; ++i)
-      PutPx(rgba, x + i, y + j, r, g, b, a);
+  if (w <= 0 || h <= 0) return;
+  if (x < 0) {
+    w += x;
+    x = 0;
+  }
+  if (y < 0) {
+    h += y;
+    y = 0;
+  }
+  if (x + w > UI_W) w = UI_W - x;
+  if (y + h > UI_H) h = UI_H - y;
+  if (w <= 0 || h <= 0) return;
+  unsigned char px[4] = {(unsigned char)r, (unsigned char)g, (unsigned char)b, (unsigned char)a};
+  // First row
+  unsigned char* row0 = rgba + (y * UI_W + x) * 4;
+  for (int i = 0; i < w; ++i) {
+    row0[i * 4 + 0] = px[0];
+    row0[i * 4 + 1] = px[1];
+    row0[i * 4 + 2] = px[2];
+    row0[i * 4 + 3] = px[3];
+  }
+  const int rowBytes = w * 4;
+  for (int j = 1; j < h; ++j)
+    std::memcpy(rgba + ((y + j) * UI_W + x) * 4, row0, rowBytes);
 }
 
 static void DrawText(unsigned char* rgba, int x, int y, const char* s, int r, int g, int b, int scale = 2) {
@@ -454,6 +476,12 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.cursorVisible = false;
   s.cursorX = 0;
   s.cursorY = 0;
+  s.paintDirty = true;
+  s.paintFrame = 0;
+  s.lastCursorQx = -9999;
+  s.lastCursorQy = -9999;
+  s.lastCursorVis = false;
+  s.paintSoftCursor = false; // laser is primary reticle
   s.categories = ScanGModMaps(gmodRoot);
   if (s.categories.empty()) {
     MapCategory c;
@@ -480,6 +508,7 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   Addons_Load(s.addons, gmodRoot);
   Bindings_Load(s.bindings, gmodRoot);
   s.status = "NEW GAME · ADDONS · SETTINGS · BINDINGS";
+  WebUI_MarkDirty(s);
 }
 
 bool WebUI_SaveBindingsIfDirty(WebUIState& s) {
@@ -506,13 +535,55 @@ int WebUI_MaxPlayers(const WebUIState& s) {
   return s.maxPlayersOpts[std::clamp(s.maxPlayersIdx, 0, 7)];
 }
 
+void WebUI_MarkDirty(WebUIState& s) { s.paintDirty = true; }
+
+bool WebUI_ShouldRepaint(WebUIState& s) {
+  // Handoff progress bar animates — full rate
+  if (s.handoff) return true;
+  if (s.paintDirty) return true;
+  // Idle heartbeat: pick up async addon meta without every-frame paint
+  int interval = 12;
+  if (s.page == WebUIPage::Addons) {
+    // Faster when titles/thumbs still loading
+    bool pending = false;
+    for (const auto& a : s.addons.addons) {
+      if (a.metaPending) {
+        pending = true;
+        break;
+      }
+    }
+    interval = pending ? 6 : 24;
+  } else if (s.page == WebUIPage::Bindings || s.page == WebUIPage::Settings) {
+    interval = 30; // mostly static until input dirties
+  }
+  if (interval > 0 && s.paintFrame >= interval) return true;
+  return false;
+}
+
+void WebUI_DidRepaint(WebUIState& s) {
+  s.paintDirty = false;
+  s.paintFrame = 0;
+}
+
 void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
+  // Quantize to 4px (VRMod focused dirty law) — sub-cell motion does not repaint
+  const int qx = px >> 2;
+  const int qy = py >> 2;
+  const bool moved = (qx != s.lastCursorQx) || (qy != s.lastCursorQy) || (visible != s.lastCursorVis);
   s.cursorX = px;
   s.cursorY = py;
   s.cursorVisible = visible;
+  if (moved) {
+    s.lastCursorQx = qx;
+    s.lastCursorQy = qy;
+    s.lastCursorVis = visible;
+    // Soft cursor only when requested; laser is the primary reticle (research-2)
+    if (s.paintSoftCursor) WebUI_MarkDirty(s);
+  }
 }
 
 bool WebUI_PointerClick(WebUIState& s, int px, int py) {
+  WebUI_MarkDirty(s);
   // Always: CLOSE / QUIT top-right
   if (py >= 4 && py <= 40 && px >= UI_W - 110 && px <= UI_W - 8) {
     WebUI_SaveBindingsIfDirty(s);
@@ -781,6 +852,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
 }
 
 void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge) {
+  if (stickX || stickY || triggerEdge || backEdge) WebUI_MarkDirty(s);
   if (backEdge) {
     WebUI_SaveBindingsIfDirty(s);
     s.wantQuit = true;

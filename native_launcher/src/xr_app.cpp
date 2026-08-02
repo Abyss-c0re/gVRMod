@@ -41,6 +41,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
   fprintf(stderr, "[cube_webui] TRIGGER=click GRIP=move CLOSE=exit MENU=reseed\n");
+  fprintf(stderr, "[cube_webui] paint law: dirty/heartbeat (research-2) · soft_cursor=off · laser reticle\n");
 
   GlxContext glx{};
   if (!GlxCreate(glx)) {
@@ -347,6 +348,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       worldInitPending = false;
       WorldPanelState().usedStage = (strcmp(spaceName, "STAGE") == 0);
       ui.status = "WORLD LOCK — grip move · menu re-place · not head-follow";
+      WebUI_MarkDirty(ui);
       fprintf(stderr, "[cube_webui] WORLD LOCK engaged space=%s\n", spaceName);
     }
 
@@ -384,6 +386,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           grabbing = true;
           grabOff = wp.c - aimO;
           ui.status = "MOVING (orientation frozen)";
+          WebUI_MarkDirty(ui);
         }
       }
       if (grabbing) {
@@ -394,6 +397,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       grabbing = false;
       // NO reface — panel stays oriented as at seed / last MENU re-place
       ui.status = "PLACED (world-anchored)";
+      WebUI_MarkDirty(ui);
       fprintf(stderr, "[cube_webui] panel place c=(%.3f,%.3f,%.3f) orient FROZEN\n",
               wp.c.x, wp.c.y, wp.c.z);
     }
@@ -403,8 +407,11 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     else
       WebUI_SetCursor(ui, 0, 0, false);
 
-    if (ui.page == WebUIPage::Addons)
-      Addons_PumpAsync(ui.addons);
+    if (ui.page == WebUIPage::Addons) {
+      if (Addons_PumpAsync(ui.addons)) WebUI_MarkDirty(ui);
+    }
+    // Tick idle paint budget (research-2 dirty/heartbeat)
+    ui.paintFrame++;
 
     XrViewLocateInfo vli0{XR_TYPE_VIEW_LOCATE_INFO};
     vli0.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
@@ -423,6 +430,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (headOk) {
         WorldPanelSeed(headWorld);
         ui.status = "PANEL RE-ANCHORED in front of you";
+        WebUI_MarkDirty(ui);
       }
     }
     prevMenu = menuBtn;
@@ -473,9 +481,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
 
     if (fs.shouldRender) {
-      WebUICursor cur{ui.cursorVisible, ui.cursorX, ui.cursorY};
-      WebUI_Rasterize(ui, panelBuf.data(), &cur);
-      GlUpdateRgbaTex(panelTex, UI_W, UI_H, panelBuf.data());
+      // Split generation from presentation (research-2):
+      // CPU raster + tex upload once when dirty/heartbeat — stereo eyes only blit the panel.
+      if (WebUI_ShouldRepaint(ui)) {
+        WebUICursor cur{ui.cursorVisible && ui.paintSoftCursor, ui.cursorX, ui.cursorY};
+        WebUI_Rasterize(ui, panelBuf.data(),
+                        (cur.visible ? &cur : nullptr));
+        GlUpdateRgbaTex(panelTex, UI_W, UI_H, panelBuf.data());
+        WebUI_DidRepaint(ui);
+      }
 
       projViews.resize(2);
       for (int eye = 0; eye < 2; ++eye) {

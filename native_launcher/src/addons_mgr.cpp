@@ -547,10 +547,11 @@ bool Addons_ToggleSelected(AddonManager& m, std::string& err) {
   return Addons_ToggleIndex(m, m.selected, err);
 }
 
-void Addons_PumpAsync(AddonManager& m) {
-  if (m.addons.empty()) return;
+bool Addons_PumpAsync(AddonManager& m) {
+  if (m.addons.empty()) return false;
   EnsureWorkers(m);
   Addons_ClampPage(m);
+  bool contentChanged = false;
 
   // Apply finished jobs (UI thread only — never block on curl)
   std::vector<SteamMeta> done;
@@ -563,10 +564,13 @@ void Addons_PumpAsync(AddonManager& m) {
       if (a.kind != "workshop" || a.id != meta.id) continue;
       a.metaQueued = false;
       if (!meta.title.empty() &&
-          (a.title.empty() || a.title.rfind("Workshop ", 0) == 0))
+          (a.title.empty() || a.title.rfind("Workshop ", 0) == 0)) {
         a.title = meta.title;
-      if (!meta.previewPath.empty() && a.thumbW == 0)
-        LoadThumbFile(meta.previewPath, a);
+        contentChanged = true;
+      }
+      if (!meta.previewPath.empty() && a.thumbW == 0) {
+        if (LoadThumbFile(meta.previewPath, a)) contentChanged = true;
+      }
       bool titleOk = !a.title.empty() && a.title.rfind("Workshop ", 0) != 0;
       bool thumbOk = a.thumbW > 0;
       if (titleOk && thumbOk) {
@@ -581,6 +585,7 @@ void Addons_PumpAsync(AddonManager& m) {
         a.metaFailed = !titleOk && !thumbOk;
       }
       ++m.doneThisSession;
+      contentChanged = true;
       break;
     }
   }
@@ -633,7 +638,11 @@ void Addons_PumpAsync(AddonManager& m) {
       char st[128];
       snprintf(st, sizeof(st), "icons/titles: %d queue · %d active · %d done",
                pending, inflight, m.doneThisSession);
-      m.status = st;
+      if (m.status != st) {
+        m.status = st;
+        contentChanged = true;
+      }
     }
   }
+  return contentChanged;
 }

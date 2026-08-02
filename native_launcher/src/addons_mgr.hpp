@@ -63,5 +63,6 @@ int Addons_EnabledCount(const AddonManager& m);
 int Addons_DisabledCount(const AddonManager& m);
 
 // Non-blocking: queue missing meta/thumbs for current page; apply finished jobs.
-// Call once per frame from UI thread.
-void Addons_PumpAsync(AddonManager& m);
+// Call once per frame from UI thread. Returns true if titles/thumbs/status changed
+// (caller should WebUI_MarkDirty).
+bool Addons_PumpAsync(AddonManager& m);
