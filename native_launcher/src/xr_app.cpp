@@ -220,6 +220,32 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
                                (XrSwapchainImageBaseHeader*)eyes[i].images.data());
   }
 
+  // UI swapchain for world-locked QUAD layer (not drawn under each eye — room static)
+  XrSwapchain uiSwap = XR_NULL_HANDLE;
+  std::vector<XrSwapchainImageOpenGLKHR> uiImages;
+  {
+    XrSwapchainCreateInfo sc{XR_TYPE_SWAPCHAIN_CREATE_INFO};
+    sc.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
+    sc.format = 0x8058;
+    sc.sampleCount = 1;
+    sc.width = UI_W;
+    sc.height = UI_H;
+    sc.faceCount = 1;
+    sc.arraySize = 1;
+    sc.mipCount = 1;
+    if (XR_FAILED(xrCreateSwapchain(session, &sc, &uiSwap))) {
+      Die("UI swapchain failed");
+      return 5;
+    }
+    uint32_t nImg = 0;
+    xrEnumerateSwapchainImages(uiSwap, 0, &nImg, nullptr);
+    uiImages.resize(nImg, {XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR});
+    xrEnumerateSwapchainImages(uiSwap, nImg, &nImg,
+                               (XrSwapchainImageBaseHeader*)uiImages.data());
+    fprintf(stderr, "[cube_webui] UI QUAD swapchain %dx%d images=%u (STAGE-locked)\n",
+            UI_W, UI_H, nImg);
+  }
+
   XrSessionBeginInfo sbi{XR_TYPE_SESSION_BEGIN_INFO};
   sbi.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
   XrSessionState state = XR_SESSION_STATE_UNKNOWN;
@@ -228,11 +254,12 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
   WebUIState ui{};
   WebUI_Init(ui, gmodRoot);
-  ui.status = "GRIP=move · TRIGGER=click · CLOSE to exit";
+  ui.status = "STATIC panel · GRIP on panel = move · MENU = re-place";
   std::vector<unsigned char> panelBuf(UI_W * UI_H * 4);
   WebUI_Rasterize(ui, panelBuf.data(), nullptr);
   GLuint panelTex = GlMakeRgbaTex(UI_W, UI_H, panelBuf.data());
   GLuint fbo = 0;
+  bool uiSwapNeedsUpload = true;
 
   bool prevTrigger = false;
   bool prevMenu = false;
@@ -362,10 +389,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (worldInitPending && headOk) {
       if (WorldPanelSeed(headWorld, /*force=*/false)) {
         worldInitPending = false;
-        WorldPanelState().usedStage = (strcmp(spaceName, "STAGE") == 0);
-        ui.status = "WORLD LOCK — frozen in room · grip=move · menu=re-place";
+        ui.status = "STATIC · grip on panel to move · menu re-place";
         WebUI_MarkDirty(ui);
-        fprintf(stderr, "[cube_webui] WORLD LOCK engaged space=%s seed#%d\n",
+        uiSwapNeedsUpload = true;
+        fprintf(stderr, "[cube_webui] STATIC QUAD space=%s seed#%d\n",
                 spaceName, WorldPanelState().seedCount);
       }
     }
@@ -403,16 +430,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         }
       }
       if (grabbing) {
-        // Translate in world space only — never re-face to HMD
-        wp.c = aimO + grabOff;
+        // ONLY motion path: translate frozen pose center in world meters
+        WorldPanelSetCenter(aimO + grabOff);
         panelHit = WorldPanelRayHit(aimO, aimD, &hitPx, &hitPy, &hitPt);
       }
     } else if (grabbing) {
       grabbing = false;
-      // NO reface — panel stays oriented as at seed / last MENU re-place
-      ui.status = "PLACED (world-anchored)";
+      ui.status = "STATIC (room locked)";
       WebUI_MarkDirty(ui);
-      fprintf(stderr, "[cube_webui] panel place c=(%.3f,%.3f,%.3f) orient FROZEN\n",
+      fprintf(stderr, "[cube_webui] grab end pos=(%.3f,%.3f,%.3f) still FROZEN orient\n",
               wp.c.x, wp.c.y, wp.c.z);
     }
 
@@ -464,9 +490,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     float sx = 0.f, sy = 0.f;
     if (XrInputReadStick(session, input, &sx, &sy)) {
       if (grabbing && aimValid) {
-        // Nudge along frozen panel axes (not head) so room orientation holds
         const float spd = 0.015f;
-        wp.c = wp.c + wp.right * (sx * spd) + wp.up * (sy * spd);
+        WorldPanelSetCenter(wp.c + wp.right * (sx * spd) + wp.up * (sy * spd));
         grabOff = wp.c - aimO;
       } else if (stickCooldown <= 0.f) {
         int isx = 0, isy = 0;
@@ -488,6 +513,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (useAlphaClear)
       layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
 
+    XrCompositionLayerQuad quadLayer{XR_TYPE_COMPOSITION_LAYER_QUAD};
+    bool submitQuad = false;
+
     XrCompositionLayerPassthroughFB ptComp{};
     if (ptLayerHandle != XR_NULL_HANDLE) {
       ptComp = {XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_FB};
@@ -497,16 +525,65 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
 
     if (fs.shouldRender) {
-      // Split generation from presentation (research-2):
-      // CPU raster + tex upload once when dirty/heartbeat — stereo eyes only blit the panel.
+      // Content paint (CPU) only when dirty — then upload into UI swapchain once
       if (WebUI_ShouldRepaint(ui)) {
-        WebUICursor cur{ui.cursorVisible && ui.paintSoftCursor, ui.cursorX, ui.cursorY};
-        WebUI_Rasterize(ui, panelBuf.data(),
-                        (cur.visible ? &cur : nullptr));
+        WebUI_Rasterize(ui, panelBuf.data(), nullptr);
         GlUpdateRgbaTex(panelTex, UI_W, UI_H, panelBuf.data());
         WebUI_DidRepaint(ui);
+        uiSwapNeedsUpload = true;
       }
 
+      // UI swapchain → compositor QUAD at FROZEN world pose (not per-eye mesh)
+      if (wp.ready && wp.frozen && uiSwap) {
+        XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+        uint32_t uidx = 0;
+        if (XR_SUCCEEDED(xrAcquireSwapchainImage(uiSwap, &ai, &uidx))) {
+          XrSwapchainImageWaitInfo wi{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+          wi.timeout = XR_INFINITE_DURATION;
+          xrWaitSwapchainImage(uiSwap, &wi);
+          if (uiSwapNeedsUpload && uidx < uiImages.size()) {
+            GLuint dst = uiImages[uidx].image;
+            if (GlBindSwapchainFbo(dst, &fbo)) {
+              glViewport(0, 0, UI_W, UI_H);
+              glDisable(GL_DEPTH_TEST);
+              glDisable(GL_CULL_FACE);
+              glMatrixMode(GL_PROJECTION);
+              glLoadIdentity();
+              glOrtho(0, UI_W, UI_H, 0, -1, 1);
+              glMatrixMode(GL_MODELVIEW);
+              glLoadIdentity();
+              glEnable(GL_TEXTURE_2D);
+              glBindTexture(GL_TEXTURE_2D, panelTex);
+              glColor4f(1, 1, 1, 1);
+              glBegin(GL_QUADS);
+              glTexCoord2f(0, 0); glVertex2f(0, 0);
+              glTexCoord2f(1, 0); glVertex2f(UI_W, 0);
+              glTexCoord2f(1, 1); glVertex2f(UI_W, UI_H);
+              glTexCoord2f(0, 1); glVertex2f(0, UI_H);
+              glEnd();
+              glDisable(GL_TEXTURE_2D);
+              GlUnbindFbo();
+              uiSwapNeedsUpload = false;
+            }
+          }
+          XrSwapchainImageReleaseInfo ri{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+          xrReleaseSwapchainImage(uiSwap, &ri);
+
+          quadLayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
+                                 XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+          quadLayer.space = space; // STAGE/LOCAL — room, NOT VIEW
+          quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+          quadLayer.subImage.swapchain = uiSwap;
+          quadLayer.subImage.imageRect.offset = {0, 0};
+          quadLayer.subImage.imageRect.extent = {UI_W, UI_H};
+          quadLayer.subImage.imageArrayIndex = 0;
+          quadLayer.pose = wp.pose; // FROZEN — only grab/MENU changes this
+          quadLayer.size = {wp.widthM, wp.heightM};
+          submitQuad = true;
+        }
+      }
+
+      // Eye projection: clear + laser only (panel is the QUAD layer)
       projViews.resize(2);
       for (int eye = 0; eye < 2; ++eye) {
         XrSwapchainImageAcquireInfo ai{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
@@ -530,7 +607,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         GlLoadProjectionFov(views0[eye].fov);
         glMatrixMode(GL_MODELVIEW);
         GlLoadModelviewLocal(views0[eye].pose);
-        GlDrawWorldPanel(panelTex);
+        // No GlDrawWorldPanel — compositor owns static panel
         if (aimValid) {
           Vec3 tip = panelHit ? hitPt : (aimO + aimD * 2.5f);
           float cr = grabbing ? 0.3f : (panelHit ? 1.f : 0.45f);
@@ -558,12 +635,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     XrFrameEndInfo fei{XR_TYPE_FRAME_END_INFO};
     fei.displayTime = fs.predictedDisplayTime;
     fei.environmentBlendMode = blendMode;
-    const XrCompositionLayerBaseHeader* layers[2] = {};
+    const XrCompositionLayerBaseHeader* layers[3] = {};
     uint32_t layerCount = 0;
     if (fs.shouldRender && !projViews.empty()) {
       if (ptLayerHandle != XR_NULL_HANDLE)
         layers[layerCount++] = (const XrCompositionLayerBaseHeader*)&ptComp;
+      // Projection first (laser / clear), then world-locked UI quad on top
       layers[layerCount++] = (const XrCompositionLayerBaseHeader*)&layer;
+      if (submitQuad)
+        layers[layerCount++] = (const XrCompositionLayerBaseHeader*)&quadLayer;
       fei.layerCount = layerCount;
       fei.layers = layers;
     }
@@ -572,6 +652,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
   for (int i = 0; i < 2; ++i)
     if (eyes[i].swap) xrDestroySwapchain(eyes[i].swap);
+  if (uiSwap) xrDestroySwapchain(uiSwap);
   if (ptLayerHandle != XR_NULL_HANDLE && pfnDestroyPtLayer) pfnDestroyPtLayer(ptLayerHandle);
   if (passthrough != XR_NULL_HANDLE) {
     if (pfnPausePt) pfnPausePt(passthrough);

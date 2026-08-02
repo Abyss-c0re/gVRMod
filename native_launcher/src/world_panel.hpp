@@ -2,31 +2,40 @@
 #include "math3d.hpp"
 #include <openxr/openxr.h>
 
-// Anchored panel in STAGE/LOCAL world space.
-// After Seed(force=false) succeeds once, pose is FROZEN — Seed without force is a no-op.
-// Never update from HMD each frame (that is head-follow heresy).
+// Room-static panel: pose freezes in STAGE/LOCAL after seed.
+// Only grab (translate) or MENU (re-place) may change pose.
+// Never update from HMD each frame.
 
 struct WorldPanel {
+  // Frozen OpenXR pose in world space (+X right, +Y up, -Z faces user)
+  XrPosef pose{};
+  float widthM = 0.84f;
+  float heightM = 0.48f;
+  bool ready = false;
+  bool frozen = false;
+  int seedCount = 0;
+
+  // Cached axes from pose (for hit / grab)
   Vec3 c{0, 0, -1.05f};
   Vec3 right{1, 0, 0};
   Vec3 up{0, 1, 0};
-  Vec3 normal{0, 0, 1};
-  bool ready = false;
-  bool frozen = false; // true after first successful seed
-  bool usedStage = false;
-  int seedCount = 0; // debug: must stay 1 unless MENU re-place
+  Vec3 normal{0, 0, 1}; // toward user (-Z of pose)
 };
 
 WorldPanel& WorldPanelState();
 void WorldPanelReset();
 
-// Place in front of head in WORLD space, then freeze.
-// force=false: only if not yet frozen (first anchor).
-// force=true: MENU intentional re-place only.
-// Returns true if pose was written.
+// Rebuild c/right/up/normal from pose (call after any pose write).
+void WorldPanelSyncAxes();
+
+// Place once in front of head (yaw-only). force=true only for MENU re-place.
+// Returns false if frozen and !force.
 bool WorldPanelSeed(const XrPosef& headInWorld, bool force = false);
 
-// Translate center only (grab). Orientation stays frozen. No-op if not frozen.
-void WorldPanelTranslate(Vec3 delta);
+// Grab: set world-space center, keep orientation. No re-face.
+void WorldPanelSetCenter(Vec3 worldCenter);
 
 bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit);
+
+// Build XrPosef from center + facing normal (normal points toward user).
+XrPosef WorldPanelMakePose(Vec3 center, Vec3 normalTowardUser);
