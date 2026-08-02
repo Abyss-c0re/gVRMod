@@ -177,34 +177,31 @@ pull_and_sync_lua() {
   echo "  branch=$LUA_BRANCH repo=$LUA_REPO"
 
   # Never leave a polluted LD_LIBRARY_PATH for git (steam-runtime breaks libcurl)
-  (
-    export -n LD_LIBRARY_PATH 2>/dev/null || true
-    unset LD_LIBRARY_PATH
+  env -u LD_LIBRARY_PATH bash -c '
+    set -e
+    src="$1"; branch="$2"; repo="$3"
     cd "$src"
-    # Fetch latest
-    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-      git remote set-url origin "$LUA_REPO" 2>/dev/null || \
-        git remote add origin "$LUA_REPO" 2>/dev/null || true
-      git fetch --depth 1 origin "$LUA_BRANCH" 2>/dev/null \
-        || git fetch origin "$LUA_BRANCH" 2>/dev/null \
-        || git fetch origin 2>/dev/null || true
-      # Prefer ff-only; if dirty local, still hard-reset to origin (launcher SoT = GitHub)
-      local head_before head_after
-      head_before="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
-      if git show-ref --verify --quiet "refs/remotes/origin/$LUA_BRANCH"; then
-        if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-          echo "  WARN: local changes in $src — resetting to origin/$LUA_BRANCH (GitHub wins)"
-        fi
-        git checkout -B "$LUA_BRANCH" "origin/$LUA_BRANCH" 2>/dev/null \
-          || git reset --hard "origin/$LUA_BRANCH" 2>/dev/null \
-          || git pull --ff-only origin "$LUA_BRANCH" 2>/dev/null || true
-      else
-        git pull --ff-only 2>/dev/null || git pull 2>/dev/null || true
-      fi
-      head_after="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
-      echo "  HEAD $head_before → $head_after ($(git log -1 --oneline 2>/dev/null || echo '?'))"
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      exit 0
     fi
-  )
+    git remote set-url origin "$repo" 2>/dev/null || git remote add origin "$repo" 2>/dev/null || true
+    git fetch --depth 1 origin "$branch" 2>/dev/null \
+      || git fetch origin "$branch" 2>/dev/null \
+      || git fetch origin 2>/dev/null || true
+    head_before="$(git rev-parse --short HEAD 2>/dev/null || echo "?")"
+    if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+      if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        echo "  WARN: local changes in $src — resetting to origin/$branch (GitHub wins)"
+      fi
+      git checkout -B "$branch" "origin/$branch" 2>/dev/null \
+        || git reset --hard "origin/$branch" 2>/dev/null \
+        || git pull --ff-only origin "$branch" 2>/dev/null || true
+    else
+      git pull --ff-only 2>/dev/null || git pull 2>/dev/null || true
+    fi
+    head_after="$(git rev-parse --short HEAD 2>/dev/null || echo "?")"
+    echo "  HEAD $head_before → $head_after ($(git log -1 --oneline 2>/dev/null || echo "?"))"
+  ' bash "$src" "$LUA_BRANCH" "$LUA_REPO"
 
   if [[ ! -d "$src/lua" ]]; then
     echo "[gVRMod] WARN: no lua/ under $src — skip rsync" >&2
