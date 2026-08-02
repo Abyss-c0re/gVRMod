@@ -1,9 +1,12 @@
 #pragma once
 // Minimal Cube shell controller set: aim laser, trigger, grip move, stick, menu.
+// Both hands are first-class: actions use L/R subaction paths; UI can fire async.
 #include "openxr_bindings.hpp"
 #include <openxr/openxr.h>
 
 namespace cube_xr {
+
+enum class Hand : int { Left = 0, Right = 1 };
 
 struct ShellInput {
   XrActionSet set = XR_NULL_HANDLE;
@@ -28,13 +31,24 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
 void ShellInputDestroy(const XrApi& api, ShellInput& in);
 void ShellInputSync(const XrApi& api, XrSession session, ShellInput& in);
 
+// Per-hand (async dual-hand UI). Prefer these for laser/click/grab.
+bool ShellInputReadTriggerHand(const XrApi& api, XrSession session, const ShellInput& in,
+                               Hand hand, float axisThresh = 0.55f);
+float ShellInputReadGrabHand(const XrApi& api, XrSession session, const ShellInput& in,
+                             Hand hand);
+bool ShellInputLocateAimHand(const XrApi& api, XrSession session, const ShellInput& in,
+                             Hand hand, XrSpace base, XrTime time, XrPosef* outPose);
+bool ShellInputReadStickHand(const XrApi& api, XrSession session, const ShellInput& in,
+                             Hand hand, float* outX, float* outY);
+
+// Combined: true / max if EITHER hand satisfies (legacy + hotkeys).
 bool ShellInputReadTrigger(const XrApi& api, XrSession session, const ShellInput& in,
                            float axisThresh = 0.55f);
 float ShellInputReadGrab(const XrApi& api, XrSession session, const ShellInput& in);
 bool ShellInputReadMenu(const XrApi& api, XrSession session, const ShellInput& in);
 bool ShellInputReadStick(const XrApi& api, XrSession session, const ShellInput& in,
                          float* outX, float* outY);
-// Locates best tracked hand aim (prefer right) in `base` space.
+// Best tracked aim (prefer higher tracking score) — for single-ray draw only.
 bool ShellInputLocateAim(const XrApi& api, XrSession session, const ShellInput& in,
                          XrSpace base, XrTime time, XrPosef* outPose);
 

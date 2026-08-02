@@ -11,6 +11,7 @@
 #include "launch_fill.hpp"
 #include "gmod_spawn.hpp"
 #include "ui_panel.hpp"
+#include "smx_player.hpp"
 #include "math3d.hpp"
 
 #include <X11/Xlib.h>
@@ -41,6 +42,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
   fprintf(stderr, "[cube_webui] TRIGGER=click GRIP=move CLOSE=exit MENU=reseed\n");
+  fprintf(stderr, "[cube_webui] dual-hand async L+R · SMX player matrix path enabled\n");
   fprintf(stderr, "[cube_webui] paint law: dirty/heartbeat (research-2) · soft_cursor=off · laser reticle\n");
 
   GlxContext glx{};
@@ -236,15 +238,23 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   GLuint fbo = 0;
   int framesNoHead = 0;
 
-  bool prevTrigger = false;
+  bool prevTrigL = false, prevTrigR = false;
   bool prevMenu = false;
   bool grabbing = false;
+  XrHand grabHand = XrHand::Right;
   bool worldInitPending = true;
+
+  SmxPeerState smx{};
+  SmxInit(smx, "gvrmod-cube-shell");
   Vec3 grabOff{0, 0, 0};
   float stickCooldown = 0.f;
+  // Primary laser (best tracking / active hand) + optional second laser
   Vec3 aimO{0, 0, 0}, aimD{0, 0, -1}, hitPt{0, 0, -1.f};
-  bool aimValid = false;
-  bool panelHit = false;
+  Vec3 aimOL{0, 0, 0}, aimDL{0, 0, -1}, hitPtL{0, 0, -1.f};
+  Vec3 aimOR{0, 0, 0}, aimDR{0, 0, -1}, hitPtR{0, 0, -1.f};
+  bool aimValid = false, aimValidL = false, aimValidR = false;
+  bool panelHit = false, panelHitL = false, panelHitR = false;
+  int hitPx = 0, hitPy = 0, hitPxL = 0, hitPyL = 0, hitPxR = 0, hitPyR = 0;
 
   while (running) {
     XrEventDataBuffer ev{XR_TYPE_EVENT_DATA_BUFFER};
@@ -385,48 +395,95 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
 
     auto& wp = WorldPanelState();
-    aimValid = false;
-    panelHit = false;
-    int hitPx = 0, hitPy = 0;
-    hitPt = wp.c;
-    XrPosef aimPose{};
-    if (XrInputLocateAim(session, input, space, fs.predictedDisplayTime, &aimPose)) {
-      aimO = {aimPose.position.x, aimPose.position.y, aimPose.position.z};
-      aimValid = true;
-      // OpenXR aim: -Z is forward (pointer direction)
-      aimD = Normalize(QuatRotate(aimPose.orientation, V3(0, 0, -1)));
-      panelHit = WorldPanelRayHit(aimO, aimD, &hitPx, &hitPy, &hitPt);
-      static int aimLog = 0;
-      if ((aimLog++ % 200) == 0)
-        fprintf(stderr, "[cube_webui] aim (%.2f,%.2f,%.2f) dir (%.2f,%.2f,%.2f) hit=%d\n",
-                aimO.x, aimO.y, aimO.z, aimD.x, aimD.y, aimD.z, panelHit ? 1 : 0);
+    // ── Dual-hand async: each hand has its own aim ray + trigger + grab ──
+    aimValidL = aimValidR = aimValid = false;
+    panelHitL = panelHitR = panelHit = false;
+    hitPx = hitPy = hitPxL = hitPyL = hitPxR = hitPyR = 0;
+    hitPt = hitPtL = hitPtR = wp.c;
+
+    auto locateHand = [&](XrHand hand, Vec3& o, Vec3& d, bool& valid, bool& hit,
+                          int& px, int& py, Vec3& hp) {
+      XrPosef pose{};
+      if (!XrInputLocateAimHand(session, input, hand, space, fs.predictedDisplayTime, &pose))
+        return;
+      o = {pose.position.x, pose.position.y, pose.position.z};
+      valid = true;
+      d = Normalize(QuatRotate(pose.orientation, V3(0, 0, -1)));
+      hit = WorldPanelRayHit(o, d, &px, &py, &hp);
+    };
+    locateHand(XrHand::Left, aimOL, aimDL, aimValidL, panelHitL, hitPxL, hitPyL, hitPtL);
+    locateHand(XrHand::Right, aimOR, aimDR, aimValidR, panelHitR, hitPxR, hitPyR, hitPtR);
+
+    // Primary laser for cursor: prefer hand that hits panel; else best tracked.
+    if (panelHitL && !panelHitR) {
+      aimO = aimOL; aimD = aimDL; aimValid = true; panelHit = true;
+      hitPx = hitPxL; hitPy = hitPyL; hitPt = hitPtL;
+    } else if (panelHitR && !panelHitL) {
+      aimO = aimOR; aimD = aimDR; aimValid = true; panelHit = true;
+      hitPx = hitPxR; hitPy = hitPyR; hitPt = hitPtR;
+    } else if (panelHitL && panelHitR) {
+      // Both hit: prefer right for cursor stability, left still independent for click
+      aimO = aimOR; aimD = aimDR; aimValid = true; panelHit = true;
+      hitPx = hitPxR; hitPy = hitPyR; hitPt = hitPtR;
+    } else if (aimValidR) {
+      aimO = aimOR; aimD = aimDR; aimValid = true;
+    } else if (aimValidL) {
+      aimO = aimOL; aimD = aimDL; aimValid = true;
     }
 
-    // Grab: only while gripping AND ray hits panel (no proximity auto-grab)
-    float grabVal = XrInputReadGrab(session, input);
-    const bool grabHeld = grabVal >= cfg.grabThresh;
-    if (grabHeld && aimValid && wp.ready && wp.frozen) {
-      if (!grabbing) {
-        if (panelHit) {
-          grabbing = true;
-          grabOff = wp.c - aimO;
-          ui.status = "MOVING panel (world freeze kept)";
-          WebUI_MarkDirty(ui);
-        }
+    static int aimLog = 0;
+    if ((aimLog++ % 200) == 0)
+      fprintf(stderr,
+              "[cube_webui] aim L hit=%d R hit=%d primary hit=%d "
+              "trigL=%d trigR=%d\n",
+              panelHitL ? 1 : 0, panelHitR ? 1 : 0, panelHit ? 1 : 0,
+              XrInputReadTriggerHand(session, input, XrHand::Left) ? 1 : 0,
+              XrInputReadTriggerHand(session, input, XrHand::Right) ? 1 : 0);
+
+    // Grab: per-hand grip + that hand's ray must hit panel (async L|R)
+    float grabL = XrInputReadGrabHand(session, input, XrHand::Left);
+    float grabR = XrInputReadGrabHand(session, input, XrHand::Right);
+    const bool grabHeldL = grabL >= cfg.grabThresh;
+    const bool grabHeldR = grabR >= cfg.grabThresh;
+
+    if (grabbing) {
+      // Continue with the hand that started the grab if still held
+      bool still = (grabHand == XrHand::Left) ? grabHeldL : grabHeldR;
+      Vec3 go = (grabHand == XrHand::Left) ? aimOL : aimOR;
+      Vec3 gd = (grabHand == XrHand::Left) ? aimDL : aimDR;
+      bool gvalid = (grabHand == XrHand::Left) ? aimValidL : aimValidR;
+      if (still && gvalid) {
+        WorldPanelSetCenter(go + grabOff);
+        int gpx = 0, gpy = 0;
+        Vec3 ghp = wp.c;
+        bool ghit = WorldPanelRayHit(go, gd, &gpx, &gpy, &ghp);
+        aimO = go; aimD = gd; aimValid = true; panelHit = ghit;
+        hitPx = gpx; hitPy = gpy; hitPt = ghp;
+      } else {
+        grabbing = false;
+        ui.status = "STATIC (room locked)";
+        WebUI_MarkDirty(ui);
+        fprintf(stderr, "[cube_webui] grab end hand=%s pos=(%.3f,%.3f,%.3f)\n",
+                grabHand == XrHand::Left ? "L" : "R", wp.c.x, wp.c.y, wp.c.z);
       }
-      if (grabbing) {
-        // ONLY motion path: translate frozen pose center in world meters
-        WorldPanelSetCenter(aimO + grabOff);
-        panelHit = WorldPanelRayHit(aimO, aimD, &hitPx, &hitPy, &hitPt);
+    } else if (wp.ready && wp.frozen) {
+      // Start grab: either hand gripping with its own ray on panel
+      if (grabHeldL && aimValidL && panelHitL) {
+        grabbing = true;
+        grabHand = XrHand::Left;
+        grabOff = wp.c - aimOL;
+        ui.status = "MOVING panel (left grip)";
+        WebUI_MarkDirty(ui);
+      } else if (grabHeldR && aimValidR && panelHitR) {
+        grabbing = true;
+        grabHand = XrHand::Right;
+        grabOff = wp.c - aimOR;
+        ui.status = "MOVING panel (right grip)";
+        WebUI_MarkDirty(ui);
       }
-    } else if (grabbing) {
-      grabbing = false;
-      ui.status = "STATIC (room locked)";
-      WebUI_MarkDirty(ui);
-      fprintf(stderr, "[cube_webui] grab end pos=(%.3f,%.3f,%.3f) still FROZEN orient\n",
-              wp.c.x, wp.c.y, wp.c.z);
     }
 
+    // Cursor from primary panel hit (either hand)
     if (aimValid && panelHit && !grabbing)
       WebUI_SetCursor(ui, hitPx, hitPy, true);
     else
@@ -447,7 +504,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     XrView views0[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
     xrLocateViews(session, &vli0, &vs0, 2, &vc0, views0);
 
-    bool trig = XrInputReadTrigger(session, input);
+    bool trigL = XrInputReadTriggerHand(session, input, XrHand::Left);
+    bool trigR = XrInputReadTriggerHand(session, input, XrHand::Right);
     bool menuBtn = XrInputReadMenu(session, input);
     // MENU re-place: edge + cooldown so chatter cannot re-seed every frame (HMD flight)
     static float menuReseedCd = 0.f;
@@ -462,22 +520,28 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     prevMenu = menuBtn;
 
-    if (trig && !prevTrigger && !grabbing) {
-      if (panelHit)
-        WebUI_PointerClick(ui, hitPx, hitPy);
+    // Click: each hand's trigger edge fires against THAT hand's ray hit (async).
+    auto tryClick = [&](bool edge, bool hit, int px, int py) {
+      if (!edge || grabbing) return;
+      if (hit)
+        WebUI_PointerClick(ui, px, py);
       else if (ui.cursorVisible)
         WebUI_PointerClick(ui, ui.cursorX, ui.cursorY);
       else
         WebUI_Input(ui, 0, 0, true, false);
-    }
-    prevTrigger = trig;
+    };
+    tryClick(trigL && !prevTrigL, panelHitL, hitPxL, hitPyL);
+    tryClick(trigR && !prevTrigR, panelHitR, hitPxR, hitPyR);
+    prevTrigL = trigL;
+    prevTrigR = trigR;
 
     float sx = 0.f, sy = 0.f;
     if (XrInputReadStick(session, input, &sx, &sy)) {
       if (grabbing && aimValid) {
         const float spd = 0.015f;
         WorldPanelSetCenter(wp.c + wp.right * (sx * spd) + wp.up * (sy * spd));
-        grabOff = wp.c - aimO;
+        Vec3 go = (grabHand == XrHand::Left) ? aimOL : aimOR;
+        grabOff = wp.c - go;
       } else if (stickCooldown <= 0.f) {
         int isx = 0, isy = 0;
         if (sx < -0.55f) isx = -1;
@@ -491,6 +555,46 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       }
     }
     if (stickCooldown > 0.f) stickCooldown -= 1.f / 72.f;
+
+    // ── SMX: pack player matrix (poses + input) → raw P2P bidirectional ──
+    {
+      SmxPlayerMatrix mat{};
+      std::strncpy(mat.player_id, smx.self_id, sizeof mat.player_id - 1);
+      if (headOk) {
+        SmxFillPose(mat.head, headWorld.position.x, headWorld.position.y, headWorld.position.z,
+                    headWorld.orientation.x, headWorld.orientation.y, headWorld.orientation.z,
+                    headWorld.orientation.w);
+        mat.valid_mask |= 1;
+      }
+      if (aimValidL) {
+        // Reconstruct orientation from aim origin only for wire — store pos + unit dir as quat identity-ish
+        SmxFillPose(mat.aim_l, aimOL.x, aimOL.y, aimOL.z, aimDL.x, aimDL.y, aimDL.z, 0.f);
+        mat.valid_mask |= 2;
+      }
+      if (aimValidR) {
+        SmxFillPose(mat.aim_r, aimOR.x, aimOR.y, aimOR.z, aimDR.x, aimDR.y, aimDR.z, 0.f);
+        mat.valid_mask |= 4;
+      }
+      mat.trigger_l = trigL ? 1.f : 0.f;
+      mat.trigger_r = trigR ? 1.f : 0.f;
+      mat.grab_l = grabL;
+      mat.grab_r = grabR;
+      mat.menu = menuBtn ? 1 : 0;
+      float slx = 0, sly = 0, srx = 0, sry = 0;
+      XrInputReadStickHand(session, input, XrHand::Left, &slx, &sly);
+      XrInputReadStickHand(session, input, XrHand::Right, &srx, &sry);
+      mat.stick_lx = slx; mat.stick_ly = sly;
+      mat.stick_rx = srx; mat.stick_ry = sry;
+      mat.ui_tex_w = (uint32_t)UI_W;
+      mat.ui_tex_h = (uint32_t)UI_H;
+      mat.ui_tex_hash = SmxHashBytes(panelBuf.data(), panelBuf.size() > 4096 ? 4096 : panelBuf.size());
+      SmxPlayerMatrix peer{};
+      SmxPump(smx, mat, &peer);
+      static int smxLog = 0;
+      if (smx.connected && (smxLog++ % 300) == 0)
+        fprintf(stderr, "[smx] live tx_seq=%u rx_seq=%u peer=%s mask=%u\n",
+                smx.tx_seq, smx.rx_seq, peer.player_id, peer.valid_mask);
+    }
 
     std::vector<XrCompositionLayerProjectionView> projViews;
     XrCompositionLayerProjection layer{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
@@ -541,13 +645,21 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         GlLoadModelviewLocal(views0[eye].pose);
         if (wp.ready)
           GlDrawWorldPanel(panelTex, views0[eye].pose);
-        if (aimValid) {
-          Vec3 tip = panelHit ? hitPt : (aimO + aimD * 2.5f);
-          float cr = grabbing ? 0.3f : (panelHit ? 1.f : 0.45f);
-          float cg = grabbing ? 0.9f : (panelHit ? 0.2f : 0.45f);
-          float cb = grabbing ? 0.4f : (panelHit ? 0.35f : 0.5f);
-          GlDrawLaser(aimO, tip, cr, cg, cb);
-        }
+        // Both lasers async — cyan-ish left, warm right; active hit brighter
+        auto drawHandLaser = [](bool valid, bool hit, bool isGrab, const Vec3& o,
+                                const Vec3& d, const Vec3& hp, float rBase, float gBase,
+                                float bBase) {
+          if (!valid) return;
+          Vec3 tip = hit ? hp : (o + d * 2.5f);
+          float cr = isGrab ? 0.3f : (hit ? rBase : rBase * 0.5f);
+          float cg = isGrab ? 0.9f : (hit ? gBase : gBase * 0.5f);
+          float cb = isGrab ? 0.4f : (hit ? bBase : bBase * 0.55f);
+          GlDrawLaser(o, tip, cr, cg, cb);
+        };
+        bool grabIsL = grabbing && grabHand == XrHand::Left;
+        bool grabIsR = grabbing && grabHand == XrHand::Right;
+        drawHandLaser(aimValidL, panelHitL, grabIsL, aimOL, aimDL, hitPtL, 0.35f, 0.85f, 1.f);
+        drawHandLaser(aimValidR, panelHitR, grabIsR, aimOR, aimDR, hitPtR, 1.f, 0.35f, 0.25f);
         GlUnbindFbo();
         glDisable(GL_DEPTH_TEST);
 
@@ -587,6 +699,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (pfnPausePt) pfnPausePt(passthrough);
     if (pfnDestroyPt) pfnDestroyPt(passthrough);
   }
+  SmxShutdown(smx);
   XrInputDestroy(input);
   if (viewSpace) xrDestroySpace(viewSpace);
   if (space) xrDestroySpace(space);

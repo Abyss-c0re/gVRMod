@@ -5,11 +5,12 @@
 
 namespace cube_xr {
 
-static XrResult CreatePoseActionWithHands(const XrApi& api, XrActionSet set,
-                                          const char* name, const char* loc,
-                                          XrPath hands[2], XrAction* out) {
+// Create any action type with both hand subaction paths so GetState can select L/R.
+static XrResult CreateActionWithHands(const XrApi& api, XrActionSet set, const char* name,
+                                      const char* loc, XrActionType ty, XrPath hands[2],
+                                      XrAction* out) {
   XrActionCreateInfo aci{XR_TYPE_ACTION_CREATE_INFO};
-  aci.actionType = XR_ACTION_TYPE_POSE_INPUT;
+  aci.actionType = ty;
   std::strncpy(aci.actionName, name, XR_MAX_ACTION_NAME_SIZE - 1);
   std::strncpy(aci.localizedActionName, loc, XR_MAX_LOCALIZED_ACTION_NAME_SIZE - 1);
   aci.countSubactionPaths = 2;
@@ -28,6 +29,10 @@ static XrResult CreateActionSpaceForHand(const XrApi& api, XrSession session, Xr
   return xrCreateActionSpace(session, &sci, out);
 }
 
+static XrPath HandPath(const ShellInput& in, Hand hand) {
+  return hand == Hand::Left ? in.handLeft : in.handRight;
+}
+
 bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
                      const char* actionSetName) {
   if (CreateActionSet(api, actionSetName, "Cube Shell", &in.set) != XR_SUCCESS)
@@ -40,27 +45,27 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
   }
   XrPath hands[2] = {in.handLeft, in.handRight};
 
-  if (CreatePoseActionWithHands(api, in.set, "aim_pose", "Aim Pose", hands, &in.pose) !=
-      XR_SUCCESS)
-    return false;
-
-  auto mk = [&](const char* name, const char* loc, XrActionType ty, XrAction* out) {
-    return CreateAction(api, in.set, name, loc, ty, out) == XR_SUCCESS;
+  auto mkH = [&](const char* name, const char* loc, XrActionType ty, XrAction* out) {
+    return CreateActionWithHands(api, in.set, name, loc, ty, hands, out) == XR_SUCCESS;
   };
-  // Boolean trigger action unused on Oculus (no trigger/click) — we use float axis only
-  if (!mk("trigger", "Trigger Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.trigger)) return false;
-  if (!mk("trigger_axis", "Trigger Axis", XR_ACTION_TYPE_FLOAT_INPUT, &in.triggerAxis))
-    return false;
-  if (!mk("grab", "Grab", XR_ACTION_TYPE_FLOAT_INPUT, &in.grab)) return false;
-  if (!mk("grab_click", "Grab Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.grabClick)) return false;
-  if (!mk("stick", "Thumbstick", XR_ACTION_TYPE_VECTOR2F_INPUT, &in.stick)) return false;
-  if (!mk("menu", "Menu", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.menu)) return false;
 
-  XrActionSuggestedBinding binds[24];
+  if (!mkH("aim_pose", "Aim Pose", XR_ACTION_TYPE_POSE_INPUT, &in.pose)) return false;
+  // Boolean trigger unused on Oculus (no trigger/click) — float axis is primary.
+  if (!mkH("trigger", "Trigger Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.trigger)) return false;
+  if (!mkH("trigger_axis", "Trigger Axis", XR_ACTION_TYPE_FLOAT_INPUT, &in.triggerAxis))
+    return false;
+  if (!mkH("grab", "Grab", XR_ACTION_TYPE_FLOAT_INPUT, &in.grab)) return false;
+  if (!mkH("grab_click", "Grab Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.grabClick)) return false;
+  if (!mkH("stick", "Thumbstick", XR_ACTION_TYPE_VECTOR2F_INPUT, &in.stick)) return false;
+  // Menu is typically left-hand only on Quest; still create with subactions for Index.
+  if (!mkH("menu", "Menu", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.menu)) return false;
+
+  XrActionSuggestedBinding binds[32];
   int n = 0;
-  auto push = [&](XrAction a, const char* p) { PushBinding(api, binds, &n, 24, a, p); };
+  auto push = [&](XrAction a, const char* p) { PushBinding(api, binds, &n, 32, a, p); };
 
   // ── Oculus / Quest Touch: NO trigger/click, NO squeeze/click ──
+  // Both hands fully bound — async dual-hand laser + trigger.
   n = 0;
   push(in.pose, path::rightAimPose);
   push(in.pose, path::leftAimPose);
@@ -69,30 +74,38 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
   push(in.grab, path::rightSqueezeValue);
   push(in.grab, path::leftSqueezeValue);
   push(in.stick, path::rightThumbstick);
+  push(in.stick, path::leftThumbstick);
   push(in.menu, path::leftMenuClick);
-  // Optional: A as click alternate
+  // A as optional right-hand click alternate (not required for UI trigger)
   push(in.trigger, path::rightAClick);
   if (!SuggestProfile(api, kProfileOculusTouch, binds, (uint32_t)n)) {
     fprintf(stderr, "[cube_xr] FATAL: oculus/touch_controller bindings failed\n");
   } else {
-    fprintf(stderr, "[cube_xr] oculus/touch_controller bindings OK (n=%d)\n", n);
+    fprintf(stderr, "[cube_xr] oculus/touch_controller bindings OK (n=%d, dual-hand)\n", n);
   }
 
-  // ── Index (has trigger/click + squeeze) ──
+  // ── Index (has trigger/click + squeeze) — both hands ──
   n = 0;
   push(in.pose, path::rightAimPose);
   push(in.pose, path::leftAimPose);
   push(in.trigger, path::rightTriggerClick);
+  push(in.trigger, path::leftTriggerClick);
   push(in.triggerAxis, path::rightTriggerValue);
+  push(in.triggerAxis, path::leftTriggerValue);
   push(in.grab, path::rightSqueezeValue);
+  push(in.grab, path::leftSqueezeValue);
+  // Index has squeeze/value only (no squeeze/click on this profile)
   push(in.stick, path::rightThumbstick);
+  push(in.stick, path::leftThumbstick);
   push(in.menu, path::rightAClick);
   SuggestProfile(api, kProfileIndex, binds, (uint32_t)n);
 
-  // ── KHR simple ──
+  // ── KHR simple — both hands where available ──
   n = 0;
   push(in.pose, path::rightAimPose);
+  push(in.pose, path::leftAimPose);
   push(in.trigger, path::rightSelectClick);
+  push(in.trigger, path::leftSelectClick);
   push(in.menu, path::leftMenuClick);
   SuggestProfile(api, kProfileKhrSimple, binds, (uint32_t)n);
 
@@ -108,7 +121,7 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
     return false;
   }
   in.attached = true;
-  fprintf(stderr, "[cube_xr] shell input ready (Quest-safe L/R aim)\n");
+  fprintf(stderr, "[cube_xr] shell input ready (async L+R subaction trigger/grab/aim)\n");
   return true;
 }
 
@@ -137,61 +150,105 @@ void ShellInputSync(const XrApi& api, XrSession session, ShellInput& in) {
   else xrSyncActions(session, &sync);
 }
 
-static bool GetBool(const XrApi& api, XrSession session, XrAction a, bool* out) {
+static bool GetBool(const XrApi& api, XrSession session, XrAction a, XrPath sub, bool* out) {
   if (a == XR_NULL_HANDLE) return false;
   XrActionStateBoolean st{XR_TYPE_ACTION_STATE_BOOLEAN};
   XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
   gi.action = a;
+  gi.subactionPath = sub;
   XrResult r = api.getBool ? api.getBool(session, &gi, &st) : xrGetActionStateBoolean(session, &gi, &st);
   if (r != XR_SUCCESS || !st.isActive) return false;
   if (out) *out = st.currentState;
   return true;
 }
-static bool GetFloat(const XrApi& api, XrSession session, XrAction a, float* out) {
+
+static bool GetFloat(const XrApi& api, XrSession session, XrAction a, XrPath sub, float* out) {
   if (a == XR_NULL_HANDLE) return false;
   XrActionStateFloat st{XR_TYPE_ACTION_STATE_FLOAT};
   XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
   gi.action = a;
+  gi.subactionPath = sub;
   XrResult r = api.getFloat ? api.getFloat(session, &gi, &st) : xrGetActionStateFloat(session, &gi, &st);
   if (r != XR_SUCCESS || !st.isActive) return false;
   if (out) *out = st.currentState;
   return true;
 }
 
-bool ShellInputReadTrigger(const XrApi& api, XrSession session, const ShellInput& in,
-                           float axisThresh) {
+bool ShellInputReadTriggerHand(const XrApi& api, XrSession session, const ShellInput& in,
+                               Hand hand, float axisThresh) {
   if (!in.attached) return false;
+  XrPath sub = HandPath(in, hand);
   bool b = false;
-  if (GetBool(api, session, in.trigger, &b) && b) return true;
+  if (GetBool(api, session, in.trigger, sub, &b) && b) return true;
   float f = 0.f;
-  if (GetFloat(api, session, in.triggerAxis, &f) && f > axisThresh) return true;
+  if (GetFloat(api, session, in.triggerAxis, sub, &f) && f > axisThresh) return true;
   return false;
 }
 
-float ShellInputReadGrab(const XrApi& api, XrSession session, const ShellInput& in) {
+float ShellInputReadGrabHand(const XrApi& api, XrSession session, const ShellInput& in,
+                             Hand hand) {
   if (!in.attached) return 0.f;
+  XrPath sub = HandPath(in, hand);
   float g = 0.f;
-  GetFloat(api, session, in.grab, &g);
+  GetFloat(api, session, in.grab, sub, &g);
   bool click = false;
-  if (GetBool(api, session, in.grabClick, &click) && click) g = 1.f;
+  if (GetBool(api, session, in.grabClick, sub, &click) && click) g = 1.f;
   return g;
 }
 
-bool ShellInputReadMenu(const XrApi& api, XrSession session, const ShellInput& in) {
-  bool b = false;
-  return in.attached && GetBool(api, session, in.menu, &b) && b;
-}
-
-bool ShellInputReadStick(const XrApi& api, XrSession session, const ShellInput& in,
-                         float* outX, float* outY) {
+bool ShellInputReadStickHand(const XrApi& api, XrSession session, const ShellInput& in,
+                             Hand hand, float* outX, float* outY) {
   if (!in.attached || in.stick == XR_NULL_HANDLE) return false;
   XrActionStateVector2f st{XR_TYPE_ACTION_STATE_VECTOR2F};
   XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
   gi.action = in.stick;
+  gi.subactionPath = HandPath(in, hand);
   XrResult r = api.getVec2 ? api.getVec2(session, &gi, &st) : xrGetActionStateVector2f(session, &gi, &st);
   if (r != XR_SUCCESS || !st.isActive) return false;
   if (outX) *outX = st.currentState.x;
   if (outY) *outY = st.currentState.y;
+  return true;
+}
+
+bool ShellInputReadTrigger(const XrApi& api, XrSession session, const ShellInput& in,
+                           float axisThresh) {
+  return ShellInputReadTriggerHand(api, session, in, Hand::Left, axisThresh) ||
+         ShellInputReadTriggerHand(api, session, in, Hand::Right, axisThresh);
+}
+
+float ShellInputReadGrab(const XrApi& api, XrSession session, const ShellInput& in) {
+  float l = ShellInputReadGrabHand(api, session, in, Hand::Left);
+  float r = ShellInputReadGrabHand(api, session, in, Hand::Right);
+  return l > r ? l : r;
+}
+
+bool ShellInputReadMenu(const XrApi& api, XrSession session, const ShellInput& in) {
+  if (!in.attached) return false;
+  bool b = false;
+  // Menu: try left first (Quest), then right (Index A), then any
+  if (GetBool(api, session, in.menu, in.handLeft, &b) && b) return true;
+  if (GetBool(api, session, in.menu, in.handRight, &b) && b) return true;
+  // Fallback: some runtimes ignore subaction on single-bound menu
+  if (GetBool(api, session, in.menu, XR_NULL_PATH, &b) && b) return true;
+  return false;
+}
+
+bool ShellInputReadStick(const XrApi& api, XrSession session, const ShellInput& in,
+                         float* outX, float* outY) {
+  // Prefer the stick with larger magnitude so either hand can navigate UI.
+  float lx = 0.f, ly = 0.f, rx = 0.f, ry = 0.f;
+  bool okL = ShellInputReadStickHand(api, session, in, Hand::Left, &lx, &ly);
+  bool okR = ShellInputReadStickHand(api, session, in, Hand::Right, &rx, &ry);
+  if (!okL && !okR) return false;
+  float mL = okL ? (lx * lx + ly * ly) : -1.f;
+  float mR = okR ? (rx * rx + ry * ry) : -1.f;
+  if (mR >= mL) {
+    if (outX) *outX = rx;
+    if (outY) *outY = ry;
+  } else {
+    if (outX) *outX = lx;
+    if (outY) *outY = ly;
+  }
   return true;
 }
 
@@ -214,6 +271,14 @@ static bool LocateOne(const XrApi& api, XrSpace aim, XrSpace base, XrTime time, 
   *out = loc.pose;
   if (outScore) *outScore = score;
   return true;
+}
+
+bool ShellInputLocateAimHand(const XrApi& api, XrSession session, const ShellInput& in,
+                             Hand hand, XrSpace base, XrTime time, XrPosef* outPose) {
+  (void)session;
+  if (!in.attached || !outPose) return false;
+  XrSpace aim = hand == Hand::Left ? in.aimLeft : in.aimRight;
+  return LocateOne(api, aim, base, time, outPose, nullptr);
 }
 
 bool ShellInputLocateAim(const XrApi& api, XrSession session, const ShellInput& in,
