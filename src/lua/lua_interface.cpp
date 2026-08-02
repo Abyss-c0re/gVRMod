@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v28: soft VR pause (keep OpenXR instance) so vrmod_start works without map reload
-    LUA->PushNumber(28);
+    // v29: fix first-start stuck g_IsPaused (Startup called Shutdown before Init)
+    LUA->PushNumber(29);
     return 1;
 }
 
@@ -173,6 +173,7 @@ LUA_FUNCTION(Init) {
         VRMOD_LOG_INFO("Session deferred after init (GL session binds on first RenderScene)");
     }
     XR_SetSubmitEnabled(true);
+    g_IsPaused = false; // clear any pre-Init Shutdown() that ran from Lua startup
 
     g_xrInitialized = true;
 
@@ -930,9 +931,10 @@ LUA_FUNCTION(SubmitSharedTexture) {
 LUA_FUNCTION(Shutdown) {
     // Soft pause only — keep OpenXR instance, session, and actions so the player
     // can vrmod_start again without map/module reload. Full teardown is GMOD_MODULE_CLOSE.
+    // Never mark paused if we never initialized — that stuck first-start (no WaitFrame/submit).
     if (!g_xrInitialized) {
         XR_SetSubmitEnabled(false);
-        g_IsPaused = true;
+        g_IsPaused = false;
         return 0;
     }
     if (g_IsPaused) {

@@ -67,7 +67,8 @@ build.bat
 
 ## Module version
 
-**v27** — `GetBackend()` · dual binary names · full restart teardown.
+**v29** — soft pause + fix first-start `g_IsPaused` stick; dual `vrmod_xr` / `vrmod` binaries.
+OpenXR is runtime-agnostic (not WiVRn-only).
 
 ## License
 
