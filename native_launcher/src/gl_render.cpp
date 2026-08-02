@@ -121,15 +121,15 @@ void GlDrawWorldPanel(GLuint tex) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // CPU buffer y=0 is top; glTexImage first row = texture V=0 bottom → flip V
+  // CPU y=0 = UI top. glTexImage row0 → V=0. Map panel top → V=0.
   glBegin(GL_QUADS);
-  glTexCoord2f(0.f, 0.f);
-  glVertex3f(bl.x, bl.y, bl.z);
-  glTexCoord2f(1.f, 0.f);
-  glVertex3f(br.x, br.y, br.z);
-  glTexCoord2f(1.f, 1.f);
-  glVertex3f(tr.x, tr.y, tr.z);
   glTexCoord2f(0.f, 1.f);
+  glVertex3f(bl.x, bl.y, bl.z);
+  glTexCoord2f(1.f, 1.f);
+  glVertex3f(br.x, br.y, br.z);
+  glTexCoord2f(1.f, 0.f);
+  glVertex3f(tr.x, tr.y, tr.z);
+  glTexCoord2f(0.f, 0.f);
   glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
   glDisable(GL_TEXTURE_2D);
