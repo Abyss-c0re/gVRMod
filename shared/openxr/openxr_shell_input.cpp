@@ -2,7 +2,6 @@
 #include "openxr_paths.hpp"
 #include <cstdio>
 #include <cstring>
-#include <cmath>
 
 namespace cube_xr {
 
@@ -48,6 +47,7 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
   auto mk = [&](const char* name, const char* loc, XrActionType ty, XrAction* out) {
     return CreateAction(api, in.set, name, loc, ty, out) == XR_SUCCESS;
   };
+  // Boolean trigger action unused on Oculus (no trigger/click) — we use float axis only
   if (!mk("trigger", "Trigger Click", XR_ACTION_TYPE_BOOLEAN_INPUT, &in.trigger)) return false;
   if (!mk("trigger_axis", "Trigger Axis", XR_ACTION_TYPE_FLOAT_INPUT, &in.triggerAxis))
     return false;
@@ -58,32 +58,27 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
 
   XrActionSuggestedBinding binds[24];
   int n = 0;
-  auto push = [&](XrAction a, const char* p) {
-    PushBinding(api, binds, &n, 24, a, p);
-  };
+  auto push = [&](XrAction a, const char* p) { PushBinding(api, binds, &n, 24, a, p); };
 
-  auto fillTouch = [&]() {
-    n = 0;
-    push(in.pose, path::rightAimPose);
-    push(in.pose, path::leftAimPose);
-    push(in.trigger, path::rightTriggerClick);
-    push(in.triggerAxis, path::rightTriggerValue);
-    push(in.grab, path::rightSqueezeValue);
-    push(in.grab, path::leftSqueezeValue);
-    push(in.grabClick, path::rightSqueezeClick);
-    push(in.stick, path::rightThumbstick);
-    push(in.menu, path::leftMenuClick); // Quest menu is left
-    push(in.menu, path::rightMenuClick);
-  };
+  // ── Oculus / Quest Touch: NO trigger/click, NO squeeze/click ──
+  n = 0;
+  push(in.pose, path::rightAimPose);
+  push(in.pose, path::leftAimPose);
+  push(in.triggerAxis, path::rightTriggerValue);
+  push(in.triggerAxis, path::leftTriggerValue);
+  push(in.grab, path::rightSqueezeValue);
+  push(in.grab, path::leftSqueezeValue);
+  push(in.stick, path::rightThumbstick);
+  push(in.menu, path::leftMenuClick);
+  // Optional: A as click alternate
+  push(in.trigger, path::rightAClick);
+  if (!SuggestProfile(api, kProfileOculusTouch, binds, (uint32_t)n)) {
+    fprintf(stderr, "[cube_xr] FATAL: oculus/touch_controller bindings failed\n");
+  } else {
+    fprintf(stderr, "[cube_xr] oculus/touch_controller bindings OK (n=%d)\n", n);
+  }
 
-  fillTouch();
-  SuggestProfile(api, kProfileOculusTouch, binds, (uint32_t)n);
-  fillTouch();
-  SuggestProfile(api, kProfileTouchPro, binds, (uint32_t)n);
-  fillTouch();
-  SuggestProfile(api, kProfileTouchPlus, binds, (uint32_t)n);
-
-  // Index
+  // ── Index (has trigger/click + squeeze) ──
   n = 0;
   push(in.pose, path::rightAimPose);
   push(in.pose, path::leftAimPose);
@@ -94,10 +89,14 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
   push(in.menu, path::rightAClick);
   SuggestProfile(api, kProfileIndex, binds, (uint32_t)n);
 
+  // ── KHR simple ──
   n = 0;
   push(in.pose, path::rightAimPose);
   push(in.trigger, path::rightSelectClick);
+  push(in.menu, path::leftMenuClick);
   SuggestProfile(api, kProfileKhrSimple, binds, (uint32_t)n);
+
+  // Skip Touch Pro / Plus unless extensions enabled (they break suggest with -22)
 
   if (AttachActionSets(api, session, &in.set, 1) != XR_SUCCESS) {
     fprintf(stderr, "[cube_xr] attach action sets failed\n");
@@ -109,7 +108,7 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
     return false;
   }
   in.attached = true;
-  fprintf(stderr, "[cube_xr] shell input ready (L/R aim spaces)\n");
+  fprintf(stderr, "[cube_xr] shell input ready (Quest-safe L/R aim)\n");
   return true;
 }
 
@@ -208,8 +207,7 @@ static bool LocateOne(const XrApi& api, XrSpace aim, XrSpace base, XrTime time, 
   if ((loc.locationFlags & need) != need) return false;
   float px = loc.pose.position.x, py = loc.pose.position.y, pz = loc.pose.position.z;
   float d2 = px * px + py * py + pz * pz;
-  // Reject origin junk (untracked often sits at 0)
-  if (d2 < 0.01f) return false; // <10cm from space origin — almost always wrong for a held controller
+  if (d2 < 0.01f) return false;
   float score = d2;
   if (loc.locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT) score += 100.f;
   if (loc.locationFlags & XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT) score += 100.f;
@@ -227,7 +225,7 @@ bool ShellInputLocateAim(const XrApi& api, XrSession session, const ShellInput& 
   bool okR = LocateOne(api, in.aimRight, base, time, &pr, &sr);
   bool okL = LocateOne(api, in.aimLeft, base, time, &pl, &sl);
   if (okR && okL) {
-    *outPose = (sr >= sl) ? pr : pl; // prefer higher track score; right usually wins
+    *outPose = (sr >= sl) ? pr : pl;
     return true;
   }
   if (okR) {
