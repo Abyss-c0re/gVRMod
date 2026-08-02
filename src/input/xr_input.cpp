@@ -91,22 +91,16 @@ static void QuatToRotMat(const XrQuaternionf& q, float m[3][3]) {
     m[2][2] = 1.0f - 2.0f * (xx + yy);
 }
 
-// ── Extract Source-engine pitch/yaw/roll from a rotation matrix using the
-// exact formulas from the legacy OpenVR ConvertPose. The rotation 3x3 from
-// OpenVR was used *raw* (only the translation column was remapped); we do the
-// same here. OpenXR quaternions are in the same axis convention as OpenVR, so
-// the raw matrix from the quat produces correct game angles with these extractors.
+// Extract Source pitch/yaw/roll from a 3x3 already expressed in Source axes
+// (same formulas as OpenVR ConvertPose on HmdMatrix34).
 static void ConvertRotToSourceAng(const float m[3][3], float ang[3]) {
-    ang[0] =  asinf(m[1][2]) * (180.0f / PI_F);
+    // Clamp asin arg — numerical noise past ±1 makes hands "orbit" for a frame.
+    float s = m[1][2];
+    if (s > 1.0f) s = 1.0f;
+    if (s < -1.0f) s = -1.0f;
+    ang[0] =  asinf(s) * (180.0f / PI_F);
     ang[1] =  atan2f(m[0][2], m[2][2]) * (180.0f / PI_F);
     ang[2] =  atan2f(-m[1][0], m[1][1]) * (180.0f / PI_F);
-
-    // Diagnostic log (throttled — was every 3 frames and flooded 60MB logs).
-    static int s_exLog = 0;
-    if ((++s_exLog % 90) == 0) {
-        VRMOD_LOG_INFO("ROT EX: game ang[0/pitch]=%.1f ang[1/yaw]=%.1f ang[2/roll]=%.1f",
-            ang[0], ang[1], ang[2]);
-    }
 }
 
 PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
@@ -121,18 +115,37 @@ PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
 
     // OpenXR: x=right, y=up, z=back (towards user)
     // Source engine (GMod): x=forward, y=left, z=up
-    // Position remap (and same for linear/angular velocity vectors). Matches legacy.
+    // p_src = M * p_xr  with  src_x=-xr_z, src_y=-xr_x, src_z=xr_y
     r.pos[0] = -loc.pose.position.z;
     r.pos[1] = -loc.pose.position.x;
     r.pos[2] =  loc.pose.position.y;
 
-    // Orientation: build the raw rotation matrix from the OpenXR quat and
-    // feed it directly to the legacy angle extractor (exactly as OpenVR's
-    // HmdMatrix34 rotation 3x3 was used raw in the old ConvertPose).
-    // Only *position* (and linear/angular vel vectors) use the axis remap.
+    // Orientation MUST use the same basis change: Rsrc = M * Rxr * M^T.
+    // Feeding raw OpenXR R into the Source angle extractor (fef9de7) left
+    // rotation in XR axes while position was remapped → hands/HMD tilt on a
+    // circle when rolling/yawing (axis mismatch).
     float Rxr[3][3];
     QuatToRotMat(loc.pose.orientation, Rxr);
-    ConvertRotToSourceAng(Rxr, r.ang);
+
+    // M rows are Source axes expressed in OpenXR (matches pos remap above).
+    const float M[3][3] = {
+        { 0.0f,  0.0f, -1.0f },
+        {-1.0f,  0.0f,  0.0f },
+        { 0.0f,  1.0f,  0.0f }
+    };
+    float temp[3][3] = {{0}};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                temp[i][j] += M[i][k] * Rxr[k][j];
+    float Rsrc[3][3] = {{0}};
+    // Rsrc = temp * M^T  (M^T[k][j] = M[j][k])
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                Rsrc[i][j] += temp[i][k] * M[j][k];
+
+    ConvertRotToSourceAng(Rsrc, r.ang);
 
     // Velocity lives on the XrSpaceVelocity chain (loc.next), NOT locationFlags.
     // LINEAR_VALID (0x1) coincides numerically with ORIENTATION_VALID on location —

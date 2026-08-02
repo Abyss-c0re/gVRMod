@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v31: restart SEGV fix — clear cached XrActions; destroy sets only after session
-    LUA->PushNumber(31);
+    // v32: restore OpenXR→Source rotation basis change (hands/HMD tilt orbit)
+    LUA->PushNumber(32);
     return 1;
 }
 
