@@ -15,15 +15,31 @@ if [[ "${GVMOD_NO_SYNC:-0}" != "1" && -x "$ROOT/scripts/sync_repos.sh" ]]; then
   env -u LD_LIBRARY_PATH "$ROOT/scripts/sync_repos.sh" --pull-only 2>/dev/null || true
 fi
 
+need_build=0
 if [[ ! -x "$BIN" ]]; then
-  echo "[cube_webui] building native launcher…"
-  mkdir -p "$ROOT/native_launcher/build"
+  need_build=1
+else
+  # Rebuild when any native source is newer than the installed binary
+  newest_src=$(find "$ROOT/native_launcher/src" -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
+  bin_mtime=$(stat -c '%Y' "$BIN" 2>/dev/null || echo 0)
+  if [[ -n "${newest_src:-}" ]]; then
+    src_i=${newest_src%.*}
+    if (( src_i > bin_mtime )); then
+      need_build=1
+      echo "[cube_webui] sources newer than binary — rebuilding"
+    fi
+  fi
+fi
+
+if [[ "$need_build" == "1" ]]; then
+  echo "[cube_webui] building native launcher → $BIN"
+  mkdir -p "$ROOT/native_launcher/build" "$ROOT/install/native"
   cmake -S "$ROOT/native_launcher" -B "$ROOT/native_launcher/build"
   cmake --build "$ROOT/native_launcher/build" -j"$(nproc)"
 fi
 
 if [[ ! -x "$BIN" ]]; then
-  echo "[cube_webui] ERROR: $BIN missing" >&2
+  echo "[cube_webui] ERROR: $BIN missing after build" >&2
   exit 1
 fi
 

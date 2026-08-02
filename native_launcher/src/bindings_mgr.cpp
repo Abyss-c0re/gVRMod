@@ -6,6 +6,20 @@
 #include <sstream>
 #include <sys/stat.h>
 
+// Minimal JSON string extractor for our bindings/custom files.
+static std::string ExtractString(const std::string& body, size_t from, const char* key) {
+  std::string pat = std::string("\"") + key + "\"";
+  auto p = body.find(pat, from);
+  if (p == std::string::npos) return {};
+  p = body.find(':', p);
+  if (p == std::string::npos) return {};
+  p = body.find('"', p);
+  if (p == std::string::npos) return {};
+  auto e = body.find('"', p + 1);
+  if (e == std::string::npos) return {};
+  return body.substr(p + 1, e - p - 1);
+}
+
 const std::vector<std::string>& Bindings_AllSources() {
   static const std::vector<std::string> s = {
     "left_x", "left_y", "left_menu", "left_stick_click", "left_thumbrest",
@@ -89,6 +103,131 @@ static BindRule R(std::initializer_list<const char*> src, const char* mode, cons
   return r;
 }
 
+// Lua util.TableToJSON of CustomActions:
+//   [ ["name","press","release","0"], ... ]  or with "driving":true on objects
+// Also accept legacy line-based files.
+static void AppendCustomIfNew(BindingsManager& m, const std::string& name, bool driving) {
+  if (name.empty()) return;
+  for (auto& L : m.logical)
+    if (L.id == name) return;
+  m.logical.push_back({name, "Custom: " + name, driving ? "driving" : "custom"});
+}
+
+static std::string ExtractQuoted(const std::string& s, size_t& i) {
+  while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r' || s[i] == ','))
+    ++i;
+  if (i >= s.size() || s[i] != '"') return {};
+  ++i;
+  std::string out;
+  while (i < s.size()) {
+    if (s[i] == '\\' && i + 1 < s.size()) {
+      out.push_back(s[i + 1]);
+      i += 2;
+      continue;
+    }
+    if (s[i] == '"') {
+      ++i;
+      break;
+    }
+    out.push_back(s[i++]);
+  }
+  return out;
+}
+
+void Bindings_LoadCustomActions(BindingsManager& m) {
+  m.logical = Bindings_LogicalActions();
+  if (m.gmodRoot.empty()) return;
+  std::string path = m.gmodRoot + "/garrysmod/data/vrmod/vrmod_custom_actions.txt";
+  std::string body = [&]() {
+    std::ifstream f(path);
+    if (!f) return std::string{};
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+  }();
+  if (body.empty()) return;
+
+  // JSON array (Lua product format)
+  auto first = body.find_first_not_of(" \t\r\n");
+  if (first != std::string::npos && body[first] == '[') {
+    size_t i = first + 1;
+    while (i < body.size()) {
+      while (i < body.size() && (body[i] == ' ' || body[i] == '\t' || body[i] == '\n' ||
+                                 body[i] == '\r' || body[i] == ','))
+        ++i;
+      if (i >= body.size() || body[i] == ']') break;
+      if (body[i] == '[') {
+        // array row: ["name", "press", "release", "0|1"]
+        ++i;
+        std::string name = ExtractQuoted(body, i);
+        std::string press = ExtractQuoted(body, i);
+        std::string release = ExtractQuoted(body, i);
+        std::string drive = ExtractQuoted(body, i);
+        (void)press;
+        (void)release;
+        bool isDrv = (drive == "1" || drive == "true" || drive == "driving");
+        // skip to end of this array
+        int depth = 1;
+        while (i < body.size() && depth > 0) {
+          if (body[i] == '[') ++depth;
+          else if (body[i] == ']') --depth;
+          else if (body[i] == '"') {
+            ++i;
+            while (i < body.size() && body[i] != '"') {
+              if (body[i] == '\\') ++i;
+              ++i;
+            }
+          }
+          ++i;
+        }
+        AppendCustomIfNew(m, name, isDrv);
+      } else if (body[i] == '{') {
+        // object row — pull "1" or "name" and driving
+        auto end = body.find('}', i);
+        if (end == std::string::npos) break;
+        std::string block = body.substr(i, end - i + 1);
+        std::string name = ExtractString(block, 0, "1");
+        if (name.empty()) name = ExtractString(block, 0, "name");
+        bool isDrv = block.find("\"driving\":true") != std::string::npos ||
+                     block.find("\"driving\": true") != std::string::npos ||
+                     ExtractString(block, 0, "4") == "1";
+        AppendCustomIfNew(m, name, isDrv);
+        i = end + 1;
+      } else {
+        ++i;
+      }
+    }
+    fprintf(stderr, "[cube_webui] custom actions (json): %zu total logical\n", m.logical.size());
+    return;
+  }
+
+  // Legacy line-based
+  std::istringstream iss(body);
+  std::string line;
+  while (std::getline(iss, line)) {
+    if (line.empty() || line[0] == '#' || line[0] == '/') continue;
+    std::string name, driving;
+    if (line.find('\t') != std::string::npos) {
+      std::istringstream ls(line);
+      std::string a, b, c;
+      std::getline(ls, a, '\t');
+      std::getline(ls, b, '\t');
+      std::getline(ls, c, '\t');
+      name = a;
+      driving = c;
+    } else if (line.find(',') != std::string::npos) {
+      name = line.substr(0, line.find(','));
+    } else {
+      name = line;
+    }
+    while (!name.empty() && (name.back() == ' ' || name.back() == '\r')) name.pop_back();
+    while (!name.empty() && name.front() == ' ') name.erase(name.begin());
+    if (name.empty()) continue;
+    bool isDrv = (driving == "1" || driving == "driving" || driving == "true");
+    AppendCustomIfNew(m, name, isDrv);
+  }
+}
+
 void Bindings_DefaultMap(BindingsManager& m) {
   m.version = 2;
   m.preset = "quest3_touch";
@@ -121,6 +260,7 @@ void Bindings_DefaultMap(BindingsManager& m) {
   m.actions["boolean_siren"] = R({"right_stick_west"}, "any", "driving");
   m.actions["boolean_turret"] = R({"right_stick_click"}, "any", "driving");
   m.actions["boolean_horn"] = R({"left_stick_click"}, "any", "driving");
+  Bindings_LoadCustomActions(m);
   m.dirty = false;
   m.status = "QUEST 3 / TOUCH DEFAULTS";
 }
@@ -157,20 +297,6 @@ static std::string Serialize(const BindingsManager& m) {
   }
   ss << "\n  }\n}\n";
   return ss.str();
-}
-
-// Very small extractor for our file shape (not a general JSON parser).
-static std::string ExtractString(const std::string& body, size_t from, const char* key) {
-  std::string pat = std::string("\"") + key + "\"";
-  auto p = body.find(pat, from);
-  if (p == std::string::npos) return {};
-  p = body.find(':', p);
-  if (p == std::string::npos) return {};
-  p = body.find('"', p);
-  if (p == std::string::npos) return {};
-  auto e = body.find('"', p + 1);
-  if (e == std::string::npos) return {};
-  return body.substr(p + 1, e - p - 1);
 }
 
 static void ParseActions(const std::string& body, BindingsManager& m) {
@@ -223,7 +349,7 @@ static void ParseActions(const std::string& body, BindingsManager& m) {
 bool Bindings_Load(BindingsManager& m, const std::string& gmodRoot) {
   m.gmodRoot = gmodRoot;
   m.filePath = gmodRoot + "/garrysmod/data/vrmod/vrmod_openxr_bindings.json";
-  Bindings_DefaultMap(m);
+  Bindings_DefaultMap(m); // includes custom actions + gold defaults
   std::ifstream f(m.filePath);
   if (!f) {
     m.status = "NO FILE — USING DEFAULTS (will save on edit)";
@@ -233,18 +359,28 @@ bool Bindings_Load(BindingsManager& m, const std::string& gmodRoot) {
   ss << f.rdbuf();
   std::string body = ss.str();
   if (body.empty()) return true;
-  // merge user over defaults
+  // merge user over defaults (same path Lua reads/writes)
   BindingsManager user = m;
   user.actions.clear();
   ParseActions(body, user);
-  for (auto& kv : user.actions)
+  for (auto& kv : user.actions) {
     m.actions[kv.first] = kv.second;
+    // surface unknown action ids (customs bound only in JSON)
+    bool known = false;
+    for (auto& L : m.logical)
+      if (L.id == kv.first) {
+        known = true;
+        break;
+      }
+    if (!known)
+      AppendCustomIfNew(m, kv.first, kv.second.set == "driving");
+  }
   auto pr = ExtractString(body, 0, "preset");
   if (!pr.empty()) m.preset = pr;
   m.dirty = false;
-  m.status = "LOADED " + m.filePath;
-  fprintf(stderr, "[cube_webui] bindings loaded %zu actions from %s\n",
-          m.actions.size(), m.filePath.c_str());
+  m.status = "SYNCED " + m.filePath;
+  fprintf(stderr, "[cube_webui] bindings loaded %zu actions from %s (logical=%zu)\n",
+          m.actions.size(), m.filePath.c_str(), m.logical.size());
   return true;
 }
 
@@ -289,11 +425,20 @@ void Bindings_RestoreAction(BindingsManager& m, const std::string& actionId) {
 
 void Bindings_Filtered(const BindingsManager& m, std::vector<int>& out) {
   out.clear();
-  const auto& list = Bindings_LogicalActions();
+  const auto& list = m.logical.empty() ? Bindings_LogicalActions() : m.logical;
   for (int i = 0; i < (int)list.size(); ++i) {
     const auto& g = list[i].group;
-    if (m.filter == 1 && g == "driving") continue;
-    if (m.filter == 2 && g == "main") continue;
+    // 0=all 1=foot (main+both, not pure custom/driving) 2=vehicle 3=custom
+    if (m.filter == 1) {
+      if (g == "driving" || g == "custom") continue;
+    } else if (m.filter == 2) {
+      if (g != "driving" && g != "both") continue;
+      if (g == "both") {
+        /* keep spawnmenu/pickup/reload */
+      }
+    } else if (m.filter == 3) {
+      if (g != "custom" && list[i].label.rfind("Custom:", 0) != 0) continue;
+    }
     out.push_back(i);
   }
 }
@@ -325,37 +470,86 @@ std::string Bindings_FormatRule(const BindRule& r) {
   return s;
 }
 
-void Bindings_CyclePrimarySource(BindingsManager& m, int filteredIdx, int dir) {
+static const BindActionInfo& LogicalAt(const BindingsManager& m, int logicalIdx) {
+  const auto& list = m.logical.empty() ? Bindings_LogicalActions() : m.logical;
+  return list[logicalIdx];
+}
+
+void Bindings_CycleSourceSlot(BindingsManager& m, int filteredIdx, int slot, int dir) {
   std::vector<int> idx;
   Bindings_Filtered(m, idx);
   if (filteredIdx < 0 || filteredIdx >= (int)idx.size()) return;
-  const auto& info = Bindings_LogicalActions()[idx[filteredIdx]];
+  const auto& info = LogicalAt(m, idx[filteredIdx]);
   BindRule& r = m.actions[info.id];
   if (r.set.empty()) {
     if (info.group == "main") r.set = "main";
     else if (info.group == "driving") r.set = "driving";
   }
   const auto& srcs = Bindings_AllSources();
+  while ((int)r.sources.size() <= slot) r.sources.push_back(srcs[0]);
   int cur = 0;
-  if (!r.sources.empty()) {
-    for (int i = 0; i < (int)srcs.size(); ++i)
-      if (srcs[i] == r.sources[0]) { cur = i; break; }
-  }
+  for (int i = 0; i < (int)srcs.size(); ++i)
+    if (srcs[i] == r.sources[slot]) { cur = i; break; }
   cur = (cur + dir + (int)srcs.size()) % (int)srcs.size();
-  if (r.sources.empty()) r.sources.push_back(srcs[cur]);
-  else r.sources[0] = srcs[cur];
-  if (r.mode.empty()) r.mode = "any";
+  r.sources[slot] = srcs[cur];
+  if (r.sources.size() >= 2) r.mode = "all"; // multi-source → chord by default
+  else if (r.mode.empty()) r.mode = "any";
   m.dirty = true;
   m.status = info.label + " → " + Bindings_FormatRule(r);
+}
+
+void Bindings_CyclePrimarySource(BindingsManager& m, int filteredIdx, int dir) {
+  Bindings_CycleSourceSlot(m, filteredIdx, m.editSlot, dir);
+}
+
+void Bindings_SetEditSlot(BindingsManager& m, int slot) {
+  m.editSlot = (slot <= 0) ? 0 : 1;
 }
 
 void Bindings_ToggleMode(BindingsManager& m, int filteredIdx) {
   std::vector<int> idx;
   Bindings_Filtered(m, idx);
   if (filteredIdx < 0 || filteredIdx >= (int)idx.size()) return;
-  const auto& info = Bindings_LogicalActions()[idx[filteredIdx]];
+  const auto& info = LogicalAt(m, idx[filteredIdx]);
   BindRule& r = m.actions[info.id];
   r.mode = (r.mode == "all") ? "any" : "all";
+  // Chord mode with 1 source: ensure second slot exists for editing
+  if (r.mode == "all" && r.sources.size() < 2) {
+    const auto& srcs = Bindings_AllSources();
+    r.sources.push_back(srcs.size() > 1 ? srcs[1] : srcs[0]);
+  }
   m.dirty = true;
-  m.status = std::string(info.label) + " mode=" + r.mode;
+  m.status = std::string(info.label) + " mode=" + r.mode +
+             (r.mode == "all" ? " (chord: hold both)" : "");
+}
+
+void Bindings_ToggleChordSlot(BindingsManager& m, int filteredIdx) {
+  std::vector<int> idx;
+  Bindings_Filtered(m, idx);
+  if (filteredIdx < 0 || filteredIdx >= (int)idx.size()) return;
+  const auto& info = LogicalAt(m, idx[filteredIdx]);
+  BindRule& r = m.actions[info.id];
+  if (r.sources.size() >= 2) {
+    r.sources.resize(1);
+    r.mode = "any";
+    m.editSlot = 0;
+    m.status = info.label + " single bind";
+  } else {
+    const auto& srcs = Bindings_AllSources();
+    r.sources.push_back(srcs.size() > 6 ? srcs[6] : srcs[0]);
+    r.mode = "all";
+    m.editSlot = 1;
+    m.status = info.label + " chord: set 2nd button";
+  }
+  m.dirty = true;
+}
+
+void Bindings_ClearAction(BindingsManager& m, int filteredIdx) {
+  std::vector<int> idx;
+  Bindings_Filtered(m, idx);
+  if (filteredIdx < 0 || filteredIdx >= (int)idx.size()) return;
+  const auto& info = LogicalAt(m, idx[filteredIdx]);
+  m.actions.erase(info.id);
+  m.dirty = true;
+  m.status = info.label + " unbound";
 }

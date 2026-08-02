@@ -24,10 +24,13 @@ struct BindingsManager {
   int version = 2;
   std::string preset = "quest3_touch";
   std::map<std::string, BindRule> actions; // action id → rule
-  int filter = 0;   // 0=all 1=main 2=driving
+  // Extended logical list = built-in + custom actions from file
+  std::vector<BindActionInfo> logical;
+  int filter = 0;   // 0=all 1=foot/main 2=vehicle/driving 3=custom
   int selected = 0; // index into filtered list
   int page = 0;
-  int pageSize = 8;
+  int pageSize = 7;
+  int editSlot = 0; // 0=primary source, 1=chord second source
   std::string status;
   bool dirty = false;
 };
@@ -49,7 +52,16 @@ void Bindings_Filtered(const BindingsManager& m, std::vector<int>& outLogicalInd
 int Bindings_PageCount(const BindingsManager& m);
 void Bindings_ClampPage(BindingsManager& m);
 
-// Cycle primary source (sources[0]) for action at filtered index.
+// Cycle source slot (0 = primary, 1 = chord second) for action at filtered index.
+void Bindings_CycleSourceSlot(BindingsManager& m, int filteredIdx, int slot, int dir);
+// Stick/trigger helper: cycle currently selected edit slot.
 void Bindings_CyclePrimarySource(BindingsManager& m, int filteredIdx, int dir);
 void Bindings_ToggleMode(BindingsManager& m, int filteredIdx);
+// Add/remove second source for chord (mode=all when 2+).
+void Bindings_ToggleChordSlot(BindingsManager& m, int filteredIdx);
+void Bindings_ClearAction(BindingsManager& m, int filteredIdx);
+void Bindings_SetEditSlot(BindingsManager& m, int slot);
 std::string Bindings_FormatRule(const BindRule& r);
+
+// Load custom actions from Lua JSON (vrmod_custom_actions.txt) + any extra keys in bindings JSON.
+void Bindings_LoadCustomActions(BindingsManager& m);

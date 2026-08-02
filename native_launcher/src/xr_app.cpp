@@ -157,11 +157,26 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
   }
 
+  // World-anchored UI: prefer STAGE (room-fixed), else LOCAL.
+  // VIEW is ONLY for head pose at seed / optional view_lock — never layer.space
+  // when world-locked (drawing in VIEW is what made the menu "follow HMD").
   XrReferenceSpaceCreateInfo rsci{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
-  rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
   rsci.poseInReferenceSpace = IdentityPose();
   XrSpace space = XR_NULL_HANDLE;
-  xrCreateReferenceSpace(session, &rsci, &space);
+  const char* spaceName = "LOCAL";
+  rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+  if (XR_SUCCEEDED(xrCreateReferenceSpace(session, &rsci, &space))) {
+    spaceName = "STAGE";
+  } else {
+    rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+    if (XR_FAILED(xrCreateReferenceSpace(session, &rsci, &space))) {
+      Die("xrCreateReferenceSpace failed");
+      return 4;
+    }
+    spaceName = "LOCAL";
+  }
+  fprintf(stderr, "[cube_webui] world space=%s (panel %s)\n", spaceName,
+          cfg.viewLock ? "VIEW_LOCK hud" : "WORLD-ANCHORED frozen");
   XrSpace viewSpace = XR_NULL_HANDLE;
   rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
   xrCreateReferenceSpace(session, &rsci, &viewSpace);
@@ -308,8 +323,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     XrInputSync(session, input);
 
-    // Head (seed only)
-    XrPosef headLocal = IdentityPose();
+    // Head pose in WORLD space (STAGE/LOCAL) — seed / MENU re-anchor / optional view_lock
+    XrPosef headWorld = IdentityPose();
     bool headOk = false;
     if (viewSpace) {
       XrSpaceLocation vloc{XR_TYPE_SPACE_LOCATION};
@@ -317,14 +332,22 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         const XrSpaceLocationFlags need =
             XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
         if ((vloc.locationFlags & need) == need) {
-          headLocal = vloc.pose;
+          headWorld = vloc.pose;
           headOk = true;
         }
       }
     }
-    if (worldInitPending && headOk) {
-      WorldPanelSeed(headLocal);
+    if (cfg.viewLock && headOk) {
+      // Explicit HUD mode only (view_lock=1). Product default is world-lock.
+      WorldPanelSeed(headWorld);
       worldInitPending = false;
+    } else if (worldInitPending && headOk) {
+      // Seed ONCE — pose freezes in STAGE/LOCAL; never tracks HMD after this.
+      WorldPanelSeed(headWorld);
+      worldInitPending = false;
+      WorldPanelState().usedStage = (strcmp(spaceName, "STAGE") == 0);
+      ui.status = "WORLD LOCK — grip move · menu re-place · not head-follow";
+      fprintf(stderr, "[cube_webui] WORLD LOCK engaged space=%s\n", spaceName);
     }
 
     auto& wp = WorldPanelState();
@@ -347,6 +370,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (!panelHit) aimD = dNeg;
     }
 
+    // Grab: translate center only — orientation stays frozen (no HMD reface)
     float grabVal = XrInputReadGrab(session, input);
     const bool grabHeld = grabVal >= cfg.grabThresh;
     if (grabHeld && aimValid && wp.ready) {
@@ -359,18 +383,19 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         if (canStart) {
           grabbing = true;
           grabOff = wp.c - aimO;
-          ui.status = "MOVING — release grip to place";
+          ui.status = "MOVING (orientation frozen)";
         }
       }
       if (grabbing) {
-        wp.c = aimO + grabOff;
+        wp.c = aimO + grabOff; // position only — right/up/normal unchanged
         panelHit = WorldPanelRayHit(aimO, aimD, &hitPx, &hitPy, &hitPt);
       }
     } else if (grabbing) {
       grabbing = false;
-      if (headOk) WorldPanelReface(headLocal);
-      ui.status = "PLACED (world)";
-      fprintf(stderr, "[cube_webui] panel placed LOCAL c=(%.2f,%.2f,%.2f)\n", wp.c.x, wp.c.y, wp.c.z);
+      // NO reface — panel stays oriented as at seed / last MENU re-place
+      ui.status = "PLACED (world-anchored)";
+      fprintf(stderr, "[cube_webui] panel place c=(%.3f,%.3f,%.3f) orient FROZEN\n",
+              wp.c.x, wp.c.y, wp.c.z);
     }
 
     if (aimValid && panelHit && !grabbing)
@@ -379,7 +404,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       WebUI_SetCursor(ui, 0, 0, false);
 
     if (ui.page == WebUIPage::Addons)
-      Addons_EnsureThumbsForPage(ui.addons);
+      Addons_PumpAsync(ui.addons);
 
     XrViewLocateInfo vli0{XR_TYPE_VIEW_LOCATE_INFO};
     vli0.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
@@ -394,9 +419,11 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     bool menuBtn = XrInputReadMenu(session, input);
     if (menuBtn && !prevMenu) {
       grabbing = false;
-      if (headOk) WorldPanelSeed(headLocal);
-      else worldInitPending = true;
-      ui.status = "PANEL RE-SEEDED";
+      // MENU = re-anchor in front of head (only intentional re-place)
+      if (headOk) {
+        WorldPanelSeed(headWorld);
+        ui.status = "PANEL RE-ANCHORED in front of you";
+      }
     }
     prevMenu = menuBtn;
 
@@ -412,11 +439,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     float sx = 0.f, sy = 0.f;
     if (XrInputReadStick(session, input, &sx, &sy)) {
-      if (grabbing && aimValid && headOk) {
+      if (grabbing && aimValid) {
+        // Nudge along frozen panel axes (not head) so room orientation holds
         const float spd = 0.015f;
-        Vec3 headR = Normalize(QuatRotate(headLocal.orientation, V3(1, 0, 0)));
-        Vec3 headF = Normalize(QuatRotate(headLocal.orientation, V3(0, 0, -1)));
-        wp.c = wp.c + headR * (sx * spd) + headF * (sy * spd);
+        wp.c = wp.c + wp.right * (sx * spd) + wp.up * (sy * spd);
         grabOff = wp.c - aimO;
       } else if (stickCooldown <= 0.f) {
         int isx = 0, isy = 0;

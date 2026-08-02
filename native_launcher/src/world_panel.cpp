@@ -1,6 +1,6 @@
 #include "world_panel.hpp"
 #include "panel_config.hpp"
-#include "ui_panel.hpp" // UI_W, UI_H
+#include "ui_panel.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -11,14 +11,8 @@ WorldPanel& WorldPanelState() { return g_wp; }
 
 void WorldPanelReset() { g_wp = WorldPanel{}; }
 
-void WorldPanelSeed(const XrPosef& headLocal) {
-  const auto& cfg = PanelCfgConst();
-  Vec3 headP = {headLocal.position.x, headLocal.position.y, headLocal.position.z};
-  Vec3 fwd = Normalize(QuatRotate(headLocal.orientation, V3(0, 0, -1)));
-  Vec3 headR = Normalize(QuatRotate(headLocal.orientation, V3(1, 0, 0)));
-  Vec3 headU = Normalize(QuatRotate(headLocal.orientation, V3(0, 1, 0)));
-  g_wp.c = headP + fwd * cfg.dist + headR * cfg.offsetX + headU * cfg.offsetY + fwd * cfg.offsetZ;
-  g_wp.normal = Normalize(headP - g_wp.c);
+static void BuildAxesFacing(Vec3 headP, Vec3 center, Vec3 headU) {
+  g_wp.normal = Normalize(headP - center);
   Vec3 worldUp = V3(0, 1, 0);
   g_wp.right = Cross(worldUp, g_wp.normal);
   if (Dot(g_wp.right, g_wp.right) < 1e-8f)
@@ -26,22 +20,35 @@ void WorldPanelSeed(const XrPosef& headLocal) {
   else
     g_wp.right = Normalize(g_wp.right);
   g_wp.up = Normalize(Cross(g_wp.normal, g_wp.right));
-  g_wp.ready = true;
-  fprintf(stderr, "[cube_webui] world panel seeded LOCAL c=(%.2f,%.2f,%.2f)\n",
-          g_wp.c.x, g_wp.c.y, g_wp.c.z);
 }
 
-void WorldPanelReface(const XrPosef& headLocal) {
+void WorldPanelSeed(const XrPosef& headInWorld) {
+  const auto& cfg = PanelCfgConst();
+  Vec3 headP = {headInWorld.position.x, headInWorld.position.y, headInWorld.position.z};
+  Vec3 fwd = Normalize(QuatRotate(headInWorld.orientation, V3(0, 0, -1)));
+  Vec3 headR = Normalize(QuatRotate(headInWorld.orientation, V3(1, 0, 0)));
+  Vec3 headU = Normalize(QuatRotate(headInWorld.orientation, V3(0, 1, 0)));
+  // Offset in head frame at seed only
+  g_wp.c = headP + fwd * (cfg.dist + cfg.offsetZ) + headR * cfg.offsetX + headU * cfg.offsetY;
+  BuildAxesFacing(headP, g_wp.c, headU);
+  g_wp.ready = true;
+  fprintf(stderr,
+          "[cube_webui] PANEL ANCHOR seed c=(%.3f,%.3f,%.3f) n=(%.2f,%.2f,%.2f) FROZEN\n",
+          g_wp.c.x, g_wp.c.y, g_wp.c.z, g_wp.normal.x, g_wp.normal.y, g_wp.normal.z);
+}
+
+void WorldPanelReface(const XrPosef& headInWorld) {
   if (!g_wp.ready) return;
-  Vec3 headP = {headLocal.position.x, headLocal.position.y, headLocal.position.z};
-  g_wp.normal = Normalize(headP - g_wp.c);
-  Vec3 worldUp = V3(0, 1, 0);
-  g_wp.right = Cross(worldUp, g_wp.normal);
-  if (Dot(g_wp.right, g_wp.right) < 1e-8f)
-    g_wp.right = V3(1, 0, 0);
-  else
-    g_wp.right = Normalize(g_wp.right);
-  g_wp.up = Normalize(Cross(g_wp.normal, g_wp.right));
+  Vec3 headP = {headInWorld.position.x, headInWorld.position.y, headInWorld.position.z};
+  Vec3 headU = Normalize(QuatRotate(headInWorld.orientation, V3(0, 1, 0)));
+  BuildAxesFacing(headP, g_wp.c, headU);
+  fprintf(stderr, "[cube_webui] PANEL REFACE (orientation only) n=(%.2f,%.2f,%.2f)\n",
+          g_wp.normal.x, g_wp.normal.y, g_wp.normal.z);
+}
+
+void WorldPanelTranslate(Vec3 delta) {
+  if (!g_wp.ready) return;
+  g_wp.c = g_wp.c + delta;
 }
 
 bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit) {

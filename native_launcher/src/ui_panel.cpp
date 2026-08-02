@@ -427,9 +427,33 @@ static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) 
 }
 
 void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
-  s = WebUIState{};
+  // In-place reset (AddonManager holds mutex — not assignable)
   s.gmodRoot = gmodRoot;
   s.page = WebUIPage::NewGame;
+  s.categories.clear();
+  s.catIndex = 0;
+  s.mapScroll = 0;
+  s.mapIndex = 0;
+  s.maxPlayersIdx = 0;
+  s.hostname = "gVRMod Cube";
+  s.svLan = true;
+  s.p2p = false;
+  s.p2pFriends = false;
+  s.gamemode = "sandbox";
+  s.focusCol = 0;
+  s.settingsRow = 0;
+  s.settingsScroll = 0;
+  s.gfx = GModGfxSettings{};
+  s.wantStart = false;
+  s.wantQuit = false;
+  s.handoff = false;
+  s.handoffMap.clear();
+  s.handoffPhase.clear();
+  s.handoffDetail.clear();
+  s.handoffElapsed = 0.f;
+  s.cursorVisible = false;
+  s.cursorX = 0;
+  s.cursorY = 0;
   s.categories = ScanGModMaps(gmodRoot);
   if (s.categories.empty()) {
     MapCategory c;
@@ -526,11 +550,11 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   }
 
   if (s.page == WebUIPage::Bindings) {
-    // Filters ALL / FOOT / VEHICLE
-    const char* filters[] = {"ALL", "FOOT", "VEHICLE"};
-    for (int f = 0; f < 3; ++f) {
-      int x0 = 16 + f * 100;
-      if (px >= x0 && px <= x0 + 92 && py >= 50 && py <= 74) {
+    // Filters ALL / FOOT / VEHICLE / CUSTOM
+    const char* filters[] = {"ALL", "FOOT", "VEHICLE", "CUSTOM"};
+    for (int f = 0; f < 4; ++f) {
+      int x0 = 16 + f * 88;
+      if (px >= x0 && px <= x0 + 82 && py >= 50 && py <= 74) {
         s.bindings.filter = f;
         s.bindings.page = 0;
         Bindings_ClampPage(s.bindings);
@@ -544,11 +568,11 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
       s.status = s.bindings.status;
       return true;
     }
-    // SAVE
+    // SAVE → same file Lua uses
     if (px >= UI_W - 320 && px <= UI_W - 210 && py >= 50 && py <= 74) {
       std::string err;
       if (!Bindings_Save(s.bindings, err)) s.status = err;
-      else s.status = "SAVED BINDINGS";
+      else s.status = "SAVED → vrmod_openxr_bindings.json (Lua sync)";
       return true;
     }
     // Prev/next
@@ -566,28 +590,56 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
     std::vector<int> idx;
     Bindings_Filtered(s.bindings, idx);
     int start = s.bindings.page * s.bindings.pageSize;
-    const int rowH = 48;
+    const int rowH = 52;
     for (int n = 0; n < s.bindings.pageSize; ++n) {
       int k = start + n;
       if (k >= (int)idx.size()) break;
       int y = 84 + n * rowH;
       if (py < y || py > y + rowH - 4) continue;
       s.bindings.selected = k;
-      // Right side buttons: MODE / DEF
-      if (px >= UI_W - 200 && px <= UI_W - 110) {
+      // Buttons: +CHD | ANY/ALL | DEF | CLR
+      if (px >= UI_W - 340 && px <= UI_W - 270) {
+        Bindings_ToggleChordSlot(s.bindings, k);
+        s.status = s.bindings.status;
+        return true;
+      }
+      if (px >= UI_W - 260 && px <= UI_W - 190) {
         Bindings_ToggleMode(s.bindings, k);
         s.status = s.bindings.status;
         return true;
       }
-      if (px >= UI_W - 100 && px <= UI_W - 16) {
-        const auto& info = Bindings_LogicalActions()[idx[k]];
+      if (px >= UI_W - 180 && px <= UI_W - 110) {
+        const auto& list = s.bindings.logical.empty() ? Bindings_LogicalActions() : s.bindings.logical;
+        const auto& info = list[idx[k]];
         Bindings_RestoreAction(s.bindings, info.id);
         s.status = s.bindings.status;
         return true;
       }
-      // Main row: cycle primary source (left half back, right half forward)
-      int dir = (px < UI_W / 2) ? -1 : 1;
-      Bindings_CyclePrimarySource(s.bindings, k, dir);
+      if (px >= UI_W - 100 && px <= UI_W - 16) {
+        Bindings_ClearAction(s.bindings, k);
+        s.status = s.bindings.status;
+        return true;
+      }
+      // Slot pick: left half of source line = slot0, right of mid = slot1 when chord
+      if (py >= y + 24 && py <= y + rowH - 6) {
+        if (px >= 120 && px < 320) {
+          Bindings_SetEditSlot(s.bindings, 0);
+          int dir = (px < 220) ? -1 : 1;
+          Bindings_CycleSourceSlot(s.bindings, k, 0, dir);
+          s.status = s.bindings.status;
+          return true;
+        }
+        if (px >= 320 && px < UI_W - 350) {
+          Bindings_SetEditSlot(s.bindings, 1);
+          // ensure chord slot exists
+          Bindings_CycleSourceSlot(s.bindings, k, 1, (px < 420) ? -1 : 1);
+          s.status = s.bindings.status;
+          return true;
+        }
+      }
+      // Label row: cycle active edit slot
+      int dir = (px < 400) ? -1 : 1;
+      Bindings_CycleSourceSlot(s.bindings, k, s.bindings.editSlot, dir);
       s.status = s.bindings.status;
       return true;
     }
@@ -920,12 +972,12 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
 
   if (s.page == WebUIPage::Bindings) {
     FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 28, 10, 16, 255);
-    const char* filters[] = {"ALL", "FOOT", "VEHICLE"};
-    for (int f = 0; f < 3; ++f) {
-      int x0 = 16 + f * 100;
+    const char* filters[] = {"ALL", "FOOT", "VEHICLE", "CUSTOM"};
+    for (int f = 0; f < 4; ++f) {
+      int x0 = 16 + f * 88;
       bool on = (s.bindings.filter == f);
-      FillRect(rgba, x0, 52, 92, 22, on ? 90 : 50, on ? 22 : 14, on ? 36 : 22, 255);
-      DrawText(rgba, x0 + 16, 56, filters[f], 255, 240, 244, 1);
+      FillRect(rgba, x0, 52, 82, 22, on ? 90 : 50, on ? 22 : 14, on ? 36 : 22, 255);
+      DrawText(rgba, x0 + 10, 56, filters[f], 255, 240, 244, 1);
     }
     FillRect(rgba, UI_W - 320, 52, 100, 22, 60, 20, 40, 255);
     DrawText(rgba, UI_W - 300, 56, "SAVE", 255, 240, 244, 1);
@@ -935,11 +987,12 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     std::vector<int> idx;
     Bindings_Filtered(s.bindings, idx);
     int start = s.bindings.page * s.bindings.pageSize;
-    const int rowH = 48;
+    const int rowH = 52;
     for (int n = 0; n < s.bindings.pageSize; ++n) {
       int k = start + n;
       if (k >= (int)idx.size()) break;
-      const auto& info = Bindings_LogicalActions()[idx[k]];
+      const auto& list = s.bindings.logical.empty() ? Bindings_LogicalActions() : s.bindings.logical;
+      const auto& info = list[idx[k]];
       BindRule rule{};
       auto it = s.bindings.actions.find(info.id);
       if (it != s.bindings.actions.end()) rule = it->second;
@@ -948,28 +1001,43 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 100 : 40, sel ? 24 : 12, sel ? 40 : 18, 255);
       char line[96];
       snprintf(line, sizeof(line), "%.22s", info.label.c_str());
-      DrawText(rgba, 20, y + 8, line, 255, 240, 244, 1);
-      std::string ruleTxt = Bindings_FormatRule(rule);
-      if (ruleTxt.size() > 40) ruleTxt = ruleTxt.substr(0, 37) + "...";
-      DrawText(rgba, 20, y + 26, ruleTxt.c_str(), 200, 150, 165, 1);
-      // set badge
+      DrawText(rgba, 20, y + 6, line, 255, 240, 244, 1);
+      // Dual source chips (chord = S1 + S2 with mode ALL)
+      std::string s0 = rule.sources.empty() ? "(empty)" : Bindings_SourceLabel(rule.sources[0]);
+      std::string s1 = rule.sources.size() >= 2 ? Bindings_SourceLabel(rule.sources[1]) : "—";
+      if (s0.size() > 14) s0 = s0.substr(0, 12) + "..";
+      if (s1.size() > 14) s1 = s1.substr(0, 12) + "..";
+      bool slot0 = (s.bindings.editSlot == 0 && sel);
+      bool slot1 = (s.bindings.editSlot == 1 && sel);
+      FillRect(rgba, 20, y + 26, 140, 18, slot0 ? 120 : 55, slot0 ? 30 : 16, slot0 ? 50 : 28, 255);
+      DrawText(rgba, 26, y + 28, s0.c_str(), 255, 240, 244, 1);
+      const char* joiner = (rule.mode == "all") ? "+" : "|";
+      DrawText(rgba, 164, y + 28, joiner, 200, 150, 165, 1);
+      FillRect(rgba, 180, y + 26, 140, 18, slot1 ? 120 : 55, slot1 ? 30 : 16, slot1 ? 50 : 28, 255);
+      DrawText(rgba, 186, y + 28, s1.c_str(), 255, 240, 244, 1);
       const char* setL = rule.set.empty() ? "BOTH" : (rule.set == "driving" ? "VEH" : "FOOT");
-      DrawText(rgba, UI_W - 280, y + 16, setL, 160, 180, 200, 1);
-      FillRect(rgba, UI_W - 200, y + 10, 80, 24, 70, 20, 40, 255);
-      DrawText(rgba, UI_W - 188, y + 16, rule.mode == "all" ? "CHORD" : "ANY", 255, 240, 244, 1);
-      FillRect(rgba, UI_W - 100, y + 10, 80, 24, 50, 30, 50, 255);
-      DrawText(rgba, UI_W - 80, y + 16, "DEF", 255, 240, 244, 1);
+      DrawText(rgba, UI_W - 400, y + 16, setL, 160, 180, 200, 1);
+      FillRect(rgba, UI_W - 340, y + 12, 64, 24, 60, 25, 45, 255);
+      DrawText(rgba, UI_W - 332, y + 18, "+CHD", 255, 240, 244, 1);
+      FillRect(rgba, UI_W - 260, y + 12, 64, 24, 70, 20, 40, 255);
+      DrawText(rgba, UI_W - 252, y + 18, rule.mode == "all" ? "ALL" : "ANY", 255, 240, 244, 1);
+      FillRect(rgba, UI_W - 180, y + 12, 64, 24, 50, 30, 50, 255);
+      DrawText(rgba, UI_W - 168, y + 18, "DEF", 255, 240, 244, 1);
+      FillRect(rgba, UI_W - 100, y + 12, 80, 24, 90, 20, 30, 255);
+      DrawText(rgba, UI_W - 84, y + 18, "CLR", 255, 240, 244, 1);
     }
     int pc = Bindings_PageCount(s.bindings);
-    char page[64];
-    snprintf(page, sizeof(page), "P%d/%d  %s%s", s.bindings.page + 1, std::max(1, pc),
-             s.bindings.dirty ? "* " : "", s.bindings.status.c_str());
+    char page[96];
+    snprintf(page, sizeof(page), "P%d/%d slot%d %s%s", s.bindings.page + 1, std::max(1, pc),
+             s.bindings.editSlot + 1, s.bindings.dirty ? "* " : "", s.bindings.status.c_str());
     FillRect(rgba, 16, UI_H - 48, 100, 32, 80, 20, 36, 255);
     DrawText(rgba, 36, UI_H - 38, "PREV", 255, 240, 244, 2);
     FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 80, 20, 36, 255);
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
     DrawText(rgba, 130, UI_H - 36, page, 200, 150, 165, 1);
-    DrawText(rgba, 130, UI_H - 20, "CLICK=CYCLE SOURCE  MODE=ANY/CHORD  DEF=DEFAULT", 160, 120, 130, 1);
+    DrawText(rgba, 130, UI_H - 20,
+             "S1/S2=CHORD  +CHD  ANY=OR ALL=AND  DEF  CLR  |  SYNC data/vrmod/vrmod_openxr_bindings.json",
+             160, 120, 130, 1);
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
@@ -1022,12 +1090,11 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
           }
         }
       } else {
-        // Placeholder color by kind
-        int pr = a.kind == "workshop" ? 60 : 40;
-        int pg = a.kind == "workshop" ? 40 : 70;
+        int pr = a.metaPending ? 90 : (a.kind == "workshop" ? 60 : 40);
+        int pg = a.metaPending ? 70 : (a.kind == "workshop" ? 40 : 70);
         int pb = 90;
         FillRect(rgba, tx, ty, 40, 40, pr, pg, pb, 255);
-        DrawText(rgba, tx + 8, ty + 14, a.kind == "workshop" ? "WS" : "L", 255, 255, 255, 1);
+        DrawText(rgba, tx + 4, ty + 14, a.metaPending ? "..." : (a.kind == "workshop" ? "WS" : "L"), 255, 255, 255, 1);
       }
       // ON/OFF badge
       if (a.enabled)

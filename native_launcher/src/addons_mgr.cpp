@@ -8,13 +8,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cstdlib>
+#include <cctype>
+#include <chrono>
+#include <unordered_map>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_JPEG
 #define STBI_ONLY_PNG
 #define STBI_NO_HDR
 #define STBI_NO_LINEAR
-#include "../third_party/stb_image.h"
+#include "stb_image.h"
 
 static bool IsDir(const std::string& p) {
   struct stat st{};
@@ -32,22 +35,39 @@ static std::string ReadFile(const std::string& path) {
   return ss.str();
 }
 static void MkDirP(const std::string& p) {
-  // one-level + parents via mkdir -p
   std::string cmd = "mkdir -p '" + p + "'";
   system(cmd.c_str());
 }
 
-static std::string ParseJsonTitle(const std::string& json) {
-  auto pos = json.find("\"title\"");
-  if (pos == std::string::npos) pos = json.find("\"Title\"");
+static std::string ParseJsonStringField(const std::string& json, const char* key) {
+  std::string pat = std::string("\"") + key + "\"";
+  auto pos = json.find(pat);
+  if (pos == std::string::npos) {
+    std::string k2 = key;
+    if (k2.size()) k2[0] = (char)std::toupper((unsigned char)k2[0]);
+    pat = "\"" + k2 + "\"";
+    pos = json.find(pat);
+  }
   if (pos == std::string::npos) return {};
   pos = json.find(':', pos);
   if (pos == std::string::npos) return {};
-  pos = json.find('"', pos);
-  if (pos == std::string::npos) return {};
-  auto end = json.find('"', pos + 1);
-  if (end == std::string::npos) return {};
-  return json.substr(pos + 1, end - pos - 1);
+  while (pos + 1 < json.size() && (json[pos + 1] == ' ' || json[pos + 1] == '\t')) ++pos;
+  if (pos + 1 >= json.size() || json[pos + 1] != '"') return {};
+  pos += 2;
+  std::string out;
+  for (size_t i = pos; i < json.size(); ++i) {
+    if (json[i] == '\\' && i + 1 < json.size()) {
+      char n = json[i + 1];
+      if (n == 'n') out.push_back(' ');
+      else if (n == '/' || n == '"' || n == '\\') out.push_back(n);
+      else out.push_back(n);
+      ++i;
+      continue;
+    }
+    if (json[i] == '"') break;
+    out.push_back(json[i]);
+  }
+  return out;
 }
 
 std::string FindWorkshopContent4000(const std::string& gmodRoot) {
@@ -126,7 +146,6 @@ static bool LoadThumbFile(const std::string& path, AddonEntry& a) {
     if (data) stbi_image_free(data);
     return false;
   }
-  // Downscale to 48x48 into entry
   const int tw = 48, th = 48;
   a.thumbW = tw;
   a.thumbH = th;
@@ -152,22 +171,17 @@ static bool FindLocalPreview(const std::string& dir, AddonEntry& a) {
   const char* names[] = {
     "addon.jpg", "addon.png", "preview.jpg", "preview.png",
     "thumb.jpg", "thumb.png", "icon.jpg", "icon.png",
-    "logo.jpg", "logo.png",
   };
-  for (auto n : names) {
+  for (auto n : names)
     if (LoadThumbFile(dir + "/" + n, a)) return true;
-  }
-  // shallow scan for first jpg/png
   if (DIR* d = opendir(dir.c_str())) {
     while (dirent* e = readdir(d)) {
       std::string n = e->d_name;
       if (n.size() < 5) continue;
       auto lower = n;
       for (char& c : lower) if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
-      if (lower.size() > 4 &&
-          (lower.compare(lower.size() - 4, 4, ".jpg") == 0 ||
-           lower.compare(lower.size() - 4, 4, ".png") == 0 ||
-           lower.compare(lower.size() - 5, 5, ".jpeg") == 0)) {
+      if (lower.find(".jpg") != std::string::npos || lower.find(".png") != std::string::npos ||
+          lower.find(".jpeg") != std::string::npos) {
         if (LoadThumbFile(dir + "/" + n, a)) {
           closedir(d);
           return true;
@@ -179,26 +193,29 @@ static bool FindLocalPreview(const std::string& dir, AddonEntry& a) {
   return false;
 }
 
-static bool FetchSteamPreview(const std::string& wsid, const std::string& cachePath) {
-  // Steam public API — no key required for GetPublishedFileDetails
-  std::string tmpJson = cachePath + ".json";
-  std::string cmd =
-      "curl -fsSL --max-time 4 -X POST "
-      "-d 'itemcount=1&publishedfileids[0]=" + wsid + "' "
-      "'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/' "
-      "-o '" + tmpJson + "' 2>/dev/null";
-  if (system(cmd.c_str()) != 0) return false;
-  std::string json = ReadFile(tmpJson);
-  unlink(tmpJson.c_str());
-  // "preview_url":"https://..."
-  auto pos = json.find("\"preview_url\"");
-  if (pos == std::string::npos) return false;
-  pos = json.find("http", pos);
-  if (pos == std::string::npos) return false;
-  auto end = json.find_first_of("\"", pos);
-  if (end == std::string::npos) return false;
-  std::string url = json.substr(pos, end - pos);
-  // unescape \/
+static bool LoadCachedTitle(const std::string& cacheDir, const std::string& id, std::string& title) {
+  std::string p = cacheDir + "/" + id + ".title";
+  title = ReadFile(p);
+  while (!title.empty() && (title.back() == '\n' || title.back() == '\r')) title.pop_back();
+  return !title.empty();
+}
+static void SaveCachedTitle(const std::string& cacheDir, const std::string& id, const std::string& title) {
+  std::ofstream f(cacheDir + "/" + id + ".title");
+  if (f) f << title;
+}
+
+struct SteamMeta {
+  std::string id;
+  std::string title;
+  std::string previewPath;
+  bool ok = false;
+};
+
+// Completed jobs buffer (worker → main). Keyed by cache path ownership via id only.
+static std::mutex g_doneMu;
+static std::vector<SteamMeta> g_doneJobs;
+
+static std::string UnescapeUrl(const std::string& url) {
   std::string clean;
   for (size_t i = 0; i < url.size(); ++i) {
     if (url[i] == '\\' && i + 1 < url.size() && url[i + 1] == '/') {
@@ -206,15 +223,133 @@ static bool FetchSteamPreview(const std::string& wsid, const std::string& cacheP
       ++i;
     } else clean.push_back(url[i]);
   }
-  std::string dl =
-      "curl -fsSL --max-time 6 -o '" + cachePath + "' '" + clean + "' 2>/dev/null";
-  return system(dl.c_str()) == 0 && IsFile(cachePath);
+  return clean;
+}
+
+static SteamMeta FetchSteamMetaSync(const std::string& cacheDir, const std::string& wsid) {
+  SteamMeta m;
+  m.id = wsid;
+  std::string tmpJson = cacheDir + "/" + wsid + ".json";
+  std::string imgPath = cacheDir + "/" + wsid + ".jpg";
+
+  LoadCachedTitle(cacheDir, wsid, m.title);
+  if (IsFile(imgPath)) m.previewPath = imgPath;
+  if (!m.title.empty() && !m.previewPath.empty()) {
+    m.ok = true;
+    return m;
+  }
+
+  // Steam published file details (title + preview_url)
+  std::string cmd =
+      "curl -fsSL --max-time 8 -X POST "
+      "-d 'itemcount=1&publishedfileids[0]=" + wsid + "' "
+      "'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/' "
+      "-o '" + tmpJson + "' 2>/dev/null";
+  int rc = system(cmd.c_str());
+  if (rc != 0) {
+    m.ok = !m.title.empty() || !m.previewPath.empty();
+    return m;
+  }
+  std::string json = ReadFile(tmpJson);
+  unlink(tmpJson.c_str());
+
+  // Prefer title inside publishedfiledetails block when present
+  std::string title = ParseJsonStringField(json, "title");
+  if (!title.empty() && title != "0") {
+    m.title = title;
+    SaveCachedTitle(cacheDir, wsid, title);
+  }
+  std::string url = ParseJsonStringField(json, "preview_url");
+  if (url.empty()) url = ParseJsonStringField(json, "file_url");
+  url = UnescapeUrl(url);
+  if (!url.empty() && m.previewPath.empty()) {
+    std::string dl =
+        "curl -fsSL --max-time 10 -o '" + imgPath + "' '" + url + "' 2>/dev/null";
+    if (system(dl.c_str()) == 0 && IsFile(imgPath) && IsFile(imgPath)) {
+      struct stat st{};
+      if (stat(imgPath.c_str(), &st) == 0 && st.st_size > 64)
+        m.previewPath = imgPath;
+      else
+        unlink(imgPath.c_str());
+    }
+  }
+  m.ok = !m.title.empty() || !m.previewPath.empty();
+  return m;
+}
+
+static void WorkerLoop(AddonManager* m) {
+  while (!m->stopWorkers.load()) {
+    std::string id;
+    {
+      std::unique_lock<std::mutex> lk(m->jobMu);
+      m->jobCv.wait_for(lk, std::chrono::milliseconds(50), [&] {
+        return m->stopWorkers.load() || !m->pendingIds.empty();
+      });
+      if (m->stopWorkers.load()) break;
+      if (m->pendingIds.empty()) continue;
+      id = m->pendingIds.front();
+      m->pendingIds.pop_front();
+      m->inFlight.insert(id);
+    }
+    SteamMeta meta = FetchSteamMetaSync(m->thumbCache, id);
+    {
+      std::lock_guard<std::mutex> lk(m->jobMu);
+      m->inFlight.erase(id);
+    }
+    {
+      std::lock_guard<std::mutex> lk(g_doneMu);
+      g_doneJobs.push_back(std::move(meta));
+    }
+  }
+}
+
+static void EnsureWorkers(AddonManager& m) {
+  if (m.stopWorkers.load()) return;
+  while ((int)m.workers.size() < m.maxWorkers) {
+    m.workers.emplace_back(WorkerLoop, &m);
+  }
+}
+
+void Addons_Shutdown(AddonManager& m) {
+  m.stopWorkers.store(true);
+  m.jobCv.notify_all();
+  for (auto& t : m.workers) {
+    if (t.joinable()) t.join();
+  }
+  m.workers.clear();
+  {
+    std::lock_guard<std::mutex> lk(m.jobMu);
+    m.pendingIds.clear();
+    m.inFlight.clear();
+  }
 }
 
 void Addons_Load(AddonManager& m, const std::string& gmodRoot) {
-  m = AddonManager{};
+  Addons_Shutdown(m);
+  // Clear any leftover done jobs from previous session
+  {
+    std::lock_guard<std::mutex> lk(g_doneMu);
+    g_doneJobs.clear();
+  }
+  // Reset fields in-place (mutex/cv/atomic are non-assignable)
   m.gmodRoot = gmodRoot;
+  m.workshopRoot.clear();
+  m.thumbCache.clear();
+  m.addons.clear();
+  m.nomount.clear();
+  m.selected = 0;
+  m.page = 0;
+  m.pageSize = 8;
+  m.filter = 0;
+  m.status.clear();
+  m.doneThisSession = 0;
+  {
+    std::lock_guard<std::mutex> lk(m.jobMu);
+    m.pendingIds.clear();
+    m.inFlight.clear();
+  }
   m.workshopRoot = FindWorkshopContent4000(gmodRoot);
+  m.stopWorkers.store(false);
   if (const char* home = getenv("HOME")) {
     m.thumbCache = std::string(home) + "/.cache/gvrmod/thumbs";
     MkDirP(m.thumbCache);
@@ -224,7 +359,7 @@ void Addons_Load(AddonManager& m, const std::string& gmodRoot) {
   }
   ParseNomount(gmodRoot + "/garrysmod/cfg/addonnomount.txt", m.nomount);
 
-  // Local addons
+  // Local
   std::string localDir = gmodRoot + "/garrysmod/addons";
   if (DIR* d = opendir(localDir.c_str())) {
     while (dirent* e = readdir(d)) {
@@ -239,15 +374,17 @@ void Addons_Load(AddonManager& m, const std::string& gmodRoot) {
       a.enabled = !disabledFolder;
       a.dirPath = full;
       std::string title = disabledFolder ? name.substr(0, name.size() - 9) : name;
-      std::string t = ParseJsonTitle(ReadFile(full + "/addon.json"));
+      std::string t = ParseJsonStringField(ReadFile(full + "/addon.json"), "title");
       if (!t.empty()) title = t;
       a.title = title;
+      FindLocalPreview(full, a);
       m.addons.push_back(std::move(a));
     }
     closedir(d);
   }
 
-  // Workshop folders (all of them — pagination handles display)
+  // Workshop (often only .bin — titles from disk cache then Steam async)
+  int needMeta = 0;
   if (!m.workshopRoot.empty()) {
     if (DIR* d = opendir(m.workshopRoot.c_str())) {
       while (dirent* e = readdir(d)) {
@@ -264,27 +401,38 @@ void Addons_Load(AddonManager& m, const std::string& gmodRoot) {
         a.id = id;
         a.enabled = m.nomount.count(id) == 0;
         a.dirPath = full;
-        std::string title = id;
         std::string aj = ReadFile(full + "/addon.json");
-        if (aj.empty()) {
-          // one-level search
+        std::string t = ParseJsonStringField(aj, "title");
+        if (t.empty()) {
           if (DIR* sub = opendir(full.c_str())) {
             while (dirent* se = readdir(sub)) {
-              if (se->d_type == DT_DIR && se->d_name[0] != '.') {
-                std::string subp = full + "/" + se->d_name + "/addon.json";
-                if (IsFile(subp)) {
-                  aj = ReadFile(subp);
-                  a.dirPath = full + "/" + se->d_name;
-                  break;
-                }
+              if (se->d_name[0] == '.') continue;
+              std::string subp = full + "/" + se->d_name + "/addon.json";
+              if (IsFile(subp)) {
+                t = ParseJsonStringField(ReadFile(subp), "title");
+                if (!t.empty()) a.dirPath = full + "/" + se->d_name;
+                break;
               }
             }
             closedir(sub);
           }
         }
-        std::string t = ParseJsonTitle(aj);
-        if (!t.empty()) title = t;
-        a.title = title;
+        if (t.empty()) LoadCachedTitle(m.thumbCache, id, t);
+        a.title = t.empty() ? ("Workshop " + id) : t;
+        if (!FindLocalPreview(a.dirPath, a)) {
+          std::string img = m.thumbCache + "/" + id + ".jpg";
+          if (!LoadThumbFile(img, a)) {
+            std::string png = m.thumbCache + "/" + id + ".png";
+            LoadThumbFile(png, a);
+          }
+        }
+        // Need Steam if title is still placeholder OR no thumb
+        bool titleOk = !t.empty();
+        bool thumbOk = a.thumbW > 0;
+        if (!titleOk || !thumbOk) {
+          a.metaPending = true;
+          ++needMeta;
+        }
         m.addons.push_back(std::move(a));
       }
       closedir(d);
@@ -297,13 +445,14 @@ void Addons_Load(AddonManager& m, const std::string& gmodRoot) {
   });
   m.selected = 0;
   m.page = 0;
-  char st[160];
-  snprintf(st, sizeof(st), "ADDONS %zu · ON %d · OFF %d · page 1/%d",
-           m.addons.size(), Addons_EnabledCount(m), Addons_DisabledCount(m),
-           std::max(1, Addons_PageCount(m)));
+  char st[200];
+  snprintf(st, sizeof(st), "ADDONS %zu · ON %d · OFF %d · meta %d",
+           m.addons.size(), Addons_EnabledCount(m), Addons_DisabledCount(m), needMeta);
   m.status = st;
-  fprintf(stderr, "[cube_webui] addons loaded: %zu (workshop root %s)\n",
-          m.addons.size(), m.workshopRoot.empty() ? "(none)" : m.workshopRoot.c_str());
+  fprintf(stderr, "[cube_webui] addons loaded: %zu (ws=%s cache=%s need_meta=%d)\n",
+          m.addons.size(), m.workshopRoot.empty() ? "none" : m.workshopRoot.c_str(),
+          m.thumbCache.c_str(), needMeta);
+  EnsureWorkers(m);
 }
 
 void Addons_FilteredIndices(const AddonManager& m, std::vector<int>& out) {
@@ -348,7 +497,6 @@ bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err) {
   }
   m.selected = absIndex;
   AddonEntry& a = m.addons[absIndex];
-
   if (a.kind == "workshop") {
     if (a.enabled) {
       m.nomount.insert(a.id);
@@ -361,7 +509,6 @@ bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err) {
     m.status = (a.enabled ? "ENABLED " : "DISABLED ") + a.title;
     return true;
   }
-
   if (a.id.rfind("local:", 0) != 0) {
     err = "bad local id";
     return false;
@@ -372,7 +519,7 @@ bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err) {
     std::string from = base + folder;
     std::string to = base + folder + ".disabled";
     if (rename(from.c_str(), to.c_str()) != 0) {
-      err = "rename failed (disable local)";
+      err = "rename failed (disable)";
       return false;
     }
     a.enabled = false;
@@ -385,7 +532,7 @@ bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err) {
       bare = bare.substr(0, bare.size() - 9);
     std::string to = base + bare;
     if (rename(from.c_str(), to.c_str()) != 0) {
-      err = "rename failed (enable local)";
+      err = "rename failed (enable)";
       return false;
     }
     a.enabled = true;
@@ -397,55 +544,96 @@ bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err) {
 }
 
 bool Addons_ToggleSelected(AddonManager& m, std::string& err) {
-  std::vector<int> idx;
-  Addons_FilteredIndices(m, idx);
-  if (idx.empty()) {
-    err = "no addons";
-    return false;
-  }
-  // selected is absolute index; if out of filter, use first on page
-  int abs = m.selected;
-  bool ok = false;
-  for (int i : idx) if (i == abs) { ok = true; break; }
-  if (!ok) abs = idx[0];
-  return Addons_ToggleIndex(m, abs, err);
+  return Addons_ToggleIndex(m, m.selected, err);
 }
 
-void Addons_EnsureThumbsForPage(AddonManager& m) {
+void Addons_PumpAsync(AddonManager& m) {
   if (m.addons.empty()) return;
+  EnsureWorkers(m);
   Addons_ClampPage(m);
+
+  // Apply finished jobs (UI thread only — never block on curl)
+  std::vector<SteamMeta> done;
+  {
+    std::lock_guard<std::mutex> lk(g_doneMu);
+    done.swap(g_doneJobs);
+  }
+  for (auto& meta : done) {
+    for (auto& a : m.addons) {
+      if (a.kind != "workshop" || a.id != meta.id) continue;
+      a.metaQueued = false;
+      if (!meta.title.empty() &&
+          (a.title.empty() || a.title.rfind("Workshop ", 0) == 0))
+        a.title = meta.title;
+      if (!meta.previewPath.empty() && a.thumbW == 0)
+        LoadThumbFile(meta.previewPath, a);
+      bool titleOk = !a.title.empty() && a.title.rfind("Workshop ", 0) != 0;
+      bool thumbOk = a.thumbW > 0;
+      if (titleOk && thumbOk) {
+        a.metaPending = false;
+        a.metaFailed = false;
+      } else if (!meta.ok) {
+        a.metaPending = false;
+        a.metaFailed = true; // don't thrash
+      } else {
+        // partial — mark done enough for UI
+        a.metaPending = false;
+        a.metaFailed = !titleOk && !thumbOk;
+      }
+      ++m.doneThisSession;
+      break;
+    }
+  }
+
+  // Queue missing meta for current page + next page (prefetch)
   std::vector<int> idx;
   Addons_FilteredIndices(m, idx);
   int start = m.page * m.pageSize;
-  int end = std::min((int)idx.size(), start + m.pageSize);
-
-  // One network fetch per call max (avoid hitch storms)
-  static int s_fetchCooldown = 0;
-  if (s_fetchCooldown > 0) --s_fetchCooldown;
-
-  for (int n = start; n < end; ++n) {
-    int ai = idx[n];
-    AddonEntry& a = m.addons[ai];
-    if (a.thumbW > 0) continue;
-
-    // 1) local preview in addon dir
-    if (FindLocalPreview(a.dirPath, a)) continue;
-
-    // 2) cached steam thumb
-    if (a.kind == "workshop" && !m.thumbCache.empty()) {
-      std::string cache = m.thumbCache + "/" + a.id + ".jpg";
-      if (LoadThumbFile(cache, a)) continue;
-      std::string cachePng = m.thumbCache + "/" + a.id + ".png";
-      if (LoadThumbFile(cachePng, a)) continue;
-
-      // 3) fetch one per call
-      if (s_fetchCooldown == 0) {
-        if (FetchSteamPreview(a.id, cache)) {
-          LoadThumbFile(cache, a);
-        }
-        s_fetchCooldown = 8; // ~8 frames between fetches when called per frame
-        break;
+  int end = std::min((int)idx.size(), start + m.pageSize * 2);
+  int queued = 0;
+  {
+    std::lock_guard<std::mutex> lk(m.jobMu);
+    for (int n = start; n < end; ++n) {
+      auto& a = m.addons[idx[n]];
+      if (a.kind != "workshop") continue;
+      if (a.metaFailed) continue;
+      bool titleOk = !a.title.empty() && a.title.rfind("Workshop ", 0) != 0;
+      bool thumbOk = a.thumbW > 0;
+      if (titleOk && thumbOk) {
+        a.metaPending = false;
+        continue;
       }
+      if (a.metaQueued || m.inFlight.count(a.id)) {
+        a.metaPending = true;
+        continue;
+      }
+      // already in pending queue?
+      bool q = false;
+      for (auto& p : m.pendingIds) if (p == a.id) { q = true; break; }
+      if (!q) {
+        m.pendingIds.push_back(a.id);
+        a.metaQueued = true;
+        a.metaPending = true;
+        ++queued;
+      }
+    }
+  }
+  if (queued) m.jobCv.notify_all();
+
+  // Status line (not every frame spam)
+  static int frame = 0;
+  if ((++frame % 30) == 0) {
+    int pending = 0, inflight = 0;
+    {
+      std::lock_guard<std::mutex> lk(m.jobMu);
+      pending = (int)m.pendingIds.size();
+      inflight = (int)m.inFlight.size();
+    }
+    if (pending + inflight > 0) {
+      char st[128];
+      snprintf(st, sizeof(st), "icons/titles: %d queue · %d active · %d done",
+               pending, inflight, m.doneThisSession);
+      m.status = st;
     }
   }
 }

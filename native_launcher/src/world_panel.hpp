@@ -2,23 +2,28 @@
 #include "math3d.hpp"
 #include <openxr/openxr.h>
 
-// World-locked floating panel in LOCAL space (frozen orientation after seed/place).
+// Anchored panel in a fixed reference space (STAGE preferred, else LOCAL).
+// Orientation freezes at seed/re-seed — never tracks HMD after that.
 struct WorldPanel {
   Vec3 c{0, 0, -1.05f};
   Vec3 right{1, 0, 0};
   Vec3 up{0, 1, 0};
   Vec3 normal{0, 0, 1};
   bool ready = false;
+  // Debug: true if last seed used STAGE
+  bool usedStage = false;
 };
 
 WorldPanel& WorldPanelState();
 void WorldPanelReset();
 
-// Place panel in front of head; orientation freezes until re-seed or grab-release reface.
-void WorldPanelSeed(const XrPosef& headLocal);
+// Place once in front of head; pose freezes in world space after this call.
+void WorldPanelSeed(const XrPosef& headInWorld);
 
-// After grab: re-face head once (still world-fixed position).
-void WorldPanelReface(const XrPosef& headLocal);
+// Optional: re-orient to face head without moving center (MENU only — never per-frame).
+void WorldPanelReface(const XrPosef& headInWorld);
 
-// Ray vs panel plane in LOCAL → UI pixels (UI_W x UI_H).
+// Translate center only (grab). Orientation stays frozen.
+void WorldPanelTranslate(Vec3 delta);
+
 bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit);
