@@ -101,8 +101,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v27: GetBackend() for dual-addon OpenVR/OpenXR auto-detect
-    LUA->PushNumber(27);
+    // v28: soft VR pause (keep OpenXR instance) so vrmod_start works without map reload
+    LUA->PushNumber(28);
     return 1;
 }
 
@@ -118,34 +118,36 @@ LUA_FUNCTION(IsHMDPresent) {
 }
 
 LUA_FUNCTION(Init) {
-    // Already fully live — no-op (Lua re-runs ShareTexture / actions after start).
+    // Already fully live — no-op (Lua re-runs ShareTexture after start).
     if (g_xrInitialized && !g_IsPaused) {
-        VRMOD_LOG_INFO("Init: already initialized (no-op)");
+        VRMOD_LOG_INFO("Init: already running (no-op)");
         return 0;
     }
 
-    // Stale pause / half-shutdown: force full teardown so restart is clean.
-    // (Old "resume from paused" path left swapchains/actions dead — restart broken.)
-    if (g_xrInitialized || g_IsPaused) {
-        VRMOD_LOG_INFO("Init: cleaning previous session before re-init");
-        XR_SetSubmitEnabled(false);
-        if (g_xrSwapchainsCreated) {
-            XR_DestroySwapchains();
-            g_xrSwapchainsCreated = false;
-        }
-        XR_ResetInputState();
-        XR_Shutdown();
-        g_xrInitialized = false;
+    // Soft-resume: instance/session/actions kept across vrmod_exit → vrmod_start.
+    // Only swapchains + submit were dropped on pause — do NOT kill OpenXR here.
+    if (g_xrInitialized && g_IsPaused) {
         g_IsPaused = false;
-        g_actionCount = 0;
-        g_actionSetCount = 0;
-        g_activeActionSetCount = 0;
-        memset(g_actions, 0, sizeof(g_actions));
-        memset(g_actionSets, 0, sizeof(g_actionSets));
-        memset(g_activeActionSets, 0, sizeof(g_activeActionSets));
-        for (int i = 0; i < LuaRefIndex_Max; i++)
-            g_luaRefs[i] = 0;
-        g_luaRefCount = 0;
+        XR_SetSubmitEnabled(true);
+        g_xrEyePosesValid = false;
+        // Recreate pose/action lua tables if freed on pause
+        if (g_luaRefCount < LuaRefIndex_Max || g_luaRefs[0] == 0) {
+            for (int i = 0; i < g_luaRefCount; i++) {
+                if (g_luaRefs[i] != 0) {
+                    LUA->ReferenceFree(g_luaRefs[i]);
+                    g_luaRefs[i] = 0;
+                }
+            }
+            g_luaRefCount = 0;
+            for (int i = 0; i < LuaRefIndex_Max; i++) {
+                LUA->CreateTable();
+                g_luaRefs[i] = LUA->ReferenceCreate();
+                g_luaRefCount++;
+            }
+        }
+        XR_PollEvents();
+        VRMOD_LOG_INFO("Init: resumed soft-paused OpenXR session (swapchains on next Share/Render)");
+        return 0;
     }
 
     char errMsg[MAX_STR_LEN];
@@ -229,6 +231,17 @@ LUA_FUNCTION(SetActionManifest) {
         LUA->ThrowError("VRMOD: getcwd failed");
     if (snprintf(path, PATH_MAX, "%s/garrysmod/data/%s", currentDir, fileName) >= PATH_MAX)
         LUA->ThrowError("VRMOD: SetActionManifest path too long");
+
+    // Soft-restart: actions already live on this OpenXR instance — re-attach only.
+    if (g_actionCount > 0 && g_xrInitialized) {
+        XR_SetActionCache(g_actions, g_actionCount);
+        if (!XR_AttachActionSets()) {
+            VRMOD_LOG_INFO("SetActionManifest: actions kept; attach deferred until session ready");
+        } else {
+            VRMOD_LOG_INFO("SetActionManifest: reused %d actions after soft-pause", g_actionCount);
+        }
+        return 0;
+    }
 
     int result = XR_ParseActionManifest(path, g_actions, MAX_ACTIONS);
     if (result == -1)
@@ -915,17 +928,23 @@ LUA_FUNCTION(SubmitSharedTexture) {
 }
 
 LUA_FUNCTION(Shutdown) {
-    // Idempotent: safe to call when already stopped (restart path).
-    if (!g_xrInitialized && !g_IsPaused) {
+    // Soft pause only — keep OpenXR instance, session, and actions so the player
+    // can vrmod_start again without map/module reload. Full teardown is GMOD_MODULE_CLOSE.
+    if (!g_xrInitialized) {
+        XR_SetSubmitEnabled(false);
+        g_IsPaused = true;
+        return 0;
+    }
+    if (g_IsPaused) {
         XR_SetSubmitEnabled(false);
         return 0;
     }
 
-    // 1) Gate submit / WaitFrame first — no more stereo pipeline.
+    // 1) Gate submit / WaitFrame — no more stereo pipeline.
     XR_SetSubmitEnabled(false);
     g_IsPaused = true;
 
-    // 2) Soft GPU drain only if a context is current. Never glFinish (mat workers die).
+    // 2) Soft GPU drain only if a context is current. Never glFinish.
 #ifdef _WIN32
 #else
     if (glXGetCurrentContext()) {
@@ -933,39 +952,14 @@ LUA_FUNCTION(Shutdown) {
     }
 #endif
 
-    // Free Lua references
-    for (int i = 0; i < g_luaRefCount; i++) {
-        if (g_luaRefs[i] != 0) {
-            LUA->ReferenceFree(g_luaRefs[i]);
-            g_luaRefs[i] = 0;
-        }
-    }
-    for (int i = 0; i < g_actionCount; i++) {
-        for (int j = 0; j < 2; j++) {
-            if (g_actions[i].luaRefs[j] != 0) {
-                LUA->ReferenceFree(g_actions[i].luaRefs[j]);
-                g_actions[i].luaRefs[j] = 0;
-            }
-        }
-    }
-    g_luaRefCount = 0;
-    g_actionCount = 0;
-    memset(g_actions, 0, sizeof(g_actions));
-    g_actionSetCount = 0;
-    g_activeActionSetCount = 0;
-    memset(g_actionSets, 0, sizeof(g_actionSets));
-    memset(g_activeActionSets, 0, sizeof(g_activeActionSets));
-
-    // 3) Tear down swapchains then full OpenXR (session + instance).
-    //    Pause-only was broken: next Init "resumed" with no swapchains/actions.
+    // 3) Drop swapchains (recreated after ShareTexture on next start).
+    //    Keep session + instance + action handles.
     if (g_xrSwapchainsCreated) {
         XR_DestroySwapchains();
         g_xrSwapchainsCreated = false;
     }
-    XR_ResetInputState();
-    XR_Shutdown();
 
-    // 4) Drop texture IDs — never glDelete engine RTs (mat_queue 2 / engine owns them).
+    // 4) Drop engine RT IDs only — never glDelete them (engine / mat_queue 2 owns them).
 #ifndef _WIN32
     g_sharedTexture = 0;
     g_leftEyeTexture = 0;
@@ -980,11 +974,9 @@ LUA_FUNCTION(Shutdown) {
     VRMOD_MarkSharedTextureEngineOwned();
 #endif
 
-    g_xrInitialized = false;
-    g_IsPaused = false;
     g_xrEyePosesValid = false;
-
-    VRMOD_LOG_INFO("VR shutdown complete (full teardown — restart OK).");
+    // g_xrInitialized stays true — OpenXR stays warm for restart.
+    VRMOD_LOG_INFO("VR soft-paused (OpenXR kept; swapchains dropped — vrmod_start without reload)");
     return 0;
 }
 
@@ -1086,23 +1078,18 @@ GMOD_MODULE_OPEN() {
 GMOD_MODULE_CLOSE() {
     VRMOD_LOG_INFO("Module closing.");
 
-    // Full shutdown if not paused
-    if (g_xrInitialized && !g_IsPaused) {
-        if (g_xrSwapchainsCreated) {
-            XR_DestroySwapchains();
-            g_xrSwapchainsCreated = false;
-        }
-        XR_Shutdown();
-        g_xrInitialized = false;
-    } else if (g_xrInitialized) {
-        // Was paused, do full shutdown now
-        if (g_xrSwapchainsCreated) {
-            XR_DestroySwapchains();
-            g_xrSwapchainsCreated = false;
-        }
+    // Real unload only — destroy OpenXR instance/loader (not a soft VR pause).
+    XR_SetSubmitEnabled(false);
+    if (g_xrSwapchainsCreated) {
+        XR_DestroySwapchains();
+        g_xrSwapchainsCreated = false;
+    }
+    if (g_xrInitialized) {
+        XR_ResetInputState();
         XR_Shutdown();
         g_xrInitialized = false;
     }
+    g_IsPaused = false;
 
     VRMOD_LOG_CLOSE();
     return 0;
