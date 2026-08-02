@@ -102,22 +102,21 @@ bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
   g_wp.heightM = cfg.halfH * 2.f;
 
   Vec3 headP = {headInWorld.position.x, headInWorld.position.y, headInWorld.position.z};
-  // Horizontal look direction only (room place, not head pitch)
+  // Place dead ahead at eye height: horizontal yaw only so panel is room-upright and centered
   Vec3 fwd = QuatRotate(headInWorld.orientation, V3(0, 0, -1));
   fwd.y = 0.f;
   if (Dot(fwd, fwd) < 1e-8f) fwd = V3(0, 0, -1);
   fwd = Normalize(fwd);
 
-  Vec3 center = headP + fwd * (cfg.dist + cfg.offsetZ) + V3(0, 1, 0) * cfg.offsetY;
-  // lateral offset along yaw-right
-  Vec3 right = Normalize(Cross(V3(0, 1, 0), fwd * -1.f));
-  if (Dot(right, right) > 1e-8f) center = center + right * cfg.offsetX;
+  // Center: same height as HMD, distance along look yaw (no lateral unless conf)
+  Vec3 center = headP + fwd * (cfg.dist + cfg.offsetZ);
+  center.y = headP.y + cfg.offsetY; // eye height
+  Vec3 yawRight = Normalize(Cross(V3(0, 1, 0), fwd * -1.f));
+  if (Dot(yawRight, yawRight) > 1e-8f) center = center + yawRight * cfg.offsetX;
 
-  // Panel faces user: normal from panel toward head ≈ -fwd
-  Vec3 normalTowardUser = fwd * -1.f; // if fwd is where head looks, panel is along fwd, faces back at head with normal -fwd? 
-  // head looks along fwd; panel sits at head+fwd*dist; surface faces head so normal = -fwd (from panel to head is -fwd? 
-  // from panel center to head = headP - center ≈ -fwd*dist, so normal toward user = Normalize(headP-center) = -fwd
-  normalTowardUser = Normalize(headP - center);
+  // Face the user
+  Vec3 normalTowardUser = Normalize(headP - center);
+  if (Dot(normalTowardUser, normalTowardUser) < 1e-8f) normalTowardUser = fwd * -1.f;
 
   g_wp.pose = WorldPanelMakePose(center, normalTowardUser);
   WorldPanelSyncAxes();

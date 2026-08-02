@@ -418,15 +418,13 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (XrInputLocateAim(session, input, space, fs.predictedDisplayTime, &aimPose)) {
       aimO = {aimPose.position.x, aimPose.position.y, aimPose.position.z};
       aimValid = true;
-      Vec3 dNeg = Normalize(QuatRotate(aimPose.orientation, V3(0, 0, -1)));
-      Vec3 dPos = Normalize(QuatRotate(aimPose.orientation, V3(0, 0, 1)));
-      aimD = dNeg;
-      panelHit = WorldPanelRayHit(aimO, dNeg, &hitPx, &hitPy, &hitPt);
-      if (!panelHit) {
-        aimD = dPos;
-        panelHit = WorldPanelRayHit(aimO, dPos, &hitPx, &hitPy, &hitPt);
-      }
-      if (!panelHit) aimD = dNeg;
+      // OpenXR aim: -Z is forward (pointer direction)
+      aimD = Normalize(QuatRotate(aimPose.orientation, V3(0, 0, -1)));
+      panelHit = WorldPanelRayHit(aimO, aimD, &hitPx, &hitPy, &hitPt);
+      static int aimLog = 0;
+      if ((aimLog++ % 200) == 0)
+        fprintf(stderr, "[cube_webui] aim (%.2f,%.2f,%.2f) dir (%.2f,%.2f,%.2f) hit=%d\n",
+                aimO.x, aimO.y, aimO.z, aimD.x, aimD.y, aimD.z, panelHit ? 1 : 0);
     }
 
     // Grab: only while gripping AND ray hits panel (no proximity auto-grab)

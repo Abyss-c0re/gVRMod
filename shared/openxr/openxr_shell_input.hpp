@@ -1,6 +1,5 @@
 #pragma once
-// Minimal Cube shell controller set: aim laser, trigger click, grip move, stick, menu.
-// Shared source — used by native launcher; vrmod can reuse paths via openxr_paths.hpp.
+// Minimal Cube shell controller set: aim laser, trigger, grip move, stick, menu.
 #include "openxr_bindings.hpp"
 #include <openxr/openxr.h>
 
@@ -15,11 +14,15 @@ struct ShellInput {
   XrAction grabClick = XR_NULL_HANDLE;
   XrAction stick = XR_NULL_HANDLE;
   XrAction menu = XR_NULL_HANDLE;
-  XrSpace aimSpace = XR_NULL_HANDLE;
+
+  XrPath handLeft = XR_NULL_PATH;
+  XrPath handRight = XR_NULL_PATH;
+  XrSpace aimLeft = XR_NULL_HANDLE;
+  XrSpace aimRight = XR_NULL_HANDLE;
+
   bool attached = false;
 };
 
-// actionSetName e.g. "cube_shell" (must be unique per app instance).
 bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
                      const char* actionSetName = "cube_shell");
 void ShellInputDestroy(const XrApi& api, ShellInput& in);
@@ -31,6 +34,7 @@ float ShellInputReadGrab(const XrApi& api, XrSession session, const ShellInput& 
 bool ShellInputReadMenu(const XrApi& api, XrSession session, const ShellInput& in);
 bool ShellInputReadStick(const XrApi& api, XrSession session, const ShellInput& in,
                          float* outX, float* outY);
+// Locates best tracked hand aim (prefer right) in `base` space.
 bool ShellInputLocateAim(const XrApi& api, XrSession session, const ShellInput& in,
                          XrSpace base, XrTime time, XrPosef* outPose);
 
