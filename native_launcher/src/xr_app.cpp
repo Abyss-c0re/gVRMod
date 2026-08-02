@@ -72,7 +72,7 @@ struct PanelConfig {
   float offsetX = 0.f;    // VIEW lateral (m)
   float offsetY = 0.f;    // VIEW vertical (m)
   float offsetZ = 0.f;    // extra depth (+ = further / more -Z)
-  // WayVR-style: world-locked floating panel (grab to place). Head-follow is optional.
+  // World-locked floating panel (grab to place). Head-follow is optional.
   bool viewLock = false;
   bool passthrough = true;
   float grabThresh = 0.55f;
@@ -559,7 +559,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
   LoadPanelConfig(gmodRoot);
 
-  fprintf(stderr, "[cube_webui] OpenXR WebUI reverse launcher (WayVR world panel)\n");
+  fprintf(stderr, "[cube_webui] OpenXR WebUI reverse launcher (world-locked panel)\n");
   fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
   fprintf(stderr, "[cube_webui] TRIGGER=click  GRIP=move world panel  MENU=reset\n");

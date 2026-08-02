@@ -88,11 +88,11 @@ Desktop icon → cube_webui_launcher (OpenXR native)
 
 ## Controls (headset)
 - **Trigger** — click UI under laser
-- **Grip / squeeze** — grab and move the **world-locked** menu (WayVR-style)
+- **Grip / squeeze** — grab and move the **world-locked** menu
 - **Menu / A** — reset panel pose to `cube_webui.conf` defaults
 - **Thumbstick** — navigate when not grabbing
 
-## WayVR panel (default)
+## World-locked panel (default)
 `view_lock=0` — panel is seeded in front of you, then **frozen in LOCAL space**.
 It does **not** follow head turn/walk; grip repositions it. Optional `view_lock=1` is HUD head-follow.
 

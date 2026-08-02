@@ -1,6 +1,6 @@
 # Copy to ~/.config/gvrmod/cube_webui.conf to override project defaults.
 #
-# view_lock=0  — WayVR world panel (default). 1 = head-follow HUD.
+# view_lock=0  — world-locked panel (default). 1 = head-follow HUD.
 # passthrough=1 — alpha-blend / FB passthrough when available
 # grab_thresh  — squeeze to move menu
 # panel_*      — size / seed pose (meters)
