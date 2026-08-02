@@ -38,23 +38,13 @@ GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
   glBindTexture(GL_TEXTURE_2D, t);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  // Allocate empty then upload flipped via GlUpdateRgbaTex
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  if (rgba) GlUpdateRgbaTex(t, w, h, rgba);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
   return t;
 }
 
 void GlUpdateRgbaTex(GLuint tex, int w, int h, const void* rgba) {
-  // Flip Y on upload: CPU buffer y=0 is top; GL expects first row at bottom
-  // without flip, UI appears inverted in headset (ADB-confirmed).
-  static std::vector<unsigned char> flip;
-  const size_t row = (size_t)w * 4;
-  flip.resize(row * (size_t)h);
-  const auto* src = static_cast<const unsigned char*>(rgba);
-  for (int y = 0; y < h; ++y)
-    std::memcpy(flip.data() + (size_t)(h - 1 - y) * row, src + (size_t)y * row, row);
   glBindTexture(GL_TEXTURE_2D, tex);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, flip.data());
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
 }
 
 // View matrix from OpenXR eye pose (pose = eye in WORLD).
@@ -125,10 +115,9 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
   const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
 
-  // Front if eye is on the normal side (normal points toward intended user)
+  // Which side of the panel is the eye on?
   const Vec3 eyeP = {eyeWorld.position.x, eyeWorld.position.y, eyeWorld.position.z};
-  const Vec3 toPanel = wp.c - eyeP;
-  const bool backFace = Dot(toPanel, wp.normal) > 0.f;
+  const bool backFace = Dot(wp.c - eyeP, wp.normal) > 0.f;
 
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
@@ -137,30 +126,20 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // Y-flip on upload: GL V=0 = UI bottom, V=1 = UI top.
-  // Bottom verts → V=0, top verts → V=1. Back-face flips U only.
-  const float u0 = backFace ? 1.f : 0.f;
-  const float u1 = backFace ? 0.f : 1.f;
+
+  // CPU y=0 = UI top. Raw glTexImage: row0 → V=0.
+  // Empirical ADB on Quest/WiVRn: treat V=0 as UI top on panel TOP.
+  // If backFace, flip U so we don't read mirrored.
+  auto emit = [&](float u, float v, const Vec3& p) {
+    glTexCoord2f(backFace ? (1.f - u) : u, v);
+    glVertex3f(p.x, p.y, p.z);
+  };
+  // ADB series showed inverted text with (bl=V1,tl=V0). Swap V.
   glBegin(GL_QUADS);
-  if (!backFace) {
-    glTexCoord2f(u0, 0.f);
-    glVertex3f(bl.x, bl.y, bl.z);
-    glTexCoord2f(u1, 0.f);
-    glVertex3f(br.x, br.y, br.z);
-    glTexCoord2f(u1, 1.f);
-    glVertex3f(tr.x, tr.y, tr.z);
-    glTexCoord2f(u0, 1.f);
-    glVertex3f(tl.x, tl.y, tl.z);
-  } else {
-    glTexCoord2f(u0, 1.f);
-    glVertex3f(bl.x, bl.y, bl.z);
-    glTexCoord2f(u0, 0.f);
-    glVertex3f(tl.x, tl.y, tl.z);
-    glTexCoord2f(u1, 0.f);
-    glVertex3f(tr.x, tr.y, tr.z);
-    glTexCoord2f(u1, 1.f);
-    glVertex3f(br.x, br.y, br.z);
-  }
+  emit(0.f, 0.f, bl);
+  emit(1.f, 0.f, br);
+  emit(1.f, 1.f, tr);
+  emit(0.f, 1.f, tl);
   glEnd();
   glDisable(GL_TEXTURE_2D);
   glColor4f(1.f, 1.f, 1.f, 1.f);
