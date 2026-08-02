@@ -61,6 +61,10 @@ bool XR_AttachActionSets();
 // Call from Lua Shutdown before XR_Shutdown (destroys session/instance).
 void XR_ResetInputState();
 
+// Destroy action spaces + action sets (before instance destroy). Required for clean restart
+// (see cb59aeb — blackscreen on VR restart).
+void XR_CleanupActions();
+
 // Cache the parsed action table for binding suggestion + analog→boolean synthesis.
 void XR_SetActionCache(const action* actions, int count);
 

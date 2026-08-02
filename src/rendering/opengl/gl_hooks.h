@@ -33,6 +33,8 @@ extern GLuint          g_leftEyeTexture;
 extern GLuint          g_rightEyeTexture;
 extern COpenGLEntryPoints* g_GL;
 extern bool            g_glIsPatched;
+extern bool            g_fbIsPatched;
+extern bool            g_captureStealActive;
 
 // ── Error callback for rendering functions that need to report errors ──
 typedef void (*ErrorFunc)(const char* msg);

@@ -259,6 +259,12 @@ bool XR_LoadLoader() {
 }
 
 bool XR_IsHMDPresent() {
+    // Warm path: already have a system from XR_Init / soft session — do not probe
+    // a second instance (can fail under single-client runtimes and block restart).
+    if (g_xrInstance != XR_NULL_HANDLE && g_xrSystemId != XR_NULL_SYSTEM_ID) {
+        return true;
+    }
+
     if (!XR_LoadLoader()) return false;
 
     // Try to create a lightweight instance just to query system

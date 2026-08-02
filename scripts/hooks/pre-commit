@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # gVRMod pre-commit: if the addon submodule working tree is dirty, commit it and stage the pointer.
 set -euo pipefail
+
+# Parent `git commit` exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE. Those
+# break `git -C submodule` (false dirty + index.lock under .git *file*).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH 2>/dev/null || true
+
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
@@ -17,6 +23,10 @@ fi
 DIRTY=0
 if ! git -C "$SUB" diff --quiet 2>/dev/null; then DIRTY=1; fi
 if ! git -C "$SUB" diff --cached --quiet 2>/dev/null; then DIRTY=1; fi
+# Untracked (not ignored) also counts
+if [[ -n "$(git -C "$SUB" ls-files --others --exclude-standard 2>/dev/null || true)" ]]; then
+  DIRTY=1
+fi
 
 # Parent staged a pointer bump only — fine
 if [[ $DIRTY -eq 0 ]]; then

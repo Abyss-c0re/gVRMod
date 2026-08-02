@@ -15,9 +15,39 @@ int               g_xrActionSpaceCount = 0;
 bool              g_xrActionsAttached = false;
 PoseResult        g_xrHMDPose;
 
+void XR_CleanupActions() {
+    // Spaces are session-tied — destroy first.
+    for (int i = 0; i < g_xrActionSpaceCount; i++) {
+        if (g_xrActionSpaces[i].space != XR_NULL_HANDLE && g_xrDestroySpace) {
+            g_xrDestroySpace(g_xrActionSpaces[i].space);
+            g_xrActionSpaces[i].space = XR_NULL_HANDLE;
+        }
+    }
+    g_xrActionSpaceCount = 0;
+    memset(g_xrActionSpaces, 0, sizeof(g_xrActionSpaces));
+
+    // Action sets (instance-level); contained actions go with them.
+    for (int i = 0; i < g_xrActionSetCount; i++) {
+        if (g_xrActionSets[i] != XR_NULL_HANDLE && g_xrDestroyActionSet) {
+            g_xrDestroyActionSet(g_xrActionSets[i]);
+            g_xrActionSets[i] = XR_NULL_HANDLE;
+        }
+    }
+    g_xrActionSetCount = 0;
+    memset(g_xrActionSets, 0, sizeof(g_xrActionSets));
+    memset(g_xrActionSetNames, 0, sizeof(g_xrActionSetNames));
+    g_xrActionsAttached = false;
+    XR_SetActionCache(nullptr, 0);
+    memset(&g_xrHMDPose, 0, sizeof(g_xrHMDPose));
+    VRMOD_LOG_INFO("XR action state cleaned (sets/spaces) for restart");
+}
+
 void XR_ResetInputState() {
-    // Session/instance are about to die — do not destroy XrAction handles here
-    // (instance destruction owns them). Clear all Lua-facing / attach SoT.
+    // Prefer real destroy when entry points still live (pre-instance teardown).
+    if (g_xrDestroySpace || g_xrDestroyActionSet) {
+        XR_CleanupActions();
+        return;
+    }
     g_xrActionSetCount = 0;
     memset(g_xrActionSets, 0, sizeof(g_xrActionSets));
     memset(g_xrActionSetNames, 0, sizeof(g_xrActionSetNames));
