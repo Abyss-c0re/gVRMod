@@ -11,8 +11,12 @@ struct PanelConfig {
   float offsetZ = 0.f;
   bool viewLock = false; // false = world-locked (product default); conf view_lock=1 honors HUD
   bool passthrough = true;
-  float grabThresh = 0.55f; // match cube_webui.conf; no silent 0.40 heresy clamp
-  float panelAlpha = 0.96f;
+  float grabThresh = 0.90f;
+  float panelAlpha = 1.0f;
+  // Grip-to-move OFF by default — Meta Cam/WiVRn: resting squeeze thrash stole all clicks.
+  // MENU re-anchors; set grab_enable=1 to restore grip-move.
+  bool grabEnable = false;
+  float triggerThresh = 0.40f; // slightly soft so Quest float trigger registers
 };
 
 // Global shell config (loaded once at startup).

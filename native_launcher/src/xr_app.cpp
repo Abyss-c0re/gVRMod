@@ -246,6 +246,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   float grabArmL = 0.f, grabArmR = 0.f; // sustained-grip arming (Meta Cam: thrash-grab)
   float grabCooldown = 0.f;              // post-end lockout so grip flicker cannot re-grab
   bool worldInitPending = true;
+  bool emergencySeedOnly = false; // true after fake seed — re-anchor on first real HMD
 
   SmxPeerState smx{};
   SmxInit(smx, "gvrmod-cube-shell");
@@ -373,26 +374,28 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       }
     }
     // Product law: view_lock is disabled. World freeze only.
-    // (cfg.viewLock ignored — head-follow is not Cube quality.)
-    if (worldInitPending) {
+    // Emergency seed at origin must NOT stick forever — re-seed when HMD tracks.
+    if (worldInitPending || emergencySeedOnly) {
       if (headOk) {
-        if (WorldPanelSeed(headWorld, /*force=*/false)) {
+        if (WorldPanelSeed(headWorld, /*force=*/emergencySeedOnly)) {
           worldInitPending = false;
-          ui.status = "PANEL LIVE · grip=move · menu=re-place";
+          emergencySeedOnly = false;
+          ui.status = "PANEL LIVE · trigger=click · MENU=re-place";
           WebUI_MarkDirty(ui);
           fprintf(stderr, "[cube_webui] PANEL VISIBLE mesh space=%s seed#%d pos=(%.2f,%.2f,%.2f)\n",
                   spaceName, WorldPanelState().seedCount,
                   WorldPanelState().c.x, WorldPanelState().c.y, WorldPanelState().c.z);
         }
-      } else if (++framesNoHead > 120) {
-        // Emergency place so user always sees *something*
+      } else if (worldInitPending && ++framesNoHead > 90) {
+        // Temporary place so user sees UI; force=false once, then wait for HMD.
         XrPosef fake = IdentityPose();
         fake.position.y = 1.5f;
         if (WorldPanelSeed(fake, /*force=*/false)) {
           worldInitPending = false;
-          ui.status = "PANEL (no HMD pose yet)";
+          emergencySeedOnly = true;
+          ui.status = "PANEL (waiting HMD track · will re-anchor)";
           WebUI_MarkDirty(ui);
-          fprintf(stderr, "[cube_webui] emergency panel seed at y=1.5\n");
+          fprintf(stderr, "[cube_webui] emergency panel seed — will re-anchor on first head pose\n");
         }
       }
     }
@@ -440,26 +443,24 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
               "[cube_webui] aim L hit=%d R hit=%d primary hit=%d "
               "trigL=%d trigR=%d\n",
               panelHitL ? 1 : 0, panelHitR ? 1 : 0, panelHit ? 1 : 0,
-              XrInputReadTriggerHand(session, input, XrHand::Left) ? 1 : 0,
-              XrInputReadTriggerHand(session, input, XrHand::Right) ? 1 : 0);
+              XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh) ? 1 : 0,
+              XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh) ? 1 : 0);
 
-    // Grab: per-hand grip + ray on panel. Meta Cam review: resting squeeze was
-    // thrash-grabbing and blocking every click — high thresh, hysteresis, arm,
-    // post-end cooldown, and never start grab on the same frame as a trigger.
+    // Grab-to-move: OFF by default (cfg.grabEnable). Resting Quest squeeze thrash
+    // moved the panel and blocked clicks (Meta Cam + WiVRn 041757). MENU re-anchors.
     float grabL = XrInputReadGrabHand(session, input, XrHand::Left);
     float grabR = XrInputReadGrabHand(session, input, XrHand::Right);
     const float grabOn = cfg.grabThresh;
-    // Release well below start so borderline squeeze cannot thrash start/end.
     const float grabOffHyst = std::max(0.35f, grabOn - 0.22f);
-    const bool grabEngageL = grabL >= grabOn;
-    const bool grabEngageR = grabR >= grabOn;
+    const bool grabEngageL = cfg.grabEnable && (grabL >= grabOn);
+    const bool grabEngageR = cfg.grabEnable && (grabR >= grabOn);
     const bool grabHeldL = grabbing && grabHand == XrHand::Left ? (grabL >= grabOffHyst)
                                                                : grabEngageL;
     const bool grabHeldR = grabbing && grabHand == XrHand::Right ? (grabR >= grabOffHyst)
                                                                 : grabEngageR;
     const float dt = 1.f / 72.f;
     if (grabCooldown > 0.f) grabCooldown = std::max(0.f, grabCooldown - dt);
-    const float grabArmNeed = 0.28f; // ~20 frames at 72 Hz
+    const float grabArmNeed = 0.28f;
     auto armGrip = [&](bool engage, float& arm) {
       if (engage) arm = std::min(grabArmNeed + 0.05f, arm + dt);
       else arm = 0.f;
@@ -467,14 +468,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     armGrip(grabEngageL, grabArmL);
     armGrip(grabEngageR, grabArmR);
 
-    // Peek trigger early so grab cannot steal click frames
-    bool trigLEarly = XrInputReadTriggerHand(session, input, XrHand::Left);
-    bool trigREarly = XrInputReadTriggerHand(session, input, XrHand::Right);
+    bool trigLEarly = XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh);
+    bool trigREarly = XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh);
     const bool anyTrig = trigLEarly || trigREarly;
 
-    if (grabbing) {
+    if (!cfg.grabEnable) {
+      grabbing = false;
+      grabArmL = grabArmR = 0.f;
+    } else if (grabbing) {
       bool still = (grabHand == XrHand::Left) ? grabHeldL : grabHeldR;
-      // Trigger cancels grab so user can click without fighting the panel
       if (anyTrig) {
         grabbing = false;
         grabArmL = grabArmR = 0.f;
@@ -502,7 +504,6 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
                 grabHand == XrHand::Left ? "L" : "R", wp.c.x, wp.c.y, wp.c.z);
       }
     } else if (wp.ready && wp.frozen && !anyTrig && grabCooldown <= 0.f) {
-      // Start grab only after sustained squeeze + ray on panel (no accidental thrash)
       if (grabArmL >= grabArmNeed && aimValidL && panelHitL) {
         grabbing = true;
         grabHand = XrHand::Left;
@@ -558,17 +559,21 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     prevMenu = menuBtn;
 
     // Click: each hand's trigger edge fires against THAT hand's ray hit (async).
-    auto tryClick = [&](bool edge, bool hit, int px, int py) {
+    auto tryClick = [&](bool edge, bool hit, int px, int py, const char* which) {
       if (!edge || grabbing) return;
-      if (hit)
+      if (hit) {
+        fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d\n", which, px, py);
         WebUI_PointerClick(ui, px, py);
-      else if (ui.cursorVisible)
+      } else if (ui.cursorVisible) {
+        fprintf(stderr, "[cube_webui] CLICK %s (cursor) px=%d py=%d\n", which, ui.cursorX, ui.cursorY);
         WebUI_PointerClick(ui, ui.cursorX, ui.cursorY);
-      else
+      } else {
+        fprintf(stderr, "[cube_webui] CLICK %s (no hit — stick-nav fallback)\n", which);
         WebUI_Input(ui, 0, 0, true, false);
+      }
     };
-    tryClick(trigL && !prevTrigL, panelHitL, hitPxL, hitPyL);
-    tryClick(trigR && !prevTrigR, panelHitR, hitPxR, hitPyR);
+    tryClick(trigL && !prevTrigL, panelHitL, hitPxL, hitPyL, "L");
+    tryClick(trigR && !prevTrigR, panelHitR, hitPxR, hitPyR, "R");
     prevTrigL = trigL;
     prevTrigR = trigR;
 
@@ -674,7 +679,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         if (useAlphaClear)
           glClearColor(0.f, 0.f, 0.f, 0.f);
         else
-          glClearColor(0.02f, 0.03f, 0.05f, 1.f); // neutral slate — no red wash
+          glClearColor(0.f, 0.f, 0.f, 1.f); // pure black — never red wash
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         GlLoadProjectionFov(views0[eye].fov);

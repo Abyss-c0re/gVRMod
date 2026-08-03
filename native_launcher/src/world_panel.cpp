@@ -150,15 +150,22 @@ bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHi
   if (!g_wp.ready) return false;
   Vec3 d = Normalize(dir);
   float denom = Dot(d, g_wp.normal);
+  // Two-sided panel: rays from either face count (WiVRn emergency seed often
+  // faces the wrong way until MENU re-anchor).
   if (std::fabs(denom) < 1e-5f) return false;
   float t = Dot(g_wp.c - origin, g_wp.normal) / denom;
-  if (t < 0.05f || t > 8.f) return false;
+  if (t < 0.02f || t > 12.f) return false;
   Vec3 hit = origin + d * t;
   float u = Dot(hit - g_wp.c, g_wp.right);
   float v = Dot(hit - g_wp.c, g_wp.up);
   const float hw = g_wp.widthM * 0.5f;
   const float hh = g_wp.heightM * 0.5f;
-  if (std::fabs(u) > hw || std::fabs(v) > hh) return false;
+  // 8% edge slop so tips that look "on" the rim still count
+  const float slop = 1.08f;
+  if (std::fabs(u) > hw * slop || std::fabs(v) > hh * slop) return false;
+  // Clamp u/v into panel for pixel mapping when inside slop rim
+  u = std::max(-hw, std::min(hw, u));
+  v = std::max(-hh, std::min(hh, v));
   int px = (int)((u / hw * 0.5f + 0.5f) * (float)UI_W);
   int py = (int)((0.5f - v / hh * 0.5f) * (float)UI_H);
   px = std::max(0, std::min(UI_W - 1, px));

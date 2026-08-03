@@ -489,7 +489,9 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.lastCursorQx = -9999;
   s.lastCursorQy = -9999;
   s.lastCursorVis = false;
-  s.paintSoftCursor = true; // laser + soft crosshair (Quest feedback)
+  // Soft cursor is the "3rd reticle" (WiVRn 041757): L laser + R laser + red cross.
+  // Laser tip alone is the hit feedback — no on-texture cursor.
+  s.paintSoftCursor = false;
   s.categories = ScanGModMaps(gmodRoot);
   if (s.categories.empty()) {
     MapCategory c;

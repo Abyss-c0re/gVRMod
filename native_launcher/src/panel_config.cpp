@@ -47,6 +47,10 @@ static void ApplyConfigKey(const char* key, float val) {
     if (val > -2.f && val < 2.f) c.offsetZ = val;
   } else if (strcmp(key, "grab_thresh") == 0 || strcmp(key, "grab_threshold") == 0) {
     if (val >= 0.2f && val <= 1.f) c.grabThresh = val;
+  } else if (strcmp(key, "grab_enable") == 0 || strcmp(key, "grip_move") == 0) {
+    c.grabEnable = (val != 0.f);
+  } else if (strcmp(key, "trigger_thresh") == 0 || strcmp(key, "trigger_threshold") == 0) {
+    if (val >= 0.15f && val <= 1.f) c.triggerThresh = val;
   } else if (strcmp(key, "panel_alpha") == 0) {
     if (val >= 0.4f && val <= 1.f) c.panelAlpha = val;
   } else if (strcmp(key, "passthrough") == 0 || strcmp(key, "ar") == 0) {
@@ -120,12 +124,15 @@ void LoadPanelConfig(const std::string& gmodRoot) {
   if (const char* v = getenv("CUBE_WORLD_LOCK")) {
     if (!(v[0] == '0' && v[1] == 0)) g_cfg.viewLock = false;
   }
-  // Honor conf grab_thresh (shipped default 0.55). Only clamp to legal range.
   if (g_cfg.grabThresh < 0.2f) g_cfg.grabThresh = 0.2f;
   if (g_cfg.grabThresh > 1.f) g_cfg.grabThresh = 1.f;
+  if (g_cfg.triggerThresh < 0.15f) g_cfg.triggerThresh = 0.15f;
+  if (g_cfg.triggerThresh > 1.f) g_cfg.triggerThresh = 1.f;
   WorldPanelReset();
   fprintf(stderr,
-          "[cube_webui] panel size=%.2fx%.2fm dist=%.2f world_lock=%d passthrough=%d grab>=%.2f\n",
+          "[cube_webui] panel size=%.2fx%.2fm dist=%.2f world_lock=%d passthrough=%d "
+          "grab=%s(>=%.2f) trig>=%.2f\n",
           g_cfg.halfW * 2.f, g_cfg.halfH * 2.f, g_cfg.dist,
-          g_cfg.viewLock ? 0 : 1, g_cfg.passthrough ? 1 : 0, g_cfg.grabThresh);
+          g_cfg.viewLock ? 0 : 1, g_cfg.passthrough ? 1 : 0,
+          g_cfg.grabEnable ? "on" : "off", g_cfg.grabThresh, g_cfg.triggerThresh);
 }
