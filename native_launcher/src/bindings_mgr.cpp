@@ -460,7 +460,7 @@ void Bindings_ResetDefaults(BindingsManager& m) {
   if (!Bindings_Save(m, err)) {
     m.status = "GOLD IN MEMORY — SAVE FAIL: " + err;
   } else {
-    m.status = "QUEST 3 GOLD RESTORED + SAVED (Lua loads same JSON)";
+    m.status = "DEFAULTS RESTORED + SAVED (Lua sync)";
   }
 }
 

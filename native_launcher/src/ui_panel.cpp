@@ -667,7 +667,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
         lastResetTap = 0.;
       } else {
         lastResetTap = now;
-        s.status = "QUEST 3 GOLD? tap RESET again to confirm";
+        s.status = "RESET DEFAULTS? tap again to confirm";
       }
       return true;
     }
@@ -1113,7 +1113,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     FillRect(rgba, UI_W - 320, 52, 100, 22, CT_RGB(CubeTheme::BTN_DIM), 255);
     DrawText(rgba, UI_W - 300, 56, "SAVE", 255, 240, 244, 1);
     FillRect(rgba, UI_W - 200, 52, 180, 22, CT_RGB(CubeTheme::CRIMSON_DIM), 255);
-    DrawText(rgba, UI_W - 192, 56, "RESET QUEST 3 GOLD", 255, 240, 244, 1);
+    DrawText(rgba, UI_W - 180, 56, "RESET DEFAULTS", 255, 240, 244, 1);
 
     std::vector<int> idx;
     Bindings_Filtered(s.bindings, idx);
