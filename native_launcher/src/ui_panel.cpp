@@ -491,7 +491,8 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.lastCursorVis = false;
   // Soft cursor is the "3rd reticle" (WiVRn 041757): L laser + R laser + red cross.
   // Laser tip alone is the hit feedback — no on-texture cursor.
-  s.paintSoftCursor = false;
+  // Soft reticle at ray hit so tip-on-button == click pixel is visible (1:1 verify).
+  s.paintSoftCursor = true;
   s.categories = ScanGModMaps(gmodRoot);
   if (s.categories.empty()) {
     MapCategory c;

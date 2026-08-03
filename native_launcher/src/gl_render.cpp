@@ -32,25 +32,19 @@ void GlUnbindFbo() {
   if (glBindFramebuffer_) glBindFramebuffer_((GLenum)0x8D40, 0);
 }
 
-// WiVRn shot 050018: without this, menu is fully upside-down + mirrored.
-// Paint buffer: y=0 = NEW GAME (top). After 180° upload + standard UV, visual is upright.
-// WorldPanelRayHit MUST apply the same 180° to px/py (see world_panel.cpp).
-static void UploadRgbaRotated180(GLuint tex, int w, int h, const void* rgba) {
-  static std::vector<unsigned char> rot;
-  rot.resize((size_t)w * (size_t)h * 4);
+// Paint buffer: y=0 = NEW GAME (top of UI). OpenGL samples first image row at V=0
+// (texture bottom). FlipY only so UI top lands at V=1 = geometric panel top.
+// NO 180° — that mirrored U and desynced aim tip from ray-plane pixels.
+// WorldPanelRayHit uses the same axes: +right→+px, +up→py↓ (no remap).
+static void UploadRgbaFlipY(GLuint tex, int w, int h, const void* rgba) {
+  static std::vector<unsigned char> flip;
+  const size_t row = (size_t)w * 4;
+  flip.resize(row * (size_t)h);
   const auto* s = static_cast<const unsigned char*>(rgba);
-  for (int y = 0; y < h; ++y) {
-    for (int x = 0; x < w; ++x) {
-      const int si = (y * w + x) * 4;
-      const int di = ((h - 1 - y) * w + (w - 1 - x)) * 4;
-      rot[di + 0] = s[si + 0];
-      rot[di + 1] = s[si + 1];
-      rot[di + 2] = s[si + 2];
-      rot[di + 3] = s[si + 3];
-    }
-  }
+  for (int y = 0; y < h; ++y)
+    std::memcpy(flip.data() + (size_t)(h - 1 - y) * row, s + (size_t)y * row, row);
   glBindTexture(GL_TEXTURE_2D, tex);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rot.data());
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, flip.data());
 }
 
 GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
@@ -60,12 +54,12 @@ GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  if (rgba) UploadRgbaRotated180(t, w, h, rgba);
+  if (rgba) UploadRgbaFlipY(t, w, h, rgba);
   return t;
 }
 
 void GlUpdateRgbaTex(GLuint tex, int w, int h, const void* rgba) {
-  UploadRgbaRotated180(tex, w, h, rgba);
+  UploadRgbaFlipY(tex, w, h, rgba);
 }
 
 void GlLoadModelviewLocal(const XrPosef& eyeWorld) {
@@ -129,7 +123,8 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // 180° already applied in upload — identity UV, front winding.
+  // FlipY upload: V=0 = UI bottom, V=1 = UI top. U=0 = UI left.
+  // bl=geo bottom-left → (0,0), tl=geo top-left → (0,1) — matches ray hit 1:1.
   glBegin(GL_QUADS);
   glTexCoord2f(0.f, 0.f);
   glVertex3f(bl.x, bl.y, bl.z);

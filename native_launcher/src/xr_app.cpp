@@ -471,21 +471,17 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       XrPosef pose{};
       if (!XrInputLocateAimHand(session, input, hand, space, fs.predictedDisplayTime, &pose))
         return;
+      // Aim pose origin = laser root (OpenXR touch aim). Same o/d for draw + hit.
       o = {pose.position.x, pose.position.y, pose.position.z};
       valid = true;
-      // OpenXR aim is -Z; some WiVRn builds flip. Prefer whichever hits the panel.
-      Vec3 dNeg = Normalize(QuatRotate(pose.orientation, V3(0, 0, -1)));
-      Vec3 dPos = Normalize(QuatRotate(pose.orientation, V3(0, 0, 1)));
-      int pxN = 0, pyN = 0, pxP = 0, pyP = 0;
-      Vec3 hpN = wp.c, hpP = wp.c;
-      bool hitN = WorldPanelRayHit(o, dNeg, &pxN, &pyN, &hpN, 1.35f);
-      bool hitP = WorldPanelRayHit(o, dPos, &pxP, &pyP, &hpP, 1.35f);
-      if (hitN) {
-        d = dNeg; hit = true; px = pxN; py = pyN; hp = hpN;
-      } else if (hitP) {
-        d = dPos; hit = true; px = pxP; py = pyP; hp = hpP;
-      } else {
-        d = dNeg; hit = false; px = 0; py = 0; hp = o + dNeg * 1.8f;
+      // OpenXR aim forward is always -Z. Do NOT try +Z: two-sided hits made the
+      // laser tip land on one face while click used the opposite intersection.
+      d = Normalize(QuatRotate(pose.orientation, V3(0, 0, -1)));
+      hit = WorldPanelRayHit(o, d, &px, &py, &hp, 1.20f);
+      if (!hit) {
+        px = 0;
+        py = 0;
+        hp = o + d * 1.8f;
       }
     };
     locateHand(XrHand::Left, aimOL, aimDL, aimValidL, panelHitL, hitPxL, hitPyL, hitPtL);
