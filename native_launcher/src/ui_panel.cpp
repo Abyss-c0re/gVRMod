@@ -334,8 +334,8 @@ void WebUI_CycleSetting(WebUIState& s, int row, int dir) {
       break;
     }
     case SR_XR_DESKTOP:
-      // cycle 1..3
-      g.xr.desktopView = 1 + ((g.xr.desktopView - 1 + dir + 3) % 3);
+      // cycle 1..4 (none / left / right / follow-cam)
+      g.xr.desktopView = 1 + ((g.xr.desktopView - 1 + dir + 4) % 4);
       g.preset = -1;
       break;
     case SR_XR_POST: g.xr.postProcess = !g.xr.postProcess; g.preset = -1; break;
@@ -427,6 +427,7 @@ static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) 
       const char* dv = "RIGHT";
       if (g.xr.desktopView == 1) dv = "NONE";
       else if (g.xr.desktopView == 2) dv = "LEFT";
+      else if (g.xr.desktopView == 4) dv = "FOLLOW CAM";
       snprintf(out, outN, "XR DESKTOP VIEW %s", dv);
       break;
     }
