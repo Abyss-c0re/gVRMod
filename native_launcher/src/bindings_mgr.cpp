@@ -2,9 +2,12 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
 
 // Minimal JSON string extractor for our bindings/custom files.
 static std::string ExtractString(const std::string& body, size_t from, const char* key) {
@@ -384,6 +387,43 @@ bool Bindings_Load(BindingsManager& m, const std::string& gmodRoot) {
   return true;
 }
 
+// Snapshot existing file before overwrite (timestamped). Keep last 12.
+static void BackupBindingsFile(const std::string& path) {
+  struct stat st {};
+  if (stat(path.c_str(), &st) != 0 || st.st_size <= 0) return;
+  char ts[32];
+  std::time_t now = std::time(nullptr);
+  std::strftime(ts, sizeof ts, "%Y%m%d_%H%M%S", std::localtime(&now));
+  std::string bak = path + ".bak." + ts;
+  // best-effort copy
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return;
+  std::ofstream out(bak, std::ios::binary);
+  if (!out) return;
+  out << in.rdbuf();
+  out.close();
+  fprintf(stderr, "[cube_webui] bindings backup → %s\n", bak.c_str());
+  // prune old backups in same dir
+  std::string dir = path;
+  auto slash = dir.find_last_of('/');
+  std::string base = (slash == std::string::npos) ? dir : dir.substr(0, slash);
+  std::string prefix = "vrmod_openxr_bindings.json.bak.";
+  DIR* d = opendir(base.c_str());
+  if (!d) return;
+  std::vector<std::string> baks;
+  while (dirent* e = readdir(d)) {
+    if (e->d_name[0] == '.') continue;
+    std::string name = e->d_name;
+    if (name.rfind(prefix, 0) == 0) baks.push_back(base + "/" + name);
+  }
+  closedir(d);
+  std::sort(baks.begin(), baks.end());
+  while (baks.size() > 12) {
+    ::unlink(baks.front().c_str());
+    baks.erase(baks.begin());
+  }
+}
+
 bool Bindings_Save(BindingsManager& m, std::string& err) {
   if (m.gmodRoot.empty()) {
     err = "no gmod root";
@@ -393,6 +433,7 @@ bool Bindings_Save(BindingsManager& m, std::string& err) {
   mkdir((m.gmodRoot + "/garrysmod/data").c_str(), 0755);
   mkdir(dir.c_str(), 0755);
   m.filePath = dir + "/vrmod_openxr_bindings.json";
+  BackupBindingsFile(m.filePath);
   std::ofstream f(m.filePath);
   if (!f) {
     err = "cannot write " + m.filePath;
@@ -406,9 +447,14 @@ bool Bindings_Save(BindingsManager& m, std::string& err) {
 }
 
 void Bindings_ResetDefaults(BindingsManager& m) {
+  // Never silently wipe disk — only mark memory dirty. User must hit SAVE.
+  // Snapshot disk first so thrash/inverted UI cannot destroy the last good file.
+  if (!m.filePath.empty()) BackupBindingsFile(m.filePath);
+  else if (!m.gmodRoot.empty())
+    BackupBindingsFile(m.gmodRoot + "/garrysmod/data/vrmod/vrmod_openxr_bindings.json");
   Bindings_DefaultMap(m);
   m.dirty = true;
-  m.status = "RESET TO QUEST 3 DEFAULTS (save on leave/start)";
+  m.status = "RESET IN MEMORY — press SAVE to commit (disk backed up)";
 }
 
 void Bindings_RestoreAction(BindingsManager& m, const std::string& actionId) {

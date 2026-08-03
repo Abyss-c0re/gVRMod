@@ -647,17 +647,26 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
         return true;
       }
     }
-    // RESET ALL
+    // SAVE (top-right, easy) — writes file + auto .bak.TIMESTAMP
     if (px >= UI_W - 200 && px <= UI_W - 16 && py >= 50 && py <= 74) {
-      Bindings_ResetDefaults(s.bindings);
-      s.status = s.bindings.status;
-      return true;
-    }
-    // SAVE → same file Lua uses
-    if (px >= UI_W - 320 && px <= UI_W - 210 && py >= 50 && py <= 74) {
       std::string err;
       if (!Bindings_Save(s.bindings, err)) s.status = err;
-      else s.status = "SAVED → vrmod_openxr_bindings.json (Lua sync)";
+      else s.status = "SAVED + backup → data/vrmod/vrmod_openxr_bindings.json";
+      return true;
+    }
+    // RESET ALL — bottom strip only, double-tap within 1.5s (misclick was wiping binds
+    // when UI was inverted and tip hit the old top-right RESET).
+    if (py >= UI_H - 48 && py <= UI_H - 12 && px >= 200 && px <= 360) {
+      static double lastResetTap = 0.;
+      double now = (double)s.paintFrame / 72.0; // coarse clock from paint
+      if (now - lastResetTap < 1.5) {
+        Bindings_ResetDefaults(s.bindings);
+        s.status = s.bindings.status;
+        lastResetTap = 0.;
+      } else {
+        lastResetTap = now;
+        s.status = "RESET? tap again to confirm (disk already backed up)";
+      }
       return true;
     }
     // Prev/next
