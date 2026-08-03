@@ -627,7 +627,10 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
           s.status = "SETTINGS";
         } else {
           s.page = WebUIPage::Bindings;
-          s.status = "CONTROLLER BINDINGS (OpenXR)";
+          // Re-read disk so launcher matches what Lua last saved
+          if (!s.gmodRoot.empty())
+            Bindings_Load(s.bindings, s.gmodRoot);
+          s.status = "CONTROLLER BINDINGS · sync " + s.bindings.filePath;
         }
         return true;
       }
@@ -647,25 +650,24 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
         return true;
       }
     }
-    // SAVE (top-right, easy) — writes file + auto .bak.TIMESTAMP
-    if (px >= UI_W - 200 && px <= UI_W - 16 && py >= 50 && py <= 74) {
+    // SAVE — same path Lua uses; always timestamp-backup first
+    if (px >= UI_W - 320 && px <= UI_W - 210 && py >= 50 && py <= 74) {
       std::string err;
       if (!Bindings_Save(s.bindings, err)) s.status = err;
-      else s.status = "SAVED + backup → data/vrmod/vrmod_openxr_bindings.json";
+      else s.status = "SAVED → vrmod_openxr_bindings.json (Lua sync)";
       return true;
     }
-    // RESET ALL — bottom strip only, double-tap within 1.5s (misclick was wiping binds
-    // when UI was inverted and tip hit the old top-right RESET).
-    if (py >= UI_H - 48 && py <= UI_H - 12 && px >= 200 && px <= 360) {
+    // RESET → Quest 3 GOLD (double-tap). Writes disk so GMod/Lua match launcher.
+    if (px >= UI_W - 200 && px <= UI_W - 16 && py >= 50 && py <= 74) {
       static double lastResetTap = 0.;
-      double now = (double)s.paintFrame / 72.0; // coarse clock from paint
+      double now = (double)s.paintFrame / 72.0;
       if (now - lastResetTap < 1.5) {
         Bindings_ResetDefaults(s.bindings);
         s.status = s.bindings.status;
         lastResetTap = 0.;
       } else {
         lastResetTap = now;
-        s.status = "RESET? tap again to confirm (disk already backed up)";
+        s.status = "QUEST 3 GOLD? tap RESET again to confirm";
       }
       return true;
     }
@@ -1110,8 +1112,8 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     }
     FillRect(rgba, UI_W - 320, 52, 100, 22, CT_RGB(CubeTheme::BTN_DIM), 255);
     DrawText(rgba, UI_W - 300, 56, "SAVE", 255, 240, 244, 1);
-    FillRect(rgba, UI_W - 200, 52, 180, 22, CT_RGB(CubeTheme::BTN_DIM), 255);
-    DrawText(rgba, UI_W - 188, 56, "RESET DEFAULTS", 255, 240, 244, 1);
+    FillRect(rgba, UI_W - 200, 52, 180, 22, CT_RGB(CubeTheme::CRIMSON_DIM), 255);
+    DrawText(rgba, UI_W - 192, 56, "RESET QUEST 3 GOLD", 255, 240, 244, 1);
 
     std::vector<int> idx;
     Bindings_Filtered(s.bindings, idx);
@@ -1165,7 +1167,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
     DrawText(rgba, 130, UI_H - 36, page, CT_RGB(CubeTheme::MUTED), 1);
     DrawText(rgba, 130, UI_H - 20,
-             "S1/S2=CHORD  +CHD  ANY=OR ALL=AND  DEF  CLR  |  SYNC data/vrmod/vrmod_openxr_bindings.json",
+             "SAVE=write JSON  RESET x2=Quest3 gold  DEF=one action  |  same file as Lua VRMod",
              160, 120, 130, 1);
     if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
       int cx = cursor ? cursor->x : s.cursorX;

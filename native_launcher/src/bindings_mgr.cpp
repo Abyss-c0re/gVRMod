@@ -447,14 +447,21 @@ bool Bindings_Save(BindingsManager& m, std::string& err) {
 }
 
 void Bindings_ResetDefaults(BindingsManager& m) {
-  // Never silently wipe disk — only mark memory dirty. User must hit SAVE.
-  // Snapshot disk first so thrash/inverted UI cannot destroy the last good file.
+  // Quest 3 / Touch GOLD — identical to Lua DefaultMap() in cl_openxr_bindings.lua.
+  // Backup, replace, write immediately so launcher + GMod share one file:
+  // garrysmod/data/vrmod/vrmod_openxr_bindings.json
   if (!m.filePath.empty()) BackupBindingsFile(m.filePath);
   else if (!m.gmodRoot.empty())
     BackupBindingsFile(m.gmodRoot + "/garrysmod/data/vrmod/vrmod_openxr_bindings.json");
   Bindings_DefaultMap(m);
+  m.preset = "quest3_touch";
   m.dirty = true;
-  m.status = "RESET IN MEMORY — press SAVE to commit (disk backed up)";
+  std::string err;
+  if (!Bindings_Save(m, err)) {
+    m.status = "GOLD IN MEMORY — SAVE FAIL: " + err;
+  } else {
+    m.status = "QUEST 3 GOLD RESTORED + SAVED (Lua loads same JSON)";
+  }
 }
 
 void Bindings_RestoreAction(BindingsManager& m, const std::string& actionId) {
