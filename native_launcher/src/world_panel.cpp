@@ -208,12 +208,13 @@ bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHi
   if (std::fabs(u) > hw * slop || std::fabs(v) > hh * slop) return false;
   u = std::max(-hw, std::min(hw, u));
   v = std::max(-hh, std::min(hh, v));
-  // Geometric UV on panel, then same 180° as UploadRgbaRotated180 so tip on
-  // visual NEW GAME → buffer NEW GAME (WiVRn 053809 upright).
+  // 180° upload already maps paint top → geometric top (V). Double-inverting
+  // hit Y made input upside-down while the menu looked upright (053809).
+  // +right → +px, +up → py=0 (NEW GAME). Only X is mirrored by 180° upload:
   int px = (int)((u / hw * 0.5f + 0.5f) * (float)UI_W);
   int py = (int)((0.5f - v / hh * 0.5f) * (float)UI_H);
-  px = (UI_W - 1) - px;
-  py = (UI_H - 1) - py;
+  px = (UI_W - 1) - px; // match 180° horizontal mirror of texture
+  // py: NO invert — geo top already hits paint top after 180° upload
   px = std::max(0, std::min(UI_W - 1, px));
   py = std::max(0, std::min(UI_H - 1, py));
   if (outPx) *outPx = px;
