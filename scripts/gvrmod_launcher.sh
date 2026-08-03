@@ -350,8 +350,8 @@ append_map_args() {
 
 append_window_args() {
   local -n arr=$1
-  # Tiny borderless desktop mirror (HMD is the product). Source: -noborder.
-  arr+=(-windowed -w "$WIN_W" -h "$WIN_H" -noborder)
+  # Normal framed window (do not force -noborder — user keeps title bar/chrome).
+  arr+=(-windowed -w "$WIN_W" -h "$WIN_H")
   # Faster SP bring-up (less time stuck on Facepunch "Initializing Serverside")
   arr+=(+maxplayers 1 +sv_lan 1)
 }

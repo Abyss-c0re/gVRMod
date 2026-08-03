@@ -43,7 +43,7 @@ struct GModGfxSettings {
   int resIdx = 0; // indexes WinRes table
   int winW = 720;
   int winH = 480;
-  bool noborder = true;
+  bool noborder = false; // default: framed GMod window (not borderless)
   bool windowed = true;
 
   // Source cvars

@@ -59,7 +59,7 @@ Native translation → process spawn:
 
 ```
 steam -applaunch 4000
-  -windowed -w 720 -h 480 -noborder
+  -windowed -w 720 -h 480
   +maxplayers N +sv_lan L +hostname H
   +map MAP
   +exec gvrmod_cube          // OpenXR autostart inside GMod

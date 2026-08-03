@@ -48,7 +48,7 @@ struct LaunchRequest {
   int winW = 720;
   int winH = 480;
   bool windowed = true;
-  bool noborder = true;
+  bool noborder = false; // keep normal window chrome (user can move/resize)
   bool useSteam = true;
   std::string xrRuntimeJson;
   std::string cubeCfg = "gvrmod_cube";
