@@ -35,7 +35,9 @@ bool WorldPanelSeed(const XrPosef& headInWorld, bool force = false);
 // Grab: set world-space center, keep orientation. No re-face.
 void WorldPanelSetCenter(Vec3 worldCenter);
 
-bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit);
+// slopScale: 1 = exact panel, >1 expands hit box (soft click when tip looks near rim).
+bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit,
+                      float slopScale = 1.08f);
 
 // Build XrPosef from center + facing normal (normal points toward user).
 XrPosef WorldPanelMakePose(Vec3 center, Vec3 normalTowardUser);

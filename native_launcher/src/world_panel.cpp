@@ -163,7 +163,8 @@ void WorldPanelSetCenter(Vec3 worldCenter) {
   WorldPanelSyncAxes();
 }
 
-bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit) {
+bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit,
+                      float slopScale) {
   if (!g_wp.ready) return false;
   Vec3 d = Normalize(dir);
   float denom = Dot(d, g_wp.normal);
@@ -171,14 +172,15 @@ bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHi
   // faces the wrong way until MENU re-anchor).
   if (std::fabs(denom) < 1e-5f) return false;
   float t = Dot(g_wp.c - origin, g_wp.normal) / denom;
-  if (t < 0.02f || t > 12.f) return false;
+  // Allow slightly behind controller origin (tracking jitter) and long aim
+  if (t < -0.05f || t > 20.f) return false;
   Vec3 hit = origin + d * t;
   float u = Dot(hit - g_wp.c, g_wp.right);
   float v = Dot(hit - g_wp.c, g_wp.up);
   const float hw = g_wp.widthM * 0.5f;
   const float hh = g_wp.heightM * 0.5f;
-  // 8% edge slop so tips that look "on" the rim still count
-  const float slop = 1.08f;
+  // Default 8% rim slop; callers can pass ~1.35 for soft click when tip looks near
+  const float slop = (slopScale < 1.f) ? 1.08f : slopScale;
   if (std::fabs(u) > hw * slop || std::fabs(v) > hh * slop) return false;
   u = std::max(-hw, std::min(hw, u));
   v = std::max(-hh, std::min(hh, v));

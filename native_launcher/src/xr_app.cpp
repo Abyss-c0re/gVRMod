@@ -239,7 +239,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   GLuint fbo = 0;
   int framesNoHead = 0;
 
-  bool prevTrigL = false, prevTrigR = false;
+  bool prevHitL = false, prevHitR = false;
+  bool axisLatchedL = false, axisLatchedR = false; // hysteresis re-arm for stuck float
   bool prevMenu = false;
   bool grabbing = false;
   XrHand grabHand = XrHand::Right;
@@ -462,13 +463,40 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         return;
       o = {pose.position.x, pose.position.y, pose.position.z};
       valid = true;
-      d = Normalize(QuatRotate(pose.orientation, V3(0, 0, -1)));
-      hit = WorldPanelRayHit(o, d, &px, &py, &hp);
+      // OpenXR aim is -Z; some WiVRn builds flip. Prefer whichever hits the panel.
+      Vec3 dNeg = Normalize(QuatRotate(pose.orientation, V3(0, 0, -1)));
+      Vec3 dPos = Normalize(QuatRotate(pose.orientation, V3(0, 0, 1)));
+      int pxN = 0, pyN = 0, pxP = 0, pyP = 0;
+      Vec3 hpN = wp.c, hpP = wp.c;
+      bool hitN = WorldPanelRayHit(o, dNeg, &pxN, &pyN, &hpN, 1.35f);
+      bool hitP = WorldPanelRayHit(o, dPos, &pxP, &pyP, &hpP, 1.35f);
+      if (hitN) {
+        d = dNeg; hit = true; px = pxN; py = pyN; hp = hpN;
+      } else if (hitP) {
+        d = dPos; hit = true; px = pxP; py = pyP; hp = hpP;
+      } else {
+        d = dNeg; hit = false; px = 0; py = 0; hp = o + dNeg * 1.8f;
+      }
     };
     locateHand(XrHand::Left, aimOL, aimDL, aimValidL, panelHitL, hitPxL, hitPyL, hitPtL);
     locateHand(XrHand::Right, aimOR, aimDR, aimValidR, panelHitR, hitPxR, hitPyR, hitPtR);
 
-    // Primary laser for cursor: prefer hand that hits panel; else best tracked.
+    // Head-gaze fallback: if both controllers miss but user looks at panel, use head ray
+    // for cursor/dwell (still need trigger/dwell to click).
+    bool panelHitHead = false;
+    int hitPxH = 0, hitPyH = 0;
+    Vec3 hitPtH = wp.c;
+    if (headOk && !panelHitL && !panelHitR) {
+      Vec3 ho = {headWorld.position.x, headWorld.position.y, headWorld.position.z};
+      Vec3 hd = Normalize(QuatRotate(headWorld.orientation, V3(0, 0, -1)));
+      panelHitHead = WorldPanelRayHit(ho, hd, &hitPxH, &hitPyH, &hitPtH, 1.2f);
+      if (panelHitHead) {
+        aimO = ho; aimD = hd; aimValid = true; panelHit = true;
+        hitPx = hitPxH; hitPy = hitPyH; hitPt = hitPtH;
+      }
+    }
+
+    // Primary laser for cursor: prefer hand that hits panel; else head; else best tracked.
     if (panelHitL && !panelHitR) {
       aimO = aimOL; aimD = aimDL; aimValid = true; panelHit = true;
       hitPx = hitPxL; hitPy = hitPyL; hitPt = hitPtL;
@@ -479,6 +507,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       // Both hit: prefer right for cursor stability, left still independent for click
       aimO = aimOR; aimD = aimDR; aimValid = true; panelHit = true;
       hitPx = hitPxR; hitPy = hitPyR; hitPt = hitPtR;
+    } else if (panelHitHead) {
+      // head ray already filled aimO/hitPx — keep for dwell/cursor
     } else if (aimValidR) {
       aimO = aimOR; aimD = aimDR; aimValid = true;
     } else if (aimValidL) {
@@ -515,32 +545,72 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     armGrip(grabEngageL, grabArmL);
     armGrip(grabEngageR, grabArmR);
 
-    // Click = trigger float/button. Grip as click only when grab-move is off (edge via prev).
-    const float clickGrip = 0.45f;
-    bool trigLEarly = XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh);
-    bool trigREarly = XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh);
+    // Sample raw trigger (float + face-button). Grip folds into axis when grab-move is off.
+    const float pressTh = cfg.triggerThresh;
+    const float releaseTh = std::max(0.12f, pressTh * 0.45f);
+    const float clickGrip = 0.55f;
+    auto sampL = XrInputSampleTriggerHand(session, input, XrHand::Left, pressTh);
+    auto sampR = XrInputSampleTriggerHand(session, input, XrHand::Right, pressTh);
     if (!cfg.grabEnable) {
-      if (grabL >= clickGrip) trigLEarly = true;
-      if (grabR >= clickGrip) trigREarly = true;
+      // Same hysteresis path as trigger float — one edge per squeeze, not per frame
+      if (grabL >= clickGrip) {
+        sampL.axis = std::max(sampL.axis, grabL);
+        sampL.axisOk = true;
+        sampL.anyDown = true;
+      }
+      if (grabR >= clickGrip) {
+        sampR.axis = std::max(sampR.axis, grabR);
+        sampR.axisOk = true;
+        sampR.anyDown = true;
+      }
     }
+    // Effective axis: real float OR grip-as-click (already folded into samp). If neither
+    // reports a sample, treat level as 0 so latch can release (stuck-edge recovery).
+    auto effAxis = [](const cube_xr::TriggerSample& s, float grab, bool grabAsClick,
+                      float gTh) -> float {
+      float a = s.axisOk ? s.axis : 0.f;
+      if (grabAsClick && grab >= gTh) a = std::max(a, grab);
+      if (s.clickDown) a = std::max(a, 1.f);
+      return a;
+    };
+    const bool grabAsClick = !cfg.grabEnable;
+    const float axL = effAxis(sampL, grabL, grabAsClick, clickGrip);
+    const float axR = effAxis(sampR, grabR, grabAsClick, clickGrip);
+    // Hysteresis: latch while held so stuck float=1 only fires once until release
+    auto axisEdge = [](float axis, float press, float release, bool& latched) -> bool {
+      if (!latched && axis > press) {
+        latched = true;
+        return true;
+      }
+      if (latched && axis < release) latched = false;
+      return false;
+    };
+    const bool edgeL = sampL.clickEdge || axisEdge(axL, pressTh, releaseTh, axisLatchedL);
+    const bool edgeR = sampR.clickEdge || axisEdge(axR, pressTh, releaseTh, axisLatchedR);
+    // Level for grab priority / SMX / HUD
+    bool trigLEarly = sampL.anyDown || axisLatchedL;
+    bool trigREarly = sampR.anyDown || axisLatchedR;
     const bool anyTrig = trigLEarly || trigREarly;
 
-    // Live debug only if CUBE_DEBUG_INPUT=1 (full-panel dirty every tick was killing FPS)
-    static const bool kDbg = getenv("CUBE_DEBUG_INPUT") && getenv("CUBE_DEBUG_INPUT")[0] == '1';
-    if (kDbg) {
+    // Always write lightweight live log (~5 Hz) — no MarkDirty (was killing FPS)
+    {
       static int dbgN = 0;
-      if ((dbgN++ % 15) == 0) {
+      if ((dbgN++ % 14) == 0) {
         FILE* df = fopen("/tmp/cube_live.txt", "w");
         if (df) {
           fprintf(df,
-                  "t=%.2f head=%d\n"
-                  "L aim=%d hit=%d px=%d py=%d trig=%d grab=%.2f\n"
-                  "R aim=%d hit=%d px=%d py=%d trig=%d grab=%.2f\n"
-                  "panel=(%.2f,%.2f,%.2f)\n",
-                  (double)(dbgN / 72.f), headOk ? 1 : 0,
-                  aimValidL ? 1 : 0, panelHitL ? 1 : 0, hitPxL, hitPyL, trigLEarly ? 1 : 0, grabL,
-                  aimValidR ? 1 : 0, panelHitR ? 1 : 0, hitPxR, hitPyR, trigREarly ? 1 : 0, grabR,
-                  wp.c.x, wp.c.y, wp.c.z);
+                  "t=%.2f head=%d sess=%d\n"
+                  "L aim=%d hit=%d px=%d py=%d ax=%.2f clk=%d edge=%d grab=%.2f\n"
+                  "R aim=%d hit=%d px=%d py=%d ax=%.2f clk=%d edge=%d grab=%.2f\n"
+                  "headHit=%d px=%d py=%d\n"
+                  "panel=(%.2f,%.2f,%.2f) Lpos=(%.2f,%.2f,%.2f) Rpos=(%.2f,%.2f,%.2f)\n",
+                  (double)(dbgN / 72.f), headOk ? 1 : 0, sessionRunning ? 1 : 0,
+                  aimValidL ? 1 : 0, panelHitL ? 1 : 0, hitPxL, hitPyL, sampL.axis,
+                  sampL.clickDown ? 1 : 0, edgeL ? 1 : 0, grabL,
+                  aimValidR ? 1 : 0, panelHitR ? 1 : 0, hitPxR, hitPyR, sampR.axis,
+                  sampR.clickDown ? 1 : 0, edgeR ? 1 : 0, grabR,
+                  panelHitHead ? 1 : 0, hitPxH, hitPyH, wp.c.x, wp.c.y, wp.c.z,
+                  aimOL.x, aimOL.y, aimOL.z, aimOR.x, aimOR.y, aimOR.z);
           fclose(df);
         }
       }
@@ -639,9 +709,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     prevMenu = menuBtn;
 
-    // Ray-plane click: trigger edge OR dwell (hold aim on same cell ~0.65s).
-    // Live VR debug: WiVRn often reports trig=0 grab=0 while ray hits — dwell saves UX.
+    // Ray-plane click paths (all work when buttons are flaky):
+    //  1) rising edge of trigger/A while on panel
+    //  2) enter panel while already holding trigger (press-then-aim)
+    //  3) dwell hold ~0.75s on same cell
+    static float clickCd = 0.f;
+    if (clickCd > 0.f) clickCd -= dt;
     auto fireClick = [&](int px, int py, const char* which) {
+      if (clickCd > 0.f) return;
+      clickCd = 0.22f; // debounce multi-path same-frame / thrash
       fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d (ray on plane)\n", which, px, py);
       WebUI_PointerClick(ui, px, py);
       char st[96];
@@ -649,14 +725,19 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.status = st;
       WebUI_MarkDirty(ui);
     };
-    auto tryClick = [&](bool edge, bool hit, int px, int py, const char* which) {
-      if (!edge || grabbing || !hit) return;
-      fireClick(px, py, which);
+    auto tryClick = [&](bool edge, bool hit, bool prevHit, bool held, int px, int py,
+                        const char* which) {
+      if (grabbing || !hit) return;
+      // Edge press on panel, OR sweep onto panel while held
+      if (edge || (held && !prevHit)) fireClick(px, py, which);
     };
-    tryClick(trigL && !prevTrigL, panelHitL, hitPxL, hitPyL, "L");
-    tryClick(trigR && !prevTrigR, panelHitR, hitPxR, hitPyR, "R");
-    prevTrigL = trigL;
-    prevTrigR = trigR;
+    tryClick(edgeL, panelHitL, prevHitL, trigL, hitPxL, hitPyL, "L");
+    tryClick(edgeR, panelHitR, prevHitR, trigR, hitPxR, hitPyR, "R");
+    // Head-gaze + any trigger edge (when controllers miss plane)
+    if (!panelHitL && !panelHitR && panelHitHead && (edgeL || edgeR))
+      fireClick(hitPxH, hitPyH, "HEAD");
+    prevHitL = panelHitL;
+    prevHitR = panelHitR;
 
     // Dwell click: stay on roughly same panel pixel → click (no button needed)
     static float dwellT = 0.f;
@@ -672,6 +753,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       dhit = true;
       dpx = hitPxL;
       dpy = hitPyL;
+    } else if (panelHitHead) {
+      dhit = true;
+      dpx = hitPxH;
+      dpy = hitPyH;
     }
     // No dwell on CLOSE (bottom-left). Dwell 0.75s elsewhere when buttons are dead.
     const bool onClose = (dpy >= UI_H - 40 && dpx <= 110);

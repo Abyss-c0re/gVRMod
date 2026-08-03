@@ -31,9 +31,21 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
 void ShellInputDestroy(const XrApi& api, ShellInput& in);
 void ShellInputSync(const XrApi& api, XrSession session, ShellInput& in);
 
+// Per-hand raw sample for UI click edges (hysteresis / changedSinceLastSync).
+struct TriggerSample {
+  float axis = 0.f;       // trigger/value 0..1
+  bool axisOk = false;    // got a usable float this frame
+  bool clickDown = false; // A/X/thumb or trigger/click boolean
+  bool clickEdge = false; // boolean rose this sync (changedSinceLastSync && down)
+  bool anyDown = false;   // axis > thresh OR clickDown
+};
+
 // Per-hand (async dual-hand UI). Prefer these for laser/click/grab.
 bool ShellInputReadTriggerHand(const XrApi& api, XrSession session, const ShellInput& in,
                                Hand hand, float axisThresh = 0.55f);
+TriggerSample ShellInputSampleTriggerHand(const XrApi& api, XrSession session,
+                                          const ShellInput& in, Hand hand,
+                                          float axisThresh = 0.55f);
 float ShellInputReadGrabHand(const XrApi& api, XrSession session, const ShellInput& in,
                              Hand hand);
 bool ShellInputLocateAimHand(const XrApi& api, XrSession session, const ShellInput& in,

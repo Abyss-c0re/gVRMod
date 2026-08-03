@@ -13,6 +13,8 @@ void XrInputSync(XrSession session, XrInputState& in);
 
 bool XrInputReadTriggerHand(XrSession session, const XrInputState& in, XrHand hand,
                             float axisThresh = 0.55f);
+cube_xr::TriggerSample XrInputSampleTriggerHand(XrSession session, const XrInputState& in,
+                                                XrHand hand, float axisThresh = 0.55f);
 float XrInputReadGrabHand(XrSession session, const XrInputState& in, XrHand hand);
 bool XrInputLocateAimHand(XrSession session, const XrInputState& in, XrHand hand,
                           XrSpace base, XrTime time, XrPosef* outPose);

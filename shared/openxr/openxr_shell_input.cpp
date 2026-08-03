@@ -153,41 +153,76 @@ void ShellInputSync(const XrApi& api, XrSession session, ShellInput& in) {
   else xrSyncActions(session, &sync);
 }
 
-// Require isActive — treating inactive currentState as down stuck trig=1 forever (no edges).
-static bool GetBool(const XrApi& api, XrSession session, XrAction a, XrPath sub, bool* out) {
+// Active preferred. If inactive, only trust changedSinceLastSync (fresh event) —
+// never treat stale inactive currentState as held (that stuck trig=1, no edges).
+static bool GetBoolEx(const XrApi& api, XrSession session, XrAction a, XrPath sub, bool* out,
+                      bool* changed) {
   if (a == XR_NULL_HANDLE) return false;
   XrActionStateBoolean st{XR_TYPE_ACTION_STATE_BOOLEAN};
   XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
   gi.action = a;
   gi.subactionPath = sub;
   XrResult r = api.getBool ? api.getBool(session, &gi, &st) : xrGetActionStateBoolean(session, &gi, &st);
-  if (r != XR_SUCCESS || !st.isActive) return false;
+  if (r != XR_SUCCESS) return false;
+  if (!st.isActive && !st.changedSinceLastSync) return false;
   if (out) *out = st.currentState != XR_FALSE;
+  if (changed) *changed = st.changedSinceLastSync != XR_FALSE;
   return true;
 }
 
-static bool GetFloat(const XrApi& api, XrSession session, XrAction a, XrPath sub, float* out) {
+static bool GetBool(const XrApi& api, XrSession session, XrAction a, XrPath sub, bool* out) {
+  return GetBoolEx(api, session, a, sub, out, nullptr);
+}
+
+static bool GetFloatEx(const XrApi& api, XrSession session, XrAction a, XrPath sub, float* out,
+                       bool* changed) {
   if (a == XR_NULL_HANDLE) return false;
   XrActionStateFloat st{XR_TYPE_ACTION_STATE_FLOAT};
   XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
   gi.action = a;
   gi.subactionPath = sub;
   XrResult r = api.getFloat ? api.getFloat(session, &gi, &st) : xrGetActionStateFloat(session, &gi, &st);
-  if (r != XR_SUCCESS || !st.isActive) return false;
+  if (r != XR_SUCCESS) return false;
+  if (!st.isActive && !st.changedSinceLastSync) return false;
   if (out) *out = st.currentState;
+  if (changed) *changed = st.changedSinceLastSync != XR_FALSE;
   return true;
+}
+
+static bool GetFloat(const XrApi& api, XrSession session, XrAction a, XrPath sub, float* out) {
+  return GetFloatEx(api, session, a, sub, out, nullptr);
+}
+
+TriggerSample ShellInputSampleTriggerHand(const XrApi& api, XrSession session,
+                                          const ShellInput& in, Hand hand, float axisThresh) {
+  TriggerSample s{};
+  if (!in.attached) return s;
+  XrPath sub = HandPath(in, hand);
+  float f = 0.f;
+  bool fCh = false;
+  if (GetFloatEx(api, session, in.triggerAxis, sub, &f, &fCh)) {
+    s.axis = f;
+    s.axisOk = true;
+  } else if (GetFloatEx(api, session, in.triggerAxis, XR_NULL_PATH, &f, &fCh)) {
+    // Some WiVRn builds only update float without subaction path
+    s.axis = f;
+    s.axisOk = true;
+  }
+  bool b = false, bCh = false;
+  if (GetBoolEx(api, session, in.trigger, sub, &b, &bCh)) {
+    s.clickDown = b;
+    s.clickEdge = b && bCh;
+  } else if (GetBoolEx(api, session, in.trigger, XR_NULL_PATH, &b, &bCh)) {
+    s.clickDown = b;
+    s.clickEdge = b && bCh;
+  }
+  s.anyDown = (s.axisOk && s.axis > axisThresh) || s.clickDown;
+  return s;
 }
 
 bool ShellInputReadTriggerHand(const XrApi& api, XrSession session, const ShellInput& in,
                                Hand hand, float axisThresh) {
-  if (!in.attached) return false;
-  XrPath sub = HandPath(in, hand);
-  // Prefer float axis (Quest has no trigger/click). Per-hand subaction only.
-  float f = 0.f;
-  if (GetFloat(api, session, in.triggerAxis, sub, &f) && f > axisThresh) return true;
-  bool b = false;
-  if (GetBool(api, session, in.trigger, sub, &b) && b) return true;
-  return false;
+  return ShellInputSampleTriggerHand(api, session, in, hand, axisThresh).anyDown;
 }
 
 float ShellInputReadGrabHand(const XrApi& api, XrSession session, const ShellInput& in,

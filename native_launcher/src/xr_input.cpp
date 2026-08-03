@@ -20,6 +20,11 @@ bool XrInputReadTriggerHand(XrSession session, const XrInputState& in, XrHand ha
   return cube_xr::ShellInputReadTriggerHand(g_api, session, in, hand, axisThresh);
 }
 
+cube_xr::TriggerSample XrInputSampleTriggerHand(XrSession session, const XrInputState& in,
+                                                XrHand hand, float axisThresh) {
+  return cube_xr::ShellInputSampleTriggerHand(g_api, session, in, hand, axisThresh);
+}
+
 float XrInputReadGrabHand(XrSession session, const XrInputState& in, XrHand hand) {
   return cube_xr::ShellInputReadGrabHand(g_api, session, in, hand);
 }
