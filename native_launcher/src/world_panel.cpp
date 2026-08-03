@@ -126,24 +126,25 @@ bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
   Vec3 toHead = headP - center;
   if (Dot(toHead, toHead) < 1e-8f) toHead = fwd * -1.f;
 
-  // Normal MUST point toward head (toHead). If inside-out, flip face.
+  // Normal MUST point toward head (toHead). Readable texture is on that front face.
   g_wp.pose = WorldPanelMakePose(center, toHead);
   WorldPanelSyncAxes();
   {
     Vec3 toward = headP - g_wp.c;
+    // Bug was: MakePose(toward * -1) when already wrong → double-wrong / back-face to HMD
     if (Dot(g_wp.normal, toward) < 0.f) {
-      // Facing away — rebuild with opposite facing
-      g_wp.pose = WorldPanelMakePose(center, toward * -1.f);
+      g_wp.pose = WorldPanelMakePose(center, toward);
       WorldPanelSyncAxes();
-      // Still wrong? force flip axes
       if (Dot(g_wp.normal, toward) < 0.f) {
-        g_wp.normal = g_wp.normal * -1.f;
-        g_wp.right = g_wp.right * -1.f;
-        g_wp.pose = WorldPanelMakePose(g_wp.c, g_wp.normal);
+        // Hard flip: reverse normal via pose rebuild with explicit facing
+        g_wp.pose = WorldPanelMakePose(center, Normalize(toward));
         WorldPanelSyncAxes();
       }
-      fprintf(stderr, "[cube_webui] panel face corrected toward HMD\n");
+      fprintf(stderr, "[cube_webui] panel face forced toward HMD (front=image)\n");
     }
+    fprintf(stderr,
+            "[cube_webui] face check n·toHead=%.2f (want >0 = front to user)\n",
+            Dot(g_wp.normal, Normalize(toward)));
   }
   g_wp.ready = true;
   g_wp.frozen = true;
@@ -163,29 +164,51 @@ void WorldPanelSetCenter(Vec3 worldCenter) {
   WorldPanelSyncAxes();
 }
 
+bool WorldPanelEnsureFaceToward(Vec3 headWorldPos) {
+  if (!g_wp.ready) return false;
+  Vec3 toward = headWorldPos - g_wp.c;
+  if (Dot(toward, toward) < 1e-6f) return false;
+  // Front half-space: normal · (head - center) > 0
+  if (Dot(g_wp.normal, toward) > 0.05f) return false;
+  // Flip face in place (keep center); rebuild pose so image faces head
+  g_wp.pose = WorldPanelMakePose(g_wp.c, toward);
+  WorldPanelSyncAxes();
+  // Keep upright after flip
+  if (g_wp.up.y < 0.f) {
+    g_wp.pose = WorldPanelMakePose(g_wp.c, toward);
+    WorldPanelSyncAxes();
+  }
+  fprintf(stderr,
+          "[cube_webui] flipped panel to face HMD n=(%.2f,%.2f,%.2f) n·toHead=%.2f\n",
+          g_wp.normal.x, g_wp.normal.y, g_wp.normal.z,
+          Dot(g_wp.normal, Normalize(toward)));
+  return true;
+}
+
 bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHit,
                       float slopScale) {
   if (!g_wp.ready) return false;
   Vec3 d = Normalize(dir);
+  // FRONT face only (normal points toward user, image on that side).
+  // Two-sided hits made clicks register on the back while the readable menu
+  // faced the other way — "sensor on back, image on front".
+  float front = Dot(origin - g_wp.c, g_wp.normal);
+  if (front < -0.02f) return false; // controller is behind the panel
   float denom = Dot(d, g_wp.normal);
-  // Two-sided panel: rays from either face count (WiVRn emergency seed often
-  // faces the wrong way until MENU re-anchor).
-  if (std::fabs(denom) < 1e-5f) return false;
+  // Ray must go into the front (against the outward normal)
+  if (denom > -1e-5f) return false;
   float t = Dot(g_wp.c - origin, g_wp.normal) / denom;
-  // Allow slightly behind controller origin (tracking jitter) and long aim
-  if (t < -0.05f || t > 20.f) return false;
+  if (t < 0.f || t > 20.f) return false;
   Vec3 hit = origin + d * t;
   float u = Dot(hit - g_wp.c, g_wp.right);
   float v = Dot(hit - g_wp.c, g_wp.up);
   const float hw = g_wp.widthM * 0.5f;
   const float hh = g_wp.heightM * 0.5f;
-  // Default 8% rim slop; callers can pass ~1.35 for soft click when tip looks near
   const float slop = (slopScale < 1.f) ? 1.08f : slopScale;
   if (std::fabs(u) > hw * slop || std::fabs(v) > hh * slop) return false;
   u = std::max(-hw, std::min(hw, u));
   v = std::max(-hh, std::min(hh, v));
-  // 1:1 with FlipY draw: +right → +px, +up → UI top (py=0). NO 180 remap —
-  // tip on visual button must equal WebUI_PointerClick pixel.
+  // 1:1 with FlipY front draw: +right → +px, +up → py=0
   int px = (int)((u / hw * 0.5f + 0.5f) * (float)UI_W);
   int py = (int)((0.5f - v / hh * 0.5f) * (float)UI_H);
   px = std::max(0, std::min(UI_W - 1, px));

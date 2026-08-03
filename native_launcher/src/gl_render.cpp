@@ -116,15 +116,18 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
   const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
 
-  glDisable(GL_CULL_FACE);
+  // Front face only (normal toward HMD). Back face was showing a mirrored
+  // "ghost" while hits still registered — felt like image front / sensor back.
+  glEnable(GL_CULL_FACE);
+  glCullFace(GL_BACK);
+  glFrontFace(GL_CCW); // bl→br→tr→tl is CCW when viewed from front (along -normal)
   glDisable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // FlipY upload: V=0 = UI bottom, V=1 = UI top. U=0 = UI left.
-  // bl=geo bottom-left → (0,0), tl=geo top-left → (0,1) — matches ray hit 1:1.
+  // FlipY: V=0 UI bottom, V=1 UI top. Front winding matches hit u/v.
   glBegin(GL_QUADS);
   glTexCoord2f(0.f, 0.f);
   glVertex3f(bl.x, bl.y, bl.z);
@@ -138,6 +141,7 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glDisable(GL_TEXTURE_2D);
   glColor4f(1.f, 1.f, 1.f, 1.f);
   glDisable(GL_BLEND);
+  glDisable(GL_CULL_FACE);
 }
 
 void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb) {

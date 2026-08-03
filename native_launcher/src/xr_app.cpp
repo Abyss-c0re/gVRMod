@@ -460,6 +460,17 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
 
     auto& wp = WorldPanelState();
+    // If HMD is looking at the back, flip so readable image + front-only hits match
+    if (headOk && wp.ready && wp.frozen && !ui.handoff) {
+      static float faceCd = 0.f;
+      if (faceCd > 0.f) faceCd -= 1.f / 72.f;
+      else if (WorldPanelEnsureFaceToward(
+                   {headWorld.position.x, headWorld.position.y, headWorld.position.z})) {
+        faceCd = 1.0f;
+        ui.status = "PANEL FACING YOU (front = image + clicks)";
+        WebUI_MarkDirty(ui);
+      }
+    }
     // ── Dual-hand async: each hand has its own aim ray + trigger + grab ──
     aimValidL = aimValidR = aimValid = false;
     panelHitL = panelHitR = panelHit = false;
