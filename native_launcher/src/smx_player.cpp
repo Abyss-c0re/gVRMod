@@ -142,22 +142,20 @@ static int TcpDial(const std::string& peer) {
   return fd;
 }
 
-static bool SendAll(int fd, const void* data, size_t n) {
+// Returns 1 ok, 0 would-block (keep fd), -1 hard fail
+static int SendAll(int fd, const void* data, size_t n) {
   const uint8_t* p = (const uint8_t*)data;
   size_t off = 0;
   while (off < n) {
     ssize_t w = ::send(fd, p + off, n - off, MSG_NOSIGNAL);
     if (w < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        // non-blocking: skip rest this frame
-        return false;
-      }
-      return false;
+      if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
+      return -1;
     }
-    if (w == 0) return false;
+    if (w == 0) return -1;
     off += (size_t)w;
   }
-  return true;
+  return 1;
 }
 
 static bool RecvExact(int fd, void* data, size_t n) {
@@ -204,13 +202,15 @@ static int TryRecvFrame(int fd, uint8_t* out, size_t cap, size_t* nOut) {
   return 1;
 }
 
-static bool SendFrame(int fd, const void* payload, uint32_t n) {
+// 1 ok, 0 skip (EAGAIN), -1 fail
+static int SendFrame(int fd, const void* payload, uint32_t n) {
   uint8_t hdr[4];
   hdr[0] = (uint8_t)(n);
   hdr[1] = (uint8_t)(n >> 8);
   hdr[2] = (uint8_t)(n >> 16);
   hdr[3] = (uint8_t)(n >> 24);
-  if (!SendAll(fd, hdr, 4)) return false;
+  int r = SendAll(fd, hdr, 4);
+  if (r != 1) return r;
   return SendAll(fd, payload, n);
 }
 
@@ -226,8 +226,17 @@ uint32_t SmxHashBytes(const void* data, size_t n) {
   return Fnv1a(data, n);
 }
 
+bool SmxEnabled(const SmxPeerState& s) {
+  return s.listen_fd >= 0 || s.fd >= 0 || !s.peer_addr.empty() || !s.bind_addr.empty();
+}
+
 void SmxInit(SmxPeerState& s, const char* selfId) {
   s = {};
+  s.tx_hz = 20;
+  if (const char* hz = getenv("GVRMOD_SMX_HZ")) {
+    int v = std::atoi(hz);
+    if (v >= 1 && v <= 90) s.tx_hz = (uint32_t)v;
+  }
   std::strncpy(s.self_id, selfId ? selfId : "gvrmod-player", sizeof s.self_id - 1);
   const char* key = getenv("GVRMOD_SMX_KEY");
   if (!key || !key[0]) key = getenv("CUBALC_SMX_KEY");
@@ -259,9 +268,11 @@ void SmxInit(SmxPeerState& s, const char* selfId) {
     }
   }
   if (s.bind_addr.empty() && s.peer_addr.empty()) {
-    fprintf(stderr, "[smx] idle — set GVRMOD_SMX_BIND or GVRMOD_SMX_PEER for P2P\n");
+    fprintf(stderr, "[smx] idle (no bind/peer) — zero cost until GVRMOD_SMX_BIND/PEER set\n");
+  } else {
+    fprintf(stderr, "[smx] key=%s self=%s tx_hz=%u\n", s.key_ok ? "ok" : "none(open)", s.self_id,
+            s.tx_hz);
   }
-  fprintf(stderr, "[smx] key=%s self=%s\n", s.key_ok ? "ok" : "none(open)", s.self_id);
 }
 
 void SmxShutdown(SmxPeerState& s) {
@@ -273,6 +284,9 @@ void SmxShutdown(SmxPeerState& s) {
 }
 
 void SmxPump(SmxPeerState& s, const SmxPlayerMatrix& local, SmxPlayerMatrix* peerOut) {
+  // Fast path: no sockets configured and no live peer
+  if (!SmxEnabled(s)) return;
+
   // Accept
   if (s.listen_fd >= 0 && s.fd < 0) {
     sockaddr_in ca{};
@@ -322,34 +336,42 @@ void SmxPump(SmxPeerState& s, const SmxPlayerMatrix& local, SmxPlayerMatrix* pee
     return;
   }
 
-  // Build TX frame from local matrix (caller fills most fields; we stamp seq/magic)
-  SmxPlayerMatrix tx = local;
-  tx.magic = kMagic;
-  tx.proto = kProto;
-  tx.flags = kHoldFlash;
-  s.tx_seq++;
-  if (s.tx_seq == 0) s.tx_seq = 1;
-  tx.seq = s.tx_seq;
-  tx.time_ns = NowNs();
-  if (tx.player_id[0] == 0)
-    std::strncpy(tx.player_id, s.self_id, sizeof tx.player_id - 1);
+  // Rate-limit TX (poses are ~20Hz enough for matrix bus; saves CPU vs 72/90fps)
+  const uint64_t now = NowNs();
+  const uint64_t minGap = 1000000000ull / (uint64_t)(s.tx_hz ? s.tx_hz : 20);
+  const bool doTx = (s.last_tx_ns == 0 || now - s.last_tx_ns >= minGap);
 
-  uint8_t wire[sizeof(SmxPlayerMatrix)];
-  std::memcpy(wire, &tx, sizeof tx);
-  if (s.key_ok)
-    XorKeystream(s.key, tx.seq, wire, sizeof wire);
+  if (doTx) {
+    SmxPlayerMatrix tx = local;
+    tx.magic = kMagic;
+    tx.proto = kProto;
+    tx.flags = kHoldFlash;
+    s.tx_seq++;
+    if (s.tx_seq == 0) s.tx_seq = 1;
+    tx.seq = s.tx_seq;
+    tx.time_ns = now;
+    if (tx.player_id[0] == 0)
+      std::strncpy(tx.player_id, s.self_id, sizeof tx.player_id - 1);
 
-  if (!SendFrame(s.fd, wire, (uint32_t)sizeof wire)) {
-    // disconnect
-    close(s.fd);
-    s.fd = -1;
-    s.connected = false;
-    s.last_err = "send_fail";
-    fprintf(stderr, "[smx] send fail — peer dropped\n");
-    return;
+    uint8_t wire[sizeof(SmxPlayerMatrix)];
+    std::memcpy(wire, &tx, sizeof tx);
+    if (s.key_ok)
+      XorKeystream(s.key, tx.seq, wire, sizeof wire);
+
+    int sr = SendFrame(s.fd, wire, (uint32_t)sizeof wire);
+    if (sr < 0) {
+      close(s.fd);
+      s.fd = -1;
+      s.connected = false;
+      s.last_err = "send_fail";
+      fprintf(stderr, "[smx] send fail — peer dropped\n");
+      return;
+    }
+    if (sr == 1) s.last_tx_ns = now;
+    // sr==0: EAGAIN — keep connection, skip this tick
   }
 
-  // Recv (drain at most one frame per pump to stay frame-budget friendly)
+  // Recv at most one frame (non-blocking)
   uint8_t rxbuf[sizeof(SmxPlayerMatrix) + 64];
   size_t n = 0;
   int rr = TryRecvFrame(s.fd, rxbuf, sizeof rxbuf, &n);
@@ -363,10 +385,8 @@ void SmxPump(SmxPeerState& s, const SmxPlayerMatrix& local, SmxPlayerMatrix* pee
   }
   if (rr == 1 && n >= sizeof(SmxPlayerMatrix)) {
     if (s.key_ok) {
-      // seq is after magic+proto+flags (offset 8)
       uint32_t seqGuess = 0;
       std::memcpy(&seqGuess, rxbuf + 8, 4);
-      // try decrypt with that seq
       XorKeystream(s.key, seqGuess, rxbuf, sizeof(SmxPlayerMatrix));
     }
     SmxPlayerMatrix rx{};

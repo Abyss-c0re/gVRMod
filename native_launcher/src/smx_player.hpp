@@ -49,6 +49,8 @@ struct SmxPeerState {
   int  listen_fd = -1;
   uint32_t tx_seq = 0;
   uint32_t rx_seq = 0;
+  uint64_t last_tx_ns = 0;
+  uint32_t tx_hz = 20;   // cap matrix send rate (not full XR fps)
   SmxPlayerMatrix last_rx{};
   std::string last_err;
   std::string peer_addr; // host:port for dial
@@ -59,11 +61,12 @@ struct SmxPeerState {
 };
 
 // Init from env: GVRMOD_SMX_PEER, GVRMOD_SMX_BIND, CUBALC_SMX_KEY / GVRMOD_SMX_KEY
+// Optional GVRMOD_SMX_HZ (default 20). No bind+no peer → pump is near-zero cost.
 void SmxInit(SmxPeerState& s, const char* selfId = "gvrmod-player");
 void SmxShutdown(SmxPeerState& s);
+bool SmxEnabled(const SmxPeerState& s); // false when idle (no socket work)
 
-// Non-blocking pump: accept/connect, send local matrix, recv peer matrix.
-// Call once per frame from XR loop (cheap when idle).
+// Non-blocking pump: accept/connect, send local matrix ≤ tx_hz, recv one frame.
 void SmxPump(SmxPeerState& s, const SmxPlayerMatrix& local, SmxPlayerMatrix* peerOut /*nullable*/);
 
 // Pack helpers from launcher frame state

@@ -525,33 +525,23 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     const bool anyTrig = trigLEarly || trigREarly;
 
-    // Live debug stream for agent + HUD (user in VR right now)
-    {
+    // Live debug only if CUBE_DEBUG_INPUT=1 (full-panel dirty every tick was killing FPS)
+    static const bool kDbg = getenv("CUBE_DEBUG_INPUT") && getenv("CUBE_DEBUG_INPUT")[0] == '1';
+    if (kDbg) {
       static int dbgN = 0;
-      if ((dbgN++ % 8) == 0) { // ~9 Hz
+      if ((dbgN++ % 15) == 0) {
         FILE* df = fopen("/tmp/cube_live.txt", "w");
         if (df) {
           fprintf(df,
                   "t=%.2f head=%d\n"
                   "L aim=%d hit=%d px=%d py=%d trig=%d grab=%.2f\n"
                   "R aim=%d hit=%d px=%d py=%d trig=%d grab=%.2f\n"
-                  "panel=(%.2f,%.2f,%.2f) thr=%.2f grabEn=%d\n",
+                  "panel=(%.2f,%.2f,%.2f)\n",
                   (double)(dbgN / 72.f), headOk ? 1 : 0,
                   aimValidL ? 1 : 0, panelHitL ? 1 : 0, hitPxL, hitPyL, trigLEarly ? 1 : 0, grabL,
                   aimValidR ? 1 : 0, panelHitR ? 1 : 0, hitPxR, hitPyR, trigREarly ? 1 : 0, grabR,
-                  wp.c.x, wp.c.y, wp.c.z, cfg.triggerThresh, cfg.grabEnable ? 1 : 0);
+                  wp.c.x, wp.c.y, wp.c.z);
           fclose(df);
-        }
-        // Always show on-panel status so user sees hits live
-        char hud[128];
-        snprintf(hud, sizeof hud, "L%s T%d G%.1f R%s T%d G%.1f | hold 0.65s=click",
-                 panelHitL ? "HIT" : (aimValidL ? "ray" : "---"),
-                 trigLEarly ? 1 : 0, grabL,
-                 panelHitR ? "HIT" : (aimValidR ? "ray" : "---"),
-                 trigREarly ? 1 : 0, grabR);
-        if (!ui.handoff) {
-          ui.status = hud;
-          WebUI_MarkDirty(ui);
         }
       }
     }
@@ -732,8 +722,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     if (stickCooldown > 0.f) stickCooldown -= 1.f / 72.f;
 
-    // ── SMX: pack player matrix (poses + input) → raw P2P bidirectional ──
-    {
+    // SMX matrix bus — only if configured; rate-limited inside SmxPump (default 20Hz)
+    if (SmxEnabled(smx)) {
       SmxPlayerMatrix mat{};
       std::strncpy(mat.player_id, smx.self_id, sizeof mat.player_id - 1);
       if (headOk) {
@@ -743,7 +733,6 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         mat.valid_mask |= 1;
       }
       if (aimValidL) {
-        // Reconstruct orientation from aim origin only for wire — store pos + unit dir as quat identity-ish
         SmxFillPose(mat.aim_l, aimOL.x, aimOL.y, aimOL.z, aimDL.x, aimDL.y, aimDL.z, 0.f);
         mat.valid_mask |= 2;
       }
@@ -756,20 +745,12 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       mat.grab_l = grabL;
       mat.grab_r = grabR;
       mat.menu = menuBtn ? 1 : 0;
-      float slx = 0, sly = 0, srx = 0, sry = 0;
-      XrInputReadStickHand(session, input, XrHand::Left, &slx, &sly);
-      XrInputReadStickHand(session, input, XrHand::Right, &srx, &sry);
-      mat.stick_lx = slx; mat.stick_ly = sly;
-      mat.stick_rx = srx; mat.stick_ry = sry;
       mat.ui_tex_w = (uint32_t)UI_W;
       mat.ui_tex_h = (uint32_t)UI_H;
-      mat.ui_tex_hash = SmxHashBytes(panelBuf.data(), panelBuf.size() > 4096 ? 4096 : panelBuf.size());
+      // Cheap hash: seq + paint frame — do NOT scan full RGBA every XR tick
+      mat.ui_tex_hash = (uint32_t)ui.paintFrame * 2654435761u ^ (uint32_t)smx.tx_seq;
       SmxPlayerMatrix peer{};
       SmxPump(smx, mat, &peer);
-      static int smxLog = 0;
-      if (smx.connected && (smxLog++ % 300) == 0)
-        fprintf(stderr, "[smx] live tx_seq=%u rx_seq=%u peer=%s mask=%u\n",
-                smx.tx_seq, smx.rx_seq, peer.player_id, peer.valid_mask);
     }
 
     std::vector<XrCompositionLayerProjectionView> projViews;
