@@ -32,26 +32,17 @@ void GlUnbindFbo() {
   if (glBindFramebuffer_) glBindFramebuffer_((GLenum)0x8D40, 0);
 }
 
-// WiVRn/Quest: panel mesh + GL row order show UI upside-down+mirrored without this.
-// 180° upload makes NEW GAME top-left visually. Hit test must apply the same 180°
-// (see WorldPanelRayHit).
-static void UploadRgbaRotated180(GLuint tex, int w, int h, const void* rgba) {
-  static std::vector<unsigned char> rot;
-  const size_t n = (size_t)w * (size_t)h * 4;
-  rot.resize(n);
+// UI buffer: y=0 = top (NEW GAME). OpenGL puts first image row at V=0 (bottom).
+// Flip Y only so UI top lands at V=1 (texture top) = panel geometric top. No X mirror.
+static void UploadRgbaFlipY(GLuint tex, int w, int h, const void* rgba) {
+  static std::vector<unsigned char> flip;
+  const size_t row = (size_t)w * 4;
+  flip.resize(row * (size_t)h);
   const auto* s = static_cast<const unsigned char*>(rgba);
-  for (int y = 0; y < h; ++y) {
-    for (int x = 0; x < w; ++x) {
-      const int si = (y * w + x) * 4;
-      const int di = ((h - 1 - y) * w + (w - 1 - x)) * 4;
-      rot[di + 0] = s[si + 0];
-      rot[di + 1] = s[si + 1];
-      rot[di + 2] = s[si + 2];
-      rot[di + 3] = s[si + 3];
-    }
-  }
+  for (int y = 0; y < h; ++y)
+    std::memcpy(flip.data() + (size_t)(h - 1 - y) * row, s + (size_t)y * row, row);
   glBindTexture(GL_TEXTURE_2D, tex);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rot.data());
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, flip.data());
 }
 
 GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
@@ -61,12 +52,12 @@ GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  if (rgba) UploadRgbaRotated180(t, w, h, rgba);
+  if (rgba) UploadRgbaFlipY(t, w, h, rgba);
   return t;
 }
 
 void GlUpdateRgbaTex(GLuint tex, int w, int h, const void* rgba) {
-  UploadRgbaRotated180(tex, w, h, rgba);
+  UploadRgbaFlipY(tex, w, h, rgba);
 }
 
 void GlLoadModelviewLocal(const XrPosef& eyeWorld) {
@@ -108,7 +99,6 @@ void GlLoadProjectionFov(const XrFovf& fov, float nearZ, float farZ) {
     B = T;
     T = tmp;
   }
-  // Standard OpenXR→GL frustum (no Y flip — 180° handled in texture)
   glFrustum(L, Rgt, B, T, nearZ, farZ);
 }
 
@@ -119,6 +109,7 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   const auto& cfg = PanelCfgConst();
   const float hw = (wp.widthM > 0.05f) ? wp.widthM * 0.5f : cfg.halfW;
   const float hh = (wp.heightM > 0.05f) ? wp.heightM * 0.5f : cfg.halfH;
+  // Panel corners in world (right / up from center)
   const Vec3 bl = wp.c - wp.right * hw - wp.up * hh;
   const Vec3 br = wp.c + wp.right * hw - wp.up * hh;
   const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
@@ -131,7 +122,8 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // Texture already 180°-rotated on upload — standard UV, front winding bl→br→tr→tl.
+  // After FlipY: V=0 = UI bottom, V=1 = UI top. U=0 = UI left.
+  // bl=bottom-left → (0,0), tl=top-left → (0,1) — matches hit: +up → py↓
   glBegin(GL_QUADS);
   glTexCoord2f(0.f, 0.f);
   glVertex3f(bl.x, bl.y, bl.z);
@@ -152,14 +144,13 @@ void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb) {
   glDisable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  // One clean ray + one tip (no multi-glow "third wheel" points)
   glLineWidth(3.f);
   glBegin(GL_LINES);
   glColor4f(cr, cg, cb, 1.f);
   glVertex3f(a.x, a.y, a.z);
   glVertex3f(b.x, b.y, b.z);
   glEnd();
-  glPointSize(14.f);
+  glPointSize(16.f);
   glBegin(GL_POINTS);
   glColor4f(1.f, 1.f, 1.f, 1.f);
   glVertex3f(b.x, b.y, b.z);

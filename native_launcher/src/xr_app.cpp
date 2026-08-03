@@ -515,8 +515,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     armGrip(grabEngageL, grabArmL);
     armGrip(grabEngageR, grabArmR);
 
-    // Click: trigger OR grip (when grab off). Low thresh for WiVRn live debug.
-    const float clickGrip = 0.30f;
+    // Click = trigger float/button. Grip as click only when grab-move is off (edge via prev).
+    const float clickGrip = 0.45f;
     bool trigLEarly = XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh);
     bool trigREarly = XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh);
     if (!cfg.grabEnable) {
