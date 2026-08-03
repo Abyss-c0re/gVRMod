@@ -302,7 +302,7 @@ mkdir -p "$CFG_DIR" "$DATA_DIR"
 # Source engine cfg only — no shell echo lines inside
 cat > "$CFG_DIR/gvrmod_cube.cfg" <<'CFG'
 // gVRMod native VR wrapper — Cube experience
-// HMD primary. Desktop = tiny borderless mirror. Auto OpenXR + Cube hub.
+// HMD primary. Desktop = small windowed mirror (with borders). Auto OpenXR + Cube hub.
 vrmod_prefer_backend openxr
 vrmod_autostart 1
 vrmod_hub 1
