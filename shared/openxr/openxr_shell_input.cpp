@@ -76,9 +76,11 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
   push(in.stick, path::rightThumbstick);
   push(in.stick, path::leftThumbstick);
   push(in.menu, path::leftMenuClick);
-  // Face buttons = click (WiVRn often weak on trigger/value alone)
+  // Face buttons + stick click = UI click (WiVRn often has dead trigger floats)
   push(in.trigger, path::rightAClick);
   push(in.trigger, path::leftXClick);
+  push(in.trigger, path::rightThumbClick);
+  push(in.trigger, path::leftThumbClick);
   if (!SuggestProfile(api, kProfileOculusTouch, binds, (uint32_t)n)) {
     fprintf(stderr, "[cube_xr] FATAL: oculus/touch_controller bindings failed\n");
   } else {

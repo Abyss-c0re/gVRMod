@@ -594,8 +594,8 @@ void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
 
 bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   WebUI_MarkDirty(s);
-  // Always: CLOSE / QUIT top-right
-  if (py >= 4 && py <= 40 && px >= UI_W - 110 && px <= UI_W - 8) {
+  // CLOSE bottom-left (away from rest-aim / START)
+  if (py >= UI_H - 40 && py <= UI_H - 8 && px >= 8 && px <= 100) {
     WebUI_SaveBindingsIfDirty(s);
     s.wantQuit = true;
     s.status = "CLOSING";
@@ -1041,8 +1041,7 @@ static void DrawNav(unsigned char* rgba, WebUIPage page) {
   tab(page == WebUIPage::Addons, 128, 100, "ADDONS", 144);
   tab(page == WebUIPage::Settings, 238, 120, "SETTINGS", 250);
   tab(page == WebUIPage::Bindings, 368, 128, "BINDINGS", 384);
-  FillRect(rgba, UI_W - 110, 6, 100, 32, CT_RGB(CubeTheme::CLOSE), 255);
-  DrawText(rgba, UI_W - 92, 14, "CLOSE", 255, 255, 255, 2);
+  // CLOSE moved off the top strip (rest-aim was auto-exiting the app)
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
@@ -1332,10 +1331,12 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? CubeTheme::CRIMSON_HOT[0] : CubeTheme::CRIMSON[0], startFoc ? CubeTheme::CRIMSON_HOT[1] : CubeTheme::CRIMSON[1], startFoc ? CubeTheme::CRIMSON_HOT[2] : CubeTheme::CRIMSON[2], 255);
   DrawText(rgba, setX + 36, by + 14, "START GAME", 255, 255, 255, 2);
 
-  DrawText(rgba, 12, UI_H - 22, s.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
+  FillRect(rgba, 8, UI_H - 36, 92, 28, CT_RGB(CubeTheme::CLOSE), 255);
+  DrawText(rgba, 22, UI_H - 28, "CLOSE", 255, 255, 255, 1);
+  DrawText(rgba, 110, UI_H - 28, s.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
   char sel[128];
-  snprintf(sel, sizeof(sel), "SEL %s  | SETTINGS TAB = GRAPHICS", WebUI_SelectedMap(s).c_str());
-  DrawText(rgba, mapX + 8, UI_H - 22, sel, CT_RGB(CubeTheme::CRIMSON_HOT), 1);
+  snprintf(sel, sizeof(sel), "SEL %s", WebUI_SelectedMap(s).c_str());
+  DrawText(rgba, mapX + 8, UI_H - 28, sel, CT_RGB(CubeTheme::CRIMSON_HOT), 1);
 
   if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
     int cx = cursor ? cursor->x : s.cursorX;

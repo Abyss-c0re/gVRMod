@@ -515,9 +515,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     armGrip(grabEngageL, grabArmL);
     armGrip(grabEngageR, grabArmR);
 
-    // Click sources: trigger axis/button OR (when grab disabled) squeeze ≥ click thresh.
-    // WiVRn often fails pure trigger/value — grip was the only live axis users feel.
-    const float clickGrip = 0.55f;
+    // Click: trigger OR grip (when grab off). Low thresh for WiVRn live debug.
+    const float clickGrip = 0.30f;
     bool trigLEarly = XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh);
     bool trigREarly = XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh);
     if (!cfg.grabEnable) {
@@ -525,6 +524,37 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       if (grabR >= clickGrip) trigREarly = true;
     }
     const bool anyTrig = trigLEarly || trigREarly;
+
+    // Live debug stream for agent + HUD (user in VR right now)
+    {
+      static int dbgN = 0;
+      if ((dbgN++ % 8) == 0) { // ~9 Hz
+        FILE* df = fopen("/tmp/cube_live.txt", "w");
+        if (df) {
+          fprintf(df,
+                  "t=%.2f head=%d\n"
+                  "L aim=%d hit=%d px=%d py=%d trig=%d grab=%.2f\n"
+                  "R aim=%d hit=%d px=%d py=%d trig=%d grab=%.2f\n"
+                  "panel=(%.2f,%.2f,%.2f) thr=%.2f grabEn=%d\n",
+                  (double)(dbgN / 72.f), headOk ? 1 : 0,
+                  aimValidL ? 1 : 0, panelHitL ? 1 : 0, hitPxL, hitPyL, trigLEarly ? 1 : 0, grabL,
+                  aimValidR ? 1 : 0, panelHitR ? 1 : 0, hitPxR, hitPyR, trigREarly ? 1 : 0, grabR,
+                  wp.c.x, wp.c.y, wp.c.z, cfg.triggerThresh, cfg.grabEnable ? 1 : 0);
+          fclose(df);
+        }
+        // Always show on-panel status so user sees hits live
+        char hud[128];
+        snprintf(hud, sizeof hud, "L%s T%d G%.1f R%s T%d G%.1f | hold 0.65s=click",
+                 panelHitL ? "HIT" : (aimValidL ? "ray" : "---"),
+                 trigLEarly ? 1 : 0, grabL,
+                 panelHitR ? "HIT" : (aimValidR ? "ray" : "---"),
+                 trigREarly ? 1 : 0, grabR);
+        if (!ui.handoff) {
+          ui.status = hud;
+          WebUI_MarkDirty(ui);
+        }
+      }
+    }
 
     if (!cfg.grabEnable) {
       grabbing = false;
@@ -619,10 +649,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     prevMenu = menuBtn;
 
-    // Ray-plane touch: click only when THAT hand's ray hits the panel (no ghost click).
-    auto tryClick = [&](bool edge, bool hit, int px, int py, const char* which) {
-      if (!edge || grabbing) return;
-      if (!hit) return; // must touch the plane
+    // Ray-plane click: trigger edge OR dwell (hold aim on same cell ~0.65s).
+    // Live VR debug: WiVRn often reports trig=0 grab=0 while ray hits — dwell saves UX.
+    auto fireClick = [&](int px, int py, const char* which) {
       fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d (ray on plane)\n", which, px, py);
       WebUI_PointerClick(ui, px, py);
       char st[96];
@@ -630,10 +659,57 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.status = st;
       WebUI_MarkDirty(ui);
     };
+    auto tryClick = [&](bool edge, bool hit, int px, int py, const char* which) {
+      if (!edge || grabbing || !hit) return;
+      fireClick(px, py, which);
+    };
     tryClick(trigL && !prevTrigL, panelHitL, hitPxL, hitPyL, "L");
     tryClick(trigR && !prevTrigR, panelHitR, hitPxR, hitPyR, "R");
     prevTrigL = trigL;
     prevTrigR = trigR;
+
+    // Dwell click: stay on roughly same panel pixel → click (no button needed)
+    static float dwellT = 0.f;
+    static int dwellPx = -1, dwellPy = -1;
+    static bool dwellFired = false;
+    int dpx = -1, dpy = -1;
+    bool dhit = false;
+    if (panelHitR) {
+      dhit = true;
+      dpx = hitPxR;
+      dpy = hitPyR;
+    } else if (panelHitL) {
+      dhit = true;
+      dpx = hitPxL;
+      dpy = hitPyL;
+    }
+    // No dwell on CLOSE (bottom-left). Dwell 0.75s elsewhere when buttons are dead.
+    const bool onClose = (dpy >= UI_H - 40 && dpx <= 110);
+    if (dhit && !grabbing && !onClose) {
+      const int cell = 36;
+      if (dwellPx >= 0 && std::abs(dpx - dwellPx) < cell && std::abs(dpy - dwellPy) < cell) {
+        dwellT += dt;
+        if (dwellT >= 0.75f && !dwellFired) {
+          dwellFired = true;
+          fireClick(dpx, dpy, "DWELL");
+        } else if (!dwellFired && (static_cast<int>(dwellT * 10) % 3 == 0)) {
+          char st[80];
+          snprintf(st, sizeof st, "HOLD… %.0f%% @%d,%d",
+                   std::min(100.f, dwellT / 0.75f * 100.f), dpx, dpy);
+          ui.status = st;
+          WebUI_MarkDirty(ui);
+        }
+      } else {
+        dwellPx = dpx;
+        dwellPy = dpy;
+        dwellT = 0.f;
+        dwellFired = false;
+      }
+    } else {
+      dwellT = 0.f;
+      dwellPx = dwellPy = -1;
+      dwellFired = false;
+    }
 
     float sx = 0.f, sy = 0.f;
     if (XrInputReadStick(session, input, &sx, &sy)) {
