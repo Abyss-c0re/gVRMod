@@ -115,16 +115,17 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // Raw upload: first row = UI top = GL V=0 (bottom of texture).
-  // Map panel TOP (tl/tr) to V=0 so NEW GAME is geometric +up; hits use same py.
+  // Front face toward +normal (user). Winding bl→br→tr→tl = CCW from front.
+  // Raw buffer y=0 = UI top. GL V=0 = first row = UI top → put on panel +up (tl/tr).
+  // U: left of panel = UI left (no mirror / not inside-out).
   glBegin(GL_QUADS);
-  glTexCoord2f(0.f, 1.f); // bl = UI bottom
+  glTexCoord2f(0.f, 1.f); // bl — UI bottom-left
   glVertex3f(bl.x, bl.y, bl.z);
-  glTexCoord2f(1.f, 1.f);
+  glTexCoord2f(1.f, 1.f); // br — UI bottom-right
   glVertex3f(br.x, br.y, br.z);
-  glTexCoord2f(1.f, 0.f); // tr = UI top
+  glTexCoord2f(1.f, 0.f); // tr — UI top-right
   glVertex3f(tr.x, tr.y, tr.z);
-  glTexCoord2f(0.f, 0.f); // tl = UI top-left
+  glTexCoord2f(0.f, 0.f); // tl — UI top-left (NEW GAME)
   glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
   glDisable(GL_TEXTURE_2D);

@@ -126,8 +126,25 @@ bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
   Vec3 toHead = headP - center;
   if (Dot(toHead, toHead) < 1e-8f) toHead = fwd * -1.f;
 
+  // Normal MUST point toward head (toHead). If inside-out, flip face.
   g_wp.pose = WorldPanelMakePose(center, toHead);
   WorldPanelSyncAxes();
+  {
+    Vec3 toward = headP - g_wp.c;
+    if (Dot(g_wp.normal, toward) < 0.f) {
+      // Facing away — rebuild with opposite facing
+      g_wp.pose = WorldPanelMakePose(center, toward * -1.f);
+      WorldPanelSyncAxes();
+      // Still wrong? force flip axes
+      if (Dot(g_wp.normal, toward) < 0.f) {
+        g_wp.normal = g_wp.normal * -1.f;
+        g_wp.right = g_wp.right * -1.f;
+        g_wp.pose = WorldPanelMakePose(g_wp.c, g_wp.normal);
+        WorldPanelSyncAxes();
+      }
+      fprintf(stderr, "[cube_webui] panel face corrected toward HMD\n");
+    }
+  }
   g_wp.ready = true;
   g_wp.frozen = true;
   g_wp.seedCount++;
@@ -166,7 +183,7 @@ bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHi
   // Clamp u/v into panel for pixel mapping when inside slop rim
   u = std::max(-hw, std::min(hw, u));
   v = std::max(-hh, std::min(hh, v));
-  // Geometric +right → +px, +up → UI top (py=0). Must match gl_render UV (tl=UI top).
+  // Same axes as draw: +right → +px, +up → UI top (py→0).
   int px = (int)((u / hw * 0.5f + 0.5f) * (float)UI_W);
   int py = (int)((0.5f - v / hh * 0.5f) * (float)UI_H);
   px = std::max(0, std::min(UI_W - 1, px));
