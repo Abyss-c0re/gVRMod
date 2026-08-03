@@ -11,10 +11,10 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     if (std::strcmp(argv[i], "--help") == 0) {
       std::printf(
-          "cube_webui_launcher — Cube WebUI in OpenXR\n"
-          "  Headset: browse maps/addons/settings. START spawns GMod.\n"
-          "  CLOSE exits. GRIP moves world panel.\n"
-          "  Env: GMOD_DIR  XR_RUNTIME_JSON  CUBE_PANEL_*\n"
+          "cube_webui_launcher — Cube WebUI in OpenXR (seamless product)\n"
+          "  TRIGGER click · MENU re-place panel · CLOSE exit · START → GMod handoff\n"
+          "  Same Cube crimson theme as Lua vrmod-x64 (cl_cube_theme).\n"
+          "  grab_enable=0 by default (no grip thrash). Env: GMOD_DIR XR_RUNTIME_JSON\n"
           "  Cmds: echo start|close|addons|settings|reset|click >/tmp/cube_webui_cmd\n");
       return 0;
     }

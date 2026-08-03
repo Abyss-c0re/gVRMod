@@ -42,9 +42,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   fprintf(stderr, "[cube_webui] OpenXR WebUI (modular host)\n");
   fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
-  fprintf(stderr, "[cube_webui] TRIGGER=click GRIP=move CLOSE=exit MENU=reseed\n");
-  fprintf(stderr, "[cube_webui] dual-hand async L+R · SMX player matrix path enabled\n");
-  fprintf(stderr, "[cube_webui] paint law: dirty/heartbeat (research-2) · soft_cursor=off · laser reticle\n");
+  fprintf(stderr, "[cube_webui] TRIGGER=click · MENU=re-place · CLOSE=exit · grab=%s\n",
+          cfg.grabEnable ? "on" : "off");
+  fprintf(stderr, "[cube_webui] seamless: eye-pose seed · dual-hand L+R · Cube theme · SMX\n");
 
   GlxContext glx{};
   if (!GlxCreate(glx)) {
@@ -319,7 +319,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       std::string phase = ReadCubeHandoffPhase(gmodRoot);
       if (phase.empty()) phase = gmodUp ? "gmod_process" : "waiting_process";
       ui.handoffPhase = phase;
-      ui.handoffDetail = gmodUp ? "GMod up · waiting take_xr" : "waiting for GMod process…";
+      ui.handoffDetail = gmodUp ? "GMod live · waiting take_xr (seamless)"
+                                : "booting GMod · panel holds OpenXR…";
+      WebUI_MarkDirty(ui);
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
       // Soft only after long wait if process is up but never signaled (was 40s — race window)
       bool soft = gmodUp && ui.handoffElapsed > 90.f;
@@ -358,26 +360,56 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     XrInputSync(session, input);
 
-    // Head pose in WORLD (STAGE/LOCAL) — used ONLY for first seed + MENU re-place.
-    // NEVER call WorldPanelSeed every frame (that is HMD-driven flight heresy).
+    // Head pose in WORLD (STAGE/LOCAL) — seed + MENU re-place only (not per-frame follow).
     XrPosef headWorld = IdentityPose();
     bool headOk = false;
+    auto acceptHead = [&](const XrPosef& p, XrSpaceLocationFlags flags) {
+      const XrSpaceLocationFlags need =
+          XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+      if ((flags & need) != need) return false;
+      // Reject origin-stuck junk (WiVRn pre-track often reports 0,0,0)
+      float d2 = p.position.x * p.position.x + p.position.y * p.position.y +
+                 p.position.z * p.position.z;
+      if (d2 < 0.0001f && std::fabs(p.orientation.w) > 0.99f) return false;
+      headWorld = p;
+      return true;
+    };
     if (viewSpace) {
       XrSpaceLocation vloc{XR_TYPE_SPACE_LOCATION};
-      if (XR_SUCCEEDED(xrLocateSpace(viewSpace, space, fs.predictedDisplayTime, &vloc))) {
-        const XrSpaceLocationFlags need =
-            XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-        if ((vloc.locationFlags & need) == need) {
-          headWorld = vloc.pose;
-          headOk = true;
+      if (XR_SUCCEEDED(xrLocateSpace(viewSpace, space, fs.predictedDisplayTime, &vloc)))
+        headOk = acceptHead(vloc.pose, vloc.locationFlags);
+    }
+    // Seamless fallback: eye poses from LocateViews (often valid when VIEW space is not)
+    XrViewLocateInfo vliHead{XR_TYPE_VIEW_LOCATE_INFO};
+    vliHead.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    vliHead.displayTime = fs.predictedDisplayTime;
+    vliHead.space = space;
+    XrViewState vsHead{XR_TYPE_VIEW_STATE};
+    uint32_t vcHead = 0;
+    XrView viewsHead[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+    if (XR_SUCCEEDED(xrLocateViews(session, &vliHead, &vsHead, 2, &vcHead, viewsHead)) &&
+        vcHead >= 1) {
+      if (!headOk) {
+        // Mid-eye between L/R if both present
+        if (vcHead >= 2) {
+          XrPosef mid = viewsHead[0].pose;
+          mid.position.x = 0.5f * (viewsHead[0].pose.position.x + viewsHead[1].pose.position.x);
+          mid.position.y = 0.5f * (viewsHead[0].pose.position.y + viewsHead[1].pose.position.y);
+          mid.position.z = 0.5f * (viewsHead[0].pose.position.z + viewsHead[1].pose.position.z);
+          mid.orientation = viewsHead[0].pose.orientation;
+          headOk = acceptHead(mid, XR_SPACE_LOCATION_POSITION_VALID_BIT |
+                                       XR_SPACE_LOCATION_ORIENTATION_VALID_BIT);
+        } else {
+          headOk = acceptHead(viewsHead[0].pose, XR_SPACE_LOCATION_POSITION_VALID_BIT |
+                                                     XR_SPACE_LOCATION_ORIENTATION_VALID_BIT);
         }
       }
     }
-    // Product law: view_lock is disabled. World freeze only.
-    // Emergency seed at origin must NOT stick forever — re-seed when HMD tracks.
+
+    // Product law: freeze after seed. Emergency origin seed re-anchors when head is real.
     if (worldInitPending || emergencySeedOnly) {
       if (headOk) {
-        if (WorldPanelSeed(headWorld, /*force=*/emergencySeedOnly)) {
+        if (WorldPanelSeed(headWorld, /*force=*/emergencySeedOnly || worldInitPending)) {
           worldInitPending = false;
           emergencySeedOnly = false;
           ui.status = "PANEL LIVE · trigger=click · MENU=re-place";
@@ -386,18 +418,34 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
                   spaceName, WorldPanelState().seedCount,
                   WorldPanelState().c.x, WorldPanelState().c.y, WorldPanelState().c.z);
         }
-      } else if (worldInitPending && ++framesNoHead > 90) {
-        // Temporary place so user sees UI; force=false once, then wait for HMD.
+      } else if (worldInitPending && ++framesNoHead > 60) {
         XrPosef fake = IdentityPose();
         fake.position.y = 1.5f;
         if (WorldPanelSeed(fake, /*force=*/false)) {
           worldInitPending = false;
           emergencySeedOnly = true;
-          ui.status = "PANEL (waiting HMD track · will re-anchor)";
+          ui.status = "PANEL · waiting track (seamless re-anchor)";
           WebUI_MarkDirty(ui);
-          fprintf(stderr, "[cube_webui] emergency panel seed — will re-anchor on first head pose\n");
+          fprintf(stderr, "[cube_webui] emergency panel seed — will re-anchor on first head/eye pose\n");
         }
       }
+    }
+    // Soft catch-up: if head is valid and panel is absurdly far, re-anchor once (no every-frame)
+    static bool farReseedDone = false;
+    if (headOk && WorldPanelState().ready && WorldPanelState().frozen && !ui.handoff) {
+      float dx = headWorld.position.x - WorldPanelState().c.x;
+      float dy = headWorld.position.y - WorldPanelState().c.y;
+      float dz = headWorld.position.z - WorldPanelState().c.z;
+      float dist2 = dx * dx + dy * dy + dz * dz;
+      if (dist2 > 9.f && !farReseedDone) { // >3m
+        if (WorldPanelSeed(headWorld, /*force=*/true)) {
+          farReseedDone = true;
+          ui.status = "PANEL RE-ANCHORED (seamless catch-up)";
+          WebUI_MarkDirty(ui);
+          fprintf(stderr, "[cube_webui] seamless far re-anchor dist=%.2f\n", std::sqrt(dist2));
+        }
+      }
+      if (dist2 < 4.f) farReseedDone = false; // allow again if they walk away later
     }
 
     auto& wp = WorldPanelState();
@@ -438,11 +486,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
 
     static int aimLog = 0;
-    if ((aimLog++ % 200) == 0)
+    if ((aimLog++ % 600) == 0)
       fprintf(stderr,
-              "[cube_webui] aim L hit=%d R hit=%d primary hit=%d "
-              "trigL=%d trigR=%d\n",
-              panelHitL ? 1 : 0, panelHitR ? 1 : 0, panelHit ? 1 : 0,
+              "[cube_webui] aim L hit=%d R hit=%d primary=%d head=%d trigL=%d trigR=%d\n",
+              panelHitL ? 1 : 0, panelHitR ? 1 : 0, panelHit ? 1 : 0, headOk ? 1 : 0,
               XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh) ? 1 : 0,
               XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh) ? 1 : 0);
 
@@ -533,14 +580,21 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     // Tick idle paint budget (research-2 dirty/heartbeat)
     ui.paintFrame++;
 
-    XrViewLocateInfo vli0{XR_TYPE_VIEW_LOCATE_INFO};
-    vli0.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-    vli0.displayTime = fs.predictedDisplayTime;
-    vli0.space = space;
-    XrViewState vs0{XR_TYPE_VIEW_STATE};
-    uint32_t vc0 = 0;
-    XrView views0[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
-    xrLocateViews(session, &vli0, &vs0, 2, &vc0, views0);
+    // Reuse early eye locate when possible (seamless: one LocateViews per frame)
+    XrViewState vs0 = vsHead;
+    uint32_t vc0 = vcHead;
+    XrView views0[2] = {viewsHead[0], viewsHead[1]};
+    if (vc0 < 1) {
+      XrViewLocateInfo vli0{XR_TYPE_VIEW_LOCATE_INFO};
+      vli0.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+      vli0.displayTime = fs.predictedDisplayTime;
+      vli0.space = space;
+      vs0 = {XR_TYPE_VIEW_STATE};
+      vc0 = 0;
+      views0[0] = {XR_TYPE_VIEW};
+      views0[1] = {XR_TYPE_VIEW};
+      xrLocateViews(session, &vli0, &vs0, 2, &vc0, views0);
+    }
 
     bool trigL = trigLEarly;
     bool trigR = trigREarly;

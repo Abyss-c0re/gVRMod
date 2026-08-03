@@ -1046,35 +1046,41 @@ static void DrawNav(unsigned char* rgba, WebUIPage page) {
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
-  // Full-panel seamless handoff (no black gap while GMod boots)
+  // Seamless handoff: keep Cube panel painted (same theme) until GMod takes XR.
   if (s.handoff) {
     FillRect(rgba, 0, 0, UI_W, UI_H, CT_RGB(CubeTheme::BG), 255);
     FillRect(rgba, 0, 0, UI_W, 52, CT_RGB(CubeTheme::HEADER), 255);
-    DrawText(rgba, 24, 16, "CUBE  ·  STARTING GMOD", 255, 240, 244, 2);
-    DrawText(rgba, 24, 80, "NO GAPS  ·  HOLDING OPENXR", CT_RGB(CubeTheme::MUTED), 1);
+    FillRect(rgba, 0, 52, UI_W, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
+    DrawText(rgba, 24, 16, "CUBE  ·  SEAMLESS HANDOFF", CT_RGB(CubeTheme::TEXT), 2);
+    DrawText(rgba, 24, 72, "STAY IN HEADSET  ·  NO DESKTOP  ·  ONE SESSION", CT_RGB(CubeTheme::MUTED), 1);
 
     char line[160];
-    snprintf(line, sizeof(line), "MAP  %s", s.handoffMap.empty() ? "..." : s.handoffMap.c_str());
-    DrawText(rgba, 24, 130, line, 255, 240, 244, 2);
+    snprintf(line, sizeof(line), "MAP     %s", s.handoffMap.empty() ? "..." : s.handoffMap.c_str());
+    DrawText(rgba, 24, 130, line, CT_RGB(CubeTheme::TEXT), 2);
 
-    snprintf(line, sizeof(line), "PHASE  %s",
+    snprintf(line, sizeof(line), "PHASE   %s",
              s.handoffPhase.empty() ? "SPAWNING" : s.handoffPhase.c_str());
     DrawText(rgba, 24, 180, line, CT_RGB(CubeTheme::CRIMSON_HOT), 2);
 
     if (!s.handoffDetail.empty())
-      DrawText(rgba, 24, 220, s.handoffDetail.c_str(), 200, 180, 190, 1);
+      DrawText(rgba, 24, 230, s.handoffDetail.c_str(), CT_RGB(CubeTheme::MUTED), 1);
 
-    // Progress bar from elapsed (soft, not a hard %)
     float t = s.handoffElapsed;
     float pulse = 0.35f + 0.65f * (0.5f + 0.5f * std::sin(t * 2.2f));
     int barW = UI_W - 48;
-    int fill = (int)(barW * std::min(0.92f, 0.12f + t / 45.f));
-    FillRect(rgba, 24, 300, barW, 28, CT_RGB(CubeTheme::ROW), 255);
-    FillRect(rgba, 24, 300, std::max(8, fill), 28, (int)(196 * pulse), (int)(30 * pulse), (int)(58 * pulse), 255);
+    int fill = (int)(barW * std::min(0.95f, 0.08f + t / 40.f));
+    FillRect(rgba, 24, 300, barW, 32, CT_RGB(CubeTheme::ROW), 255);
+    FillRect(rgba, 24, 300, std::max(8, fill), 32,
+             (int)(196 * pulse), (int)(30 * pulse), (int)(58 * pulse), 255);
+    // Accent tick on bar (Cube DrawPanel style)
+    FillRect(rgba, 24, 300, 6, 32, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
 
-    snprintf(line, sizeof(line), "%.0fs  ·  STAY IN VR UNTIL GMOD TAKES SESSION", t);
-    DrawText(rgba, 24, 350, line, CT_RGB(CubeTheme::MUTED), 1);
-    DrawText(rgba, 24, 400, "PASSTHROUGH STAYS  ·  WORLD PANEL STAYS", 160, 120, 130, 1);
+    snprintf(line, sizeof(line), "%.0fs  ·  HOLDING OPENXR FOR GMOD", t);
+    DrawText(rgba, 24, 360, line, CT_RGB(CubeTheme::MUTED), 1);
+    DrawText(rgba, 24, 400, "THEME = LUA CUBE  ·  BINDINGS CARRY OVER  ·  NO BLACK GAP",
+             CT_RGB(CubeTheme::MUTED), 1);
+    DrawText(rgba, 24, 440, "When GMod signals take_xr, this panel releases the runtime.",
+             160, 120, 130, 1);
     DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 255, 200, 210, 1);
     return;
   }
