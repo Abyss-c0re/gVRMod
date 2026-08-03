@@ -592,6 +592,13 @@ void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
   }
 }
 
+// Full-width nav geometry (shared paint + hit)
+static constexpr int kNavY0 = 0, kNavY1 = 48;
+static constexpr int kTabN = 4;
+static constexpr int kTabX0[kTabN] = {0, 240, 480, 720};
+static constexpr int kTabW = 240;
+static constexpr const char* kTabLabel[kTabN] = {"NEW GAME", "ADDONS", "SETTINGS", "BINDINGS"};
+
 bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   WebUI_MarkDirty(s);
   // CLOSE bottom-left (away from rest-aim / START)
@@ -602,31 +609,27 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
     return true;
   }
 
-  // Nav tabs (compact)
-  if (py >= 6 && py <= 38) {
+  // Full-width nav (same geometry as DrawNav)
+  if (py >= kNavY0 && py <= kNavY1) {
     auto leave = [&]() { WebUI_SaveBindingsIfDirty(s); };
-    if (px >= 8 && px <= 120) {
-      leave();
-      s.page = WebUIPage::NewGame;
-      s.status = "NEW GAME";
-      return true;
-    }
-    if (px >= 128 && px <= 230) {
-      leave();
-      s.page = WebUIPage::Addons;
-      s.status = "ADDONS";
-      return true;
-    }
-    if (px >= 238 && px <= 360) {
-      leave();
-      s.page = WebUIPage::Settings;
-      s.status = "SETTINGS";
-      return true;
-    }
-    if (px >= 368 && px <= 500) {
-      s.page = WebUIPage::Bindings;
-      s.status = "CONTROLLER BINDINGS (OpenXR)";
-      return true;
+    for (int i = 0; i < kTabN; ++i) {
+      if (px >= kTabX0[i] && px < kTabX0[i] + kTabW) {
+        leave();
+        if (i == 0) {
+          s.page = WebUIPage::NewGame;
+          s.status = "NEW GAME";
+        } else if (i == 1) {
+          s.page = WebUIPage::Addons;
+          s.status = "ADDONS";
+        } else if (i == 2) {
+          s.page = WebUIPage::Settings;
+          s.status = "SETTINGS";
+        } else {
+          s.page = WebUIPage::Bindings;
+          s.status = "CONTROLLER BINDINGS (OpenXR)";
+        }
+        return true;
+      }
     }
   }
 
@@ -1027,21 +1030,20 @@ inline constexpr int CLOSE[]     = {180, 40, 50};     // cubeui close
 #define CT_RGB(c) (c)[0], (c)[1], (c)[2]
 
 static void DrawNav(unsigned char* rgba, WebUIPage page) {
-  // Header bar = Cube crimson (cl_cube_theme T.crimson / cl_vr_newgame header)
-  FillRect(rgba, 0, 0, UI_W, 44, CT_RGB(CubeTheme::HEADER), 255);
-  // Active tab = btnHover; idle = btnDim (matches DrawButton hover/enabled)
-  auto tab = [&](bool on, int x, int w, const char* label, int tx) {
+  FillRect(rgba, 0, kNavY0, UI_W, kNavY1, CT_RGB(CubeTheme::HEADER), 255);
+  const WebUIPage pages[kTabN] = {WebUIPage::NewGame, WebUIPage::Addons, WebUIPage::Settings,
+                                  WebUIPage::Bindings};
+  for (int i = 0; i < kTabN; ++i) {
+    bool on = (page == pages[i]);
+    int x = kTabX0[i];
     if (on)
-      FillRect(rgba, x, 6, w, 32, CT_RGB(CubeTheme::BTN_HOVER), 255);
+      FillRect(rgba, x + 4, 6, kTabW - 8, 36, CT_RGB(CubeTheme::BTN_HOVER), 255);
     else
-      FillRect(rgba, x, 6, w, 32, CT_RGB(CubeTheme::BTN_DIM), 255);
-    DrawText(rgba, tx, 14, label, CT_RGB(CubeTheme::TEXT), 1);
-  };
-  tab(page == WebUIPage::NewGame, 8, 110, "NEW GAME", 16);
-  tab(page == WebUIPage::Addons, 128, 100, "ADDONS", 144);
-  tab(page == WebUIPage::Settings, 238, 120, "SETTINGS", 250);
-  tab(page == WebUIPage::Bindings, 368, 128, "BINDINGS", 384);
-  // CLOSE moved off the top strip (rest-aim was auto-exiting the app)
+      FillRect(rgba, x + 4, 6, kTabW - 8, 36, CT_RGB(CubeTheme::BTN_DIM), 255);
+    // center-ish label
+    int tx = x + 40;
+    DrawText(rgba, tx, 16, kTabLabel[i], CT_RGB(CubeTheme::TEXT), 1);
+  }
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {

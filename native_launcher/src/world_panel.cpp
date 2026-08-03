@@ -166,7 +166,7 @@ bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHi
   // Clamp u/v into panel for pixel mapping when inside slop rim
   u = std::max(-hw, std::min(hw, u));
   v = std::max(-hh, std::min(hh, v));
-  // Buffer y=0 is UI top; panel +up → lower py. Matches UploadRgbaRotated180 upright draw.
+  // Geometric +right → +px, +up → UI top (py=0). Must match gl_render UV (tl=UI top).
   int px = (int)((u / hw * 0.5f + 0.5f) * (float)UI_W);
   int py = (int)((0.5f - v / hh * 0.5f) * (float)UI_H);
   px = std::max(0, std::min(UI_W - 1, px));
