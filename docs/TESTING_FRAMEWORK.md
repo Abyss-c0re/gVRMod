@@ -205,20 +205,13 @@ For wall collision policy, either:
 
 Existence tests are weak but prevent “API deleted” without contract update.
 
-### 4.5 Shared pure cores (post deep-research)
+### 4.5 Shared pure cores (deep research + product bugs)
 
-When research lands, extract first:
+**Already central — test in place:** math (`sh_math`), frames, traces, collisions, projection/crop (`cl_rendering`), menu dedupe (`AddInGameMenuItem`).
 
-| Candidate | From | Offline test value |
-|-----------|------|--------------------|
-| Math (vec/ang/smooth) | `sh_math.lua` | high |
-| Submit/UV bounds | `cl_rendering.lua` | high (already golden in C++) |
-| Menu stable key / dedupe | `cl_api.lua` | high (recent bug) |
-| Floor/ceiling wall policy | `sh_collisions.lua` | high (climb fight) |
-| Bind conflict detect | bindings | medium |
-| Trace filter predicates | `sh_trace.lua` | medium |
+**Extract then test (research order):** finger curl SoT, bone hierarchy apply, AutoScale/seated height, color parse adoption, unified smoothing, settings row-kind binder. Details in §10 Phase 3.
 
-Tests import the pure module path; GMod file becomes a thin wrapper (behavior preserved).
+Tests import the pure util path; call sites become thin wrappers (behavior preserved).
 
 ---
 
@@ -381,17 +374,49 @@ Pre-commit optional: `scripts/test_all.sh --fast` (pure only).
 - [ ] Keyboard C++ state machine  
 - [ ] Launcher paths + bindings gold + panel hit UV
 
-### Phase 3 — Extract pure cores (parallel with deep research)
+### Phase 3 — Extract pure cores (deep research order)
 
-- [ ] Apply modular util extractions **with tests first** (TDD on pure module)  
-- [ ] Thin wrappers in original files  
-- [ ] Inventory re-scan
+Deep research (2026-08-03, partial) confirmed utils load early as a shared table and ranked **near-duplicate** extractions. **Rule: write pure unit tests → extract util → rewire call sites → re-run contracts.**
+
+| Priority | Extract | From (dup sites) | Into | Offline tests |
+|----------|---------|------------------|------|---------------|
+| 1 | Finger curl apply | `player/cl_character_hands`, `player/sh_character_fbt` (already partly in `utils/cl_character_ik`) | single `vrmod.utils.ApplyFingerCurl` / charik API | curl tables × fractions |
+| 2 | Bone hierarchy pose apply | FBT/hands parent→child `LocalToWorld` + override + matrix | `vrmod.utils.ApplyBoneHierarchy` / frames | parent chain fixtures |
+| 3 | AutoScaleHeight / AutoSeatedOffset | `ui/cl_heightadjust` + `ui/cl_avatar_menu` (66.8 eye math) | one `vrmod.utils` or `vrmod.calibration` SoT | table-driven heights |
+| 4 | Color parse adoption | laser/beam re-`string.match` vs `SettingsParseColor` | force call sites → one parser (`vrmod.utils.ParseColor` or keep catalog) | RGBA strings / bad input |
+| 5 | Unified smoothing | `cl_api` local SmoothValue; input/player FrameTime Lerps vs `SmoothVector`/`SmoothAngle` | export `vrmod.utils.SmoothValue` | number/vec/ang cases |
+| 6 | Settings row-kind binder | Derma + Cube dual switch on catalog kinds | shared dispatch util (render stays toolkit-specific) | kind → handler map existence |
+
+**Placement rule (from research):** new general helpers = flat `sh_`/`cl_` under `lua/vrmod/utils/` extending `vrmod.utils`; cohesive features may use `vrmod.<feature>` if they need early load (avatar/iknet style). Do **not** move `api` symbols under utils without load-order review (api loads **before** utils).
+
+**Already in utils (contract-first, little extract):** math, frames, traces, collisions, pickup, weapons, vehicles, system hooks, projection/crop/FOV, npc2rag, plus namespaces charik/iknet/avatar/algocube, VirtualDisplay, GameUIProject, MapStart.
+
+- [ ] For each row: contract entry + pure tests **before** rewiring  
+- [ ] Thin wrappers leave old names if external addons call them  
+- [ ] Inventory re-scan after each extract
 
 ### Phase 4 — Scenarios + optional GMod
 
 - [ ] Scenario runner  
 - [ ] Nightly `quick_test.sh` artifact log parse (Map: / VRMOD_QUICKTEST)  
 - [ ] Quest review hooks only as smoke, not unit
+
+---
+
+## 10b. Deep research → test matrix (quick map)
+
+| Research finding | Contract tier | First test IDs |
+|------------------|---------------|----------------|
+| Finger curl SoT | pure (after extract) | `util.fingers.curl_lerp_unit`, `util.fingers.digit_index` |
+| Bone hierarchy apply | pure | `util.bones.hierarchy_child`, `util.bones.override_wins` |
+| Dual AutoScale / seated | pure | `util.calib.autoscale_668`, `util.calib.seated_offset` |
+| Settings row kinds | pure map + seam render | `util.settings.kinds_complete`, smoke Derma optional |
+| Color parse | pure | `util.color.parse_rgba`, `util.color.parse_bad` |
+| SmoothValue / Smooth* | pure | `util.smooth.number`, `util.smooth.vector` |
+| Menu add dedupe | pure (done product-side) | `api.menu.dedupe_name`, `api.menu.dedupe_id` |
+| Floor/ceiling wall policy | pure or seam | `util.collisions.floor_not_wall` |
+| NetReceiveLimited / AddCallbackedConvar | seam (api) | rate-limit mock clock; cvar callback fire |
+| Primary-hand helpers | seam | left/right primary flip |
 
 ---
 
