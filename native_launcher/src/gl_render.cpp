@@ -32,11 +32,26 @@ void GlUnbindFbo() {
   if (glBindFramebuffer_) glBindFramebuffer_((GLenum)0x8D40, 0);
 }
 
-// Upload UI buffer as-is (y=0 = top of menu). Orientation is fixed only in UVs
-// so ray-hit px/py stay 1:1 with paint coordinates (no invert / no 180 mess).
-static void UploadRgbaRaw(GLuint tex, int w, int h, const void* rgba) {
+// WiVRn/Quest: panel mesh + GL row order show UI upside-down+mirrored without this.
+// 180° upload makes NEW GAME top-left visually. Hit test must apply the same 180°
+// (see WorldPanelRayHit).
+static void UploadRgbaRotated180(GLuint tex, int w, int h, const void* rgba) {
+  static std::vector<unsigned char> rot;
+  const size_t n = (size_t)w * (size_t)h * 4;
+  rot.resize(n);
+  const auto* s = static_cast<const unsigned char*>(rgba);
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      const int si = (y * w + x) * 4;
+      const int di = ((h - 1 - y) * w + (w - 1 - x)) * 4;
+      rot[di + 0] = s[si + 0];
+      rot[di + 1] = s[si + 1];
+      rot[di + 2] = s[si + 2];
+      rot[di + 3] = s[si + 3];
+    }
+  }
   glBindTexture(GL_TEXTURE_2D, tex);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rot.data());
 }
 
 GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
@@ -45,12 +60,13 @@ GLuint GlMakeRgbaTex(int w, int h, const void* rgba) {
   glBindTexture(GL_TEXTURE_2D, t);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  if (rgba) UploadRgbaRotated180(t, w, h, rgba);
   return t;
 }
 
 void GlUpdateRgbaTex(GLuint tex, int w, int h, const void* rgba) {
-  UploadRgbaRaw(tex, w, h, rgba);
+  UploadRgbaRotated180(tex, w, h, rgba);
 }
 
 void GlLoadModelviewLocal(const XrPosef& eyeWorld) {
@@ -115,17 +131,15 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // Front face toward +normal (user). Winding bl→br→tr→tl = CCW from front.
-  // Raw buffer y=0 = UI top. GL V=0 = first row = UI top → put on panel +up (tl/tr).
-  // U: left of panel = UI left (no mirror / not inside-out).
+  // Texture already 180°-rotated on upload — standard UV, front winding bl→br→tr→tl.
   glBegin(GL_QUADS);
-  glTexCoord2f(0.f, 1.f); // bl — UI bottom-left
+  glTexCoord2f(0.f, 0.f);
   glVertex3f(bl.x, bl.y, bl.z);
-  glTexCoord2f(1.f, 1.f); // br — UI bottom-right
+  glTexCoord2f(1.f, 0.f);
   glVertex3f(br.x, br.y, br.z);
-  glTexCoord2f(1.f, 0.f); // tr — UI top-right
+  glTexCoord2f(1.f, 1.f);
   glVertex3f(tr.x, tr.y, tr.z);
-  glTexCoord2f(0.f, 0.f); // tl — UI top-left (NEW GAME)
+  glTexCoord2f(0.f, 1.f);
   glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
   glDisable(GL_TEXTURE_2D);
