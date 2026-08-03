@@ -997,31 +997,61 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
   }
 }
 
+
+// =============================================================================
+// Cube UI palette — MUST match addon vrmod-x64/lua/vrmod/ui/cl_cube_theme.lua
+//   vrmod.cube.Theme (and cl_vr_newgame Theme fallback)
+// =============================================================================
+namespace CubeTheme {
+// r,g,b (alpha always 255 in RT)
+inline constexpr int BG[]        = {12, 6, 10};       // T.bg
+inline constexpr int BG_GLASS[]  = {22, 10, 16};      // T.bgGlass
+inline constexpr int PANEL[]     = {36, 12, 18};      // T.panel
+inline constexpr int PANEL_DIM[] = {28, 10, 16};      // newgame panel
+inline constexpr int ROW[]       = {40, 14, 20};      // newgame row
+inline constexpr int ROW_HOT[]   = {90, 22, 36};      // newgame rowHot / sel
+inline constexpr int BTN[]       = {55, 14, 24};      // T.btn
+inline constexpr int BTN_HOVER[] = {100, 22, 38};     // T.btnHover
+inline constexpr int BTN_DIM[]   = {30, 10, 16};      // T.btnDim
+inline constexpr int HEADER[]    = {196, 30, 58};     // T.crimson / header
+inline constexpr int HEADER_DIM[]= {80, 12, 24};      // headerDim
+inline constexpr int CRIMSON[]   = {196, 30, 58};
+inline constexpr int CRIMSON_HOT[]={255, 70, 100};    // T.crimsonHot / hot
+inline constexpr int CRIMSON_DIM[]={120, 20, 40};     // T.crimsonDim
+inline constexpr int TEXT[]      = {255, 240, 244};   // T.text
+inline constexpr int MUTED[]     = {200, 150, 165};   // T.muted
+inline constexpr int OK[]        = {90, 220, 150};    // T.ok
+inline constexpr int WARN[]      = {255, 200, 100};   // T.warn
+inline constexpr int CLOSE[]     = {180, 40, 50};     // cubeui close
+}
+#define CT_RGB(c) (c)[0], (c)[1], (c)[2]
+
 static void DrawNav(unsigned char* rgba, WebUIPage page) {
-  FillRect(rgba, 0, 0, UI_W, 44, 36, 44, 62, 255);
-  bool ng = page == WebUIPage::NewGame;
-  bool ad = page == WebUIPage::Addons;
-  bool st = page == WebUIPage::Settings;
-  bool bd = page == WebUIPage::Bindings;
-  FillRect(rgba, 8, 6, 110, 32, ng ? 28 : 0, ng ? 34 : 140, ng ? 46 : 190, 255);
-  DrawText(rgba, 16, 14, "NEW GAME", 255, 240, 244, 1);
-  FillRect(rgba, 128, 6, 100, 32, ad ? 28 : 0, ad ? 34 : 140, ad ? 46 : 190, 255);
-  DrawText(rgba, 144, 14, "ADDONS", 255, 240, 244, 1);
-  FillRect(rgba, 238, 6, 120, 32, st ? 28 : 0, st ? 34 : 140, st ? 46 : 190, 255);
-  DrawText(rgba, 250, 14, "SETTINGS", 255, 240, 244, 1);
-  FillRect(rgba, 368, 6, 128, 32, bd ? 28 : 0, bd ? 34 : 140, bd ? 46 : 190, 255);
-  DrawText(rgba, 384, 14, "BINDINGS", 255, 240, 244, 1);
-  FillRect(rgba, UI_W - 110, 6, 100, 32, 180, 55, 55, 255);
+  // Header bar = Cube crimson (cl_cube_theme T.crimson / cl_vr_newgame header)
+  FillRect(rgba, 0, 0, UI_W, 44, CT_RGB(CubeTheme::HEADER), 255);
+  // Active tab = btnHover; idle = btnDim (matches DrawButton hover/enabled)
+  auto tab = [&](bool on, int x, int w, const char* label, int tx) {
+    if (on)
+      FillRect(rgba, x, 6, w, 32, CT_RGB(CubeTheme::BTN_HOVER), 255);
+    else
+      FillRect(rgba, x, 6, w, 32, CT_RGB(CubeTheme::BTN_DIM), 255);
+    DrawText(rgba, tx, 14, label, CT_RGB(CubeTheme::TEXT), 1);
+  };
+  tab(page == WebUIPage::NewGame, 8, 110, "NEW GAME", 16);
+  tab(page == WebUIPage::Addons, 128, 100, "ADDONS", 144);
+  tab(page == WebUIPage::Settings, 238, 120, "SETTINGS", 250);
+  tab(page == WebUIPage::Bindings, 368, 128, "BINDINGS", 384);
+  FillRect(rgba, UI_W - 110, 6, 100, 32, CT_RGB(CubeTheme::CLOSE), 255);
   DrawText(rgba, UI_W - 92, 14, "CLOSE", 255, 255, 255, 2);
 }
 
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
   // Full-panel seamless handoff (no black gap while GMod boots)
   if (s.handoff) {
-    FillRect(rgba, 0, 0, UI_W, UI_H, 14, 16, 22, 255);
-    FillRect(rgba, 0, 0, UI_W, 52, 36, 44, 62, 255);
+    FillRect(rgba, 0, 0, UI_W, UI_H, CT_RGB(CubeTheme::BG), 255);
+    FillRect(rgba, 0, 0, UI_W, 52, CT_RGB(CubeTheme::HEADER), 255);
     DrawText(rgba, 24, 16, "CUBE  ·  STARTING GMOD", 255, 240, 244, 2);
-    DrawText(rgba, 24, 80, "NO GAPS  ·  HOLDING OPENXR", 150, 165, 185, 1);
+    DrawText(rgba, 24, 80, "NO GAPS  ·  HOLDING OPENXR", CT_RGB(CubeTheme::MUTED), 1);
 
     char line[160];
     snprintf(line, sizeof(line), "MAP  %s", s.handoffMap.empty() ? "..." : s.handoffMap.c_str());
@@ -1029,7 +1059,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
 
     snprintf(line, sizeof(line), "PHASE  %s",
              s.handoffPhase.empty() ? "SPAWNING" : s.handoffPhase.c_str());
-    DrawText(rgba, 24, 180, line, 0, 220, 255, 2);
+    DrawText(rgba, 24, 180, line, CT_RGB(CubeTheme::CRIMSON_HOT), 2);
 
     if (!s.handoffDetail.empty())
       DrawText(rgba, 24, 220, s.handoffDetail.c_str(), 200, 180, 190, 1);
@@ -1039,31 +1069,31 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     float pulse = 0.35f + 0.65f * (0.5f + 0.5f * std::sin(t * 2.2f));
     int barW = UI_W - 48;
     int fill = (int)(barW * std::min(0.92f, 0.12f + t / 45.f));
-    FillRect(rgba, 24, 300, barW, 28, 42, 48, 62, 255);
-    FillRect(rgba, 24, 300, std::max(8, fill), 28, (int)(0 * pulse), (int)(180 * pulse), (int)(220 * pulse), 255);
+    FillRect(rgba, 24, 300, barW, 28, CT_RGB(CubeTheme::ROW), 255);
+    FillRect(rgba, 24, 300, std::max(8, fill), 28, (int)(196 * pulse), (int)(30 * pulse), (int)(58 * pulse), 255);
 
     snprintf(line, sizeof(line), "%.0fs  ·  STAY IN VR UNTIL GMOD TAKES SESSION", t);
-    DrawText(rgba, 24, 350, line, 150, 165, 185, 1);
-    DrawText(rgba, 24, 400, "PASSTHROUGH STAYS  ·  WORLD PANEL STAYS", 120, 135, 155, 1);
-    DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 200, 230, 245, 1);
+    DrawText(rgba, 24, 350, line, CT_RGB(CubeTheme::MUTED), 1);
+    DrawText(rgba, 24, 400, "PASSTHROUGH STAYS  ·  WORLD PANEL STAYS", 160, 120, 130, 1);
+    DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 255, 200, 210, 1);
     return;
   }
 
-  FillRect(rgba, 0, 0, UI_W, UI_H, 18, 20, 26, 255);
+  FillRect(rgba, 0, 0, UI_W, UI_H, CT_RGB(CubeTheme::BG), 255);
   DrawNav(rgba, s.page);
 
   if (s.page == WebUIPage::Bindings) {
-    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 30, 34, 46, 255);
+    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, CT_RGB(CubeTheme::PANEL_DIM), 255);
     const char* filters[] = {"ALL", "FOOT", "VEHICLE", "CUSTOM"};
     for (int f = 0; f < 4; ++f) {
       int x0 = 16 + f * 88;
       bool on = (s.bindings.filter == f);
-      FillRect(rgba, x0, 52, 82, 22, on ? 0 : 50, on ? 130 : 58, on ? 180 : 74, 255);
+      FillRect(rgba, x0, 52, 82, 22, on ? CubeTheme::CRIMSON[0] : CubeTheme::BTN[0], on ? CubeTheme::CRIMSON[1] : CubeTheme::BTN[1], on ? CubeTheme::CRIMSON[2] : CubeTheme::BTN[2], 255);
       DrawText(rgba, x0 + 10, 56, filters[f], 255, 240, 244, 1);
     }
-    FillRect(rgba, UI_W - 320, 52, 100, 22, 48, 56, 72, 255);
+    FillRect(rgba, UI_W - 320, 52, 100, 22, CT_RGB(CubeTheme::BTN_DIM), 255);
     DrawText(rgba, UI_W - 300, 56, "SAVE", 255, 240, 244, 1);
-    FillRect(rgba, UI_W - 200, 52, 180, 22, 50, 70, 90, 255);
+    FillRect(rgba, UI_W - 200, 52, 180, 22, CT_RGB(CubeTheme::BTN_DIM), 255);
     DrawText(rgba, UI_W - 188, 56, "RESET DEFAULTS", 255, 240, 244, 1);
 
     std::vector<int> idx;
@@ -1080,7 +1110,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       if (it != s.bindings.actions.end()) rule = it->second;
       int y = 84 + n * rowH;
       bool sel = (k == s.bindings.selected);
-      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 20 : 42, sel ? 95 : 48, sel ? 130 : 62, 255);
+      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? CubeTheme::ROW_HOT[0] : CubeTheme::ROW[0], sel ? CubeTheme::ROW_HOT[1] : CubeTheme::ROW[1], sel ? CubeTheme::ROW_HOT[2] : CubeTheme::ROW[2], 255);
       char line[96];
       snprintf(line, sizeof(line), "%.22s", info.label.c_str());
       DrawText(rgba, 20, y + 6, line, 255, 240, 244, 1);
@@ -1091,52 +1121,52 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       if (s1.size() > 14) s1 = s1.substr(0, 12) + "..";
       bool slot0 = (s.bindings.editSlot == 0 && sel);
       bool slot1 = (s.bindings.editSlot == 1 && sel);
-      FillRect(rgba, 20, y + 26, 140, 18, slot0 ? 0 : 55, slot0 ? 140 : 62, slot0 ? 190 : 80, 255);
+      FillRect(rgba, 20, y + 26, 140, 18, slot0 ? CubeTheme::CRIMSON[0] : CubeTheme::BTN[0], slot0 ? CubeTheme::CRIMSON[1] : CubeTheme::BTN[1], slot0 ? CubeTheme::CRIMSON[2] : CubeTheme::BTN[2], 255);
       DrawText(rgba, 26, y + 28, s0.c_str(), 255, 240, 244, 1);
       const char* joiner = (rule.mode == "all") ? "+" : "|";
-      DrawText(rgba, 164, y + 28, joiner, 150, 165, 185, 1);
-      FillRect(rgba, 180, y + 26, 140, 18, slot1 ? 0 : 55, slot1 ? 140 : 62, slot1 ? 190 : 80, 255);
+      DrawText(rgba, 164, y + 28, joiner, CT_RGB(CubeTheme::MUTED), 1);
+      FillRect(rgba, 180, y + 26, 140, 18, slot1 ? CubeTheme::CRIMSON[0] : CubeTheme::BTN[0], slot1 ? CubeTheme::CRIMSON[1] : CubeTheme::BTN[1], slot1 ? CubeTheme::CRIMSON[2] : CubeTheme::BTN[2], 255);
       DrawText(rgba, 186, y + 28, s1.c_str(), 255, 240, 244, 1);
       const char* setL = rule.set.empty() ? "BOTH" : (rule.set == "driving" ? "VEH" : "FOOT");
       DrawText(rgba, UI_W - 400, y + 16, setL, 160, 180, 200, 1);
-      FillRect(rgba, UI_W - 340, y + 12, 64, 24, 60, 25, 45, 255);
+      FillRect(rgba, UI_W - 340, y + 12, 64, 24, CT_RGB(CubeTheme::BTN), 255);
       DrawText(rgba, UI_W - 332, y + 18, "+CHD", 255, 240, 244, 1);
-      FillRect(rgba, UI_W - 260, y + 12, 64, 24, 70, 20, 40, 255);
+      FillRect(rgba, UI_W - 260, y + 12, 64, 24, CT_RGB(CubeTheme::CRIMSON_DIM), 255);
       DrawText(rgba, UI_W - 252, y + 18, rule.mode == "all" ? "ALL" : "ANY", 255, 240, 244, 1);
-      FillRect(rgba, UI_W - 180, y + 12, 64, 24, 50, 30, 50, 255);
+      FillRect(rgba, UI_W - 180, y + 12, 64, 24, CT_RGB(CubeTheme::BTN_DIM), 255);
       DrawText(rgba, UI_W - 168, y + 18, "DEF", 255, 240, 244, 1);
-      FillRect(rgba, UI_W - 100, y + 12, 80, 24, 160, 50, 55, 255);
+      FillRect(rgba, UI_W - 100, y + 12, 80, 24, CT_RGB(CubeTheme::CRIMSON_DIM), 255);
       DrawText(rgba, UI_W - 84, y + 18, "CLR", 255, 240, 244, 1);
     }
     int pc = Bindings_PageCount(s.bindings);
     char page[96];
     snprintf(page, sizeof(page), "P%d/%d slot%d %s%s", s.bindings.page + 1, std::max(1, pc),
              s.bindings.editSlot + 1, s.bindings.dirty ? "* " : "", s.bindings.status.c_str());
-    FillRect(rgba, 16, UI_H - 48, 100, 32, 40, 85, 115, 255);
+    FillRect(rgba, 16, UI_H - 48, 100, 32, CT_RGB(CubeTheme::BTN), 255);
     DrawText(rgba, 36, UI_H - 38, "PREV", 255, 240, 244, 2);
-    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 40, 85, 115, 255);
+    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, CT_RGB(CubeTheme::BTN), 255);
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
-    DrawText(rgba, 130, UI_H - 36, page, 150, 165, 185, 1);
+    DrawText(rgba, 130, UI_H - 36, page, CT_RGB(CubeTheme::MUTED), 1);
     DrawText(rgba, 130, UI_H - 20,
              "S1/S2=CHORD  +CHD  ANY=OR ALL=AND  DEF  CLR  |  SYNC data/vrmod/vrmod_openxr_bindings.json",
-             120, 135, 155, 1);
+             160, 120, 130, 1);
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
-      FillRect(rgba, cx - 8, cy - 2, 16, 4, 0, 220, 255, 255);
-      FillRect(rgba, cx - 2, cy - 8, 4, 16, 0, 220, 255, 255);
+      FillRect(rgba, cx - 8, cy - 2, 16, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
+      FillRect(rgba, cx - 2, cy - 8, 4, 16, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
     }
     return;
   }
 
   if (s.page == WebUIPage::Addons) {
-    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, 30, 34, 46, 255);
+    FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, CT_RGB(CubeTheme::PANEL_DIM), 255);
     // Filters
     const char* filters[] = {"ALL", "ON", "OFF", "WS", "LOCAL"};
     for (int f = 0; f < 5; ++f) {
       int x0 = 16 + f * 90;
       bool on = (s.addons.filter == f);
-      FillRect(rgba, x0, 52, 84, 22, on ? 0 : 50, on ? 130 : 58, on ? 180 : 74, 255);
+      FillRect(rgba, x0, 52, 84, 22, on ? CubeTheme::CRIMSON[0] : CubeTheme::BTN[0], on ? CubeTheme::CRIMSON[1] : CubeTheme::BTN[1], on ? CubeTheme::CRIMSON[2] : CubeTheme::BTN[2], 255);
       DrawText(rgba, x0 + 12, 56, filters[f], 255, 240, 244, 1);
     }
     char cnt[96];
@@ -1147,7 +1177,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
              idx.size(), s.addons.addons.size(),
              Addons_EnabledCount(s.addons), Addons_DisabledCount(s.addons),
              s.addons.page + 1, std::max(1, pc));
-    DrawText(rgba, 480, 56, cnt, 150, 165, 185, 1);
+    DrawText(rgba, 480, 56, cnt, CT_RGB(CubeTheme::MUTED), 1);
 
     int start = s.addons.page * s.addons.pageSize;
     const int rowH = 48;
@@ -1158,7 +1188,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       const auto& a = s.addons.addons[ai];
       int y = 84 + n * rowH;
       bool sel = (ai == s.addons.selected);
-      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? 20 : 42, sel ? 95 : 48, sel ? 130 : 62, 255);
+      FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? CubeTheme::ROW_HOT[0] : CubeTheme::ROW[0], sel ? CubeTheme::ROW_HOT[1] : CubeTheme::ROW[1], sel ? CubeTheme::ROW_HOT[2] : CubeTheme::ROW[2], 255);
       // Thumb 40x40
       int tx = 18, ty = y + 4;
       if (a.thumbW > 0 && (int)a.thumbRgba.size() >= a.thumbW * a.thumbH * 4) {
@@ -1180,38 +1210,38 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       }
       // ON/OFF badge
       if (a.enabled)
-        FillRect(rgba, 66, y + 12, 44, 20, 30, 120, 60, 255);
+        FillRect(rgba, 66, y + 12, 44, 20, CT_RGB(CubeTheme::OK), 255);
       else
-        FillRect(rgba, 66, y + 12, 44, 20, 120, 30, 40, 255);
+        FillRect(rgba, 66, y + 12, 44, 20, CT_RGB(CubeTheme::CRIMSON_DIM), 255);
       DrawText(rgba, 72, y + 16, a.enabled ? "ON" : "OFF", 255, 255, 255, 1);
       char line[96];
       snprintf(line, sizeof(line), "%.52s", a.title.c_str());
       DrawText(rgba, 120, y + 10, line, 255, 240, 244, 1);
       snprintf(line, sizeof(line), "%s  %s", a.kind.c_str(), a.id.c_str());
-      DrawText(rgba, 120, y + 28, line, 120, 135, 155, 1);
+      DrawText(rgba, 120, y + 28, line, 160, 120, 130, 1);
     }
 
     // Page buttons
-    FillRect(rgba, 16, UI_H - 48, 100, 32, 40, 85, 115, 255);
+    FillRect(rgba, 16, UI_H - 48, 100, 32, CT_RGB(CubeTheme::BTN), 255);
     DrawText(rgba, 36, UI_H - 38, "PREV", 255, 240, 244, 2);
-    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, 40, 85, 115, 255);
+    FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, CT_RGB(CubeTheme::BTN), 255);
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
-    DrawText(rgba, 140, UI_H - 36, s.addons.status.c_str(), 150, 165, 185, 1);
-    DrawText(rgba, 140, UI_H - 20, "TRIGGER = TOGGLE MOUNT  ·  CLOSE = EXIT", 120, 135, 155, 1);
+    DrawText(rgba, 140, UI_H - 36, s.addons.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
+    DrawText(rgba, 140, UI_H - 20, "TRIGGER = TOGGLE MOUNT  ·  CLOSE = EXIT", 160, 120, 130, 1);
 
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
-      FillRect(rgba, cx - 8, cy - 2, 16, 4, 0, 220, 255, 255);
-      FillRect(rgba, cx - 2, cy - 8, 4, 16, 0, 220, 255, 255);
+      FillRect(rgba, cx - 8, cy - 2, 16, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
+      FillRect(rgba, cx - 2, cy - 8, 4, 16, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
     }
     return;
   }
 
   // --- Settings page (GMod native graphics + engine) ---
   if (s.page == WebUIPage::Settings) {
-    FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, 30, 34, 46, 255);
-    DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER CYCLES  ·  XR SS NEEDS VR RESTART", 150, 165, 185, 1);
+    FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, CT_RGB(CubeTheme::PANEL_DIM), 255);
+    DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER CYCLES  ·  XR SS NEEDS VR RESTART", CT_RGB(CubeTheme::MUTED), 1);
     char line[96];
     const int visible = 12;
     const int rowH = 32;
@@ -1221,39 +1251,39 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       if (i >= SR_COUNT) break;
       int y = 72 + n * rowH;
       bool foc = (i == s.settingsRow);
-      if (foc) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 20, 95, 130, 255);
-      else if (n % 2) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, 38, 42, 56, 255);
+      if (foc) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, CT_RGB(CubeTheme::BTN_HOVER), 255);
+      else if (n % 2) FillRect(rgba, 16, y, UI_W - 32, rowH - 4, CT_RGB(CubeTheme::PANEL), 255);
       FormatSettingRow(s, i, line, sizeof(line));
       DrawText(rgba, 28, y + 8, line, 255, 240, 244, 1);
     }
     snprintf(line, sizeof(line), "APPLIED ON START VIA gvrmod_cube.cfg + -w/-h");
-    DrawText(rgba, 20, UI_H - 48, line, 120, 135, 155, 1);
-    DrawText(rgba, 20, UI_H - 28, s.status.c_str(), 150, 165, 185, 1);
+    DrawText(rgba, 20, UI_H - 48, line, 160, 120, 130, 1);
+    DrawText(rgba, 20, UI_H - 28, s.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
     if ((cursor && cursor->visible) || s.cursorVisible) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
-      FillRect(rgba, cx - 10, cy - 2, 20, 4, 0, 220, 255, 255);
-      FillRect(rgba, cx - 2, cy - 10, 4, 20, 0, 220, 255, 255);
+      FillRect(rgba, cx - 10, cy - 2, 20, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
+      FillRect(rgba, cx - 2, cy - 10, 4, 20, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
     }
     return;
   }
 
   // --- New Game page (3-col) ---
   const int catW = 180, mapX = 188, mapW = 500, setX = 700, setW = 250;
-  FillRect(rgba, 8, 52, catW, UI_H - 60, 30, 34, 46, 255);
-  FillRect(rgba, mapX, 52, mapW, UI_H - 60, 38, 42, 56, 255);
-  FillRect(rgba, setX, 52, setW, UI_H - 60, 30, 34, 46, 255);
+  FillRect(rgba, 8, 52, catW, UI_H - 60, CT_RGB(CubeTheme::PANEL_DIM), 255);
+  FillRect(rgba, mapX, 52, mapW, UI_H - 60, CT_RGB(CubeTheme::PANEL), 255);
+  FillRect(rgba, setX, 52, setW, UI_H - 60, CT_RGB(CubeTheme::PANEL_DIM), 255);
 
-  DrawText(rgba, 16, 60, "CATEGORY", 150, 165, 185, 1);
+  DrawText(rgba, 16, 60, "CATEGORY", CT_RGB(CubeTheme::MUTED), 1);
   for (int i = 0; i < (int)s.categories.size() && i < 12; ++i) {
     bool sel = (i == s.catIndex);
     bool foc = (s.focusCol == 0 && sel);
     int y = 80 + i * 28;
-    if (sel) FillRect(rgba, 12, y - 2, catW - 8, 24, foc ? 30 : 50, foc ? 120 : 70, foc ? 160 : 95, 255);
+    if (sel) FillRect(rgba, 12, y - 2, catW - 8, 24, foc ? CubeTheme::ROW_HOT[0] : CubeTheme::ROW[0], foc ? CubeTheme::ROW_HOT[1] : CubeTheme::ROW[1], foc ? CubeTheme::ROW_HOT[2] : CubeTheme::ROW[2], 255);
     DrawText(rgba, 18, y + 2, s.categories[i].name.c_str(), 255, 240, 244, 1);
   }
 
-  DrawText(rgba, mapX + 8, 60, "MAPS", 150, 165, 185, 1);
+  DrawText(rgba, mapX + 8, 60, "MAPS", CT_RGB(CubeTheme::MUTED), 1);
   if (!s.categories.empty()) {
     const auto& maps = s.categories[s.catIndex].maps;
     int visible = 12;
@@ -1264,17 +1294,17 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       bool sel = (i == s.mapIndex);
       bool foc = (s.focusCol == 1 && sel);
       int y = 80 + n * 28;
-      if (sel) FillRect(rgba, mapX + 4, y - 2, mapW - 8, 24, foc ? 30 : 50, foc ? 120 : 70, foc ? 160 : 95, 255);
+      if (sel) FillRect(rgba, mapX + 4, y - 2, mapW - 8, 24, foc ? CubeTheme::ROW_HOT[0] : CubeTheme::ROW[0], foc ? CubeTheme::ROW_HOT[1] : CubeTheme::ROW[1], foc ? CubeTheme::ROW_HOT[2] : CubeTheme::ROW[2], 255);
       DrawText(rgba, mapX + 12, y + 2, maps[i].c_str(), 255, 240, 244, 1);
     }
   }
 
-  DrawText(rgba, setX + 8, 60, "SERVER", 150, 165, 185, 1);
+  DrawText(rgba, setX + 8, 60, "SERVER", CT_RGB(CubeTheme::MUTED), 1);
   char line[96];
   auto row = [&](int idx, const char* label) {
     int y = 84 + idx * 36;
     bool foc = (s.focusCol == 2 && s.settingsRow == idx);
-    if (foc) FillRect(rgba, setX + 4, y - 4, setW - 8, 30, 24, 100, 140, 255);
+    if (foc) FillRect(rgba, setX + 4, y - 4, setW - 8, 30, CT_RGB(CubeTheme::ROW_HOT), 255);
     DrawText(rgba, setX + 12, y, label, 255, 240, 244, 1);
   };
   snprintf(line, sizeof(line), "PLAYERS %d", WebUI_MaxPlayers(s));
@@ -1284,28 +1314,28 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   row(3, s.p2pFriends ? "P2P FRIENDS ON" : "P2P FRIENDS OFF");
 
   // Graphics + OpenXR summary → Settings tab
-  FillRect(rgba, setX + 8, 236, setW - 16, 56, 48, 56, 72, 255);
+  FillRect(rgba, setX + 8, 236, setW - 16, 56, CT_RGB(CubeTheme::BTN_DIM), 255);
   snprintf(line, sizeof(line), "GFX %s", PresetLabel(s.gfx.preset));
-  DrawText(rgba, setX + 16, 244, line, 200, 230, 245, 1);
+  DrawText(rgba, setX + 16, 244, line, 255, 200, 210, 1);
   float ss = kSs[std::clamp(s.gfx.xr.ssIdx, 0, kSsN - 1)];
   snprintf(line, sizeof(line), "XR SS %.2f  AA%d", ss, s.gfx.matAntialias);
-  DrawText(rgba, setX + 16, 266, line, 150, 165, 185, 1);
+  DrawText(rgba, setX + 16, 266, line, CT_RGB(CubeTheme::MUTED), 1);
 
   int by = UI_H - 70;
   bool startFoc = (s.focusCol == 3);
-  FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? 0 : 0, startFoc ? 200 : 160, startFoc ? 140 : 100, 255);
+  FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? CubeTheme::CRIMSON_HOT[0] : CubeTheme::CRIMSON[0], startFoc ? CubeTheme::CRIMSON_HOT[1] : CubeTheme::CRIMSON[1], startFoc ? CubeTheme::CRIMSON_HOT[2] : CubeTheme::CRIMSON[2], 255);
   DrawText(rgba, setX + 36, by + 14, "START GAME", 255, 255, 255, 2);
 
-  DrawText(rgba, 12, UI_H - 22, s.status.c_str(), 150, 165, 185, 1);
+  DrawText(rgba, 12, UI_H - 22, s.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
   char sel[128];
   snprintf(sel, sizeof(sel), "SEL %s  | SETTINGS TAB = GRAPHICS", WebUI_SelectedMap(s).c_str());
-  DrawText(rgba, mapX + 8, UI_H - 22, sel, 0, 220, 255, 1);
+  DrawText(rgba, mapX + 8, UI_H - 22, sel, CT_RGB(CubeTheme::CRIMSON_HOT), 1);
 
   if ((cursor && cursor->visible) || s.cursorVisible) {
     int cx = cursor ? cursor->x : s.cursorX;
     int cy = cursor ? cursor->y : s.cursorY;
-    FillRect(rgba, cx - 10, cy - 2, 20, 4, 0, 220, 255, 255);
-    FillRect(rgba, cx - 2, cy - 10, 4, 20, 0, 220, 255, 255);
+    FillRect(rgba, cx - 10, cy - 2, 20, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
+    FillRect(rgba, cx - 2, cy - 10, 4, 20, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
     FillRect(rgba, cx - 3, cy - 3, 6, 6, 255, 255, 255, 255);
   }
 }
