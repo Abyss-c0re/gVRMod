@@ -239,7 +239,6 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   GLuint fbo = 0;
   int framesNoHead = 0;
 
-  bool prevHitL = false, prevHitR = false;
   bool axisLatchedL = false, axisLatchedR = false; // hysteresis re-arm for stuck float
   bool prevMenu = false;
   bool grabbing = false;
@@ -288,7 +287,18 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       grabbing = false;
       worldInitPending = true;
     }
-    if (ui.wantQuit) break;
+    // Orderly quit: request exit session first — mid-frame destroy aborts ("terminate…")
+    static bool quitRequested = false;
+    if (ui.wantQuit && !quitRequested) {
+      quitRequested = true;
+      fprintf(stderr, "[cube_webui] quit requested — orderly xrRequestExitSession\n");
+      if (sessionRunning) xrRequestExitSession(session);
+      else running = false;
+    }
+    if (quitRequested && (!sessionRunning)) {
+      running = false;
+      break;
+    }
 
     // StartGame → keep XR until take_xr handoff
     if (ui.wantStart && !ui.handoff) {
@@ -523,12 +533,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
               XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh) ? 1 : 0,
               XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh) ? 1 : 0);
 
-    // Grab-to-move: OFF by default (cfg.grabEnable). Resting Quest squeeze thrash
-    // moved the panel and blocked clicks (Meta Cam + WiVRn 041757). MENU re-anchors.
     float grabL = XrInputReadGrabHand(session, input, XrHand::Left);
     float grabR = XrInputReadGrabHand(session, input, XrHand::Right);
     const float grabOn = cfg.grabThresh;
-    const float grabOffHyst = std::max(0.35f, grabOn - 0.22f);
+    const float grabOffHyst = std::max(0.40f, grabOn - 0.18f);
     const bool grabEngageL = cfg.grabEnable && (grabL >= grabOn);
     const bool grabEngageR = cfg.grabEnable && (grabR >= grabOn);
     const bool grabHeldL = grabbing && grabHand == XrHand::Left ? (grabL >= grabOffHyst)
@@ -537,7 +545,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
                                                                 : grabEngageR;
     const float dt = 1.f / 72.f;
     if (grabCooldown > 0.f) grabCooldown = std::max(0.f, grabCooldown - dt);
-    const float grabArmNeed = 0.28f;
+    // Short arm (~120ms) so deliberate squeeze grabs without resting thrash
+    const float grabArmNeed = 0.12f;
     auto armGrip = [&](bool engage, float& arm) {
       if (engage) arm = std::min(grabArmNeed + 0.05f, arm + dt);
       else arm = 0.f;
@@ -545,52 +554,32 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     armGrip(grabEngageL, grabArmL);
     armGrip(grabEngageR, grabArmR);
 
-    // Sample raw trigger (float + face-button). Grip folds into axis when grab-move is off.
+    // Trigger sample: float axis + face-button EDGE only.
+    // NEVER treat clickDown level as held — WiVRn stuck clk=1 spammed enter-clicks
+    // and cancelled grab every frame.
     const float pressTh = cfg.triggerThresh;
     const float releaseTh = std::max(0.12f, pressTh * 0.45f);
-    const float clickGrip = 0.55f;
     auto sampL = XrInputSampleTriggerHand(session, input, XrHand::Left, pressTh);
     auto sampR = XrInputSampleTriggerHand(session, input, XrHand::Right, pressTh);
-    if (!cfg.grabEnable) {
-      // Same hysteresis path as trigger float — one edge per squeeze, not per frame
-      if (grabL >= clickGrip) {
-        sampL.axis = std::max(sampL.axis, grabL);
-        sampL.axisOk = true;
-        sampL.anyDown = true;
-      }
-      if (grabR >= clickGrip) {
-        sampR.axis = std::max(sampR.axis, grabR);
-        sampR.axisOk = true;
-        sampR.anyDown = true;
-      }
-    }
-    // Effective axis: real float OR grip-as-click (already folded into samp). If neither
-    // reports a sample, treat level as 0 so latch can release (stuck-edge recovery).
-    auto effAxis = [](const cube_xr::TriggerSample& s, float grab, bool grabAsClick,
-                      float gTh) -> float {
-      float a = s.axisOk ? s.axis : 0.f;
-      if (grabAsClick && grab >= gTh) a = std::max(a, grab);
-      if (s.clickDown) a = std::max(a, 1.f);
-      return a;
-    };
-    const bool grabAsClick = !cfg.grabEnable;
-    const float axL = effAxis(sampL, grabL, grabAsClick, clickGrip);
-    const float axR = effAxis(sampR, grabR, grabAsClick, clickGrip);
-    // Hysteresis: latch while held so stuck float=1 only fires once until release
-    auto axisEdge = [](float axis, float press, float release, bool& latched) -> bool {
-      if (!latched && axis > press) {
+    // Axis for hysteresis: float only (not face-button level)
+    auto axisEdge = [](float axis, bool ok, float press, float release, bool& latched) -> bool {
+      const float a = ok ? axis : 0.f;
+      if (!latched && a > press) {
         latched = true;
         return true;
       }
-      if (latched && axis < release) latched = false;
+      if (latched && a < release) latched = false;
       return false;
     };
-    const bool edgeL = sampL.clickEdge || axisEdge(axL, pressTh, releaseTh, axisLatchedL);
-    const bool edgeR = sampR.clickEdge || axisEdge(axR, pressTh, releaseTh, axisLatchedR);
-    // Level for grab priority / SMX / HUD
-    bool trigLEarly = sampL.anyDown || axisLatchedL;
-    bool trigREarly = sampR.anyDown || axisLatchedR;
-    const bool anyTrig = trigLEarly || trigREarly;
+    const bool edgeL =
+        sampL.clickEdge || axisEdge(sampL.axis, sampL.axisOk, pressTh, releaseTh, axisLatchedL);
+    const bool edgeR =
+        sampR.clickEdge || axisEdge(sampR.axis, sampR.axisOk, pressTh, releaseTh, axisLatchedR);
+    // Level "held" for press-then-aim: axis latch only, never stuck face-button level
+    bool trigLEarly = axisLatchedL || (sampL.axisOk && sampL.axis > pressTh);
+    bool trigREarly = axisLatchedR || (sampR.axisOk && sampR.axis > pressTh);
+    // Only EDGE cancels grab — stuck clk/trig level must not freeze grip-move
+    const bool anyTrigEdge = edgeL || edgeR;
 
     // Always write lightweight live log (~5 Hz) — no MarkDirty (was killing FPS)
     {
@@ -621,10 +610,11 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       grabArmL = grabArmR = 0.f;
     } else if (grabbing) {
       bool still = (grabHand == XrHand::Left) ? grabHeldL : grabHeldR;
-      if (anyTrig) {
+      // Trigger EDGE aborts grab (not stuck level)
+      if (anyTrigEdge) {
         grabbing = false;
         grabArmL = grabArmR = 0.f;
-        grabCooldown = 0.45f;
+        grabCooldown = 0.35f;
         ui.status = "STATIC · click priority";
         WebUI_MarkDirty(ui);
       } else if (still) {
@@ -635,19 +625,20 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           WorldPanelSetCenter(go + grabOff);
           int gpx = 0, gpy = 0;
           Vec3 ghp = wp.c;
-          bool ghit = WorldPanelRayHit(go, gd, &gpx, &gpy, &ghp);
+          bool ghit = WorldPanelRayHit(go, gd, &gpx, &gpy, &ghp, 1.35f);
           aimO = go; aimD = gd; aimValid = true; panelHit = ghit;
           hitPx = gpx; hitPy = gpy; hitPt = ghp;
         }
       } else {
         grabbing = false;
-        grabCooldown = 0.45f;
+        grabCooldown = 0.25f;
         ui.status = "STATIC (room locked)";
         WebUI_MarkDirty(ui);
         fprintf(stderr, "[cube_webui] grab end hand=%s pos=(%.3f,%.3f,%.3f)\n",
                 grabHand == XrHand::Left ? "L" : "R", wp.c.x, wp.c.y, wp.c.z);
       }
-    } else if (wp.ready && wp.frozen && !anyTrig && grabCooldown <= 0.f) {
+    } else if (wp.ready && wp.frozen && !anyTrigEdge && grabCooldown <= 0.f) {
+      // Start grab only with sustained squeeze WHILE laser hits panel
       if (grabArmL >= grabArmNeed && aimValidL && panelHitL) {
         grabbing = true;
         grabHand = XrHand::Left;
@@ -709,15 +700,13 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     prevMenu = menuBtn;
 
-    // Ray-plane click paths (all work when buttons are flaky):
-    //  1) rising edge of trigger/A while on panel
-    //  2) enter panel while already holding trigger (press-then-aim)
-    //  3) dwell hold ~0.75s on same cell
+    // Ray-plane click: EDGE only while on panel (+ dwell). No enter-while-held —
+    // stuck face-button level made that spam CLICK every hit flicker.
     static float clickCd = 0.f;
     if (clickCd > 0.f) clickCd -= dt;
     auto fireClick = [&](int px, int py, const char* which) {
-      if (clickCd > 0.f) return;
-      clickCd = 0.22f; // debounce multi-path same-frame / thrash
+      if (clickCd > 0.f || grabbing) return;
+      clickCd = 0.28f;
       fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d (ray on plane)\n", which, px, py);
       WebUI_PointerClick(ui, px, py);
       char st[96];
@@ -725,19 +714,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.status = st;
       WebUI_MarkDirty(ui);
     };
-    auto tryClick = [&](bool edge, bool hit, bool prevHit, bool held, int px, int py,
-                        const char* which) {
-      if (grabbing || !hit) return;
-      // Edge press on panel, OR sweep onto panel while held
-      if (edge || (held && !prevHit)) fireClick(px, py, which);
-    };
-    tryClick(edgeL, panelHitL, prevHitL, trigL, hitPxL, hitPyL, "L");
-    tryClick(edgeR, panelHitR, prevHitR, trigR, hitPxR, hitPyR, "R");
-    // Head-gaze + any trigger edge (when controllers miss plane)
+    if (edgeL && panelHitL) fireClick(hitPxL, hitPyL, "L");
+    if (edgeR && panelHitR) fireClick(hitPxR, hitPyR, "R");
     if (!panelHitL && !panelHitR && panelHitHead && (edgeL || edgeR))
       fireClick(hitPxH, hitPyH, "HEAD");
-    prevHitL = panelHitL;
-    prevHitR = panelHitR;
 
     // Dwell click: stay on roughly same panel pixel → click (no button needed)
     static float dwellT = 0.f;
@@ -933,21 +913,47 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     xrEndFrame(session, &fei);
   }
 
-  for (int i = 0; i < 2; ++i)
-    if (eyes[i].swap) xrDestroySwapchain(eyes[i].swap);
-  if (ptLayerHandle != XR_NULL_HANDLE && pfnDestroyPtLayer) pfnDestroyPtLayer(ptLayerHandle);
-  if (passthrough != XR_NULL_HANDLE) {
-    if (pfnPausePt) pfnPausePt(passthrough);
-    if (pfnDestroyPt) pfnDestroyPt(passthrough);
+  // Tear down without C++ exception escape (WiVRn: "terminate called without an active exception")
+  try {
+    if (sessionRunning && session) {
+      xrRequestExitSession(session);
+      // Drain a few events so runtime can STOPPING → END
+      for (int n = 0; n < 32; ++n) {
+        XrEventDataBuffer ev{XR_TYPE_EVENT_DATA_BUFFER};
+        if (xrPollEvent(instance, &ev) != XR_SUCCESS) break;
+        if (ev.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
+          auto* sc = reinterpret_cast<XrEventDataSessionStateChanged*>(&ev);
+          if (sc->state == XR_SESSION_STATE_STOPPING) {
+            xrEndSession(session);
+            sessionRunning = false;
+          }
+          if (sc->state == XR_SESSION_STATE_EXITING || sc->state == XR_SESSION_STATE_LOSS_PENDING)
+            break;
+        }
+      }
+      if (sessionRunning) {
+        xrEndSession(session);
+        sessionRunning = false;
+      }
+    }
+    for (int i = 0; i < 2; ++i)
+      if (eyes[i].swap) xrDestroySwapchain(eyes[i].swap);
+    if (ptLayerHandle != XR_NULL_HANDLE && pfnDestroyPtLayer) pfnDestroyPtLayer(ptLayerHandle);
+    if (passthrough != XR_NULL_HANDLE) {
+      if (pfnPausePt) pfnPausePt(passthrough);
+      if (pfnDestroyPt) pfnDestroyPt(passthrough);
+    }
+    SmxShutdown(smx);
+    XrInputDestroy(input);
+    if (viewSpace) xrDestroySpace(viewSpace);
+    if (space) xrDestroySpace(space);
+    if (session) xrDestroySession(session);
+    if (instance) xrDestroyInstance(instance);
+    if (panelTex) glDeleteTextures(1, &panelTex);
+    GlxDestroy(glx);
+  } catch (...) {
+    fprintf(stderr, "[cube_webui] teardown exception swallowed\n");
   }
-  SmxShutdown(smx);
-  XrInputDestroy(input);
-  if (viewSpace) xrDestroySpace(viewSpace);
-  if (space) xrDestroySpace(space);
-  if (session) xrDestroySession(session);
-  if (instance) xrDestroyInstance(instance);
-  if (panelTex) glDeleteTextures(1, &panelTex);
-  GlxDestroy(glx);
   fprintf(stderr, "[cube_webui] exit\n");
   return 0;
 }

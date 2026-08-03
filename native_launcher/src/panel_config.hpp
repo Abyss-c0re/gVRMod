@@ -11,12 +11,11 @@ struct PanelConfig {
   float offsetZ = 0.f;
   bool viewLock = false; // false = world-locked (product default); conf view_lock=1 honors HUD
   bool passthrough = true;
-  float grabThresh = 0.90f;
+  float grabThresh = 0.80f;
   float panelAlpha = 1.0f;
-  // Grip-to-move OFF by default — Meta Cam/WiVRn: resting squeeze thrash stole all clicks.
-  // MENU re-anchors; set grab_enable=1 to restore grip-move.
-  bool grabEnable = false;
-  float triggerThresh = 0.40f; // slightly soft so Quest float trigger registers
+  // Grip-to-move ON: high thresh + arm + hit-required (see xr_app). MENU re-anchors.
+  bool grabEnable = true;
+  float triggerThresh = 0.35f;
 };
 
 // Global shell config (loaded once at startup).
