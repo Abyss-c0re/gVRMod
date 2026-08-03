@@ -515,8 +515,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     armGrip(grabEngageL, grabArmL);
     armGrip(grabEngageR, grabArmR);
 
+    // Click sources: trigger axis/button OR (when grab disabled) squeeze ≥ click thresh.
+    // WiVRn often fails pure trigger/value — grip was the only live axis users feel.
+    const float clickGrip = 0.55f;
     bool trigLEarly = XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh);
     bool trigREarly = XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh);
+    if (!cfg.grabEnable) {
+      if (grabL >= clickGrip) trigLEarly = true;
+      if (grabR >= clickGrip) trigREarly = true;
+    }
     const bool anyTrig = trigLEarly || trigREarly;
 
     if (!cfg.grabEnable) {
@@ -612,19 +619,16 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     prevMenu = menuBtn;
 
-    // Click: each hand's trigger edge fires against THAT hand's ray hit (async).
+    // Ray-plane touch: click only when THAT hand's ray hits the panel (no ghost click).
     auto tryClick = [&](bool edge, bool hit, int px, int py, const char* which) {
       if (!edge || grabbing) return;
-      if (hit) {
-        fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d\n", which, px, py);
-        WebUI_PointerClick(ui, px, py);
-      } else if (ui.cursorVisible) {
-        fprintf(stderr, "[cube_webui] CLICK %s (cursor) px=%d py=%d\n", which, ui.cursorX, ui.cursorY);
-        WebUI_PointerClick(ui, ui.cursorX, ui.cursorY);
-      } else {
-        fprintf(stderr, "[cube_webui] CLICK %s (no hit — stick-nav fallback)\n", which);
-        WebUI_Input(ui, 0, 0, true, false);
-      }
+      if (!hit) return; // must touch the plane
+      fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d (ray on plane)\n", which, px, py);
+      WebUI_PointerClick(ui, px, py);
+      char st[96];
+      snprintf(st, sizeof st, "CLICK %s @ %d,%d", which, px, py);
+      ui.status = st;
+      WebUI_MarkDirty(ui);
     };
     tryClick(trigL && !prevTrigL, panelHitL, hitPxL, hitPyL, "L");
     tryClick(trigR && !prevTrigR, panelHitR, hitPxR, hitPyR, "R");
@@ -741,21 +745,20 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         GlLoadModelviewLocal(views0[eye].pose);
         if (wp.ready)
           GlDrawWorldPanel(panelTex, views0[eye].pose);
-        // Both lasers async — cyan-ish left, warm right; active hit brighter
-        auto drawHandLaser = [](bool valid, bool hit, bool isGrab, const Vec3& o,
-                                const Vec3& d, const Vec3& hp, float rBase, float gBase,
-                                float bBase) {
+        // One ray per hand. Tip only stops on the panel when WorldPanelRayHit says so.
+        auto drawHandLaser = [](bool valid, bool hit, const Vec3& o, const Vec3& d,
+                                const Vec3& hp, float cr, float cg, float cb) {
           if (!valid) return;
-          Vec3 tip = hit ? hp : (o + d * 2.5f);
-          float cr = isGrab ? 0.3f : (hit ? rBase : rBase * 0.5f);
-          float cg = isGrab ? 0.9f : (hit ? gBase : gBase * 0.5f);
-          float cb = isGrab ? 0.4f : (hit ? bBase : bBase * 0.55f);
+          Vec3 tip = hit ? hp : (o + d * 1.8f);
+          if (hit) {
+            cr = 1.f;
+            cg = 0.25f;
+            cb = 0.35f; // crimson hit = plane touch confirmed
+          }
           GlDrawLaser(o, tip, cr, cg, cb);
         };
-        bool grabIsL = grabbing && grabHand == XrHand::Left;
-        bool grabIsR = grabbing && grabHand == XrHand::Right;
-        drawHandLaser(aimValidL, panelHitL, grabIsL, aimOL, aimDL, hitPtL, 0.35f, 0.85f, 1.f);
-        drawHandLaser(aimValidR, panelHitR, grabIsR, aimOR, aimDR, hitPtR, 1.f, 0.35f, 0.25f);
+        drawHandLaser(aimValidL, panelHitL, aimOL, aimDL, hitPtL, 0.55f, 0.55f, 0.6f);
+        drawHandLaser(aimValidR, panelHitR, aimOR, aimDR, hitPtR, 0.55f, 0.55f, 0.6f);
         GlUnbindFbo();
         glDisable(GL_DEPTH_TEST);
 

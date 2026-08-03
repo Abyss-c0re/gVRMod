@@ -1156,7 +1156,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     DrawText(rgba, 130, UI_H - 20,
              "S1/S2=CHORD  +CHD  ANY=OR ALL=AND  DEF  CLR  |  SYNC data/vrmod/vrmod_openxr_bindings.json",
              160, 120, 130, 1);
-    if ((cursor && cursor->visible) || s.cursorVisible) {
+    if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
       FillRect(rgba, cx - 8, cy - 2, 16, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
@@ -1235,7 +1235,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     DrawText(rgba, 140, UI_H - 36, s.addons.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
     DrawText(rgba, 140, UI_H - 20, "TRIGGER = TOGGLE MOUNT  ·  CLOSE = EXIT", 160, 120, 130, 1);
 
-    if ((cursor && cursor->visible) || s.cursorVisible) {
+    if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
       FillRect(rgba, cx - 8, cy - 2, 16, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
@@ -1265,7 +1265,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     snprintf(line, sizeof(line), "APPLIED ON START VIA gvrmod_cube.cfg + -w/-h");
     DrawText(rgba, 20, UI_H - 48, line, 160, 120, 130, 1);
     DrawText(rgba, 20, UI_H - 28, s.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
-    if ((cursor && cursor->visible) || s.cursorVisible) {
+    if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;
       FillRect(rgba, cx - 10, cy - 2, 20, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
@@ -1337,7 +1337,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   snprintf(sel, sizeof(sel), "SEL %s  | SETTINGS TAB = GRAPHICS", WebUI_SelectedMap(s).c_str());
   DrawText(rgba, mapX + 8, UI_H - 22, sel, CT_RGB(CubeTheme::CRIMSON_HOT), 1);
 
-  if ((cursor && cursor->visible) || s.cursorVisible) {
+  if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
     int cx = cursor ? cursor->x : s.cursorX;
     int cy = cursor ? cursor->y : s.cursorY;
     FillRect(rgba, cx - 10, cy - 2, 20, 4, CT_RGB(CubeTheme::CRIMSON_HOT), 255);

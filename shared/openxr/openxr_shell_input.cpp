@@ -76,8 +76,9 @@ bool ShellInputSetup(const XrApi& api, XrSession session, ShellInput& in,
   push(in.stick, path::rightThumbstick);
   push(in.stick, path::leftThumbstick);
   push(in.menu, path::leftMenuClick);
-  // A as optional right-hand click alternate (not required for UI trigger)
+  // Face buttons = click (WiVRn often weak on trigger/value alone)
   push(in.trigger, path::rightAClick);
+  push(in.trigger, path::leftXClick);
   if (!SuggestProfile(api, kProfileOculusTouch, binds, (uint32_t)n)) {
     fprintf(stderr, "[cube_xr] FATAL: oculus/touch_controller bindings failed\n");
   } else {
@@ -150,6 +151,7 @@ void ShellInputSync(const XrApi& api, XrSession session, ShellInput& in) {
   else xrSyncActions(session, &sync);
 }
 
+// WiVRn often leaves isActive=false while currentState is live — read state anyway.
 static bool GetBool(const XrApi& api, XrSession session, XrAction a, XrPath sub, bool* out) {
   if (a == XR_NULL_HANDLE) return false;
   XrActionStateBoolean st{XR_TYPE_ACTION_STATE_BOOLEAN};
@@ -157,9 +159,9 @@ static bool GetBool(const XrApi& api, XrSession session, XrAction a, XrPath sub,
   gi.action = a;
   gi.subactionPath = sub;
   XrResult r = api.getBool ? api.getBool(session, &gi, &st) : xrGetActionStateBoolean(session, &gi, &st);
-  if (r != XR_SUCCESS || !st.isActive) return false;
-  if (out) *out = st.currentState;
-  return true;
+  if (r != XR_SUCCESS) return false;
+  if (out) *out = st.currentState != XR_FALSE;
+  return st.isActive || st.currentState;
 }
 
 static bool GetFloat(const XrApi& api, XrSession session, XrAction a, XrPath sub, float* out) {
@@ -169,9 +171,9 @@ static bool GetFloat(const XrApi& api, XrSession session, XrAction a, XrPath sub
   gi.action = a;
   gi.subactionPath = sub;
   XrResult r = api.getFloat ? api.getFloat(session, &gi, &st) : xrGetActionStateFloat(session, &gi, &st);
-  if (r != XR_SUCCESS || !st.isActive) return false;
+  if (r != XR_SUCCESS) return false;
   if (out) *out = st.currentState;
-  return true;
+  return st.isActive || st.currentState != 0.f;
 }
 
 bool ShellInputReadTriggerHand(const XrApi& api, XrSession session, const ShellInput& in,
@@ -180,8 +182,11 @@ bool ShellInputReadTriggerHand(const XrApi& api, XrSession session, const ShellI
   XrPath sub = HandPath(in, hand);
   bool b = false;
   if (GetBool(api, session, in.trigger, sub, &b) && b) return true;
+  // Runtime may only update the action when queried without subaction
+  if (GetBool(api, session, in.trigger, XR_NULL_PATH, &b) && b) return true;
   float f = 0.f;
   if (GetFloat(api, session, in.triggerAxis, sub, &f) && f > axisThresh) return true;
+  if (GetFloat(api, session, in.triggerAxis, XR_NULL_PATH, &f) && f > axisThresh) return true;
   return false;
 }
 
@@ -189,8 +194,10 @@ float ShellInputReadGrabHand(const XrApi& api, XrSession session, const ShellInp
                              Hand hand) {
   if (!in.attached) return 0.f;
   XrPath sub = HandPath(in, hand);
-  float g = 0.f;
+  float g = 0.f, g2 = 0.f;
   GetFloat(api, session, in.grab, sub, &g);
+  GetFloat(api, session, in.grab, XR_NULL_PATH, &g2);
+  if (g2 > g) g = g2;
   bool click = false;
   if (GetBool(api, session, in.grabClick, sub, &click) && click) g = 1.f;
   return g;
@@ -264,7 +271,8 @@ static bool LocateOne(const XrApi& api, XrSpace aim, XrSpace base, XrTime time, 
   if ((loc.locationFlags & need) != need) return false;
   float px = loc.pose.position.x, py = loc.pose.position.y, pz = loc.pose.position.z;
   float d2 = px * px + py * py + pz * pz;
-  if (d2 < 0.01f) return false;
+  // Near STAGE origin is valid (was 0.01 — killed WiVRn poses near 0)
+  if (d2 < 1e-6f) return false;
   float score = d2;
   if (loc.locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT) score += 100.f;
   if (loc.locationFlags & XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT) score += 100.f;
