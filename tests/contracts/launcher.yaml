@@ -1,0 +1,16 @@
+# Cube native launcher contracts
+version: 1
+symbols:
+  - id: math3d.Normalize
+    file: native_launcher/src/math3d.hpp
+    tier: pure
+    tests: [launcher.math3d.normalize]
+  - id: math3d.Dot
+    file: native_launcher/src/math3d.hpp
+    tier: pure
+    tests: [launcher.math3d.dot]
+  - id: desktopView.cycle
+    file: native_launcher/src/ui_panel.cpp
+    tier: pure
+    tests: [launcher.desktop.cycle_1_to_4]
+    notes: "1=none 2=left 3=right 4=follow-cam"

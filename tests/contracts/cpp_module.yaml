@@ -1,0 +1,75 @@
+# C++ / Lua module export contracts
+version: 1
+exports:
+  - id: VRMOD_GetVersion
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_Init
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_Shutdown
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_GetPoses
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_GetActions
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_UpdatePosesAndActions
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_ShareTextureBegin
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_ShareTextureFinish
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_GetDisplayInfo
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_SubmitSharedTexture
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardOpen
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardClose
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardIsOpen
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardGetText
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardSetText
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardAppend
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardBackspace
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardHitTest
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_KeyboardPointerClick
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_VirtualDisplayCreate
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_VirtualDisplayDestroy
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_VirtualDisplayGetInfo
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_VirtualDisplayCaptureWindow
+    tier: seam
+    tests: [cpp.exports.registry]
+  - id: VRMOD_VirtualDisplayIsSupported
+    tier: seam
+    tests: [cpp.exports.registry]

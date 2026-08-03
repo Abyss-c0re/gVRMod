@@ -115,6 +115,7 @@ if(VRMOD_BUILD_TESTS)
         tests/test_lua.cpp
         tests/test_distortion.cpp
         tests/test_frame_pipeline.cpp
+        tests/test_exports.cpp
     )
 
     add_executable(vrmod_tests

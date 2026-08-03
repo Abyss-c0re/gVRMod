@@ -80,10 +80,12 @@ make -j"$(nproc)" vrmod_tests
 popd >/dev/null
 
 echo ""
-echo "=== Running C++ unit tests ==="
+echo "=== Running full offline suite (contracts + Lua + C++ + launcher) ==="
 echo ""
 
-./build_tests/vrmod_tests
+EXTRA=()
+if [[ $DO_CLEAN -eq 0 ]]; then EXTRA+=(--no-clean); fi
+./scripts/test_all.sh "${EXTRA[@]}"
 
 echo ""
 echo "=== All tests completed ==="
@@ -92,3 +94,5 @@ echo "Release artifact is ready in install/ if you want to deploy with ./install
 echo "For a full in-game quick test cycle (build + auto-launch GMod + vrmod_start): ./quick_test.sh"
 echo ""
 echo "Tip: run with --no-clean for faster incremental rebuilds during active development."
+echo "Fast pure-only: ./scripts/test_all.sh --fast"
+

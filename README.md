@@ -67,6 +67,22 @@ vrmod_backend          print active backend + version
 
 ---
 
+
+## Testing
+
+Offline gate (no headset required):
+
+```bash
+./scripts/test_all.sh          # contracts + Lua + C++ module + launcher
+./scripts/test_all.sh --fast   # contracts + Lua only
+./test.sh                      # clean rebuild + full suite
+```
+
+- Framework design: [`docs/TESTING_FRAMEWORK.md`](docs/TESTING_FRAMEWORK.md)
+- Desktop follow-cam / broadcast: [`docs/DESKTOP_BROADCAST.md`](docs/DESKTOP_BROADCAST.md)
+- In-game smoke: `./quick_test.sh`
+
+
 ## Features (high level)
 
 - OpenXR first-class (Quest 3 / WiVRn / Monado / SteamVR OpenXR)

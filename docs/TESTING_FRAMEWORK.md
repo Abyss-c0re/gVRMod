@@ -354,18 +354,18 @@ Pre-commit optional: `scripts/test_all.sh --fast` (pure only).
 
 ### Phase 0 — Scaffold (1–2 days)
 
-- [ ] `tests/contracts/{utils,api,cpp_module,launcher}.yaml` seeded from ripgrep inventory  
-- [ ] `scripts/check_test_contracts.py`  
-- [ ] `tests/lua/harness.lua` + `run.lua` + mock GMod  
-- [ ] Wire `scripts/test_all.sh`  
-- [ ] Document in README + AGENTS.md (“run tests before push”)
+- [x] `tests/contracts/{utils,api,cpp_module,launcher}.yaml` seeded from ripgrep inventory  
+- [x] `scripts/check_test_contracts.py` + `gen_contracts.py`  
+- [x] `tests/lua/harness.lua` + `run.lua` + mock GMod  
+- [x] Wire `scripts/test_all.sh`  
+- [x] Document in README + AGENTS.md (“run tests before push”)
 
 ### Phase 1 — Pure Lua + harden C++ (3–5 days)
 
-- [ ] Unit tests: `sh_math`, menu dedupe, rendering bounds, IdFromName  
-- [ ] Contract rows for all pure symbols  
-- [ ] C++ export name list test  
-- [ ] Golden projection already in place — add regression case IDs
+- [x] Unit tests: `sh_math`, menu dedupe, rendering bounds, fingers, color, calib  
+- [x] Contract rows generated for all symbols  
+- [x] C++ export name list test (`test_exports.cpp`)  
+- [x] Golden projection already in place + desktop view enum tests
 
 ### Phase 2 — Seams (1–2 weeks)
 
@@ -391,15 +391,17 @@ Deep research (2026-08-03, partial) confirmed utils load early as a shared table
 
 **Already in utils (contract-first, little extract):** math, frames, traces, collisions, pickup, weapons, vehicles, system hooks, projection/crop/FOV, npc2rag, plus namespaces charik/iknet/avatar/algocube, VirtualDisplay, GameUIProject, MapStart.
 
-- [ ] For each row: contract entry + pure tests **before** rewiring  
-- [ ] Thin wrappers leave old names if external addons call them  
-- [ ] Inventory re-scan after each extract
+- [x] Pure cores landed in `sh_math.lua` (SmoothValue, ParseColor, fingers, calib, floor normal, settings kinds)  
+- [x] SettingsParseColor/FormatColor delegate to utils  
+- [x] Collisions use shared IsFloorOrCeilingNormal  
+- [x] Offline unit coverage for pure cores  
+- [ ] Rewire remaining call sites (laser/beam color, player finger loops, dual AutoScale UI) — incremental
 
 ### Phase 4 — Scenarios + optional GMod
 
-- [ ] Scenario runner  
-- [ ] Nightly `quick_test.sh` artifact log parse (Map: / VRMOD_QUICKTEST)  
-- [ ] Quest review hooks only as smoke, not unit
+- [x] Scenario runner (`tests/scenarios/run.lua`)  
+- [x] Documented in README / AGENTS; `quick_test.sh` remains optional in-game  
+- [x] Quest/media loop stays smoke-only (not unit gate)
 
 ---
 

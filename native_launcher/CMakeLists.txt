@@ -71,3 +71,20 @@ add_custom_command(TARGET cube_webui_launcher POST_BUILD
 
 install(TARGETS cube_webui_launcher RUNTIME DESTINATION bin)
 install(FILES cube_webui.conf cube_webui.conf.example DESTINATION share/gvrmod)
+
+# ── Offline unit tests (no OpenXR runtime / no display required for math3d) ──
+option(CUBE_BUILD_TESTS "Build cube launcher unit tests" ON)
+if(CUBE_BUILD_TESTS)
+  add_executable(cube_launcher_tests
+    tests/test_main.cpp
+  )
+  target_include_directories(cube_launcher_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/openxr
+  )
+  target_compile_options(cube_launcher_tests PRIVATE -g -O0 -Wall)
+  set_target_properties(cube_launcher_tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+  )
+endif()
