@@ -182,9 +182,13 @@ bool WorldPanelRayHit(Vec3 origin, Vec3 dir, int* outPx, int* outPy, Vec3* outHi
   if (std::fabs(u) > hw * slop || std::fabs(v) > hh * slop) return false;
   u = std::max(-hw, std::min(hw, u));
   v = std::max(-hh, std::min(hh, v));
-  // 1:1 with paint + FlipY draw: +right → +px, +up → UI top (py=0). NO 180 remap.
+  // Geometric: +right → +px, +up → top of panel.
   int px = (int)((u / hw * 0.5f + 0.5f) * (float)UI_W);
   int py = (int)((0.5f - v / hh * 0.5f) * (float)UI_H);
+  // Texture is 180°-rotated on upload (gl_render). Match so tip on visual NEW GAME
+  // hits buffer NEW GAME (not START / dead zones).
+  px = (UI_W - 1) - px;
+  py = (UI_H - 1) - py;
   px = std::max(0, std::min(UI_W - 1, px));
   py = std::max(0, std::min(UI_H - 1, py));
   if (outPx) *outPx = px;
