@@ -116,18 +116,17 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   const Vec3 tr = wp.c + wp.right * hw + wp.up * hh;
   const Vec3 tl = wp.c - wp.right * hw + wp.up * hh;
 
-  // Front face only (normal toward HMD). Back face was showing a mirrored
-  // "ghost" while hits still registered — felt like image front / sensor back.
-  glEnable(GL_CULL_FACE);
-  glCullFace(GL_BACK);
-  glFrontFace(GL_CCW); // bl→br→tr→tl is CCW when viewed from front (along -normal)
+  // Never cull: OpenXR eye modelview made GL_CCW front-face cull hide the whole
+  // panel (hits still worked — "cant see panel"). Draw BOTH faces with matching UV
+  // so front (hit side) and back both show upright readable UI.
+  glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   glColor4f(1.f, 1.f, 1.f, cfg.panelAlpha);
-  // FlipY: V=0 UI bottom, V=1 UI top. Front winding matches hit u/v.
+  // Front: bl→br→tr→tl — U along +right, V along +up (FlipY upload)
   glBegin(GL_QUADS);
   glTexCoord2f(0.f, 0.f);
   glVertex3f(bl.x, bl.y, bl.z);
@@ -138,10 +137,20 @@ void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld) {
   glTexCoord2f(0.f, 1.f);
   glVertex3f(tl.x, tl.y, tl.z);
   glEnd();
+  // Back: reverse winding + mirror U so text is not mirrored when seen from behind
+  glBegin(GL_QUADS);
+  glTexCoord2f(0.f, 0.f);
+  glVertex3f(bl.x, bl.y, bl.z);
+  glTexCoord2f(0.f, 1.f);
+  glVertex3f(tl.x, tl.y, tl.z);
+  glTexCoord2f(1.f, 1.f);
+  glVertex3f(tr.x, tr.y, tr.z);
+  glTexCoord2f(1.f, 0.f);
+  glVertex3f(br.x, br.y, br.z);
+  glEnd();
   glDisable(GL_TEXTURE_2D);
   glColor4f(1.f, 1.f, 1.f, 1.f);
   glDisable(GL_BLEND);
-  glDisable(GL_CULL_FACE);
 }
 
 void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb) {
