@@ -3,7 +3,7 @@
 **Cycle:** 9  
 **Time:** 2026-08-04T16:01:50+03:00  
 **Focus:** G14 Glide stick-primary SoT + seat toast  
-**Commit (gVRMod):** `d22a769`  
+**Commit (gVRMod):** `ca30d8c`  
 **Commit (vrmod-x64):** `e8318a9`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 

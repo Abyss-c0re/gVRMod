@@ -5,7 +5,7 @@
   "cycle": 9,
   "status": "ok",
   "last_cycle_at": "2026-08-04T16:01:50+03:00",
-  "last_commit": "d22a769",
+  "last_commit": "ca30d8c",
   "last_commit_repo": "gVRMod+vrmod-x64",
   "last_test": "test_all --fast PASS 4/4",
   "last_focus": "G14 Glide stick-primary SoT helpers + seat toast",
