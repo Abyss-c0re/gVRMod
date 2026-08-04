@@ -3,7 +3,7 @@
 **Cycle:** 19  
 **Time:** 2026-08-04T17:49:44+03:00  
 **Focus:** G12 ambient clip contract (partial — no OpenAL player)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `f7e35ff`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
