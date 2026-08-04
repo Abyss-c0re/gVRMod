@@ -23,7 +23,7 @@ Never submit eng texture. Never dual pose truth.
 - G05 partial: `StereoLoad_IsLoading` + dual-hold toast + `StereoLoad_HmdExpect` checklist; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD walk still open (TESTING_FRAMEWORK §0.1)
 - G04 partial: default cold-spawns; skip-spawn plan + `WriteWarmAttachMarkers` when `GVRMOD_WARM_REUSE=1`; careful changelevel plan executor opt-in (`vrmod_warm_changelevel` / `warm_changelevel_enable.txt` / `GVRMOD_WARM_CHANGELEVEL`) — **default off**
 - G13 partial: soft ack `panel_live` default; env `GVRMOD_CUBE_RECLAIM` → pure XR plan **panel refresh only** (never restart session); action rebind deferred; HMD walk §0.3 open
-- G03 partial: pack + plan + opt-in executor (`vrmod_stage_apply` 1 or `stage_apply_enable.txt`); **default off** — no auto height jump
+- G03 partial: pack + plan + opt-in executor (`vrmod_stage_apply` / `stage_apply_enable.txt`); **default off**; `StagePack_HmdExpect` + §0.4 walk; HMD height proof open
 - G12 partial: gain law + `cube_hold.ogg` + ffplay; **default ON**; comfort master 0.55 or `GVRMOD_AMBIENT_MASTER`; silence `GVRMOD_AMBIENT_PLAY=0`; HMD taste walk §0.2 open
 
 ## UI / interaction

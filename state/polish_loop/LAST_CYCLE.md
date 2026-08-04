@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 34  
-**Time:** 2026-08-04T20:35:04+03:00  
-**Focus:** G13 careful XR reclaim plan (panel refresh)  
-**Commit (gVRMod):** `2c03ca0`  
-**Commit (vrmod-x64):** none  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass  
+**Cycle:** 35  
+**Time:** 2026-08-04T20:45:23+03:00  
+**Focus:** G03 HMD stage-apply expect + §0.4  
+**Commit (gVRMod):** (set after push)  
+**Commit (vrmod-x64):** (set after push)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **Pure** CubeReclaimXrPlanDecide / ShouldExecute / Label / HmdExpect  
-2. Law: never restart_session; env path = panel_refresh only  
-3. **xr_app** applies panel refresh status when RECLAIM=1 + ack  
-4. TESTING_FRAMEWORK §0.3 reclaim walk  
+1. **Pure Lua** StagePack_HmdExpect / HeightJumpRiskIsBad  
+2. **openxr_launch** logs G03 HMD checklist once with stage pack  
+3. TESTING_FRAMEWORK §0.4 stage height walk  
+4. Unit + PURE_TESTED  
 
 ## Pain points
 
-- Untouched; no OpenXR session thrash.
+- Untouched; default still no auto height apply.
 
 ## Gaps
 
-- G13 partial — action rebind still deferred; HMD walk open  
-- Next: G03 HMD stage-apply notes or G14 Glide smoke notes  
+- G03 partial — HMD height walk still open  
+- Next: G14 Glide smoke notes or G04 warm HMD notes  
 
 ## Notes
 

@@ -113,6 +113,26 @@ Offline gate proves soft ack + pure XR plan (panel refresh). **Headset** require
 
 Pure helpers: `CubeReclaimXrPlanDecide` / `CubeReclaim_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.4 G03 STAGE pack / height continuity (manual)
+
+Offline gate proves parse + deferred plan + opt-in executor. **Headset** required to claim height continuity OK.
+
+| Mode | How | Expect | FAIL if |
+|------|-----|--------|---------|
+| Default | no convar/file | Preview toast only; **no** seated jump | Silent auto `vrmod_seatedoffset` |
+| Close | pack head ≈ live HMD | “already close”; height unchanged | Rewrite thrash |
+| Too far | ΔY outside safe band | Blocked; no apply | Forced multi-meter pop |
+| Opt-in apply | `vrmod_stage_apply 1` or `DATA/vrmod/stage_apply_enable.txt` | Soft seated step; continuous floor | Ceiling crush / dual height truth |
+
+**Procedure (claim “G03 stage OK” only if walked):**
+
+1. Cube Start with STAGE pack written → enter VR.  
+2. Default: toast may show deferred ΔY; standing height stable.  
+3. Optional opt-in: enable apply once — soft continuity, not a jump.  
+4. Log may show `G03 HMD · DEFERRED|APPLIED|CLOSE|BLOCKED …` (`g_VR._cubeStagePackHmdExpect`).
+
+Pure helper: `vrmod.utils.StagePack_HmdExpect(decision, plan, execRes)` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

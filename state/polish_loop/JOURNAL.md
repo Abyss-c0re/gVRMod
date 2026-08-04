@@ -340,3 +340,13 @@ Append one block per cycle. Newest at bottom.
 - G13 partial — action rebind deferred; HMD walk open.
 - Tests: full test_all PASS 6/6.
 - Next: G03 HMD stage-apply notes or G14 Glide smoke notes.
+
+## 2026-08-04 cycle 35 — G03 HMD stage-apply expect
+
+- Theme: pure HMD height continuity expect + smoke checklist; no auto apply.
+- Pure: StagePack_HmdExpect / HeightJumpRiskIsBad.
+- openxr_launch logs G03 HMD checklist with stage pack note.
+- TESTING_FRAMEWORK §0.4 walk table + procedure.
+- G03 partial — headset height proof still open.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: G14 Glide smoke notes or G04 warm HMD notes.

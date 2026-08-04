@@ -381,6 +381,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
     [
+      "vrmod.utils.StagePack_HeightJumpRiskIsBad",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
       "vrmod.utils.StagePack_IsUsable",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],

@@ -441,6 +441,14 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
     tier: pure
     tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_HeightJumpRiskIsBad
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
   - id: vrmod.utils.StagePack_IsUsable
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
     tier: pure

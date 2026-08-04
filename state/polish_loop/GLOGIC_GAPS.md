@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 34
+Last updated: 2026-08-04 cycle 35
 
 ## P0 — seamless / feel broken
 
@@ -10,7 +10,7 @@ Last updated: 2026-08-04 cycle 34
 |----|-----|-------|--------|
 | G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |
 | G02 | No coordinated fade on take_xr | Panel + eye-buffer fade cycle14; Cube shell done | **done** cycle14 |
-| G03 | Cal / STAGE not packed into handoff | Executor opt-in cycle29; default still off | **partial** cycle29 |
+| G03 | Cal / STAGE not packed into handoff | HmdExpect+§0.4 cycle35; default still off | **partial** cycle35 |
 | G04 | Cold Steam/hl2 every Start | changelevel plan executor cycle31; default still cold | **partial** cycle31 |
 | G05 | Loading after take_xr may not be stereo | HmdExpect+§0.1 checklist cycle32; HMD walk open | **partial** cycle32 |
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G03 | HMD stage-apply expect + §0.4 walk | StagePack_HmdExpect |
 | G13 | XR reclaim panel_refresh plan (env) | XrPlanDecide + §0.3 walk |
 | G12 | Ambient master env + HMD volume expect | MasterFromEnv + §0.2 walk |
 | G05 | HMD load-flash expect + §0.1 walk | StereoLoad_HmdExpect + TESTING_FRAMEWORK |
