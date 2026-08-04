@@ -3,8 +3,8 @@
 **Cycle:** 58  
 **Time:** 2026-08-05T01:00:28+03:00  
 **Focus:** G40 Vision border fill law (W1)  
-**Commit (gVRMod):** (pending close)  
-**Commit (vrmod-x64):** (pending close)  
+**Commit (gVRMod):** `08e3d42`  
+**Commit (vrmod-x64):** `07a4a5e`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 52 Lua)  
 
 ## What changed
