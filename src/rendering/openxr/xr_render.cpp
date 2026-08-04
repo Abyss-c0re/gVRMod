@@ -357,7 +357,9 @@ bool XR_CollectEyesFromEngine(const float textureBounds[8]) {
         : (g_rightEyeTexture ? g_rightEyeTexture : 0);
     GLuint sbs = g_vrRtColorTex ? g_vrRtColorTex
         : (g_sharedTexture ? g_sharedTexture : g_captureTexture);
-    bool havePerEye = leftSrc && rightSrc && leftSrc != rightSrc;
+    // Same rule as Submit: both FBOs required (no color+depth false dual).
+    bool havePerEye = leftSrc && rightSrc && leftSrc != rightSrc
+        && g_leftEyeFBO != 0 && g_rightEyeFBO != 0;
     if (!havePerEye && !sbs) return false;
 
     GLint srcW = g_knownSubmitSrcW;
@@ -605,8 +607,17 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
 
         bool leftOk = (perEyeSrc[0] != 0);
         bool rightOk = (perEyeSrc[1] != 0);
-        havePerEye = leftOk && rightOk && (perEyeSrc[0] != perEyeSrc[1]);
+        // True dual only when BOTH eyes have real FBO COLOR attaches.
+        // Gen-steal during ShareTexture often pairs SBS color + depth/junk as L/R
+        // (log: L=52 R=54 leftFBO=45 rightFBO=0) → havePerEye full-UV blit = one black eye.
+        // Lua paints one SBS RT (mat_queue 0/1 dual RenderView); prefer bounds-crop halves.
+        havePerEye = leftOk && rightOk && (perEyeSrc[0] != perEyeSrc[1])
+            && g_leftEyeFBO != 0 && g_rightEyeFBO != 0;
         if (!havePerEye) {
+            // Authoritative SBS color if observed; else shared/stolen.
+            if (g_vrRtColorTex) srcTex = g_vrRtColorTex;
+            if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
+            if (!srcTex && stolenTexture) srcTex = stolenTexture;
             if (srcTex) {
                 perEyeSrc[0] = perEyeSrc[1] = srcTex;
             }
@@ -775,11 +786,34 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                         u0 = 0.5f;
                         u1 = 1.0f - ins;
                     }
+                } else if (!singleEyeTex && cropMode != 1) {
+                    // Clamp Lua UV into the correct SBS half. ComputeSubmitBounds can
+                    // emit u0≈-0.09 / u1≈0.40 under extreme offset×scale (seen in logs);
+                    // unclamped sample = black bars / thin strip on WiVRn.
+                    if (eye == 0) {
+                        if (u0 < ins) u0 = ins;
+                        if (u1 > 0.5f) u1 = 0.5f;
+                        if (u0 > u1 - 0.01f) { u0 = ins; u1 = 0.5f; }
+                    } else {
+                        if (u0 < 0.5f) u0 = 0.5f;
+                        if (u1 > 1.0f - ins) u1 = 1.0f - ins;
+                        if (u0 > u1 - 0.01f) { u0 = 0.5f; u1 = 1.0f - ins; }
+                    }
                 }
                 // V: empty only → full. Inverted V intentional on SBS (flip via blit).
                 if (!singleEyeTex && cropMode != 1 && std::fabs(v1 - v0) < 0.001f) {
                     v0 = ins;
                     v1 = 1.0f - ins;
+                }
+                // Clamp V into [0,1] while preserving invert order (Linux flip convention).
+                if (!singleEyeTex) {
+                    if (v0 > v1) {
+                        if (v0 > 1.0f) v0 = 1.0f;
+                        if (v1 < 0.0f) v1 = 0.0f;
+                    } else {
+                        if (v0 < 0.0f) v0 = 0.0f;
+                        if (v1 > 1.0f) v1 = 1.0f;
+                    }
                 }
 
                 // g_rtTextureNeedsVFlip: mirror V into GL bottom-left space when bounds
