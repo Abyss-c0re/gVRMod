@@ -1280,17 +1280,15 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     else
       snprintf(line, sizeof(line), "%.0fs  ·  HOLDING OPENXR FOR GMOD", t);
     DrawText(rgba, 24, 360, line, CT_RGB(CubeTheme::MUTED), 1);
-    // G12: ambient gain law (panel contract; actual clip optional future)
+    // G12: ambient gain + clip contract (status file; OpenAL player still optional)
     {
       float g = s.handoffAudioGain;
       if (g < 0.f) g = 0.f;
       if (g > 1.f) g = 1.f;
-      if (g <= 0.02f)
-        snprintf(line, sizeof(line), "AUDIO   SILENT  ·  GAIN LAW READY");
-      else if (g < 0.99f)
-        snprintf(line, sizeof(line), "AUDIO   DUCK %.0f%%  ·  AMBIENT HOLD", g * 100.f);
-      else
-        snprintf(line, sizeof(line), "AUDIO   HOLD  ·  AMBIENT GAIN 100%%");
+      bool playing = CubeAmbient_ShouldPlay(g, true);
+      // Asset presence unknown here without I/O — label is contract-honest
+      std::string al = CubeAmbient_StatusLabel(g, playing, /*clipPresent=*/false);
+      snprintf(line, sizeof(line), "AUDIO   %s", al.c_str());
       DrawText(rgba, 24, 380, line, CT_RGB(CubeTheme::MUTED), 1);
     }
     DrawText(rgba, 24, 400, "THEME = LUA CUBE  ·  BINDINGS CARRY OVER  ·  NO BLACK GAP",

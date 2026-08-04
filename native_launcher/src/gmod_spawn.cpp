@@ -1,6 +1,7 @@
 #include "gmod_spawn.hpp"
 #include "panel_config.hpp"
 #include "stage_pack.hpp"
+#include "ambient_clip.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -228,6 +229,8 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot) {
   unlink((d + "cube_ready.txt").c_str());
   // G13: clear prior return marker so a new Start does not look like reverse mid-flight
   unlink((d + "cube_return.txt").c_str());
+  // G12: clear ambient status (rewritten while handoff runs)
+  unlink((d + "cube_ambient.txt").c_str());
   // G03: keep cube_stage_pack.txt so GMod can read after claim (overwritten on next Start)
 }
 
@@ -244,5 +247,20 @@ bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pa
   if (!WriteFile(path, StagePack_Format(s))) return false;
   fprintf(stderr, "[cube_webui] stage pack → %s space=%s head_ok=%d y=%.3f\n",
           path.c_str(), s.refSpace.c_str(), s.headOk ? 1 : 0, s.headY);
+  return true;
+}
+
+bool WriteCubeAmbientStatus(const std::string& gmodRoot, const AmbientClipSnapshot& snap) {
+  if (gmodRoot.empty()) return false;
+  const std::string dataDir = gmodRoot + "/garrysmod/data/vrmod";
+  mkdir((gmodRoot + "/garrysmod/data").c_str(), 0755);
+  mkdir(dataDir.c_str(), 0755);
+  AmbientClipSnapshot s = snap;
+  if (s.ts <= 0) s.ts = (long)time(nullptr);
+  if (s.clip_rel.empty()) s.clip_rel = CubeAmbient_DefaultClipRel();
+  s.playing = CubeAmbient_ShouldPlay(s.gain, s.handoff);
+  s.valid = true;
+  const std::string path = dataDir + "/cube_ambient.txt";
+  if (!WriteFile(path, CubeAmbient_Format(s))) return false;
   return true;
 }

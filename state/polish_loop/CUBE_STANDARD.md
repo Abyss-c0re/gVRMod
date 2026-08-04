@@ -24,7 +24,7 @@ Never submit eng texture. Never dual pose truth.
 - G04 partial: every Start is still cold Steam/hl2 (`CubeLaunchBootKind`); warm process reuse not shipped
 - G13 partial: VR exit writes `cube_return.txt`; Cube does **not** auto-reclaim XR yet (relaunch shell)
 - G03 partial: Cube writes `cube_stage_pack.txt`; GMod parses + `StagePack_ApplyDecision` (allow_apply=false); **must not** auto-jump origin/height without HMD-proven apply
-- G12 partial: handoff ambient uses `CubeHandoffAudioGain` (duck to silence); actual clip optional future — panel shows AUDIO line
+- G12 partial: `CubeHandoffAudioGain` + `cube_ambient.txt` clip contract (`ambient/cube_hold.ogg`); OpenAL player optional future
 
 ## UI / interaction
 

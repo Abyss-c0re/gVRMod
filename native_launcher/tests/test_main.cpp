@@ -3,6 +3,7 @@
 #include "gmod_spawn.hpp"
 #include "last_play.hpp"
 #include "stage_pack.hpp"
+#include "ambient_clip.hpp"
 
 TEST(launcher_math3d_normalize) {
     Vec3 n = Normalize(V3(3.f, 0.f, 0.f));
@@ -144,6 +145,31 @@ TEST(launcher_cold_start_boot_kind) {
     ASSERT_TRUE(CubeColdStartProgressSeconds() >= 40.f);
     auto d = CubeHandoffDetailForPhase("waiting_process", false);
     ASSERT_TRUE(d.find("cold") != std::string::npos || d.find("Steam") != std::string::npos);
+}
+
+// G12: ambient clip contract — pure should-play + format/parse + status label
+TEST(launcher_ambient_clip_contract) {
+    ASSERT_TRUE(CubeAmbient_ShouldPlay(1.f, true));
+    ASSERT_TRUE(!CubeAmbient_ShouldPlay(0.f, true));
+    ASSERT_TRUE(!CubeAmbient_ShouldPlay(1.f, false));
+    ASSERT_NEAR(CubeAmbient_EffectiveVolume(0.5f, 0.5f), 0.25f, 1e-5f);
+    AmbientClipSnapshot a;
+    a.gain = 0.88f;
+    a.handoff = true;
+    a.playing = CubeAmbient_ShouldPlay(a.gain, true);
+    a.clip_rel = CubeAmbient_DefaultClipRel();
+    a.ts = 42;
+    std::string body = CubeAmbient_Format(a);
+    AmbientClipSnapshot b;
+    ASSERT_TRUE(CubeAmbient_Parse(body, b));
+    ASSERT_NEAR(b.gain, 0.88f, 1e-4f);
+    ASSERT_TRUE(b.playing);
+    ASSERT_TRUE(b.handoff);
+    ASSERT_EQ(b.clip_rel, std::string(CubeAmbient_DefaultClipRel()));
+    auto path = CubeAmbient_ResolveClipPath("/opt/cube/assets", "ambient/x.ogg");
+    ASSERT_EQ(path, std::string("/opt/cube/assets/ambient/x.ogg"));
+    ASSERT_TRUE(CubeAmbient_StatusLabel(0.f, false, true).find("SILENT") != std::string::npos);
+    ASSERT_TRUE(CubeAmbient_StatusLabel(1.f, true, false).find("MISSING") != std::string::npos);
 }
 
 // G12: ambient gain law — full during hold, duck at take_xr, 0 on exit complete

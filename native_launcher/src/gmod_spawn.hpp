@@ -1,4 +1,5 @@
 #pragma once
+#include "ambient_clip.hpp"
 #include "stage_pack.hpp"
 #include <string>
 
@@ -67,6 +68,9 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot);
 // G03: write cube_stage_pack.txt (STAGE/LOCAL + head sample). Does not clear on handoff markers.
 // Applying pack in GMod is intentionally separate — this only persists continuity data.
 bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pack);
+
+// G12: write cube_ambient.txt (gain/playing/clip_rel). No audio engine — status SoT only.
+bool WriteCubeAmbientStatus(const std::string& gmodRoot, const AmbientClipSnapshot& snap);
 
 // G04: cold Steam/hl2 Start inventory — pure strategy labels (warm process reuse not shipped).
 // Current product always cold_spawns via steam -applaunch / hl2.sh. Warm reuse needs a

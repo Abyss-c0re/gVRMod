@@ -179,3 +179,12 @@ Append one block per cycle. Newest at bottom.
 - Tests: full test_all PASS 6/6.
 - Commits: vrmod-x64 b1dc55f; gVRMod submodule + launcher + state.
 - Next: G12 ambient clip or G04 warm reuse design.
+
+## 2026-08-04 cycle 19 — G12 ambient clip contract
+
+- Theme: name the ambient clip + status SoT without OpenAL.
+- Pure: ambient_clip.hpp (ShouldPlay/Format/Parse/StatusLabel).
+- handoff writes cube_ambient.txt; panel AUDIO clip labels.
+- G12 partial — real player + asset still open.
+- Tests: full test_all PASS 6/6 (+ambient unit).
+- Next: G04 warm reuse design or ambient asset+player careful.

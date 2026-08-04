@@ -11,6 +11,7 @@
 #include "launch_fill.hpp"
 #include "gmod_spawn.hpp"
 #include "stage_pack.hpp"
+#include "ambient_clip.hpp"
 #include "ui_panel.hpp"
 #include "smx_player.hpp"
 #include "math3d.hpp"
@@ -370,8 +371,26 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.handoffDetail = CubeHandoffDetailForPhase(phase, gmodUp);
       // G02: panel-side fade amount (phase pre-dim + ramp during orderly exit)
       ui.handoffFade = CubeHandoffFadeAmount(phase, handoffExitRequested, handoffExitWait);
-      // G12: ambient gain law (duck toward silence; no audio engine required yet)
+      // G12: ambient gain law + status file (clip contract; no OpenAL yet)
       ui.handoffAudioGain = CubeHandoffAudioGain(phase, handoffExitRequested, handoffExitWait);
+      {
+        static float lastAmbGain = -1.f;
+        static bool lastAmbPlay = false;
+        AmbientClipSnapshot amb;
+        amb.gain = ui.handoffAudioGain;
+        amb.handoff = true;
+        amb.playing = CubeAmbient_ShouldPlay(amb.gain, true);
+        amb.clip_rel = CubeAmbient_DefaultClipRel();
+        amb.source = "cube_webui_handoff";
+        // Throttle disk writes: on play edge or gain step ≥5%
+        const bool edge = (amb.playing != lastAmbPlay);
+        const bool step = (lastAmbGain < 0.f) || (std::fabs(amb.gain - lastAmbGain) >= 0.05f);
+        if (edge || step) {
+          WriteCubeAmbientStatus(gmodRoot, amb);
+          lastAmbGain = amb.gain;
+          lastAmbPlay = amb.playing;
+        }
+      }
       WebUI_MarkDirty(ui);
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
       // Soft only after long wait if process is up but never signaled (was 40s — race window)

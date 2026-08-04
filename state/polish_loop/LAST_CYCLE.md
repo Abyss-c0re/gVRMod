@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 18  
-**Time:** 2026-08-04T17:38:00+03:00  
-**Focus:** G13 reverse handoff protocol (partial — no auto reclaim)  
-**Commit (gVRMod):** `bbbffa4`  
-**Commit (vrmod-x64):** `b1dc55f`  
+**Cycle:** 19  
+**Time:** 2026-08-04T17:49:44+03:00  
+**Focus:** G12 ambient clip contract (partial — no OpenAL player)  
+**Commit (gVRMod):** (pending close)  
+**Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **sh_cube_return.lua** pure Format/Parse/PhaseLabel/ShouldNotifyCube/Detail  
-2. **VRUtilClientExit** writes `cube_return.txt` (vr_exit → xr_released) for Cube sessions  
-3. **CubeReverse*** pure labels in launcher; clear return marker on Start  
-4. Toast: relaunch Cube shell — **no** auto OpenXR reclaim  
+1. **ambient_clip.hpp** pure ShouldPlay / Format / Parse / Resolve / StatusLabel  
+2. **WriteCubeAmbientStatus** → `cube_ambient.txt` during handoff (throttled)  
+3. Panel AUDIO line uses clip contract labels  
+4. Default clip path `ambient/cube_hold.ogg` (asset still optional — no forced playback)
 
 ## Pain points
 
-- Untouched; soft handoff timeouts unchanged.
+- Untouched.
 
 ## Gaps
 
-- G13 → **partial** (protocol + marker; Cube reclaim process open)  
-- Next: G12 ambient clip, or G04 warm reuse, or G13 Cube poll reclaim  
+- G12 still **partial** — player/OpenAL + real ogg asset open  
+- Next: G04 warm reuse design, or drop real ambient asset + soft player  
 
 ## Notes
 
