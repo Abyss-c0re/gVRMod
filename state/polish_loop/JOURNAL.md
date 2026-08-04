@@ -410,3 +410,13 @@ Append one block per cycle. Newest at bottom.
 - G18 partial — product already framed; law now offline-tested.
 - Tests: full test_all PASS 6/6 (launcher 28 tests).
 - Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.
+
+## 2026-08-04 cycle 42 — G19 submit path law
+
+- Theme: dual OUT RGBA8 only; never eng IN / virgin OUT (pain #6).
+- Pure: SubmitLaw_PreferTextureKind/Allow*/Decide/HmdExpect/StatusLabel.
+- cl_vrmod: collect via AllowCollect; _submitLaw decision snapshot.
+- TESTING_FRAMEWORK §0.11 submit walk.
+- G19 partial — product path already dual OUT; law offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: dual-truth pose SoT law (pain #4) or HMD walk backlog.
