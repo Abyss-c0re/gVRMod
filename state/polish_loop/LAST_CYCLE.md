@@ -3,8 +3,8 @@
 **Cycle:** 56  
 **Time:** 2026-08-05T00:38:00+03:00  
 **Focus:** G38 worldmodel single-path law (W10)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `68b2ced`  
+**Commit (vrmod-x64):** `3952a64`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 50 Lua)  
 
 ## What changed
