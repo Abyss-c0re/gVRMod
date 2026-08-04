@@ -70,7 +70,7 @@ vrmod_backend          print active backend + version
 
 ## Testing
 
-Offline gate (no headset required):
+**Offline gate** (required before product push — no headset):
 
 ```bash
 ./scripts/test_all.sh          # contracts + Lua + C++ module + launcher
@@ -78,9 +78,11 @@ Offline gate (no headset required):
 ./test.sh                      # clean rebuild + full suite
 ```
 
-- Framework design: [`docs/TESTING_FRAMEWORK.md`](docs/TESTING_FRAMEWORK.md)
+**HMD smoke** is still **manual** (not automated). Offline green ≠ headset-proven. Checklist and tool map: [`docs/TESTING_FRAMEWORK.md`](docs/TESTING_FRAMEWORK.md) §0.
+
+- Framework + ship bar: [`docs/TESTING_FRAMEWORK.md`](docs/TESTING_FRAMEWORK.md)
 - Desktop follow-cam / broadcast: [`docs/DESKTOP_BROADCAST.md`](docs/DESKTOP_BROADCAST.md)
-- In-game smoke: `./quick_test.sh`
+- In-game smoke helper: `./quick_test.sh`
 
 
 ## Features (high level)

@@ -1,22 +1,71 @@
 # gVRMod Full Testing Framework
 
-**Status:** design (implementation phased)  
+**Status:** offline gate **implemented** (contracts + Lua unit + C++ module + launcher); HMD smoke still **manual**  
 **Scope:** Lua addon (`addon/vrmod-x64`), C++ module (`src/`), Cube native launcher (`native_launcher/`), shared OpenXR path helpers (`shared/`)  
 **Goal:** every public util and API has automated coverage; tests survive refactors by locking **contracts**, not call graphs.
 
 ---
 
+## 0. Ship bar — offline vs HMD smoke (G24)
+
+Two layers. Do not conflate them in commits, PR claims, or polish-loop status.
+
+### Offline gate (required before product push)
+
+```bash
+./scripts/test_all.sh          # contracts + Lua + C++ module + launcher
+./scripts/test_all.sh --fast   # contracts + Lua only (Lua/docs/state cycles)
+```
+
+| Proves | Does **not** prove |
+|--------|---------------------|
+| Pure utils (math, color, fingers, experience gate, desktop crop/submit) | Real OpenXR session / WiVRn / Quest image |
+| Contract inventory (every `vrmod.utils.*` / `vrmod.*` classified; pure pending = 0) | Stereo submit path in headset |
+| C++ module unit (poses, distortion goldens, mat_queue law, exports) | Seamless Cube handoff feel in XR |
+| Launcher pure helpers (handoff phase strings, last_play, math3d) | Panel laser hit accuracy on HMD |
+| Offline Lua scenarios (menu dedupe, version smoke) | Loading/map after `take_xr`, cal continuity |
+
+**Rule:** green offline is necessary to push product code. It is **not** “shipped Ideal VR.”
+
+### HMD / in-game smoke (manual — no automation yet)
+
+| Tool | Role |
+|------|------|
+| `./quick_test.sh` | Build + launch GMod; inject `vrmod_start`; needs desktop focus tools |
+| Cube webui / `scripts/gvrmod_launcher.sh` | Product path: hold XR → GMod → `take_xr` |
+| `scripts/quest_media_auto_review.sh` | Post-hoc Quest media review (smoke evidence, not a unit gate) |
+
+**Minimum headset checklist** (claim “smoke OK” only if walked):
+
+1. **Boot** — Cube panel or openxr launch → tracking valid (not origin-stuck).  
+2. **Handoff** — Start Game → phase labels progress → GMod claims XR without long black void.  
+3. **Stereo** — both eyes clear; no eng-IN submit / virgin OUT flash.  
+4. **UI** — laser + trigger click menus; no menu id thrash.  
+5. **Desktop** — `vrmod_desktopview` 1/2/3/4 (follow-cam) as intended; mirror is secondary.  
+6. **Cal** — Experience once (or skip forever); border profile reload on later boots.  
+7. **Pain points** — no force `-noborder`; `mat_queue_mode` stays 1; climb/wall not thrashing.
+
+**Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
+
+### Agent / polish-loop law
+
+- Offline red → fix or revert; **never push**.  
+- Offline green + no HMD → say “offline gate green”; do **not** claim headset-proven.  
+- G02/G03/G05 feel bugs need headset observation even when offline is green.
+
+---
+
 ## 1. Why this exists
 
-Today we have a thin offline C++ suite (`tests/`, `./test.sh`) and a manual in-game cycle (`./quick_test.sh`). Gaps:
+The offline gate and contract inventory close the old “only found in HMD” util/API gap. Remaining risk is **runtime XR** (handoff, submit, cal, Glide), covered only by manual smoke above.
 
-| Gap | Risk |
-|-----|------|
-| Almost no Lua unit tests | Utils/API regressions (menu dedupe, math, collisions) only found in HMD |
-| C++ tests only cover input / distortion / mock Lua push | Module surface (`VRMOD_*`) can drift silently |
-| Launcher untested offline | Binding/path/panel math breaks only at Quest |
-| Tests coupled to private helpers | Refactors break tests without product bugs |
-| No inventory gate | New `vrmod.utils.*` / `vrmod.*` APIs ship untested |
+| Gap (historical) | Status |
+|------------------|--------|
+| Almost no Lua unit tests | Closed for pure utils + menu/experience offline |
+| C++ module surface drift | Module + export registry tests in `test_all` |
+| Launcher untested offline | Launcher unit tests (handoff, last_play, math3d) |
+| No inventory gate | `gen_contracts` + hard pure-pending fail (G21) |
+| No HMD automation | **Still open** — see §0 |
 
 This design unifies **three runners** under one contract catalog and one CI entrypoint.
 
@@ -479,13 +528,13 @@ end
 
 ---
 
-## 15. Next concrete steps (when implementing)
+## 15. Next concrete steps
 
-1. Land Phase 0 scaffold + contracts inventory from current tree (~239 `vrmod.*` functions, ~82 `vrmod.utils.*`).  
-2. Port the menu-dedupe regression and climb/wall floor-policy as the first “bug→test” pair.  
-3. Fold deep-research modular util list into Phase 3 extraction order.  
-4. Do not expand in-game automation until offline gate is green.
+1. Keep pure-pending at **0** when adding helpers (`PURE_TESTED` + unit test).  
+2. Prefer pure extraction before touching HMD-only paths.  
+3. HMD smoke remains checklist-driven until an optional OpenXR smoke job exists.  
+4. Do **not** expand in-game automation as a PR-blocking gate while offline is the product gate.
 
 ---
 
-*Document version: 1.0 — design only. Implementation tracks this file; update contracts when symbols change.*
+*Document version: 1.1 — offline gate live; HMD smoke manual (G24). Update contracts when symbols change.*

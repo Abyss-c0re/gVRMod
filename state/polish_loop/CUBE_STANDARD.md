@@ -33,13 +33,20 @@ Never submit eng texture. Never dual pose truth.
 - Optional args / version gates for new features
 - Engine blacklists: never call blocked convars
 
-## Ship bar (offline proxy)
+## Ship bar (two layers — G24)
+
+**Offline (required to push product):**
 
 ```bash
 ./scripts/test_all.sh          # or --fast when only Lua
 ```
 
-In-headset smoke remains open; do not claim “shipped” without it.
+Proves contracts + pure utils + module/launcher unit. **Not** headset-proven.
+
+**HMD smoke (manual, no automation yet):** boot → handoff phases → stereo both eyes → laser UI → desktopview modes → cal/skip → pain-point checks.  
+Tools: `./quick_test.sh`, Cube webui / `gvrmod_launcher.sh`. Details: [`docs/TESTING_FRAMEWORK.md`](../../docs/TESTING_FRAMEWORK.md) §0.
+
+Never claim “shipped Ideal VR” or “HMD smoke passed” from offline green alone.
 
 ## Polish taste
 

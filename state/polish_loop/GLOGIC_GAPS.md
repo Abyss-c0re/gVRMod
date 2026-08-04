@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 7
+Last updated: 2026-08-04 cycle 8
 
 ## P0 — seamless / feel broken
 
@@ -32,7 +32,7 @@ Last updated: 2026-08-04 cycle 7
 | G21 | Contract inventory lag for new symbols | gen_contracts after new vrmod.* | **done** cycle7 (pure pending=0 gate) |
 | G22 | VERSION drift in cubalc mirror | informational; don’t “fix” upstream VERSION | n/a |
 | G23 | Desktop follow-cam call sites incomplete | follow cam landed; verify all desktopview=4 paths | **done** cycle5 |
-| G24 | Offline tests green but no HMD smoke automation | document only | open |
+| G24 | Offline tests green but no HMD smoke automation | document only | **done** cycle8 (checklist; auto still open) |
 
 ## P3 — watchlist / workshop
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G24 | Offline vs HMD ship bar documented | TESTING_FRAMEWORK §0 |
 | G21 | Pure contract inventory + fail-on-pending | gen_contracts PURE_TESTED |
 | G20 | TryParseColor theme/laser/beam SoT | vrmod-x64 f9d5d8a |
 | G23 | Follow-cam mode 4 path harden | vrmod-x64 8dc402c |

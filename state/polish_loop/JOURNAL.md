@@ -74,3 +74,11 @@ Append one block per cycle. Newest at bottom.
 - Unit: submit_bounds + adjust_fov; launcher.yaml handoff/last_play contracts.
 - Tests: --fast PASS 4/4 (30 Lua tests).
 - Next: G24 HMD smoke docs only, or safe P1 G12/G14 watchlist docs.
+
+## 2026-08-04 cycle 8 — G24 offline vs HMD smoke bar
+
+- Theme: document-only ship bar law (no product code).
+- docs/TESTING_FRAMEWORK.md §0: offline proves vs HMD checklist; agent law.
+- CUBE_STANDARD + README: two-layer bar; never claim HMD from offline green.
+- G24 → done (automation still open as future work).
+- Next: P0 G02 fade only with tiny safe step, or G14 Glide watchlist smoke note.

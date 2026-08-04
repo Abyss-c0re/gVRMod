@@ -1,18 +1,17 @@
 # Last cycle
 
-**Cycle:** 7  
-**Time:** 2026-08-04T15:38:51+03:00  
-**Focus:** G21 contract inventory — pure symbols tested  
-**Commit (gVRMod):** `f6983d9`  
+**Cycle:** 8  
+**Time:** 2026-08-04T15:49:35+03:00  
+**Focus:** G24 document offline vs HMD smoke bar  
+**Commit (gVRMod):** `6a5ded5`  
 **Commit (vrmod-x64):** none  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (30 Lua tests)  
+**Tests:** n/a (docs only — no product code)  
 
 ## What changed
 
-1. **gen_contracts.py** — PURE_TESTED for TryParseColor, SubmitBounds, AdjustFOV, Experience_ShouldRunFromState; SEAM_FORCE ComputePhysicsParams; launcher handoff/last_play contracts  
-2. **check_test_contracts.py** — FAIL if pure-pending ≠ 0  
-3. **Unit tests** — submit_bounds + adjust_fov  
-4. Pure pending: **0**
+1. **docs/TESTING_FRAMEWORK.md §0** — offline proves/does-not-prove table; HMD checklist; agent law  
+2. **CUBE_STANDARD.md** — two-layer ship bar  
+3. **README.md** Testing — offline required; HMD manual  
 
 ## Pain points
 
@@ -20,8 +19,8 @@
 
 ## Gaps
 
-- G21 → **done**  
-- Next: G24 HMD smoke docs or G14 Glide watchlist  
+- G24 → **done** (documentation of gap + checklist; HMD automation still future)  
+- Next: G14 Glide docs/toast note or careful P0  
 
 ## Notes
 
