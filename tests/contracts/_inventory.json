@@ -869,6 +869,50 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
     ],
     [
+      "vrmod.utils.SwapEyesLaw_AllowDualPoseFork",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_CubeDefault",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_FromAny",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_IsForkRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_LogicalLeftHalf",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_LogicalRightHalf",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_PreserveIpdFov",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_ResolveSbsHalves",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
+      "vrmod.utils.SwapEyesLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_swap_eyes_law.lua"
+    ],
+    [
       "vrmod.utils.TempSetDamping",
       "addon/vrmod-x64/lua/vrmod/utils/sh_npc2rag.lua"
     ],

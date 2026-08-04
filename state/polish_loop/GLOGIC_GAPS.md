@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 50
+Last updated: 2026-08-04 cycle 51
 
 ## P0 — seamless / feel broken
 
@@ -26,6 +26,7 @@ Last updated: 2026-08-04 cycle 50
 | G12 | Audio dead during handoff | master env+HmdExpect cycle33; HMD walk open | **partial** cycle33 |
 | G31 | Action-manifest self-heal + honest toast (W6) | BindingsLaw_* cycle49; HMD walk open | **partial** cycle49 |
 | G32 | Stereo ShareTexture / HMD self-test toast (W7) | StereoSelfTest_* cycle50; HMD walk open | **partial** cycle50 |
+| G33 | Swap-eyes content-only (W4; no dual pose) | SwapEyesLaw_* cycle51; HMD walk open | **partial** cycle51 |
 | G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
 | G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
 | G15 | Opaque black HUD / wall of Real | HudLaw composite cycle38; HMD walk open | **partial** cycle38 |
@@ -55,6 +56,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G33 | Swap-eyes content-only (W4) | SwapEyesLaw_* + cl_vrmod SBS wire |
 | G32 | Stereo ShareTexture / HMD self-test toast (W7) | StereoSelfTest_* + cl_vrmod wire |
 | G31 | Action-manifest self-heal + toast (W6) | BindingsLaw_* + cl_vrmod SetupActions |
 | G30 | FOV archive write-only-when-touched | CubeFov_* + gmod_spawn cfg wire |

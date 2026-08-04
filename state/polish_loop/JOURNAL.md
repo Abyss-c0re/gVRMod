@@ -501,3 +501,13 @@ Append one block per cycle. Newest at bottom.
 - G32 partial — product already toasted; law offline-tested.
 - Tests: --fast PASS 4/4 (pure pending=0; 44 Lua).
 - Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.
+
+## 2026-08-04 cycle 51 — G33 swap-eyes content-only law (W4)
+
+- Theme: SBS content L↔R only; IPD/FOV/pose single path; no dual pose fork.
+- Pure: SwapEyesLaw_FromAny/ResolveSbsHalves/Decide/HmdExpect.
+- cl_vrmod stereo eye write uses pure ResolveSbsHalves + snapshot.
+- TESTING_FRAMEWORK §0.20; PURE_TESTED map.
+- G33 partial — product already content-only swap; law offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0; 45 Lua).
+- Next: HMD walk backlog (G05/G12) or W12 fly-away / origin snap notes.

@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 50  
-**Time:** 2026-08-04T23:31:00+03:00  
-**Focus:** G32 stereo ShareTexture / HMD self-test toast law (W7)  
-**Commit (gVRMod):** `db41068`  
-**Commit (vrmod-x64):** `7cffb05`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 44 Lua tests)  
+**Cycle:** 51  
+**Time:** 2026-08-04T23:42:00+03:00  
+**Focus:** G33 swap-eyes content-only law (W4)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 45 Lua tests)  
 
 ## What changed
 
-1. **Pure** StereoSelfTest_ShouldToast*/ShareOk/Decide/HmdExpect  
-2. **cl_vrmod** ShareTexture fail + delayed selftest wire pure law  
-3. Unit test util.stereo_selftest_law.w7_toast_g32 + PURE_TESTED  
-4. TESTING_FRAMEWORK §0.19 stereo self-test walk  
-5. Gap G32 partial  
+1. **Pure** SwapEyesLaw_FromAny/ResolveSbsHalves/Decide/HmdExpect  
+2. **cl_vrmod** stereo SBS write uses pure ResolveSbsHalves + snapshot  
+3. Unit test util.swap_eyes_law.content_only_g33 + PURE_TESTED  
+4. TESTING_FRAMEWORK §0.20 swap-eyes walk  
+5. Gap G33 partial  
 
 ## Pain points
 
-- Soft care: honest toast on share/HMD fail; never silent black HMD.
+- Soft care: no dual pose fork; swap content halves only.
 
 ## Gaps
 
-- G32 partial — HMD black walk open  
-- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects  
+- G33 partial — HMD inverted-stereo walk open  
+- Next: HMD walk backlog (G05/G12) or W12 fly-away / origin snap notes  
 
 ## Notes
 

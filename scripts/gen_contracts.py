@@ -127,6 +127,18 @@ PURE_TESTED = {
     "vrmod.utils.StereoSelfTest_StatusLabel": "util.stereo_selftest_law.w7_toast_g32",
     "vrmod.utils.StereoSelfTest_HmdExpect": "util.stereo_selftest_law.w7_toast_g32",
     "vrmod.utils.StereoSelfTest_IsSilentFailRisk": "util.stereo_selftest_law.w7_toast_g32",
+    # G33 pure swap-eyes content-only law (W4; no dual pose)
+    "vrmod.utils.SwapEyesLaw_CubeDefault": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_FromAny": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_AllowDualPoseFork": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_PreserveIpdFov": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_ResolveSbsHalves": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_LogicalLeftHalf": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_LogicalRightHalf": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_Decide": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_StatusLabel": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_HmdExpect": "util.swap_eyes_law.content_only_g33",
+    "vrmod.utils.SwapEyesLaw_IsForkRisk": "util.swap_eyes_law.content_only_g33",
     # G26 pure menu thrash / QM dedupe law (VRClimb id collapse)
     "vrmod.utils.MenuLaw_NormalizeName": "util.menu_law.dedupe_g26",
     "vrmod.utils.MenuLaw_StableKey": "util.menu_law.dedupe_g26",

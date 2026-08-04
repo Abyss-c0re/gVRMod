@@ -432,6 +432,25 @@ Offline gate proves ShareTexture begin/finish fail **must toast**, delayed (~2.5
 
 Pure helpers: `StereoSelfTest_Decide` / `StereoSelfTest_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.20 G33 swap-eyes content-only (manual)
+
+Offline gate proves default **off**, SBS half resolve L↔R on toggle, **no dual pose / IPD / FOV fork**. **Headset** for inverted stereo (PSVR2 etc.).
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Default `vrmod_swap_eyes 0` | Natural stereo; left content → left half | Crossed / double vision at default |
+| Toggle 1 live | Content swaps halves; IPD/depth feel OK | Tracking thrash or FOV swapped per-eye wrong |
+| Pose path | Still single raw→tracking→modifiers | Second eye pose stream |
+| Cube Vision toggle | Live while VR active | Requires full restart only |
+
+**Procedure (claim “G33 swap eyes OK” only if walked):**
+
+1. Start VR default — stereo natural.  
+2. Settings Swap eyes on — inverted fixed without world jump.  
+3. Off again — returns natural.
+
+Pure helpers: `SwapEyesLaw_ResolveSbsHalves` / `SwapEyesLaw_Decide` / `SwapEyesLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law
