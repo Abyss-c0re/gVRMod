@@ -38,3 +38,14 @@ New `vrmod.*` / `vrmod.utils.*` symbols must appear in contracts after `gen_cont
 - `scripts/gvrmod_launcher.sh` is **GMod-only helper** (after Start), not the menu
 - Source: `native_launcher/`
 - Defaults: `native_launcher/cube_webui.conf` (shipped; user overrides in `~/.config/gvrmod/`)
+
+## Cube polish loop (every 11 min)
+
+Durable self-tracking lives in **`state/polish_loop/`** (survives context prune).
+
+- Brief: `state/polish_loop/AGENT_PROMPT.md`
+- Pain points: `state/polish_loop/PAIN_POINTS.md` (climbing thrash, borderless, mat_queue_mode=2, dual pose, …)
+- Gaps backlog: `state/polish_loop/GLOGIC_GAPS.md`
+- Machine status: `state/polish_loop/LOOP_STATE.json`
+
+Cadence: recover → one safe polish vs Cube standard → offline tests if code → **meaningful** commit+push (never empty) → update journal/state. Play safe; avoid regression.
