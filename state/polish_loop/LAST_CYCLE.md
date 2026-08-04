@@ -3,7 +3,7 @@
 **Cycle:** 31  
 **Time:** 2026-08-04T20:03:17+03:00  
 **Focus:** G04 careful changelevel plan executor  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `65e66a9`  
 **Commit (vrmod-x64):** `c3fefcd`  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
