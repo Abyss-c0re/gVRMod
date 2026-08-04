@@ -141,4 +141,38 @@ return function(H, env)
 		H.assert_eq(vm1, 0)
 		H.assert_eq(ho1, 0)
 	end)
+
+	-- G21: ComputeSubmitBounds pure offline (mock is Linux/OpenGL — v flips)
+	H.TEST("util.rendering.submit_bounds", function()
+		local L = { Width = 1.0, Height = 1.0, HorizontalOffset = 0.0, VerticalOffset = 0.0 }
+		local R = { Width = 1.0, Height = 1.0, HorizontalOffset = 0.0, VerticalOffset = 0.0 }
+		local uMinL, vMinL, uMaxL, vMaxL, uMinR, vMinR, uMaxR, vMaxR =
+			env.vrmod.utils.ComputeSubmitBounds(L, R, 0, 0, 1.0, false)
+		H.assert_true(uMinL < uMaxL)
+		H.assert_true(uMinR < uMaxR)
+		H.assert_true(uMaxL <= uMinR + 0.001, "left half ends at seam")
+		H.assert_true(uMinL >= 0 and uMaxR <= 1.01)
+		-- asymmetric auto offset should shift U when renderOffset=true
+		local La = { Width = 1.0, Height = 1.0, HorizontalOffset = 0.1, VerticalOffset = 0.0 }
+		local Ra = { Width = 1.0, Height = 1.0, HorizontalOffset = -0.1, VerticalOffset = 0.0 }
+		local aUMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
+		local bUMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, false)
+		H.assert_true(math.abs(aUMinL - bUMinL) > 1e-6, "auto FOV offset changes U mins")
+	end)
+
+	H.TEST("util.rendering.adjust_fov", function()
+		local proj = {
+			{ 1, 0, 0.1, 0 },
+			{ 0, 1, -0.2, 0 },
+			{ 0, 0, 1, 0 },
+			{ 0, 0, 0, 1 },
+		}
+		local out = env.vrmod.utils.AdjustFOV(proj, 2.0, 0.5)
+		H.assert_near(out[1][1], 2.0, 1e-6)
+		H.assert_near(out[2][2], 0.5, 1e-6)
+		H.assert_near(out[1][3], 0.2, 1e-6) -- offset scaled by X
+		H.assert_near(out[2][3], -0.1, 1e-6)
+		-- original not mutated
+		H.assert_near(proj[1][1], 1.0, 1e-6)
+	end)
 end

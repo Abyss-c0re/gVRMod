@@ -64,3 +64,13 @@ Append one block per cycle. Newest at bottom.
 - Commits: vrmod-x64 f9d5d8a; gVRMod tests + submodule + state.
 - G20 → done (core color/finger rewires complete).
 - Next: G21 contracts inventory lag (gen after symbols) or safe docs G24.
+
+## 2026-08-04 cycle 7 — G21 contract inventory
+
+- Theme: pure symbols inventory lag — gen + check + unit tests.
+- PURE_TESTED: TryParseColor, ComputeSubmitBounds, AdjustFOV, Experience_ShouldRunFromState.
+- SEAM_FORCE: ComputePhysicsParams (engine/model).
+- check_test_contracts fails if pure-pending > 0; pure pending now 0.
+- Unit: submit_bounds + adjust_fov; launcher.yaml handoff/last_play contracts.
+- Tests: --fast PASS 4/4 (30 Lua tests).
+- Next: G24 HMD smoke docs only, or safe P1 G12/G14 watchlist docs.

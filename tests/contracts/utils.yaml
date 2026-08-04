@@ -12,9 +12,8 @@ symbols:
     notes: "engine or state"
   - id: vrmod.utils.AdjustFOV
     file: addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua
-    tier: seam
-    tests: [pending]
-    notes: "engine or state"
+    tier: pure
+    tests: [util.rendering.adjust_fov]
   - id: vrmod.utils.AngAlmostEqual
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
@@ -92,14 +91,13 @@ symbols:
     tests: [util.rendering.desktop_crop]
   - id: vrmod.utils.ComputePhysicsParams
     file: addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua
-    tier: pure
+    tier: seam
     tests: [pending]
-    notes: "needs unit test"
+    notes: "engine/model I/O — not offline-pure"
   - id: vrmod.utils.ComputeSubmitBounds
     file: addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua
     tier: pure
-    tests: [pending]
-    notes: "needs unit test"
+    tests: [util.rendering.submit_bounds]
   - id: vrmod.utils.ConvertToRelativeFrame
     file: addon/vrmod-x64/lua/vrmod/utils/sh_frames.lua
     tier: seam
@@ -410,8 +408,7 @@ symbols:
   - id: vrmod.utils.TryParseColor
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
-    tests: [pending]
-    notes: "needs unit test"
+    tests: [util.color.try_parse]
   - id: vrmod.utils.UnblockInputActions
     file: addon/vrmod-x64/lua/vrmod/utils/sh_system.lua
     tier: seam

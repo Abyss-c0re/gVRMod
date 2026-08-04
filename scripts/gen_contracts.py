@@ -11,6 +11,7 @@ LUA = ROOT / "addon" / "vrmod-x64" / "lua"
 CONTRACTS = ROOT / "tests" / "contracts"
 
 # Symbols with dedicated offline unit tests (must stay pure/seam + tested)
+# G21: keep this map current when adding pure helpers + unit tests.
 PURE_TESTED = {
     "vrmod.utils.VecAlmostEqual": "util.math.vec_almost_equal",
     "vrmod.utils.LengthSqr": "util.math.length_sqr",
@@ -22,6 +23,7 @@ PURE_TESTED = {
     "vrmod.utils.SmoothAngle": "util.smooth.vector",
     "vrmod.utils.IsFloorOrCeilingNormal": "util.collisions.floor_not_wall",
     "vrmod.utils.ParseColor": "util.color.parse_rgba",
+    "vrmod.utils.TryParseColor": "util.color.try_parse",
     "vrmod.utils.FormatColor": "util.color.parse_bad",
     "vrmod.utils.FingerDigitIndex": "util.fingers.digit_index",
     "vrmod.utils.LerpFingerAngle": "util.fingers.curl_lerp_unit",
@@ -30,12 +32,21 @@ PURE_TESTED = {
     "vrmod.utils.AutoSeatedOffset": "util.calib.seated_offset",
     "vrmod.utils.IsSettingsRowKind": "util.settings.kinds_complete",
     "vrmod.utils.ComputeDesktopCrop": "util.rendering.desktop_crop",
+    "vrmod.utils.ComputeSubmitBounds": "util.rendering.submit_bounds",
+    "vrmod.utils.AdjustFOV": "util.rendering.adjust_fov",
     "vrmod.utils.AngAlmostEqual": "util.math.vec_almost_equal",
     "vrmod.utils.LerpAngleWrap": "util.fingers.curl_lerp_unit",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.DedupInGameMenuItems": "api.menu.dedup_function",
     "vrmod.RemoveInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.GetVersion": "api.smoke.get_version",
+    # G10 pure decision helper (loaded via sh_experience.lua)
+    "vrmod.Experience_ShouldRunFromState": "util.experience.g10_wrapper_plus_cal_skips",
+}
+
+# Engine / model / filesystem heavy — never auto-promote to pure-pending.
+SEAM_FORCE = {
+    "vrmod.utils.ComputePhysicsParams",
 }
 
 # Thin getters → smoke suite
@@ -65,10 +76,17 @@ def scan_functions() -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
 def tier_for(name: str) -> tuple[str, list[str], str | None]:
     if name in PURE_TESTED:
         return "pure", [PURE_TESTED[name]], None
+    if name in SEAM_FORCE:
+        return "seam", ["pending"], "engine/model I/O — not offline-pure"
     short = name.split(".")[-1]
     if name.startswith("vrmod.utils."):
         # default utils: classify seam unless known pure-ish name
-        pure_hints = ("Almost", "Lerp", "Smooth", "Length", "Sub", "Add", "Mul", "Parse", "Format", "Finger", "Auto", "IsFloor", "IsSettings", "Compute")
+        # Note: avoid bare "Compute" — ComputePhysicsParams is engine-bound (SEAM_FORCE).
+        pure_hints = (
+            "Almost", "Lerp", "Smooth", "Length", "Sub", "Add", "Mul",
+            "Parse", "Format", "Finger", "Auto", "IsFloor", "IsSettings",
+            "ComputeDesktop", "ComputeSubmit", "AdjustFOV",
+        )
         if any(h in short for h in pure_hints):
             return "pure", ["pending"], "needs unit test"
         return "seam", ["pending"], "engine or state"
@@ -150,9 +168,29 @@ symbols:
     tier: pure
     tests: [launcher.desktop.cycle_1_to_4]
     notes: "1=none 2=left 3=right 4=follow-cam"
+  - id: handoff.phase_detail
+    file: native_launcher/src/gmod_spawn.hpp
+    tier: pure
+    tests: [launcher.handoff.detail_known_phases]
+  - id: handoff.phase_progress
+    file: native_launcher/src/gmod_spawn.hpp
+    tier: pure
+    tests: [launcher.handoff.progress_monotone]
+  - id: last_play.roundtrip
+    file: native_launcher/src/last_play.hpp
+    tier: pure
+    tests: [launcher.last_play.roundtrip]
+  - id: last_play.desktopview_clamp
+    file: native_launcher/src/last_play.hpp
+    tier: pure
+    tests: [launcher.last_play.clamps_desktopview]
 """
     (CONTRACTS / "launcher.yaml").write_text(launcher)
+
+    pure_pending = sum(1 for s in util_syms + api_syms if s["tier"] == "pure" and s["tests"] == ["pending"])
+    pure_tested = sum(1 for s in util_syms + api_syms if s["tier"] == "pure" and s["tests"] != ["pending"])
     print(f"Wrote contracts: utils={len(util_syms)} api={len(api_syms)} cpp={len(cpp_exports)}")
+    print(f"Pure utils/api: {pure_tested} tested, {pure_pending} pending unit tests")
 
 
 if __name__ == "__main__":

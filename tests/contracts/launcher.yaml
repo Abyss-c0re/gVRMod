@@ -14,3 +14,19 @@ symbols:
     tier: pure
     tests: [launcher.desktop.cycle_1_to_4]
     notes: "1=none 2=left 3=right 4=follow-cam"
+  - id: handoff.phase_detail
+    file: native_launcher/src/gmod_spawn.hpp
+    tier: pure
+    tests: [launcher.handoff.detail_known_phases]
+  - id: handoff.phase_progress
+    file: native_launcher/src/gmod_spawn.hpp
+    tier: pure
+    tests: [launcher.handoff.progress_monotone]
+  - id: last_play.roundtrip
+    file: native_launcher/src/last_play.hpp
+    tier: pure
+    tests: [launcher.last_play.roundtrip]
+  - id: last_play.desktopview_clamp
+    file: native_launcher/src/last_play.hpp
+    tier: pure
+    tests: [launcher.last_play.clamps_desktopview]

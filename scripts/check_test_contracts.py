@@ -85,14 +85,25 @@ def main() -> int:
                 if tests.replace(" ", "") in ("[pending]", "[]"):
                     pure_pending.append(sid)
 
-    # Soft: print pure pending count (gen marks many pure-ish as pending)
-    print(f"INFO: pure symbols still pending tests: {len(pure_pending)} (gen_contracts expands over time)")
+    # G21: pure-pending inventory must stay empty (or only intentional notes).
+    # gen_contracts.py maps PURE_TESTED; new pure helpers need unit tests + map entry.
+    if pure_pending:
+        print(f"FAIL: {len(pure_pending)} pure symbols still pending tests:")
+        for s in pure_pending[:30]:
+            print(f"  - {s}")
+        if len(pure_pending) > 30:
+            print(f"  ... +{len(pure_pending) - 30} more")
+        print("Hint: add unit test + entry in scripts/gen_contracts.py PURE_TESTED, then gen_contracts.py")
+        rc = 1
+    else:
+        print("OK: pure symbols pending tests: 0")
 
     # Required offline suites present
     required_tests = [
         ROOT / "tests" / "lua" / "run.lua",
         ROOT / "tests" / "lua" / "unit" / "math_test.lua",
         ROOT / "tests" / "lua" / "unit" / "menu_test.lua",
+        ROOT / "tests" / "lua" / "unit" / "experience_test.lua",
         ROOT / "tests" / "test_framework.h",
     ]
     for p in required_tests:

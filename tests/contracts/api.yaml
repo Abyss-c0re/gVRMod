@@ -219,6 +219,10 @@ symbols:
     tier: seam
     tests: [api.smoke.Experience_ShouldRun]
     notes: "thin getter / smoke"
+  - id: vrmod.Experience_ShouldRunFromState
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_experience.lua
+    tier: pure
+    tests: [util.experience.g10_wrapper_plus_cal_skips]
   - id: vrmod.Experience_Start
     file: addon/vrmod-x64/lua/vrmod/ui/cl_onboarding.lua
     tier: seam
@@ -927,6 +931,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
     tier: seam
     tests: [api.smoke.IsMenuSecondaryClick]
+    notes: "thin getter / smoke"
+  - id: vrmod.IsNativeWrapperLaunch
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua
+    tier: seam
+    tests: [api.smoke.IsNativeWrapperLaunch]
     notes: "thin getter / smoke"
   - id: vrmod.IsOpenVR
     file: addon/vrmod-x64/lua/vrmod/core/cl_runtime.lua
