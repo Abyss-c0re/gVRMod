@@ -215,6 +215,117 @@ inline float CubeHandoffLayerFadeAlpha(float fadeAmount) {
   return fadeAmount;
 }
 
+// G29: supersample cold-start cap law (pure). Soft care: don't crank SS at Start.
+// Product: gvrmod_cube.cfg writes min(requested, cold_cap). Live ladder may go higher
+// after bring-up (user SETTINGS) — cold cfg must never inject 1.75/2.0 thrash.
+// Ladder (UI): 0.75, 1.0, 1.25, 1.5, 1.75, 2.0. Cube high default: 1.5 (idx 3).
+// Cold bring-up cap: 1.4 (historical product pin — smoother first frames).
+inline float CubeSs_ColdStartCap() { return 1.4f; }
+inline float CubeSs_CubeDefault() { return 1.5f; }
+inline float CubeSs_LiveMax() { return 2.0f; }
+inline float CubeSs_LiveMin() { return 0.5f; }
+
+inline float CubeSs_LadderFromIdx(int idx) {
+  static const float kSs[] = {0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
+  if (idx < 0) idx = 0;
+  if (idx > 5) idx = 5;
+  return kSs[idx];
+}
+
+inline int CubeSs_ClampIdx(int idx) {
+  if (idx < 0) return 0;
+  if (idx > 5) return 5;
+  return idx;
+}
+
+/// Clamp for cold Start cfg (+exec) — never crank above bring-up cap.
+inline float CubeSs_ClampColdStart(float requested) {
+  if (requested < CubeSs_LiveMin()) requested = CubeSs_LiveMin();
+  if (requested > CubeSs_ColdStartCap()) return CubeSs_ColdStartCap();
+  return requested;
+}
+
+/// Live SETTINGS / runtime ladder clamp (full range after bring-up).
+inline float CubeSs_ClampLive(float requested) {
+  if (requested < CubeSs_LiveMin()) return CubeSs_LiveMin();
+  if (requested > CubeSs_LiveMax()) return CubeSs_LiveMax();
+  return requested;
+}
+
+struct SupersampleDecision {
+  bool valid = true;
+  float requested = 1.5f;
+  float applied = 1.4f;
+  bool cold_start = true;
+  bool capped = false;
+  /// none | cold_capped | live | overcrank_risk
+  std::string risk = "none";
+  std::string reason = "ok";
+};
+
+struct SupersampleHmdExpect {
+  std::string verdict = "idle";
+  bool expect_smooth_bringup = true;
+  std::string checklist = "G29 · IDLE · no supersample decision";
+  std::string pass_line = "N/A";
+  std::string fail_line = "N/A";
+};
+
+inline SupersampleDecision CubeSs_Decide(float requested, bool coldStart = true) {
+  SupersampleDecision d;
+  d.requested = requested;
+  d.cold_start = coldStart;
+  if (coldStart) {
+    d.applied = CubeSs_ClampColdStart(requested);
+    d.capped = d.applied < requested - 1e-4f || (requested > CubeSs_ColdStartCap());
+    if (requested > CubeSs_ColdStartCap()) {
+      d.risk = "cold_capped";
+      d.reason = "cold_start_cap_1_4";
+    } else {
+      d.risk = "none";
+      d.reason = "cold_within_cap";
+    }
+  } else {
+    d.applied = CubeSs_ClampLive(requested);
+    d.capped = d.applied < requested - 1e-4f;
+    if (requested > CubeSs_LiveMax()) {
+      d.risk = "overcrank_risk";
+      d.reason = "live_above_ladder_max";
+    } else {
+      d.risk = "live";
+      d.reason = "live_ladder";
+    }
+  }
+  return d;
+}
+
+inline std::string CubeSs_StatusLabel(const SupersampleDecision& d) {
+  if (!d.valid) return "SS · IDLE";
+  if (d.cold_start && d.risk == "cold_capped") return "SS · COLD CAP 1.4";
+  if (d.cold_start) return "SS · COLD OK";
+  if (d.risk == "overcrank_risk") return "SS · LIVE CLAMP";
+  return "SS · LIVE";
+}
+
+inline SupersampleHmdExpect CubeSs_HmdExpect(const SupersampleDecision& d) {
+  SupersampleHmdExpect e;
+  if (!d.valid) return e;
+  if (d.cold_start) {
+    e.verdict = "expect_cold_cap";
+    e.expect_smooth_bringup = true;
+    e.checklist = "G29 · COLD · applied=" + std::to_string(d.applied).substr(0, 4) +
+                  " · cap=" + std::to_string(CubeSs_ColdStartCap()).substr(0, 4);
+    e.pass_line = "First frames smooth; cfg SS ≤ 1.4";
+    e.fail_line = "Cold Start injects 1.75/2.0 thrash / long hitch";
+    return e;
+  }
+  e.verdict = "expect_live";
+  e.checklist = "G29 · LIVE · SS=" + std::to_string(d.applied).substr(0, 4);
+  e.pass_line = "User ladder after bring-up";
+  e.fail_line = "Silent overcrank above 2.0";
+  return e;
+}
+
 // G28: soft handoff timeout law (pure). Pain soft-care: 90s/180s; never racey early release.
 // Soft: GMod process up but never signaled take_xr — wait long enough for cold boot.
 // Hard: absolute panel-hold ceiling, then orderly xrRequestExitSession (not mid-frame destroy).

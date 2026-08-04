@@ -105,8 +105,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "vrmod_hub 1\n"
       << "vrmod_menu_vr 0\n"
       << "vrmod_laserpointer 1\n"
-      // Cap SS for frame time — extreme SS is a common lag source after Start
-      << "vrmod_supersample " << (g.xrSupersample > 1.4f ? 1.4f : g.xrSupersample) << "\n"
+      // G29: cold-start SS cap (pure) — never crank 1.75/2.0 into first frames
+      << "vrmod_supersample " << CubeSs_ClampColdStart(g.xrSupersample) << "\n"
       << "vrmod_viewscale " << g.xrViewScale << "\n"
       << "mat_queue_mode 1\n"
       << "engine_no_focus_sleep 0\n";

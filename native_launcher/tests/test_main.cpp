@@ -517,6 +517,33 @@ TEST(launcher_stage_pack_head_y_sanity) {
     ASSERT_EQ(StagePack_NormalizeSpace("local"), std::string("LOCAL"));
 }
 
+// G29: supersample cold-start cap (never crank SS at Start)
+TEST(launcher_supersample_cold_cap_g29) {
+    ASSERT_NEAR(CubeSs_ColdStartCap(), 1.4f, 1e-4f);
+    ASSERT_NEAR(CubeSs_CubeDefault(), 1.5f, 1e-4f);
+    ASSERT_NEAR(CubeSs_LadderFromIdx(3), 1.5f, 1e-4f);
+    ASSERT_NEAR(CubeSs_LadderFromIdx(5), 2.0f, 1e-4f);
+    ASSERT_NEAR(CubeSs_ClampColdStart(2.0f), 1.4f, 1e-4f);
+    ASSERT_NEAR(CubeSs_ClampColdStart(1.25f), 1.25f, 1e-4f);
+    ASSERT_NEAR(CubeSs_ClampColdStart(1.5f), 1.4f, 1e-4f);
+    ASSERT_NEAR(CubeSs_ClampLive(2.0f), 2.0f, 1e-4f);
+    ASSERT_NEAR(CubeSs_ClampLive(3.0f), 2.0f, 1e-4f);
+    auto cold = CubeSs_Decide(2.0f, true);
+    ASSERT_TRUE(cold.capped);
+    ASSERT_NEAR(cold.applied, 1.4f, 1e-4f);
+    ASSERT_EQ(cold.risk, std::string("cold_capped"));
+    ASSERT_EQ(CubeSs_StatusLabel(cold), std::string("SS · COLD CAP 1.4"));
+    auto he = CubeSs_HmdExpect(cold);
+    ASSERT_EQ(he.verdict, std::string("expect_cold_cap"));
+    ASSERT_TRUE(he.checklist.find("G29") != std::string::npos);
+    auto ok = CubeSs_Decide(1.0f, true);
+    ASSERT_TRUE(!ok.capped);
+    ASSERT_EQ(ok.risk, std::string("none"));
+    auto live = CubeSs_Decide(1.75f, false);
+    ASSERT_EQ(live.risk, std::string("live"));
+    ASSERT_NEAR(live.applied, 1.75f, 1e-4f);
+}
+
 // G28: soft handoff timeout law (90s soft / 180s hard; never racey)
 TEST(launcher_handoff_timeout_law_g28) {
     ASSERT_NEAR(CubeHandoffSoftReleaseSeconds(), 90.f, 1e-3f);

@@ -355,6 +355,25 @@ Offline gate proves **soft 90s** (GMod up, no take_xr), **hard 180s** ceiling, *
 
 Pure helpers: `CubeHandoffTimeout_Decide` / `CubeHandoffTimeout_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.16 G29 supersample cold-start cap (manual)
+
+Offline gate proves cold cfg **≤ 1.4**, live ladder up to **2.0**, default Cube high **1.5** (capped to 1.4 on Start). **Headset** for hitch feel.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Cold Start Ultra preset | `gvrmod_cube.cfg` has `vrmod_supersample` ≤ **1.4** | 1.75/2.0 injected at boot |
+| High preset (1.5) | Cap to 1.4 on Start | Full 1.5 thrash first frames |
+| After VR live | User may raise SS in SETTINGS | Forced permanent 1.4 forever without user |
+| Ladder | idx 0..5 → 0.75…2.0 | Out-of-range crash |
+
+**Procedure (claim “G29 SS OK” only if walked):**
+
+1. SETTINGS Ultra → Start Game — first stereo frames without huge hitch.  
+2. Inspect `garrysmod/cfg/gvrmod_cube.cfg` supersample line ≤ 1.4.  
+3. Optional: raise SS in-game after stable — live path only.
+
+Pure helpers: `CubeSs_ClampColdStart` / `CubeSs_Decide` / `CubeSs_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

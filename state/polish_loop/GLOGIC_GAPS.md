@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 46
+Last updated: 2026-08-04 cycle 47
 
 ## P0 — seamless / feel broken
 
@@ -14,6 +14,7 @@ Last updated: 2026-08-04 cycle 46
 | G04 | Cold Steam/hl2 every Start | HmdExpect+§0.6 cycle37; default still cold | **partial** cycle37 |
 | G05 | Loading after take_xr may not be stereo | HmdExpect+§0.1 checklist cycle32; HMD walk open | **partial** cycle32 |
 | G28 | Soft handoff timeouts (no racey release) | CubeHandoffTimeout_* cycle46; HMD walk open | **partial** cycle46 |
+| G29 | Supersample cold-start cap (no crank) | CubeSs_* cycle47; HMD walk open | **partial** cycle47 |
 
 ## P1 — Cube experience polish
 
@@ -51,6 +52,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G29 | SS cold-start cap 1.4 (no crank) | CubeSs_* + gmod_spawn cfg wire |
 | G28 | Soft handoff 90s/180s never racey | CubeHandoffTimeout_* + xr_app wire |
 | G27 | Engine blacklist never-call (W2) | EngineBlacklist_* + setConvarValue gate |
 | G26 | Menu thrash / VRClimb dedupe by id | MenuLaw_* + cl_api wire |
