@@ -192,4 +192,41 @@ return function(H, env)
 		H.assert_eq(src3, "stick")
 		H.assert_near(s3, 0, 1e-6)
 	end)
+
+	-- G03 pure STAGE pack parse + toast (no origin apply)
+	H.TEST("util.stage_pack.parse_and_hint", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.StagePack_NormalizeSpace("stage"), "STAGE")
+		H.assert_true(u.StagePack_Parse("") == nil)
+		H.assert_true(u.StagePack_Parse("v=1\nmap=gm_construct\n") == nil)
+		local body = table.concat({
+			"v=1",
+			"ref_space=stage",
+			"head_x_m=0.1",
+			"head_y_m=1.65",
+			"head_z_m=-0.2",
+			"head_ok=1",
+			"viewscale=1",
+			"scalefactor=1.05",
+			"supersample=1.5",
+			"map=gm_construct",
+			"source=cube_webui",
+			"ts=123",
+		}, "\n")
+		local p = u.StagePack_Parse(body)
+		H.assert_true(p ~= nil)
+		H.assert_eq(p.ref_space, "STAGE")
+		H.assert_near(p.head_y, 1.65, 1e-4)
+		H.assert_true(p.head_ok)
+		H.assert_true(u.StagePack_IsUsable(p))
+		local hint = u.StagePack_ToastHint(p)
+		H.assert_true(type(hint) == "string" and #hint > 8)
+		H.assert_true(string.find(hint, "STAGE", 1, true) ~= nil)
+		H.assert_true(string.find(hint, "deferred", 1, true) ~= nil)
+		-- Extreme head Y clears head_ok but pack stays usable
+		local badY = u.StagePack_Parse("v=1\nref_space=LOCAL\nhead_y_m=9.0\nhead_ok=1\n")
+		H.assert_true(u.StagePack_IsUsable(badY))
+		H.assert_true(not badY.head_ok)
+		H.assert_true(u.StagePack_ToastHint(nil) == nil)
+	end)
 end

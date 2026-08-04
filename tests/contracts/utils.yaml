@@ -389,6 +389,22 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.StagePack_IsUsable
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_NormalizeSpace
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_Parse
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_ToastHint
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
   - id: vrmod.utils.SubVec
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure

@@ -1,28 +1,27 @@
 # Last cycle
 
-**Cycle:** 11  
-**Time:** 2026-08-04T16:23:41+03:00  
-**Focus:** G03 cal/STAGE pack into handoff (partial — pack write, no apply)  
-**Commit (gVRMod):** `f909d15`  
-**Commit (vrmod-x64):** none  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass  
+**Cycle:** 12  
+**Time:** 2026-08-04T16:32:44+03:00  
+**Focus:** G03 STAGE pack Lua parse + toast (apply still deferred)  
+**Commit (gVRMod):** (pending close)  
+**Commit (vrmod-x64):** `d052c35`  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **stage_pack.hpp** pure Format/Parse/IsUsable/NormalizeSpace  
-2. **WriteCubeStagePack** → `garrysmod/data/vrmod/cube_stage_pack.txt`  
-3. **xr_app** writes pack on Start success + refreshes on take_xr exit (ref space + head sample + scales)  
-4. **ui_panel** handoff line: `SPACE STAGE · HEAD Y · PACKED`  
-5. Intentionally **not** GMod auto-apply of head/origin (height jump risk without HMD proof)
+1. **sh_stage_pack.lua** pure Parse / Normalize / IsUsable / ToastHint  
+2. **cl_openxr_launch** reads `cube_stage_pack.txt` after VR live → `g_VR._cubeStagePack` + toast  
+3. Unit test `util.stage_pack.parse_and_hint`; PURE_TESTED map updated  
+4. **No** origin / scale / seatedoffset mutation (height apply deferred)
 
 ## Pain points
 
-- Untouched; soft timeouts unchanged; FOV archives not clobbered.
+- Untouched; FOV archives and soft handoff timeouts unchanged.
 
 ## Gaps
 
-- G03 → **partial** (continuity data on disk; apply path future)  
-- Next: G03 apply (careful pure hint only) or G12 audio design-only or G02 XR layer  
+- G03 still **partial** — continuity data end-to-end (write + read + toast); apply path open  
+- Next: G12 audio design-only, or careful G03 apply only with pure decision + HMD note  
 
 ## Notes
 

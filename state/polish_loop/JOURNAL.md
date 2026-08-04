@@ -112,3 +112,13 @@ Append one block per cycle. Newest at bottom.
 - G03 partial — GMod origin/height apply still open (pain-point careful).
 - Tests: full test_all PASS 6/6 (14 launcher tests).
 - Next: careful G03 apply hint, or G12 audio design-only, or G02 layer fade.
+
+## 2026-08-04 cycle 12 — G03 STAGE pack read + toast
+
+- Theme: GMod side pure parse + continuity toast (no height/origin apply).
+- Pure: sh_stage_pack.lua StagePack_* helpers + unit test.
+- cl_openxr_launch noteStagePackOnce after VR live; g_VR._cubeStagePack.
+- PURE_TESTED: 4 StagePack symbols → util.stage_pack.parse_and_hint.
+- Tests: --fast PASS 4/4 (32 Lua, pure pending=0).
+- Commits: vrmod-x64 d052c35; gVRMod submodule + tests + state.
+- G03 remains partial (apply deferred); next G12 audio design-only or careful apply design.

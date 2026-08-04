@@ -38,6 +38,11 @@ PURE_TESTED = {
     "vrmod.utils.GlidePreferStickSteer": "util.glide.seat_and_steer_sot",
     "vrmod.utils.AngAlmostEqual": "util.math.vec_almost_equal",
     "vrmod.utils.LerpAngleWrap": "util.fingers.curl_lerp_unit",
+    # G03 pure STAGE pack parse + toast (no origin apply)
+    "vrmod.utils.StagePack_NormalizeSpace": "util.stage_pack.parse_and_hint",
+    "vrmod.utils.StagePack_Parse": "util.stage_pack.parse_and_hint",
+    "vrmod.utils.StagePack_IsUsable": "util.stage_pack.parse_and_hint",
+    "vrmod.utils.StagePack_ToastHint": "util.stage_pack.parse_and_hint",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.DedupInGameMenuItems": "api.menu.dedup_function",
     "vrmod.RemoveInGameMenuItem": "api.menu.dedupe_name",

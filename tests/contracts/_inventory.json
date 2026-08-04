@@ -329,6 +329,22 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua"
     ],
     [
+      "vrmod.utils.StagePack_IsUsable",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_NormalizeSpace",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_Parse",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_ToastHint",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
       "vrmod.utils.SubVec",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
