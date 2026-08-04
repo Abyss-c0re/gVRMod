@@ -428,10 +428,13 @@ static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) 
       snprintf(out, outN, "XR ZNEAR        %.1f", g.xr.zNear);
       break;
     case SR_XR_DESKTOP: {
+      // G23: all four modes labeled (1 none / 2 left / 3 right / 4 follow-cam)
       const char* dv = "RIGHT";
       if (g.xr.desktopView == 1) dv = "NONE";
       else if (g.xr.desktopView == 2) dv = "LEFT";
+      else if (g.xr.desktopView == 3) dv = "RIGHT";
       else if (g.xr.desktopView == 4) dv = "FOLLOW CAM";
+      else dv = "NONE";
       snprintf(out, outN, "XR DESKTOP VIEW %s", dv);
       break;
     }

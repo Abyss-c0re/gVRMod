@@ -25,7 +25,7 @@ struct OpenXrRenderSettings {
   float scaleFactor = 1.0f; // vrmod_scalefactor (submit UV crop)
   float eyeScale = 0.5f;    // vrmod_eyescale (IPD-ish submit)
   float zNear = 1.0f;       // vrmod_znear
-  int desktopView = 1;      // 1=none (Cube seamless) 2=left 3=right
+  int desktopView = 1;      // 1=none (Cube seamless) 2=left 3=right 4=follow-cam
   bool postProcess = false;
   bool swapEyes = false;
   bool skybox = false;

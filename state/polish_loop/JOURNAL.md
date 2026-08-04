@@ -46,3 +46,12 @@ Append one block per cycle. Newest at bottom.
 - No -noborder force; mat_queue untouched.
 - Tests: full test_all PASS 6/6; cube_webui_launcher builds.
 - Next: G23 follow-cam paths verify or G02 fade (careful).
+
+## 2026-08-04 cycle 5 — G23 follow-cam paths
+
+- Theme: verify/fix desktopview=4 call sites (no stereo crop fallthrough).
+- Lua: IsEyeCropMode/Clamp/Cycle/Label; cl_vrmod follow vs eye-crop branch; crop for mode 1/4.
+- Launcher: explicit RIGHT label; last_play clamps xr_desktopview 1..4; docs call-site table.
+- Tests: full test_all PASS 6/6 (+desktop enum unit + clamp test).
+- Commits: vrmod-x64 8dc402c; gVRMod submodule + launcher + docs + state.
+- Next: G20 residual (cube_framework color) or inventory G21; avoid G02 fade without plan.

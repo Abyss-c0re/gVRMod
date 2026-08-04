@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 4  
-**Time:** 2026-08-04T15:05:48+03:00  
-**Focus:** G11 Quick Play last map + gfx  
-**Commit (gVRMod):** `5408886`  
-**Commit (vrmod-x64):** none  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass (+2 last_play unit tests); launcher builds  
+**Cycle:** 5  
+**Time:** 2026-08-04T15:16:02+03:00  
+**Focus:** G23 desktopview=4 follow-cam call sites  
+**Commit (gVRMod):** `d31dcae`  
+**Commit (vrmod-x64):** `8dc402c`  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **`last_play.hpp`** — pure Format/Parse for map + server + gfx + XR SS snapshot  
-2. **Save** on successful StartGame → `garrysmod/data/vrmod/cube_last_play.txt`  
-3. **Load** on WebUI_Init — restore selection + gfx  
-4. **QUICK PLAY** button on New Game when snapshot exists  
-5. Offline tests for round-trip + reject-empty  
+1. **cl_vrmod** — mode 4 never falls into stereo eye crop; uses IsFollowMode/IsEyeCropMode  
+2. **cl_desktop_cam** — Clamp/Cycle/Label/IsEyeCropMode pure helpers  
+3. **ComputeDesktopCrop** — mode 1 and 4 return unused 0,0  
+4. **Launcher** — RIGHT label explicit; last_play clamps desktopview  
+5. **docs/DESKTOP_BROADCAST.md** — call-site law table  
 
 ## Pain points
 
-- Untouched: climbing, -noborder (snapshot may store user noborder=0 default), mat_queue, dual pose, HUD, force-push.
+- Untouched: climbing, -noborder, mat_queue, dual pose, HUD, force-push.
 
 ## Gaps
 
-- G11 → **done**  
-- Next: G23 follow-cam call sites  
+- G23 → **done**  
+- Next: G20 residual color parse or G21 contracts  
 
 ## Notes
 

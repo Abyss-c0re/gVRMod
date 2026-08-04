@@ -88,6 +88,14 @@ TEST(launcher_last_play_rejects_empty) {
     ASSERT_TRUE(!LastPlay_Parse("v=1\ngamemode=sandbox\n", b));
 }
 
+TEST(launcher_last_play_clamps_desktopview) {
+    LastPlaySnapshot b;
+    ASSERT_TRUE(LastPlay_Parse("v=1\nmap=gm_flatgrass\nxr_desktopview=9\n", b));
+    ASSERT_EQ(b.xrDesktopView, 4);
+    ASSERT_TRUE(LastPlay_Parse("v=1\nmap=gm_flatgrass\nxr_desktopview=0\n", b));
+    ASSERT_EQ(b.xrDesktopView, 1);
+}
+
 int main() {
     return RunAllTests();
 }

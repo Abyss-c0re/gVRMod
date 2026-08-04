@@ -139,6 +139,9 @@ inline bool LastPlay_Parse(const std::string& body, LastPlaySnapshot& out) {
   if (out.winH < 240) out.winH = 480;
   if (out.xrSsIdx < 0) out.xrSsIdx = 0;
   if (out.xrSsIdx > 5) out.xrSsIdx = 5;
+  // G23: desktop view enum 1..4 only
+  if (out.xrDesktopView < 1) out.xrDesktopView = 1;
+  if (out.xrDesktopView > 4) out.xrDesktopView = 4;
   // Never invent borderless via corrupt snapshot
   if (out.noborder && out.windowed == false) { /* ok */ }
   out.valid = gotMap;
