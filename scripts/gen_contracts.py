@@ -43,6 +43,10 @@ PURE_TESTED = {
     "vrmod.utils.StagePack_Parse": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_IsUsable": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_ToastHint": "util.stage_pack.parse_and_hint",
+    # G05 pure stereo-load policy (never dual under mat_queue≥2)
+    "vrmod.utils.StereoLoadPolicy": "util.stereo_load.policy_g05",
+    "vrmod.utils.ShouldPaintStereoThisFrame": "util.stereo_load.policy_g05",
+    "vrmod.utils.StereoLoadToastHint": "util.stereo_load.policy_g05",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.DedupInGameMenuItems": "api.menu.dedup_function",
     "vrmod.RemoveInGameMenuItem": "api.menu.dedupe_name",

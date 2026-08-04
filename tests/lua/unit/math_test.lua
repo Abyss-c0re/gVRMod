@@ -229,4 +229,38 @@ return function(H, env)
 		H.assert_true(not badY.head_ok)
 		H.assert_true(u.StagePack_ToastHint(nil) == nil)
 	end)
+
+	-- G05 pure stereo-load policy (never dual under mat_queue 2)
+	H.TEST("util.stereo_load.policy_g05", function()
+		local u = env.vrmod.utils
+		local dual = u.StereoLoadPolicy({
+			mat_queue_mode = 1,
+			vr_active = true,
+			loading = true,
+			openxr_should_render = false,
+		})
+		H.assert_true(dual.dual_eye)
+		H.assert_true(dual.prefer_paint_while_load)
+		H.assert_true(dual.keep_submit)
+		H.assert_true(u.ShouldPaintStereoThisFrame(dual, false))
+		local mq2 = u.StereoLoadPolicy({
+			mat_queue_mode = 2,
+			vr_active = true,
+			loading = true,
+			openxr_should_render = true,
+		})
+		H.assert_true(not mq2.dual_eye)
+		H.assert_true(mq2.single_pass)
+		H.assert_true(not mq2.prefer_paint_while_load)
+		H.assert_true(u.ShouldPaintStereoThisFrame(mq2, true))
+		H.assert_true(not u.ShouldPaintStereoThisFrame(mq2, false))
+		local idle = u.StereoLoadPolicy({
+			mat_queue_mode = 1,
+			vr_active = false,
+			loading = false,
+		})
+		H.assert_true(not idle.keep_submit)
+		local hint = u.StereoLoadToastHint(dual)
+		H.assert_true(type(hint) == "string" and string.find(hint, "dual", 1, true))
+	end)
 end

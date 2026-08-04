@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 14
+Last updated: 2026-08-04 cycle 15
 
 ## P0 — seamless / feel broken
 
@@ -12,7 +12,7 @@ Last updated: 2026-08-04 cycle 14
 | G02 | No coordinated fade on take_xr | Panel + eye-buffer fade cycle14; Cube shell done | **done** cycle14 |
 | G03 | Cal / STAGE not packed into handoff | Write+parse+toast landed; height/origin apply still open | **partial** cycle12 |
 | G04 | Cold Steam/hl2 every Start | Long Facepunch gap | open (warm process is larger) |
-| G05 | Loading after take_xr may not be stereo | Black or flat load flash | open |
+| G05 | Loading after take_xr may not be stereo | Policy+dual paint cycle15; HMD proof open | **partial** cycle15 |
 
 ## P1 — Cube experience polish
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G05 | Stereo-load policy (partial) | vrmod-x64 879a551 |
 | G02 | Eye-buffer layer fade (Cube shell) | GlFadeEyeBufferTowardBlack |
 | G12 | Handoff audio gain law (no clip) | CubeHandoffAudioGain |
 | G03 | STAGE pack parse+toast (no apply) | vrmod-x64 d052c35 + stage_pack.hpp |

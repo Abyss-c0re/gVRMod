@@ -140,3 +140,13 @@ Append one block per cycle. Newest at bottom.
 - G02 shell done; GMod-side black/load flash still G05.
 - Tests: full test_all PASS 6/6 (+layer alpha unit).
 - Next: G05 stereo-during-load pure gate/inventory, or G03 apply design.
+
+## 2026-08-04 cycle 15 — G05 stereo-load policy
+
+- Theme: dual-eye paint through early load after take_xr (safe mq path).
+- Pure: StereoLoadPolicy / ShouldPaintStereoThisFrame (+ unit test).
+- cl_vrmod RenderScene uses policy; never dual under mat_queue≥2.
+- G05 partial — HMD load-flash proof still open.
+- Tests: --fast PASS 4/4 (33 Lua, pure pending=0).
+- Commits: vrmod-x64 879a551; gVRMod submodule + tests + state.
+- Next: G04 cold Start note, or G03 apply design-only.

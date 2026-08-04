@@ -305,6 +305,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_npc2rag.lua"
     ],
     [
+      "vrmod.utils.ShouldPaintStereoThisFrame",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
+    ],
+    [
       "vrmod.utils.SmoothAngle",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
@@ -343,6 +347,14 @@
     [
       "vrmod.utils.StagePack_ToastHint",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StereoLoadPolicy",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
+    ],
+    [
+      "vrmod.utils.StereoLoadToastHint",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
     ],
     [
       "vrmod.utils.SubVec",
