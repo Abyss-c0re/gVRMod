@@ -572,3 +572,13 @@ Append one block per cycle. Newest at bottom.
 - G39 partial — runtime fail walk open.
 - Tests: --fast PASS 4/4 (pure pending=0; 51 Lua).
 - Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects inventory.
+
+## 2026-08-05 cycle 58 — G40 Vision border fill law (W1)
+
+- Theme: guided scale→V→H→save; defaults scale=1 offsets=0; no slider maze; soft FOV care.
+- Pure: BorderLaw_GuideBaseline/Clamp*/IsBleedRisk/Decide/HmdExpect.
+- cl_border_calibrate wires baseline + clamp + snapshot.
+- TESTING_FRAMEWORK §0.27; PURE_TESTED map; CUBE_WATCHLIST W1 partial.
+- G40 partial — HMD fill walk open.
+- Tests: --fast PASS 4/4 (pure pending=0; 52 Lua).
+- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects inventory.

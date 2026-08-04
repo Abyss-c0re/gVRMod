@@ -100,6 +100,110 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.BorderLaw_ClampOffset
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ClampScale
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ComfortOffsetAbsMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ComfortScaleMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ComfortScaleMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_DefaultHorizontal
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_DefaultScale
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_DefaultVertical
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_GuideBaseline
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_IsBleedDecision
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_IsBleedRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_IsGuidedPathOnly
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_OffsetMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_OffsetMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_OffsetStep
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_PreferGuideOverZSpam
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ProfilePath
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_RequireRenderOffsetOnGuide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_Sanitize
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ScaleMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ScaleMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ScaleStep
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_StepIds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: pure
+    tests: [util.border_law.fill_g40]
   - id: vrmod.utils.BuildRagdollOffsets
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

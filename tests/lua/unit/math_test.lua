@@ -454,6 +454,68 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G40 pure Vision/border fill law (W1; guided path, defaults, bleed risk)
+	H.TEST("util.border_law.fill_g40", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.BorderLaw_DefaultScale(), 1.0)
+		H.assert_eq(u.BorderLaw_DefaultVertical(), 0.0)
+		H.assert_eq(u.BorderLaw_DefaultHorizontal(), 0.0)
+		H.assert_true(u.BorderLaw_IsGuidedPathOnly())
+		H.assert_true(u.BorderLaw_PreferGuideOverZSpam())
+		H.assert_true(u.BorderLaw_RequireRenderOffsetOnGuide())
+		H.assert_eq(u.BorderLaw_ClampScale(0.01), u.BorderLaw_ScaleMin())
+		H.assert_eq(u.BorderLaw_ClampScale(9), u.BorderLaw_ScaleMax())
+		H.assert_eq(u.BorderLaw_ClampOffset(-5), u.BorderLaw_OffsetMin())
+		H.assert_eq(u.BorderLaw_ClampOffset(5), u.BorderLaw_OffsetMax())
+		local steps = u.BorderLaw_StepIds()
+		H.assert_eq(steps[1], "reset")
+		H.assert_eq(steps[2], "scale")
+		H.assert_eq(steps[3], "vertical")
+		H.assert_eq(steps[4], "horizontal")
+		H.assert_eq(steps[5], "done")
+		local base = u.BorderLaw_GuideBaseline()
+		H.assert_eq(base.scalefactor, 1.0)
+		H.assert_eq(base.verticaloffset, 0.0)
+		H.assert_eq(base.horizontaloffset, 0.0)
+		H.assert_eq(base.renderoffset, 1)
+		H.assert_true(not u.BorderLaw_IsBleedRisk({ scalefactor = 1, verticaloffset = 0, horizontaloffset = 0 }))
+		H.assert_true(u.BorderLaw_IsBleedRisk({ scalefactor = 0.5, verticaloffset = 0, horizontaloffset = 0 }))
+		H.assert_true(u.BorderLaw_IsBleedRisk({ scalefactor = 1, verticaloffset = 0.5, horizontaloffset = 0 }))
+		local ok = u.BorderLaw_Decide({ scalefactor = 1, verticaloffset = 0, horizontaloffset = 0 })
+		H.assert_true(ok.path_ok)
+		H.assert_eq(u.BorderLaw_StatusLabel(ok), "BORDER · OK")
+		local he = u.BorderLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G40", 1, true))
+		local guide = u.BorderLaw_Decide({
+			scalefactor = 1,
+			verticaloffset = 0,
+			horizontaloffset = 0,
+			guide_active = true,
+		})
+		H.assert_eq(guide.risk, "guide")
+		H.assert_eq(u.BorderLaw_StatusLabel(guide), "BORDER · GUIDE")
+		local bleed = u.BorderLaw_Decide({ scalefactor = 0.5, verticaloffset = 0, horizontaloffset = 0 })
+		H.assert_eq(bleed.risk, "bleed")
+		H.assert_true(u.BorderLaw_IsBleedDecision(bleed))
+		local bars = u.BorderLaw_Decide({
+			scalefactor = 1,
+			verticaloffset = 0,
+			horizontaloffset = 0,
+			fill_ok = false,
+		})
+		H.assert_eq(bars.risk, "bars")
+		H.assert_true(not bars.path_ok)
+		local heB = u.BorderLaw_HmdExpect(bars)
+		H.assert_eq(heB.verdict, "expect_bars")
+		local san = u.BorderLaw_Sanitize({ scalefactor = 99, verticaloffset = -9, horizontaloffset = 9 })
+		H.assert_true(san.clamped)
+		H.assert_eq(san.scalefactor, u.BorderLaw_ScaleMax())
+		H.assert_eq(san.verticaloffset, u.BorderLaw_OffsetMin())
+		H.assert_eq(san.horizontaloffset, u.BorderLaw_OffsetMax())
+		H.assert_true(string.find(u.BorderLaw_ProfilePath(), "border_profile", 1, true))
+	end)
+
 	-- G39 pure VR_Init human error surface (W11 codes 108/215)
 	H.TEST("util.init_law.surface_g39", function()
 		local u = env.vrmod.utils

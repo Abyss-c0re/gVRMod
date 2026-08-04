@@ -567,6 +567,25 @@ Offline gate proves codes **108/215** humanized, module zip linked, toast requir
 
 Pure helpers: `InitLaw_Humanize` / `InitLaw_Decide` / `InitLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.27 G40 Vision / border fill walk (manual)
+
+Offline gate proves guided path defaults (scale=1, offsets=0), clamps, bleed risk, HmdExpect. **Headset** still required to claim bars/fill OK.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Defaults / after Experience | HMD filled; no permanent black bars | Bars with scale≈1 and offsets≈0 |
+| `vrmod_border_calibrate` | Guided scale → V → H → save; profile reloads later | Slider maze; cancel leaves broken crop only |
+| Extreme scale/offset | Comfort bleed risk flagged; re-run guide | Stuck tunnel/crop with no guide path |
+| Soft care | FOV archives not force-written mid-guide (G30) | FOV thrash fighting Vision |
+
+**Procedure (claim “G40 border fill OK” only if walked):**
+
+1. Fresh or Reset Experience → Vision/border path → edges fill HMD both eyes.  
+2. Crimson Cube → Border calibrate one trigger → complete save → reboot keeps fill.  
+3. Optional: `print(g_VR._borderLawLabel, g_VR._borderLawHmdExpect and g_VR._borderLawHmdExpect.checklist)`.
+
+Pure helpers: `BorderLaw_GuideBaseline` / `BorderLaw_Decide` / `BorderLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

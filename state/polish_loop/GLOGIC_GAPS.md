@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 57
+Last updated: 2026-08-05 cycle 58
 
 ## P0 — seamless / feel broken
 
@@ -16,6 +16,7 @@ Last updated: 2026-08-05 cycle 57
 | G28 | Soft handoff timeouts (no racey release) | CubeHandoffTimeout_* cycle46; HMD walk open | **partial** cycle46 |
 | G29 | Supersample cold-start cap (no crank) | CubeSs_* cycle47; HMD walk open | **partial** cycle47 |
 | G30 | FOV archive write-only-when-touched | CubeFov_* cycle48; HMD Vision walk open | **partial** cycle48 |
+| G40 | Vision border fill / black bars (W1) | BorderLaw_* cycle58; HMD fill walk open | **partial** cycle58 |
 
 ## P1 — Cube experience polish
 
@@ -62,6 +63,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G40 | Vision border fill law (W1) | BorderLaw_* + cl_border_calibrate |
 | G39 | VR_Init human error surface (W11) | InitLaw_* + PerformStartup |
 | G38 | Worldmodel single path (W10) | WorldModelLaw_* + cl_vrmod draw path |
 | G37 | Hand vs bullet filter (W9) | HandBulletLaw_* + sv_collision_proxies |
