@@ -97,7 +97,7 @@ scan_once() {
     # Recent files only (7 days) matching Quest/KDE share names
     find "$d" -maxdepth 1 -type f \( \
       -iname 'com.oculus*' -o -iname '*metacam*' -o -iname '*vrshell*' \
-      -o -iname '*gvrmod*' -o -iname '*quest* -o -iname '*wivrn*'' \
+      -o -iname '*gvrmod*' -o -iname '*quest*' -o -iname '*wivrn*' \
     \) -mtime -7 2>/dev/null | while read -r f; do
       case "$f" in
         *.mp4|*.webm|*.mkv|*.mov|*.jpg|*.jpeg|*.png|*.MP4|*.JPG|*.PNG) review_one "$f" ;;
