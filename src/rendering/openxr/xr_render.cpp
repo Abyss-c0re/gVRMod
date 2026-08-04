@@ -8,6 +8,7 @@
 #include <GL/glx.h>
 #include <cstring>
 #include <cstdio>
+#include <cmath>
 #include <vector>
 #include <algorithm>
 
@@ -19,6 +20,42 @@ extern PoseResult ConvertXrPose(const XrSpaceLocation& loc);
 extern PoseResult g_xrEyePoses[2];
 extern bool g_xrEyePosesValid;
 extern XrFovf g_xrEyeFovs[2];
+
+// 0=SAFE 1=FULL 2=FOV_CROP — see XR_SetSubmitCropMode. Default SAFE after FOV_CROP disaster.
+static int g_submitCropMode = 0;
+
+void XR_SetSubmitCropMode(int mode) {
+    if (mode < 0) mode = 0;
+    if (mode > 2) mode = 2;
+    g_submitCropMode = mode;
+}
+int XR_GetSubmitCropMode() { return g_submitCropMode; }
+
+// Map asymmetric OpenXR FOV → UV inside symmetric overrender (single-eye RT).
+// Opt-in only (mode FOV_CROP). Wrong use looks like swapped/crossed eyes.
+static void AsymmetricFovToUvCrop(const XrFovf& fov, float* u0, float* u1, float* v0, float* v1) {
+    const float tanL = tanf(fov.angleLeft);
+    const float tanR = tanf(fov.angleRight);
+    const float tanU = tanf(fov.angleUp);
+    const float tanD = tanf(fov.angleDown);
+    float halfTanX = fmaxf(fabsf(tanL), fabsf(tanR));
+    float halfTanY = fmaxf(fabsf(tanU), fabsf(tanD));
+    if (halfTanX < 1e-6f) halfTanX = 1e-6f;
+    if (halfTanY < 1e-6f) halfTanY = 1e-6f;
+    *u0 = (tanL + halfTanX) / (2.0f * halfTanX);
+    *u1 = (tanR + halfTanX) / (2.0f * halfTanX);
+    *v0 = (halfTanY - tanU) / (2.0f * halfTanY);
+    *v1 = (halfTanY - tanD) / (2.0f * halfTanY);
+    if (*u1 < *u0) { float t = *u0; *u0 = *u1; *u1 = t; }
+    if (*v1 < *v0) { float t = *v0; *v0 = *v1; *v1 = t; }
+    const float ins = 0.003f;
+    if (*u0 < ins) *u0 = ins;
+    if (*u1 > 1.0f - ins) *u1 = 1.0f - ins;
+    if (*v0 < ins) *v0 = ins;
+    if (*v1 > 1.0f - ins) *v1 = 1.0f - ins;
+    if (!(*u1 > *u0 + 0.01f)) { *u0 = ins; *u1 = 1.0f - ins; }
+    if (!(*v1 > *v0 + 0.01f)) { *v0 = ins; *v1 = 1.0f - ins; }
+}
 
 // Exposed to input unit so UpdatePoses can ensure a fresh HMD pose is available
 // for Lua GetPoses on the first frame (fixes "no head tracking" and helps avoid
@@ -703,33 +740,35 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 glReadBuffer(GL_COLOR_ATTACHMENT0);
                 glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
-                // Rect selection from Lua textureBounds.
-                // IMPORTANT: Linux ComputeSubmitBounds returns inverted V (v0>v1) for OpenVR
-                // UV convention. That must NOT be treated as "invalid full rect" — doing so
-                // resets U to 0..1 and each eye blits the entire SBS RT → doubled image,
-                // no stereo. Only repair the broken axis; keep L/R U halves for SBS.
+                // Rect selection — policy g_submitCropMode (Lua vrmod_submit_crop):
+                //   SAFE(0): collector/per-eye = full eye; SBS = Lua bounds halves
+                //   FULL(1): force full-eye UV (debug borders)
+                //   FOV_CROP(2): experimental asymmetric FOV crop on per-eye only
+                // IMPORTANT: Linux SBS bounds often invert V (v0>v1). Do not treat that
+                // as invalid — would reset U and double the image.
                 float u0 = (eye == 0) ? textureBounds[0] : textureBounds[4];
                 float u1 = (eye == 0) ? textureBounds[2] : textureBounds[6];
                 float v0 = (eye == 0) ? textureBounds[1] : textureBounds[5];
                 float v1 = (eye == 0) ? textureBounds[3] : textureBounds[7];
 
                 const float ins = 0.003f;
-                // Staging = engine GL orientation, one full eye (no SBS U halves).
                 const bool fromCollector = g_preferCollectedEyes && g_eyeStageReady
                     && perEyeSrc[eye] == g_eyeStage[eye][g_eyeStageRead];
-                if (fromCollector) {
+                const bool singleEyeTex = fromCollector || havePerEye;
+                const int cropMode = g_submitCropMode;
+
+                if (singleEyeTex && cropMode == 2) {
+                    // Experimental: crop symmetric overrender to OpenXR FOV
+                    AsymmetricFovToUvCrop(g_views[eye].fov, &u0, &u1, &v0, &v1);
+                } else if (singleEyeTex || cropMode == 1) {
+                    // SAFE/FULL: full single-eye texture (no SBS U halves)
                     u0 = ins;
                     u1 = 1.0f - ins;
-                    // Ordered V; one flip applied below via dest Y (same as engine RT path).
                     v0 = ins;
                     v1 = 1.0f - ins;
-                }
-                // U: require ordered min<max. If bad, default to correct SBS half for this eye.
-                else if (!(u1 > u0 + 0.001f)) {
-                    if (havePerEye) {
-                        u0 = ins;
-                        u1 = 1.0f - ins;
-                    } else if (eye == 0) {
+                } else if (!(u1 > u0 + 0.001f)) {
+                    // SBS path: repair broken U only
+                    if (eye == 0) {
                         u0 = ins;
                         u1 = 0.5f;
                     } else {
@@ -737,8 +776,8 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                         u1 = 1.0f - ins;
                     }
                 }
-                // V: empty (zero height) only → full. Inverted V is intentional (flip via blit).
-                if (!fromCollector && std::fabs(v1 - v0) < 0.001f) {
+                // V: empty only → full. Inverted V intentional on SBS (flip via blit).
+                if (!singleEyeTex && cropMode != 1 && std::fabs(v1 - v0) < 0.001f) {
                     v0 = ins;
                     v1 = 1.0f - ins;
                 }

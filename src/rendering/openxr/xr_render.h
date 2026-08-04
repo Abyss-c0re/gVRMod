@@ -40,6 +40,13 @@ bool XR_HasCollectedEyes();
 void XR_SetPreferCollectedEyes(bool prefer);
 bool XR_PreferCollectedEyes();
 void XR_DestroyEyeCollectors();
+
+// Submit UV crop policy (Lua: vrmod_submit_crop). Live-safe.
+//   0 SAFE     — collector/per-eye full eye rect; SBS uses Lua textureBounds (default)
+//   1 FULL     — force full-eye UV even if bounds look like SBS halves (debug)
+//   2 FOV_CROP — experimental asymmetric FOV crop on per-eye textures (can break stereo)
+void XR_SetSubmitCropMode(int mode);
+int  XR_GetSubmitCropMode();
 #endif
 
 // ── Recommended size ──

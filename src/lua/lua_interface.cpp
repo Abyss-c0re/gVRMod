@@ -852,6 +852,27 @@ LUA_FUNCTION(SetSubmitEnabled) {
     return 0;
 }
 
+// Per-eye UV crop policy (vrmod_submit_crop). 0=SAFE 1=FULL 2=FOV_CROP. Default 0.
+LUA_FUNCTION(SetSubmitCropMode) {
+#ifndef _WIN32
+    int mode = 0;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) {
+        mode = (int)LUA->GetNumber(1);
+    }
+    XR_SetSubmitCropMode(mode);
+#endif
+    return 0;
+}
+
+LUA_FUNCTION(GetSubmitCropMode) {
+#ifndef _WIN32
+    LUA->PushNumber((double)XR_GetSubmitCropMode());
+#else
+    LUA->PushNumber(0.0);
+#endif
+    return 1;
+}
+
 // After UpdatePosesAndActions (WaitFrame+Begin): true if compositor wants a layer this frame.
 LUA_FUNCTION(ShouldRender) {
     LUA->PushBool(XR_ShouldRenderThisFrame());
@@ -1345,6 +1366,10 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SetKnownSubmitSize");
     LUA->PushCFunction(SetSubmitEnabled);
     LUA->SetField(-2, "SetSubmitEnabled");
+    LUA->PushCFunction(SetSubmitCropMode);
+    LUA->SetField(-2, "SetSubmitCropMode");
+    LUA->PushCFunction(GetSubmitCropMode);
+    LUA->SetField(-2, "GetSubmitCropMode");
     LUA->PushCFunction(ShouldRender);
     LUA->SetField(-2, "ShouldRender");
     LUA->PushCFunction(CollectEyes);

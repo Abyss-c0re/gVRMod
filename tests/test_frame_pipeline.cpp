@@ -246,6 +246,7 @@ TEST(ModuleRegistration_PipelineExportsPresent) {
         "UpdatePosesAndActions", "GetPoses", "GetActions",
         "ShareTextureBegin", "ShareTextureFinish",
         "SetSubmitTextureBounds", "SetSubmitEnabled",
+        "SetSubmitCropMode", "GetSubmitCropMode",
         "ShouldRender", "CollectEyes", "HasCollectedEyes",
         "SubmitSharedTexture", "SetKnownSubmitSize",
         "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames"

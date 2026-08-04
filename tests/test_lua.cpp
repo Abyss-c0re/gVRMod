@@ -136,6 +136,7 @@ TEST(ModuleRegistration_AllFunctionsPresent) {
         "UpdatePosesAndActions", "GetPoses", "GetActions",
         "ShareTextureBegin", "ShareTextureFinish",
         "SetSubmitTextureBounds", "SetSubmitEnabled",
+        "SetSubmitCropMode", "GetSubmitCropMode",
         "ShouldRender", "CollectEyes", "HasCollectedEyes",
         "SetKnownSubmitSize", "SubmitSharedTexture",
         "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames"
