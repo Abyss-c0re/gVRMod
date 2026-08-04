@@ -3,7 +3,7 @@
 **Cycle:** 33  
 **Time:** 2026-08-04T20:23:39+03:00  
 **Focus:** G12 ambient master taste + HMD volume expect  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `ea572d8`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
