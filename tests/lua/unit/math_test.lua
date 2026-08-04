@@ -465,6 +465,53 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G47 pure false per-eye FBO guard (both FBOs; no color+depth dual)
+	H.TEST("util.false_per_eye_law.guard_g47", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.FalsePerEyeLaw_RequireBothFbos())
+		H.assert_true(u.FalsePerEyeLaw_RequireDistinctColorTex())
+		H.assert_true(not u.FalsePerEyeLaw_AllowColorDepthAsDual())
+		H.assert_true(u.FalsePerEyeLaw_FallbackToSbsWhenInvalid())
+		H.assert_true(u.FalsePerEyeLaw_IsLegalPair({
+			left_tex = 10, right_tex = 11, left_fbo = 1, right_fbo = 2,
+		}))
+		H.assert_true(not u.FalsePerEyeLaw_IsLegalPair({
+			left_tex = 10, right_tex = 11, left_fbo = 1, right_fbo = 0,
+		}))
+		H.assert_true(not u.FalsePerEyeLaw_IsLegalPair({
+			left_tex = 10, right_tex = 10, left_fbo = 1, right_fbo = 2,
+		}))
+		H.assert_eq(u.FalsePerEyeLaw_ResolvePath({
+			left_tex = 10, right_tex = 11, left_fbo = 1, right_fbo = 2,
+		}), "per_eye")
+		H.assert_eq(u.FalsePerEyeLaw_ResolvePath({
+			left_tex = 10, right_tex = 11, left_fbo = 0, right_fbo = 0, sbs_tex = 99,
+		}), "sbs")
+		H.assert_eq(u.FalsePerEyeLaw_ResolvePath({}), "none")
+		local ok = u.FalsePerEyeLaw_Decide({
+			left_tex = 10, right_tex = 11, left_fbo = 1, right_fbo = 2,
+		})
+		H.assert_true(ok.path_ok)
+		H.assert_eq(ok.path, "per_eye")
+		H.assert_eq(u.FalsePerEyeLaw_StatusLabel(ok), "EYE · PER-EYE OK")
+		local he = u.FalsePerEyeLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_per_eye")
+		H.assert_true(string.find(he.checklist, "G47", 1, true))
+		local bad = u.FalsePerEyeLaw_Decide({
+			left_tex = 10, right_tex = 11, left_fbo = 1, right_fbo = 0,
+			sbs_tex = 99, claimed_per_eye = true,
+		})
+		H.assert_eq(bad.risk, "missing_fbo")
+		H.assert_eq(bad.path, "sbs")
+		H.assert_true(bad.path_ok)
+		H.assert_true(u.FalsePerEyeLaw_IsBlackEyeRisk(u.FalsePerEyeLaw_Decide({
+			claimed_per_eye = true, left_tex = 5, right_tex = 6,
+		})))
+		local none = u.FalsePerEyeLaw_Decide({})
+		H.assert_eq(none.risk, "no_src")
+		H.assert_true(not none.path_ok)
+	end)
+
 	-- G46 pure desktop mirror law (b1a5e9e mid-frame legacy + post-submit ban)
 	H.TEST("util.desktop_mirror_law.hmd_g46", function()
 		local u = env.vrmod.utils

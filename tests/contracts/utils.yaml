@@ -411,6 +411,46 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
     tier: pure
     tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.FalsePerEyeLaw_AllowColorDepthAsDual
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_FallbackToSbsWhenInvalid
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_IsBlackEyeRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_IsLegalPair
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_RequireBothFbos
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_RequireDistinctColorTex
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_ResolvePath
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
+  - id: vrmod.utils.FalsePerEyeLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
+    tier: pure
+    tests: [util.false_per_eye_law.guard_g47]
   - id: vrmod.utils.FindPickupBySteamIDAndHand
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

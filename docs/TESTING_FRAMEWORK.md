@@ -249,6 +249,20 @@ Product path (2026-08-05): **b1a5e9e mid-frame** CullMode(1)+NDC eye-crop restor
 
 Pure helpers: `DesktopMirror_AllowPresent` / `DesktopMirror_Decide` / `DesktopMirror_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.34 G47 false per-eye FBO guard (manual)
+
+Offline gate proves **both FBOs + distinct color** required for per-eye; else **SBS fallback**. **Headset** for black-eye claim.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Legal dual | Both eyes from dual textures | One eye black |
+| Missing FBO | Fall back SBS halves (not false dual) | Color+depth as L/R black eye |
+| Same color tex | SBS path | Pretend dual |
+
+**Procedure:** WiVRn/Quest — both eyes lit; log may show PER-EYE or SBS fallback, never partial dual.
+
+Pure helpers: `FalsePerEyeLaw_IsLegalPair` / `FalsePerEyeLaw_Decide` / `FalsePerEyeLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 ### 0.9 G17 mat_queue pin (manual)
 
 Offline gate proves pin prefer **1**, dual only when mq&lt;2, **never write** from VR. **Headset** optional for feel; console check is enough for write law.

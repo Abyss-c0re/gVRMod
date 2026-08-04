@@ -623,3 +623,12 @@ Append one block per cycle. Newest at bottom.
 - Push product on cube-stereo-g45 (do not force main over mq2 mono revert).
 - Tests: full test_all PASS 6/6 (pure pending=0; 57 Lua).
 - Next: HMD walk desktopview 1 vs 2; merge cube-stereo-g45→main only with user OK.
+
+## 2026-08-05 cycle 63 — G47 false per-eye FBO guard
+
+- Theme: offline pure law for both-FBO dual; SBS fallback; no color+depth false dual.
+- Pure: FalsePerEyeLaw_IsLegalPair/ResolvePath/Decide/HmdExpect.
+- Mirrors xr_render Submit guard; did not touch quest WIP.
+- TESTING_FRAMEWORK §0.34; HmdWalk G47; pure pending=0.
+- Tests: --fast PASS 4/4 (pure pending=0; 58 Lua).
+- Next: HMD walk both eyes; merge cube-stereo-g45→main only with user OK.

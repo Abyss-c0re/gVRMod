@@ -34,6 +34,7 @@ Never submit eng texture. Never dual pose truth.
 - G41 partial: **HMD walk inventory** catalog + dump; never claim smoke from offline alone; `HmdWalk_*`; §0.28 open
 - G42–G44 partial (product in addon): hands stuck / nested RT / grab_end; offline pure gated cycle59; HMD walks open
 - G46 partial: **desktop mirror** — prefer desktopview 1; mid-frame live RT eye-crop is **legacy risk** (b1a5e9e restored); post-submit live RT still forbidden; `DesktopMirror_*`; §0.33 open
+- G47 partial: **false per-eye guard** — both FBOs + distinct color for dual; else SBS fallback; never color+depth as L/R; `FalsePerEyeLaw_*`; §0.34 open
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoad_IsLoading` + dual-hold toast + `StereoLoad_HmdExpect` checklist; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD walk still open (TESTING_FRAMEWORK §0.1)

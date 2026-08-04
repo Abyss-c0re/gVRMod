@@ -393,6 +393,46 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
     ],
     [
+      "vrmod.utils.FalsePerEyeLaw_AllowColorDepthAsDual",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_FallbackToSbsWhenInvalid",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_IsBlackEyeRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_IsLegalPair",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_RequireBothFbos",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_RequireDistinctColorTex",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_ResolvePath",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
+      "vrmod.utils.FalsePerEyeLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
+    ],
+    [
       "vrmod.utils.FindPickupBySteamIDAndHand",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],

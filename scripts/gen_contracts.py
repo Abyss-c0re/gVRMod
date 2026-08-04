@@ -372,6 +372,17 @@ PURE_TESTED = {
     "vrmod.utils.DesktopMirror_HmdExpect": "util.desktop_mirror_law.hmd_g46",
     "vrmod.utils.DesktopMirror_IsBlackRisk": "util.desktop_mirror_law.hmd_g46",
     "vrmod.utils.DesktopMirror_PreferDesktopViewForHmd": "util.desktop_mirror_law.hmd_g46",
+    # G47 pure false per-eye FBO guard (both FBOs; no color+depth dual)
+    "vrmod.utils.FalsePerEyeLaw_RequireBothFbos": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_RequireDistinctColorTex": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_AllowColorDepthAsDual": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_FallbackToSbsWhenInvalid": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_IsLegalPair": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_ResolvePath": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_Decide": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_StatusLabel": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_HmdExpect": "util.false_per_eye_law.guard_g47",
+    "vrmod.utils.FalsePerEyeLaw_IsBlackEyeRisk": "util.false_per_eye_law.guard_g47",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",
