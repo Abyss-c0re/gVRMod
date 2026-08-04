@@ -1,30 +1,29 @@
 # Last cycle
 
-**Cycle:** 59  
-**Time:** 2026-08-05T01:55:52+03:00  
-**Focus:** G41–G44 parent pure offline gate + HmdWalk inventory  
-**Commit (gVRMod):** `29b641b`  
-**Commit (vrmod-x64):** `b027607` (unchanged product pointer; no addon commit)  
+**Cycle:** 60  
+**Time:** 2026-08-05T02:05:52+03:00  
+**Focus:** G45 primary-hand left SoT (LaserLaw_Decide)  
+**Commit (gVRMod):** `9094d10`  
+**Commit (vrmod-x64):** `fcad81a` (branch `cube-stereo-g45`; origin/main non-ff)  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 56 Lua)  
 
 ## What changed
 
-1. Load G41–G44 pure laws in tests/lua/run.lua  
-2. PURE_TESTED + unit tests: HmdWalk inventory, HandStuck, NestedRt, GrabEnd  
-3. SubmitBounds_MirrorLeftToBoth pure-tested (mq2 mono both)  
-4. G05 HmdExpect test expects mq2_mono_both (product law)  
-5. TESTING_FRAMEWORK §0.28–0.31; GLOGIC_GAPS inventory  
-6. Left quest module commit + cubalc_mirror unstaged/untouched for thrash  
+1. **Pure** LaserLaw_Decide / AllowLaserFromHand / IsWrongHandPrimaryClick  
+2. **cl_ui** laser path snapshot _laserLaw + HmdExpect  
+3. Unit tests G45 steal/dual + submit_bounds V-offset under clampHalf  
+4. TESTING_FRAMEWORK §0.32; HmdWalk G45; GLOGIC_GAPS G45  
+5. Pushed addon to `cube-stereo-g45` (main blocked by remote mq2 revert)  
 
 ## Pain points
 
-- Soft care: no climb/mq thrash; quest WIP preserved.
+- Soft care: no climb thrash; left primary only.
 
 ## Gaps
 
-- G41–G44 partial — HMD walks still open  
-- Next: Walk G05/G12 on HMD; or primary-hand left smoke  
+- G45 partial — HMD primary-left walk open  
+- **Attention:** vrmod-x64 origin/main diverged (revert mq2 mono vs local stereo fixes)  
 
 ## Notes
 
-- Recovered from state lag at cycle 58 while addon already had G41–G44 product.
+- cubalc_mirror left unstaged.
