@@ -510,6 +510,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         CubeReturnSnapshot ret;
         const bool have = ReadCubeReturnMarker(gmodRoot, ret);
         CubeReclaimDecision dec = CubeReclaimDecide(have, ret);
+        // XR plan from pre-ack decision (soft ack may clear auto_reclaim on re-read).
+        CubeReclaimXrPlan xrPlan =
+            CubeReclaimXrPlanDecide(dec, CubeReclaimEnabled(), /*allowActionRebind=*/false);
         if (dec.show_panel)
           returnVisibleSec += 1.f;
         else
@@ -534,9 +537,20 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
               dec = CubeReclaimDecide(false, ret);
           }
         }
-        // Env reclaim path: same ack today; full XR re-claim remains future
-        if (dec.auto_reclaim && CubeReclaimEnabled()) {
-          // Soft ack already covers marker; session already Cube-owned.
+        // Env reclaim: panel refresh only (session already Cube-owned; never restart XR).
+        if (CubeReclaimShouldExecuteXrPlan(xrPlan, CubeReclaimEnabled()) && xrPlan.refresh_panel
+            && (ack.should_write || ack.clear_banner)) {
+          std::string lab = CubeReclaimXrPlanLabel(xrPlan);
+          if (!lab.empty()) ui.status = lab;
+          WebUI_MarkDirty(ui);
+          static bool loggedXrPlan = false;
+          if (!loggedXrPlan) {
+            loggedXrPlan = true;
+            fprintf(stderr, "[cube_webui] G13 XR plan method=%s detail=%s\n",
+                    xrPlan.method.c_str(), xrPlan.detail.c_str());
+            auto he = CubeReclaim_HmdExpect(dec, xrPlan);
+            fprintf(stderr, "[cube_webui] G13 HMD %s\n", he.checklist.c_str());
+          }
         }
         const bool active = dec.show_panel;
         std::string label = CubeReclaimPanelLabel(dec);

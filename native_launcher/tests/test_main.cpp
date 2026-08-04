@@ -185,6 +185,28 @@ TEST(launcher_cube_return_reclaim_poll) {
     ASSERT_EQ(autoR.action, std::string("reclaim_auto"));
     ASSERT_TRUE(autoR.auto_reclaim);
 
+    // G13 careful XR plan: panel refresh only; never restart session
+    auto xrOff = CubeReclaimXrPlanDecide(notify, false, false);
+    ASSERT_TRUE(!xrOff.do_anything);
+    ASSERT_EQ(xrOff.method, std::string("none"));
+    ASSERT_TRUE(!CubeReclaimShouldExecuteXrPlan(xrOff, false));
+    auto xrOn = CubeReclaimXrPlanDecide(autoR, true, false);
+    ASSERT_TRUE(xrOn.do_anything);
+    ASSERT_TRUE(xrOn.refresh_panel);
+    ASSERT_TRUE(!xrOn.restart_session);
+    ASSERT_TRUE(!xrOn.rebind_actions);
+    ASSERT_EQ(xrOn.method, std::string("panel_refresh"));
+    ASSERT_TRUE(CubeReclaimShouldExecuteXrPlan(xrOn, true));
+    ASSERT_TRUE(CubeReclaimXrPlanLabel(xrOn).find("REFRESH") != std::string::npos);
+    auto xrRebind = CubeReclaimXrPlanDecide(autoR, true, true);
+    ASSERT_EQ(xrRebind.method, std::string("full_rebind_deferred"));
+    ASSERT_TRUE(!xrRebind.restart_session);
+    auto heSoft = CubeReclaim_HmdExpect(notify, xrOff);
+    ASSERT_EQ(heSoft.verdict, std::string("expect_soft_ack"));
+    ASSERT_TRUE(heSoft.expect_session_kept);
+    auto heXr = CubeReclaim_HmdExpect(autoR, xrOn);
+    ASSERT_EQ(heXr.verdict, std::string("expect_panel_refresh"));
+
     CubeReturnSnapshot live;
     live.phase = "panel_live";
     live.valid = true;

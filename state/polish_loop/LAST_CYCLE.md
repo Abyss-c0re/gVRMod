@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 33  
-**Time:** 2026-08-04T20:23:39+03:00  
-**Focus:** G12 ambient master taste + HMD volume expect  
-**Commit (gVRMod):** `ea572d8`  
+**Cycle:** 34  
+**Time:** 2026-08-04T20:35:04+03:00  
+**Focus:** G13 careful XR reclaim plan (panel refresh)  
+**Commit (gVRMod):** (set after push)  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **Pure** CubeAmbient_MasterFromEnv / ClampMaster / DefaultComfortMaster  
-2. ComfortMaster reads GVRMOD_AMBIENT_MASTER (default still 0.55)  
-3. TasteBand + HmdVolumeExpect checklist tokens  
-4. TESTING_FRAMEWORK §0.2 volume taste walk  
+1. **Pure** CubeReclaimXrPlanDecide / ShouldExecute / Label / HmdExpect  
+2. Law: never restart_session; env path = panel_refresh only  
+3. **xr_app** applies panel refresh status when RECLAIM=1 + ack  
+4. TESTING_FRAMEWORK §0.3 reclaim walk  
 
 ## Pain points
 
-- Untouched.
+- Untouched; no OpenXR session thrash.
 
 ## Gaps
 
-- G12 near-done offline; HMD walk still open  
-- Next: G13 XR reclaim careful or G03 HMD stage-apply notes  
+- G13 partial — action rebind still deferred; HMD walk open  
+- Next: G03 HMD stage-apply notes or G14 Glide smoke notes  
 
 ## Notes
 

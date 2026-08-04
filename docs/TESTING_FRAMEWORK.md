@@ -94,6 +94,25 @@ Offline gate proves gain law + PlayerDecide + master env. **Headset** (or deskto
 
 Pure helper: `CubeAmbient_HmdVolumeExpect(master, gain, playing, enabled, clipPresent)` → `checklist` (unit-tested; offline ≠ HMD OK).
 
+### 0.3 G13 return-to-Cube / reclaim (manual)
+
+Offline gate proves soft ack + pure XR plan (panel refresh). **Headset** required for reclaim feel.
+
+| Mode | Env | Expect | FAIL if |
+|------|-----|--------|---------|
+| Soft ack (default) | unset | After VR exit: RETURN banner ~2.5s → `panel_live`; Cube keeps XR session | Stuck RETURN; XR dies; need hard relaunch |
+| Panel refresh | `GVRMOD_CUBE_RECLAIM=1` | Same marker ack + status `RECLAIM · PANEL REFRESH`; **no** second OpenXR session | Session recreate thrash; black void |
+| Action rebind | n/a offline | Deferred forever until HMD-proven | Force rebind without proof |
+
+**Procedure (claim “G13 reclaim OK” only if walked):**
+
+1. Cube Start → enter GMod VR → exit VR / return path that writes `cube_return.txt`.  
+2. Default: RETURN chrome briefly, then panel usable.  
+3. Optional: `GVRMOD_CUBE_RECLAIM=1` — log shows XR plan `panel_refresh`; session never restarts.  
+4. Confirm laser/UI still works on Cube panel after return.
+
+Pure helpers: `CubeReclaimXrPlanDecide` / `CubeReclaim_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

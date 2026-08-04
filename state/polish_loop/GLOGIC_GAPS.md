@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 33
+Last updated: 2026-08-04 cycle 34
 
 ## P0 — seamless / feel broken
 
@@ -21,7 +21,7 @@ Last updated: 2026-08-04 cycle 33
 | G10 | First-run gates re-spam on wrapper autostart | Should skip if cal exists + native_wrapper | **done** cycle2 |
 | G11 | Quick Play (last map + gfx) missing | Reduces menu friction | **done** cycle4 |
 | G12 | Audio dead during handoff | master env+HmdExpect cycle33; HMD walk open | **partial** cycle33 |
-| G13 | Return-to-Cube reverse handoff | Soft ack panel_live cycle30; XR rebind env | **partial** cycle30 |
+| G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
 | G14 | Glide vehicle input SoT | Watchlist W3; partial | **partial** cycle9 (pure SoT+toast; HMD smoke open) |
 
 ## P2 — code quality / glogic hygiene
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G13 | XR reclaim panel_refresh plan (env) | XrPlanDecide + §0.3 walk |
 | G12 | Ambient master env + HMD volume expect | MasterFromEnv + §0.2 walk |
 | G05 | HMD load-flash expect + §0.1 walk | StereoLoad_HmdExpect + TESTING_FRAMEWORK |
 | G04 | Careful changelevel plan executor (opt-in) | WarmAttach_ChangelevelPlan + RCC wire |

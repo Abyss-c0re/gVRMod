@@ -248,3 +248,132 @@ inline CubeReclaimAckPlan CubeReclaimAckPlanDecide(const CubeReclaimDecision& d,
   p.detail = "Cube panel live · reverse handoff acked";
   return p;
 }
+
+// ── G13 careful XR reclaim plan (env GVRMOD_CUBE_RECLAIM, default OFF) ───────
+// Law: never destroy/create OpenXR session here. Cube shell already owns XR when
+// the panel is live. "Reclaim" offline means panel refresh + marker ack only.
+// allowActionRebind remains false until HMD-proven bindings thrash is safe.
+
+struct CubeReclaimXrPlan {
+  bool valid = false;
+  bool do_anything = false;
+  bool refresh_panel = false;       // mark UI dirty / status reclaim refresh
+  bool clear_return_banner = false; // drop RETURN chrome after ack
+  bool write_panel_live = false;    // ensure marker phase panel_live
+  bool rebind_actions = false;      // experimental; product default false
+  bool restart_session = false;     // always false — hard law
+  // none | panel_refresh | full_rebind_deferred
+  std::string method = "none";
+  std::string reason = "none";
+  std::string detail;
+  std::string checklist; // HMD observer row
+};
+
+// Pure XR reclaim plan. featureEnabled defaults to CubeReclaimEnabled() (off).
+// allowActionRebind defaults false — never thrash action sets offline.
+inline CubeReclaimXrPlan CubeReclaimXrPlanDecide(const CubeReclaimDecision& d,
+                                                 bool featureEnabled = CubeReclaimEnabled(),
+                                                 bool allowActionRebind = false) {
+  CubeReclaimXrPlan p;
+  p.valid = true;
+  p.restart_session = false;
+  p.rebind_actions = false;
+  if (!d.valid || d.action == "idle" || !d.show_panel) {
+    p.reason = d.reason.empty() ? "no_return" : d.reason;
+    p.method = "none";
+    p.detail = "no XR reclaim plan";
+    p.checklist = "G13 · IDLE · no return signal";
+    return p;
+  }
+  if (d.phase == "panel_live") {
+    p.reason = "already_live";
+    p.method = "none";
+    p.detail = "already panel_live";
+    p.checklist = "G13 · PANEL LIVE · reverse complete";
+    return p;
+  }
+  if (!featureEnabled || !d.auto_reclaim) {
+    // Soft path only (handled by AckPlan) — XR plan stays empty
+    p.reason = featureEnabled ? "not_auto" : "feature_off";
+    p.method = "none";
+    p.detail = "soft ack only · XR rebind deferred";
+    p.checklist = "G13 · SOFT ACK · no XR rebind";
+    return p;
+  }
+  // Feature on + reclaim_auto: safe panel refresh (session already Cube-owned)
+  p.do_anything = true;
+  p.refresh_panel = true;
+  p.clear_return_banner = true;
+  p.write_panel_live = true;
+  p.method = "panel_refresh";
+  p.reason = "eligible_panel";
+  p.detail = "XR reclaim · panel refresh · session kept (no rebind thrash)";
+  p.checklist = "G13 · PANEL REFRESH · session kept · marker panel_live";
+  if (allowActionRebind) {
+    // Documented future path — still not executed product-side offline
+    p.rebind_actions = true;
+    p.method = "full_rebind_deferred";
+    p.reason = "rebind_deferred";
+    p.detail = "XR reclaim · action rebind requested but deferred (not online)";
+    p.checklist = "G13 · REBIND DEFERRED · panel refresh only";
+  }
+  return p;
+}
+
+// True when product may apply panel-side XR plan steps (not session restart).
+inline bool CubeReclaimShouldExecuteXrPlan(const CubeReclaimXrPlan& p, bool featureEnabled) {
+  if (!featureEnabled) return false;
+  if (!p.valid || !p.do_anything) return false;
+  if (p.restart_session) return false; // hard law
+  return p.method == "panel_refresh" || p.method == "full_rebind_deferred";
+}
+
+inline std::string CubeReclaimXrPlanLabel(const CubeReclaimXrPlan& p) {
+  if (!p.valid || p.method == "none") return {};
+  if (p.method == "panel_refresh") return "RECLAIM · PANEL REFRESH";
+  if (p.method == "full_rebind_deferred") return "RECLAIM · REBIND DEFERRED";
+  return "RECLAIM · " + p.method;
+}
+
+// HMD observer contract for reverse handoff (offline tokens).
+struct CubeReclaimHmdExpect {
+  std::string verdict = "idle"; // expect_soft_ack | expect_panel_refresh | expect_live | idle
+  bool expect_return_banner = false;
+  bool expect_session_kept = true; // Cube keeps XR; no second session
+  std::string checklist;
+  std::string pass_line;
+  std::string fail_line;
+};
+
+inline CubeReclaimHmdExpect CubeReclaim_HmdExpect(const CubeReclaimDecision& d,
+                                                  const CubeReclaimXrPlan& xr) {
+  CubeReclaimHmdExpect e;
+  e.expect_session_kept = true;
+  if (!d.show_panel || d.action == "idle") {
+    if (d.phase == "panel_live" || d.reason == "already_live") {
+      e.verdict = "expect_live";
+      e.checklist = "G13 · PANEL LIVE · no RETURN banner";
+      e.pass_line = "Cube panel usable after VR exit; tracking still valid";
+      e.fail_line = "Black void / lost XR / need hard relaunch";
+      return e;
+    }
+    e.verdict = "idle";
+    e.checklist = "G13 · IDLE · no reverse signal";
+    e.pass_line = "N/A";
+    e.fail_line = "N/A";
+    return e;
+  }
+  e.expect_return_banner = true;
+  if (xr.do_anything && xr.method == "panel_refresh") {
+    e.verdict = "expect_panel_refresh";
+    e.checklist = xr.checklist.empty() ? "G13 · PANEL REFRESH" : xr.checklist;
+    e.pass_line = "Brief RETURN then panel live; session never dies";
+    e.fail_line = "OpenXR restart thrash or frozen RETURN banner";
+    return e;
+  }
+  e.verdict = "expect_soft_ack";
+  e.checklist = "G13 · SOFT ACK · RETURN then panel_live";
+  e.pass_line = "RETURN banner ~2.5s then PANEL LIVE; no session recreate";
+  e.fail_line = "Stuck RETURN forever or XR drops";
+  return e;
+}

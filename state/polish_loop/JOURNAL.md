@@ -330,3 +330,13 @@ Append one block per cycle. Newest at bottom.
 - G12 partial → offline complete-ish; headset taste still open.
 - Tests: full test_all PASS 6/6.
 - Next: G13 XR reclaim careful or G03 HMD stage-apply notes.
+
+## 2026-08-04 cycle 34 — G13 careful XR reclaim plan
+
+- Theme: env XR reclaim = panel refresh only; never restart OpenXR session.
+- Pure: CubeReclaimXrPlanDecide/ShouldExecute/Label/HmdExpect.
+- xr_app: plan from pre-ack decision; status RECLAIM · PANEL REFRESH on env path.
+- TESTING_FRAMEWORK §0.3 reclaim walk.
+- G13 partial — action rebind deferred; HMD walk open.
+- Tests: full test_all PASS 6/6.
+- Next: G03 HMD stage-apply notes or G14 Glide smoke notes.
