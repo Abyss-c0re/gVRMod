@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 12  
-**Time:** 2026-08-04T16:32:44+03:00  
-**Focus:** G03 STAGE pack Lua parse + toast (apply still deferred)  
-**Commit (gVRMod):** `0b545f9`  
-**Commit (vrmod-x64):** `d052c35`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
+**Cycle:** 13  
+**Time:** 2026-08-04T16:44:00+03:00  
+**Focus:** G12 handoff ambient gain law (partial — no clip yet)  
+**Commit (gVRMod):** (pending close)  
+**Commit (vrmod-x64):** none  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **sh_stage_pack.lua** pure Parse / Normalize / IsUsable / ToastHint  
-2. **cl_openxr_launch** reads `cube_stage_pack.txt` after VR live → `g_VR._cubeStagePack` + toast  
-3. Unit test `util.stage_pack.parse_and_hint`; PURE_TESTED map updated  
-4. **No** origin / scale / seatedoffset mutation (height apply deferred)
+1. **CubeHandoffAudioGain** pure phase/exit gain curve (inverse of visual fade on release)  
+2. **handoffAudioGain** on WebUIState; xr_app drives it  
+3. **ui_panel** AUDIO HOLD / DUCK / SILENT status line  
+4. No OpenAL/ambient asset — gain law is the G12 contract for future clip  
 
 ## Pain points
 
-- Untouched; FOV archives and soft handoff timeouts unchanged.
+- Untouched.
 
 ## Gaps
 
-- G03 still **partial** — continuity data end-to-end (write + read + toast); apply path open  
-- Next: G12 audio design-only, or careful G03 apply only with pure decision + HMD note  
+- G12 → **partial** (gain law + panel; real ambient clip open)  
+- Next: G02 XR layer fade note, or G05 load stereo, or careful G03 apply design  
 
 ## Notes
 

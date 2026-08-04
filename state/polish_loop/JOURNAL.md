@@ -122,3 +122,12 @@ Append one block per cycle. Newest at bottom.
 - Tests: --fast PASS 4/4 (32 Lua, pure pending=0).
 - Commits: vrmod-x64 d052c35; gVRMod submodule + tests + state.
 - G03 remains partial (apply deferred); next G12 audio design-only or careful apply design.
+
+## 2026-08-04 cycle 13 — G12 handoff audio gain law
+
+- Theme: ambient gain contract during seamless handoff (no audio engine).
+- Pure: CubeHandoffAudioGain (hold → duck take_xr → silence on exit).
+- Panel AUDIO line; inverse of fade on release window.
+- G12 partial — actual ambient clip still open.
+- Tests: full test_all PASS 6/6 (+audio gain unit).
+- Next: G02 XR layer design note, or G05/G04 careful inventory.

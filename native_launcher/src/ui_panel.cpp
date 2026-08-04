@@ -490,6 +490,7 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.handoffDetail.clear();
   s.handoffElapsed = 0.f;
   s.handoffFade = 0.f;
+  s.handoffAudioGain = 1.f;
   s.handoffRefSpace.clear();
   s.handoffHeadY = 0.f;
   s.handoffHeadOk = false;
@@ -1268,6 +1269,19 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     else
       snprintf(line, sizeof(line), "%.0fs  ·  HOLDING OPENXR FOR GMOD", t);
     DrawText(rgba, 24, 360, line, CT_RGB(CubeTheme::MUTED), 1);
+    // G12: ambient gain law (panel contract; actual clip optional future)
+    {
+      float g = s.handoffAudioGain;
+      if (g < 0.f) g = 0.f;
+      if (g > 1.f) g = 1.f;
+      if (g <= 0.02f)
+        snprintf(line, sizeof(line), "AUDIO   SILENT  ·  GAIN LAW READY");
+      else if (g < 0.99f)
+        snprintf(line, sizeof(line), "AUDIO   DUCK %.0f%%  ·  AMBIENT HOLD", g * 100.f);
+      else
+        snprintf(line, sizeof(line), "AUDIO   HOLD  ·  AMBIENT GAIN 100%%");
+      DrawText(rgba, 24, 380, line, CT_RGB(CubeTheme::MUTED), 1);
+    }
     DrawText(rgba, 24, 400, "THEME = LUA CUBE  ·  BINDINGS CARRY OVER  ·  NO BLACK GAP",
              CT_RGB(CubeTheme::MUTED), 1);
     DrawText(rgba, 24, 440, "When GMod signals take_xr, panel dims then releases the runtime.",

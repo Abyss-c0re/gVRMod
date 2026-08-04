@@ -109,6 +109,23 @@ TEST(launcher_handoff_fade_amount) {
     ASSERT_TRUE(CubeHandoffPhaseLabel("take_xr").find("FADE") != std::string::npos);
 }
 
+// G12: ambient gain law — full during hold, duck at take_xr, 0 on exit complete
+TEST(launcher_handoff_audio_gain) {
+    ASSERT_NEAR(CubeHandoffAudioGain("waiting_process", false, 0.f), 1.f, 1e-5f);
+    ASSERT_NEAR(CubeHandoffAudioGain("boot", false, 0.f), 0.88f, 1e-5f);
+    float mapG = CubeHandoffAudioGain("map_ready", false, 0.f);
+    float takeG = CubeHandoffAudioGain("take_xr", false, 0.f);
+    ASSERT_TRUE(mapG > takeG && takeG > 0.f);
+    ASSERT_NEAR(CubeHandoffAudioGain("vr_active", false, 0.f), 0.f, 1e-5f);
+    float mid = CubeHandoffAudioGain("take_xr", true, 1.25f);
+    float end = CubeHandoffAudioGain("take_xr", true, 2.5f);
+    ASSERT_TRUE(mid < 0.6f && mid > 0.f);
+    ASSERT_NEAR(end, 0.f, 1e-5f);
+    // Inverse of visual fade: when fade is high, audio gain is low
+    float fadeEnd = CubeHandoffFadeAmount("take_xr", true, 2.5f);
+    ASSERT_NEAR(fadeEnd + end, 1.f, 1e-5f);
+}
+
 // G03: STAGE/cal pack — pure format/parse + usability (no auto-apply height)
 TEST(launcher_stage_pack_roundtrip) {
     StagePackSnapshot a;

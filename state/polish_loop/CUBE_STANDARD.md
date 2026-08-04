@@ -21,6 +21,7 @@ Never submit eng texture. Never dual pose truth.
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 partial: Cube panel dims on take_xr / release (`CubeHandoffFadeAmount`); full OpenXR layer crossfade still open
 - G03 partial: Cube writes `cube_stage_pack.txt`; GMod parses + toasts (`StagePack_*`); **must not** auto-jump origin/height without careful apply
+- G12 partial: handoff ambient uses `CubeHandoffAudioGain` (duck to silence); actual clip optional future — panel shows AUDIO line
 
 ## UI / interaction
 

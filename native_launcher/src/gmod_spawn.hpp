@@ -138,3 +138,24 @@ inline float CubeHandoffFadeAmount(const std::string& phase, bool exitRequested,
   if (phase == "vr_active") return 0.65f;
   return 0.f;
 }
+
+// G12: handoff ambient gain law (0..1). Pure contract for optional Cube ambient clip.
+// No audio engine required — panel status + future OpenAL/Sound source share this curve.
+// Intent: hold presence while GMod boots, duck at take_xr, silence when session releases.
+inline float CubeHandoffAudioGain(const std::string& phase, bool exitRequested, float exitWaitSec) {
+  if (exitRequested) {
+    // Mirror fade window: gain → 0 over ~2.5s orderly release
+    float f = exitWaitSec / 2.5f;
+    if (f < 0.f) f = 0.f;
+    if (f > 1.f) f = 1.f;
+    return 1.f - f;
+  }
+  if (phase == "vr_active") return 0.f;
+  if (phase == "starting_xr") return 0.18f;
+  if (phase == "take_xr" || phase == "ready") return 0.35f;
+  if (phase == "wait_module") return 0.55f;
+  if (phase == "map_ready") return 0.72f;
+  if (phase == "boot") return 0.88f;
+  // spawned / waiting_process / gmod_process / unknown hold → full ambient
+  return 1.f;
+}
