@@ -3,8 +3,8 @@
 **Cycle:** 50  
 **Time:** 2026-08-04T23:31:00+03:00  
 **Focus:** G32 stereo ShareTexture / HMD self-test toast law (W7)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `db41068`  
+**Commit (vrmod-x64):** `7cffb05`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 44 Lua tests)  
 
 ## What changed
