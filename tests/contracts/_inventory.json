@@ -333,6 +333,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua"
     ],
     [
+      "vrmod.utils.StagePack_ApplyDecision",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_ApplyToast",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
       "vrmod.utils.StagePack_IsUsable",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],

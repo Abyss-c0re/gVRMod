@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 16
+Last updated: 2026-08-04 cycle 17
 
 ## P0 — seamless / feel broken
 
@@ -10,7 +10,7 @@ Last updated: 2026-08-04 cycle 16
 |----|-----|-------|--------|
 | G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |
 | G02 | No coordinated fade on take_xr | Panel + eye-buffer fade cycle14; Cube shell done | **done** cycle14 |
-| G03 | Cal / STAGE not packed into handoff | Write+parse+toast landed; height/origin apply still open | **partial** cycle12 |
+| G03 | Cal / STAGE not packed into handoff | Write+parse+toast+apply-gate; auto apply still off | **partial** cycle17 |
 | G04 | Cold Steam/hl2 every Start | Boot kind+panel cycle16; warm reuse not shipped | **partial** cycle16 |
 | G05 | Loading after take_xr may not be stereo | Policy+dual paint cycle15; HMD proof open | **partial** cycle15 |
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G03 | StagePack apply gate (no auto) | vrmod-x64 82a0a6d |
 | G04 | Cold Start inventory (partial) | CubeLaunchBootKind |
 | G05 | Stereo-load policy (partial) | vrmod-x64 879a551 |
 | G02 | Eye-buffer layer fade (Cube shell) | GlFadeEyeBufferTowardBlack |

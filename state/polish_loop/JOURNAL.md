@@ -159,3 +159,13 @@ Append one block per cycle. Newest at bottom.
 - G04 partial — warm reuse needs map-change/attach protocol.
 - Tests: full test_all PASS 6/6 (+cold start unit).
 - Next: G03 apply design-only or G12 ambient clip.
+
+## 2026-08-04 cycle 17 — G03 StagePack apply gate
+
+- Theme: pure apply decision for STAGE pack height (never auto-jump).
+- Pure: StagePack_ApplyDecision / ApplyToast (close/far/eligible_deferred).
+- openxr_launch: allow_apply=false; g_VR._cubeStagePackApply; toast reason.
+- G03 partial — real apply still HMD-gated future work.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Commits: vrmod-x64 82a0a6d; gVRMod submodule + tests + state.
+- Next: G12 ambient clip or G13 reverse handoff design-only.

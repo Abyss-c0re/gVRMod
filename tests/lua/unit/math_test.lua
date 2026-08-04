@@ -228,6 +228,37 @@ return function(H, env)
 		H.assert_true(u.StagePack_IsUsable(badY))
 		H.assert_true(not badY.head_ok)
 		H.assert_true(u.StagePack_ToastHint(nil) == nil)
+		-- G03 apply gate (default allow_apply=false)
+		local decNone = u.StagePack_ApplyDecision(nil, {})
+		H.assert_eq(decNone.reason, "unusable")
+		local decClose = u.StagePack_ApplyDecision(p, {
+			measured_head_y_m = 1.66,
+			allow_apply = false,
+		})
+		H.assert_eq(decClose.reason, "already_close")
+		H.assert_eq(decClose.action, "none")
+		H.assert_true(decClose.safe)
+		local decFar = u.StagePack_ApplyDecision(p, {
+			measured_head_y_m = 2.3,
+			allow_apply = false,
+		})
+		H.assert_eq(decFar.reason, "too_far")
+		H.assert_true(not decFar.safe)
+		local decElig = u.StagePack_ApplyDecision(p, {
+			measured_head_y_m = 1.80,
+			allow_apply = false,
+		})
+		H.assert_eq(decElig.reason, "eligible_deferred")
+		H.assert_eq(decElig.action, "hint_only")
+		H.assert_true(decElig.safe)
+		local decApply = u.StagePack_ApplyDecision(p, {
+			measured_head_y_m = 1.80,
+			allow_apply = true,
+		})
+		H.assert_eq(decApply.action, "apply_scale")
+		H.assert_eq(decApply.reason, "eligible")
+		local at = u.StagePack_ApplyToast(decElig)
+		H.assert_true(type(at) == "string" and string.find(at, "deferred", 1, true))
 	end)
 
 	-- G05 pure stereo-load policy (never dual under mat_queue 2)
