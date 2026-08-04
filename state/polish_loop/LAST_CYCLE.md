@@ -3,7 +3,7 @@
 **Cycle:** 14  
 **Time:** 2026-08-04T16:55:00+03:00  
 **Focus:** G02 full eye-buffer layer fade on take_xr  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `c3a56a2`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
