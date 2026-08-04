@@ -420,3 +420,13 @@ Append one block per cycle. Newest at bottom.
 - G19 partial — product path already dual OUT; law offline-tested.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: dual-truth pose SoT law (pain #4) or HMD walk backlog.
+
+## 2026-08-04 cycle 43 — G25 pose SoT single-path law
+
+- Theme: one energy path raw→tracking→modifiers; no dual angvel/public SoT (pain #4).
+- Pure: PoseSoT_Pipeline/Sources/Allow*/Decide/HmdExpect/StatusLabel.
+- cl_vrmod: _poseSoT decision snapshot after ApplyPoseModifiers.
+- TESTING_FRAMEWORK §0.12 pose walk.
+- G25 partial — product path already single SoT; law offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.

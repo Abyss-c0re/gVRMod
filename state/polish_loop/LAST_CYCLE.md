@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 42  
-**Time:** 2026-08-04T22:05:00+03:00  
-**Focus:** G19 submit path law (dual OUT only)  
-**Commit (gVRMod):** `f61e38e`  
-**Commit (vrmod-x64):** `ae8a517`  
+**Cycle:** 43  
+**Time:** 2026-08-04T22:16:00+03:00  
+**Focus:** G25 pose SoT single-path law  
+**Commit (gVRMod):** `7547b22`  
+**Commit (vrmod-x64):** `fbf50f8`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **Pure** sh_submit_law.lua — PreferTextureKind dual_out_rgba8; forbid eng IN / virgin OUT; AllowCollect mq&lt;2; Decide/HmdExpect  
-2. **cl_vrmod** BindRenderSceneHook uses AllowCollect + stores `_submitLaw*` snapshot  
-3. PURE_TESTED + unit test util.submit_law.path_g19  
-4. TESTING_FRAMEWORK §0.11 submit walk  
-5. Gap G19 partial  
+1. **Pure** sh_pose_sot_law.lua — PipelineSteps; Public/Raw source; forbid second angvel/dual public; Decide/HmdExpect  
+2. **cl_vrmod** stores `_poseSoT*` snapshot after UpdateTracking+ApplyPoseModifiers  
+3. PURE_TESTED + unit test util.pose_sot_law.single_path_g25  
+4. TESTING_FRAMEWORK §0.12 pose walk  
+5. Gap G25 partial  
 
 ## Pain points
 
-- Reinforces #6: never Submit eng IN; dual OUT RGBA8 only; no virgin OUT before blit.
+- Reinforces #4: one path raw→tracking→modifiers; no second angvel/pose SoT.
 
 ## Gaps
 
-- G19 partial — HMD flash walk open  
-- Next: dual-truth pose SoT law (pain #4) or HMD walk backlog  
+- G25 partial — HMD hands/gun lock walk open  
+- Next: HMD walk backlog (G05/G12) or remaining partials  
 
 ## Notes
 
