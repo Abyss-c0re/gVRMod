@@ -3,7 +3,7 @@
 **Cycle:** 11  
 **Time:** 2026-08-04T16:23:41+03:00  
 **Focus:** G03 cal/STAGE pack into handoff (partial — pack write, no apply)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `f909d15`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 

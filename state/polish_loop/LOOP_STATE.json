@@ -5,7 +5,7 @@
   "cycle": 11,
   "status": "ok",
   "last_cycle_at": "2026-08-04T16:23:41+03:00",
-  "last_commit": "pending",
+  "last_commit": "f909d15",
   "last_commit_repo": "gVRMod",
   "last_test": "test_all PASS 6/6",
   "last_focus": "G03 cal/STAGE pack into handoff (partial)",
