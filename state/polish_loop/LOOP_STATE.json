@@ -5,7 +5,7 @@
   "cycle": 24,
   "status": "ok",
   "last_cycle_at": "2026-08-04T18:45:49+03:00",
-  "last_commit": "pending",
+  "last_commit": "a80a832",
   "last_commit_repo": "gVRMod",
   "last_test": "test_all PASS 6/6",
   "last_focus": "G12 ambient ffplay/paplay backend (env opt-in)",

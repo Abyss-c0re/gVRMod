@@ -3,7 +3,7 @@
 **Cycle:** 24  
 **Time:** 2026-08-04T18:45:49+03:00  
 **Focus:** G12 paplay/ffplay ambient backend (env opt-in)  
-**Commit (gVRMod):** (pending)  
+**Commit (gVRMod):** `a80a832`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
