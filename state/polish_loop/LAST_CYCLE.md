@@ -3,7 +3,7 @@
 **Cycle:** 16  
 **Time:** 2026-08-04T17:16:00+03:00  
 **Focus:** G04 cold Start inventory (partial — no warm reuse yet)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `857d3d4`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
