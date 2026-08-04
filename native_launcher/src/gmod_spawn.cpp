@@ -361,3 +361,20 @@ bool ReadCubeReturnMarker(const std::string& gmodRoot, CubeReturnSnapshot& out) 
   ss << f.rdbuf();
   return CubeReturn_Parse(ss.str(), out);
 }
+
+bool WriteCubeReturnMarker(const std::string& gmodRoot, const CubeReturnSnapshot& snap) {
+  if (gmodRoot.empty()) return false;
+  const std::string dataDir = gmodRoot + "/garrysmod/data/vrmod";
+  mkdir((gmodRoot + "/garrysmod/data").c_str(), 0755);
+  mkdir(dataDir.c_str(), 0755);
+  CubeReturnSnapshot s = snap;
+  if (s.ts <= 0) s.ts = (long)time(nullptr);
+  if (s.phase.empty()) s.phase = "panel_live";
+  s.phase = CubeReturn_NormalizePhase(s.phase);
+  s.valid = true;
+  const std::string path = dataDir + "/cube_return.txt";
+  if (!WriteFile(path, CubeReturn_Format(s))) return false;
+  fprintf(stderr, "[cube_webui] G13 cube_return write phase=%s map=%s\n",
+          s.phase.c_str(), s.map.c_str());
+  return true;
+}

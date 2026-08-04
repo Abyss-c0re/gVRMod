@@ -93,6 +93,9 @@ bool WriteWarmAttachMarkers(const std::string& gmodRoot, const std::string& map,
 // Returns true when file present and body parses. Does not auto-reclaim XR.
 bool ReadCubeReturnMarker(const std::string& gmodRoot, CubeReturnSnapshot& out);
 
+// G13: write/overwrite cube_return.txt (soft ack → panel_live).
+bool WriteCubeReturnMarker(const std::string& gmodRoot, const CubeReturnSnapshot& snap);
+
 // G04: cold Steam/hl2 Start inventory — pure strategy labels.
 // Warm reuse: see warm_reuse.hpp (CubeWarmReuseEnabled hard-off until attach proven).
 inline std::string CubeLaunchBootKind(bool gmodAlreadyRunning, bool forceCold = false) {

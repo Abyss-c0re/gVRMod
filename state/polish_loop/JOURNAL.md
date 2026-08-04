@@ -289,3 +289,13 @@ Append one block per cycle. Newest at bottom.
 - G03 partial — HMD-proven default-on still open.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: G13 reclaim careful or G04 changelevel careful.
+
+## 2026-08-04 cycle 30 — G13 soft reclaim ack
+
+- Theme: soft ack reverse handoff after RETURN banner; no XR rebind.
+- Pure: CubeReclaimAckPlanDecide + SoftAck hold; env GVRMOD_CUBE_RECLAIM.
+- WriteCubeReturnMarker; xr_app acks to panel_live after ~2.5s.
+- Soft ack default ON; XR rebind still env-gated empty path.
+- G13 partial → soft complete offline; full reclaim still open.
+- Tests: full test_all PASS 6/6.
+- Next: G04 changelevel careful or G05 HMD notes.

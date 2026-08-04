@@ -27,8 +27,24 @@ struct CubeReclaimDecision {
   bool valid = false;
 };
 
-// Hard off until reverse reclaim is HMD-proven. Do not flip lightly.
-inline bool CubeReclaimEnabled() { return false; }
+// Env opt-in for experimental auto reclaim path (unit-tested).
+inline bool CubeReclaimWantEnv(const char* envVal) {
+  if (!envVal || !envVal[0]) return false;
+  char c = envVal[0];
+  return c == '1' || c == 'y' || c == 'Y' || c == 't' || c == 'T';
+}
+
+// Hard XR rebind reclaim: off unless GVRMOD_CUBE_RECLAIM=1.
+inline bool CubeReclaimEnabled() {
+  return CubeReclaimWantEnv(std::getenv("GVRMOD_CUBE_RECLAIM"));
+}
+
+// Soft ack default ON: after brief RETURN banner, write phase=panel_live.
+// Safe — Cube shell already owns OpenXR when panel is live; no session thrash.
+inline bool CubeReclaimSoftAckEnabled() { return true; }
+
+// Hold seconds before soft-acking return marker (pure constant).
+inline float CubeReclaimSoftAckHoldSeconds() { return 2.5f; }
 
 inline void CubeReturn_Trim(std::string& s) {
   while (!s.empty() && (s.back() == '\r' || s.back() == ' ' || s.back() == '\t')) s.pop_back();
@@ -67,8 +83,8 @@ inline std::string CubeReversePhaseLabel(const std::string& phase) {
 
 inline std::string CubeReverseDetailForPhase(const std::string& phase) {
   const std::string p = CubeReturn_NormalizePhase(phase);
-  if (p == "vr_exit") return "GMod left VR · Cube reclaim not auto yet";
-  if (p == "xr_released") return "OpenXR free · relaunch Cube shell to reclaim";
+  if (p == "vr_exit") return "GMod left VR · soft ack → panel live";
+  if (p == "xr_released") return "OpenXR free · Cube shell already holds session";
   if (p == "cube_claim") return "Cube claiming OpenXR…";
   if (p == "panel_live") return "Cube panel live · reverse handoff complete";
   return "return-to-Cube protocol (future)";
@@ -175,7 +191,7 @@ inline std::string CubeReclaimPanelLabel(const CubeReclaimDecision& d) {
   std::string pl = CubeReversePhaseLabel(d.phase);
   if (d.action == "reclaim_auto")
     return "RETURN  " + pl + "  ·  AUTO RECLAIM";
-  return "RETURN  " + pl + "  ·  POLL ONLY";
+  return "RETURN  " + pl + "  ·  SOFT ACK";
 }
 
 inline std::string CubeReclaimDetail(const CubeReclaimDecision& d) {
@@ -185,6 +201,50 @@ inline std::string CubeReclaimDetail(const CubeReclaimDecision& d) {
   // Prefer phase detail; note deferred
   std::string base = CubeReverseDetailForPhase(d.phase);
   if (d.reason == "eligible_deferred")
-    return base; // already says "not auto"
+    return base;
   return base;
+}
+
+// Soft reclaim ack plan: after hold, advance marker to panel_live (no XR rebind).
+struct CubeReclaimAckPlan {
+  bool should_write = false;
+  std::string next_phase = "panel_live";
+  bool clear_banner = false;
+  std::string detail;
+  bool valid = false;
+};
+
+// visibleSec = seconds RETURN banner has been active this session.
+// softAck defaults to CubeReclaimSoftAckEnabled(); auto_reclaim also triggers ack.
+inline CubeReclaimAckPlan CubeReclaimAckPlanDecide(const CubeReclaimDecision& d, float visibleSec,
+                                                   float holdSec = CubeReclaimSoftAckHoldSeconds(),
+                                                   bool softAck = CubeReclaimSoftAckEnabled()) {
+  CubeReclaimAckPlan p;
+  p.valid = true;
+  p.next_phase = "panel_live";
+  if (!d.show_panel || d.action == "idle") {
+    p.detail = "no return signal";
+    return p;
+  }
+  if (d.phase == "panel_live") {
+    p.detail = "already panel_live";
+    return p;
+  }
+  const bool wantAck = softAck || d.auto_reclaim;
+  if (!wantAck) {
+    p.detail = "ack disabled";
+    return p;
+  }
+  if (holdSec < 0.5f) holdSec = 0.5f;
+  if (visibleSec < holdSec) {
+    p.should_write = false;
+    p.clear_banner = false;
+    p.detail = "RETURN hold · soft ack pending";
+    return p;
+  }
+  p.should_write = true;
+  p.clear_banner = true;
+  p.next_phase = "panel_live";
+  p.detail = "Cube panel live · reverse handoff acked";
+  return p;
 }

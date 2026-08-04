@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 29
+Last updated: 2026-08-04 cycle 30
 
 ## P0 — seamless / feel broken
 
@@ -21,7 +21,7 @@ Last updated: 2026-08-04 cycle 29
 | G10 | First-run gates re-spam on wrapper autostart | Should skip if cal exists + native_wrapper | **done** cycle2 |
 | G11 | Quick Play (last map + gfx) missing | Reduces menu friction | **done** cycle4 |
 | G12 | Audio dead during handoff | default-on + comfort master cycle28; opt-out=0 | **partial** cycle28 |
-| G13 | Return-to-Cube reverse handoff | Poll+panel cycle21; auto reclaim hard-off | **partial** cycle21 |
+| G13 | Return-to-Cube reverse handoff | Soft ack panel_live cycle30; XR rebind env | **partial** cycle30 |
 | G14 | Glide vehicle input SoT | Watchlist W3; partial | **partial** cycle9 (pure SoT+toast; HMD smoke open) |
 
 ## P2 — code quality / glogic hygiene
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G13 | Soft reclaim ack (panel_live) | AckPlan + WriteCubeReturnMarker |
 | G03 | StagePack plan executor (opt-in) | ExecuteMutations + vrmod_stage_apply |
 | G12 | Ambient default-on careful | EnabledFromEnv + ComfortMaster 0.55 |
 | G04 | Skip-spawn plan + warm_attach markers | SkipSpawnPlan + WriteWarmAttachMarkers |

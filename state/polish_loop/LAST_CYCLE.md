@@ -1,27 +1,28 @@
 # Last cycle
 
-**Cycle:** 29  
-**Time:** 2026-08-04T19:39:39+03:00  
-**Focus:** G03 StagePack plan executor (opt-in)  
-**Commit (gVRMod):** `5b2afa4`  
-**Commit (vrmod-x64):** `3d98cb4`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
+**Cycle:** 30  
+**Time:** 2026-08-04T19:52:15+03:00  
+**Focus:** G13 soft reclaim ack (panel_live)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** none  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **StagePack_AllowApplyFromFlags / ShouldExecutePlan / ExecuteMutations / ExecuteToast** pure  
-2. **openxr_launch** opt-in via `vrmod_stage_apply` or DATA file; SetFloat seated only then  
-3. Default path still preview-only  
-4. Unit expanded util.stage_pack.parse_and_hint  
+1. **CubeReclaimAckPlanDecide** soft ack after 2.5s RETURN hold  
+2. **WriteCubeReturnMarker** I/O; phase=panel_live  
+3. Soft ack default ON; `GVRMOD_CUBE_RECLAIM` for experimental auto path  
+4. xr_app poll: ack + clear RETURN banner  
+5. Unit expanded reclaim soft-ack  
 
 ## Pain points
 
-- Untouched; no auto height jump by default.
+- Untouched; no XR session thrash.
 
 ## Gaps
 
-- G03 still **partial** — default-on after HMD proof open  
-- Next: G13 reclaim or G04 changelevel careful  
+- G13 soft path shipped offline; full XR reclaim still open  
+- Next: G04 changelevel careful or G12 HMD volume  
 
 ## Notes
 

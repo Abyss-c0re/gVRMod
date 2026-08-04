@@ -131,15 +131,22 @@ TEST(launcher_handoff_layer_fade_alpha) {
 TEST(launcher_reverse_handoff_phases) {
     ASSERT_EQ(CubeReversePhaseLabel("vr_exit"), std::string("VR EXIT"));
     ASSERT_EQ(CubeReversePhaseLabel("panel_live"), std::string("PANEL LIVE"));
-    ASSERT_TRUE(CubeReverseDetailForPhase("xr_released").find("relaunch") != std::string::npos);
+    ASSERT_TRUE(CubeReverseDetailForPhase("xr_released").find("OpenXR") != std::string::npos
+                || CubeReverseDetailForPhase("xr_released").find("session") != std::string::npos);
     ASSERT_TRUE(CubeReverseProgressForPhase("vr_exit") > 0.f);
     ASSERT_TRUE(CubeReverseProgressForPhase("panel_live") >= 0.99f);
     ASSERT_TRUE(CubeReverseProgressForPhase("unknown") < 0.f);
 }
 
-// G13: reclaim poll decide + format/parse (feature hard-off → notify only)
+// G13: reclaim poll decide + soft ack plan (XR rebind still env-gated)
 TEST(launcher_cube_return_reclaim_poll) {
+    ASSERT_TRUE(!CubeReclaimWantEnv(nullptr));
+    ASSERT_TRUE(CubeReclaimWantEnv("1"));
+    unsetenv("GVRMOD_CUBE_RECLAIM");
     ASSERT_TRUE(!CubeReclaimEnabled());
+    ASSERT_TRUE(CubeReclaimSoftAckEnabled());
+    ASSERT_TRUE(CubeReclaimSoftAckHoldSeconds() >= 1.f);
+
     CubeReturnSnapshot empty;
     auto idle = CubeReclaimDecide(false, empty);
     ASSERT_EQ(idle.action, std::string("idle"));
@@ -161,10 +168,19 @@ TEST(launcher_cube_return_reclaim_poll) {
     ASSERT_EQ(notify.reason, std::string("eligible_deferred"));
     ASSERT_TRUE(notify.show_panel);
     ASSERT_TRUE(!notify.auto_reclaim);
-    ASSERT_TRUE(CubeReclaimPanelLabel(notify).find("POLL") != std::string::npos);
-    ASSERT_TRUE(CubeReclaimDetail(notify).find("reclaim") != std::string::npos);
+    ASSERT_TRUE(CubeReclaimPanelLabel(notify).find("SOFT") != std::string::npos
+                || CubeReclaimPanelLabel(notify).find("ACK") != std::string::npos);
 
-    // Feature-on path (unit only — product keeps CubeReclaimEnabled false)
+    // Soft ack: hold then write panel_live
+    auto pend = CubeReclaimAckPlanDecide(notify, 0.5f, 2.5f, true);
+    ASSERT_TRUE(!pend.should_write);
+    auto ready = CubeReclaimAckPlanDecide(notify, 3.0f, 2.5f, true);
+    ASSERT_TRUE(ready.should_write);
+    ASSERT_EQ(ready.next_phase, std::string("panel_live"));
+    ASSERT_TRUE(ready.clear_banner);
+    auto noSoft = CubeReclaimAckPlanDecide(notify, 9.f, 2.5f, false);
+    ASSERT_TRUE(!noSoft.should_write);
+
     auto autoR = CubeReclaimDecide(true, b, /*featureEnabled=*/true);
     ASSERT_EQ(autoR.action, std::string("reclaim_auto"));
     ASSERT_TRUE(autoR.auto_reclaim);

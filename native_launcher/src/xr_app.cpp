@@ -500,8 +500,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       }
     } else {
       // G13: poll cube_return.txt while Cube panel is live (not during Start handoff).
-      // Auto reclaim remains hard-off — surface RETURN line only.
+      // Soft ack default-on: after brief RETURN banner, write phase=panel_live (no XR rebind).
       static float returnPollAccum = 0.f;
+      static float returnVisibleSec = 0.f;
       static std::string lastReturnKey;
       returnPollAccum += 1.f / 72.f;
       if (returnPollAccum >= 1.f) {
@@ -509,28 +510,57 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         CubeReturnSnapshot ret;
         const bool have = ReadCubeReturnMarker(gmodRoot, ret);
         CubeReclaimDecision dec = CubeReclaimDecide(have, ret);
-        // Feature branch reserved: never execute auto reclaim while hard-off
+        if (dec.show_panel)
+          returnVisibleSec += 1.f;
+        else
+          returnVisibleSec = 0.f;
+        // Soft ack (default) or env auto-reclaim: advance marker; no second XR session
+        CubeReclaimAckPlan ack = CubeReclaimAckPlanDecide(
+            dec, returnVisibleSec, CubeReclaimSoftAckHoldSeconds(),
+            CubeReclaimSoftAckEnabled() || CubeReclaimEnabled());
+        if (ack.should_write && have) {
+          CubeReturnSnapshot ackSnap = ret;
+          ackSnap.phase = ack.next_phase.empty() ? "panel_live" : ack.next_phase;
+          ackSnap.source = "cube_webui_soft_ack";
+          if (WriteCubeReturnMarker(gmodRoot, ackSnap)) {
+            fprintf(stderr, "[cube_webui] G13 soft ack → phase=%s map=%s\n",
+                    ackSnap.phase.c_str(), ackSnap.map.c_str());
+            returnVisibleSec = 0.f;
+            lastReturnKey.clear();
+            // Re-read decision after ack
+            if (ReadCubeReturnMarker(gmodRoot, ret))
+              dec = CubeReclaimDecide(true, ret);
+            else
+              dec = CubeReclaimDecide(false, ret);
+          }
+        }
+        // Env reclaim path: same ack today; full XR re-claim remains future
         if (dec.auto_reclaim && CubeReclaimEnabled()) {
-          // Future: orderly reverse claim path. Intentionally empty.
+          // Soft ack already covers marker; session already Cube-owned.
         }
         const bool active = dec.show_panel;
         std::string label = CubeReclaimPanelLabel(dec);
         std::string detail = CubeReclaimDetail(dec);
-        std::string key = active ? (dec.phase + "|" + dec.map + "|" + dec.action) : std::string();
+        if (ack.should_write && !ack.detail.empty())
+          detail = ack.detail;
+        std::string key = active ? (dec.phase + "|" + dec.map + "|" + dec.action) : std::string("idle");
         if (key != lastReturnKey) {
           lastReturnKey = key;
+          const bool wasActive = ui.returnActive;
           ui.returnActive = active;
           ui.returnPhase = active ? dec.phase : std::string();
           ui.returnMap = active ? dec.map : std::string();
-          ui.returnLabel = label;
+          ui.returnLabel = active ? label : std::string();
           ui.returnDetail = detail;
           if (active) {
-            fprintf(stderr, "[cube_webui] G13 return poll phase=%s action=%s map=%s reclaim=%d\n",
+            fprintf(stderr, "[cube_webui] G13 return poll phase=%s action=%s map=%s reclaim=%d vis=%.1f\n",
                     dec.phase.c_str(), dec.action.c_str(), dec.map.c_str(),
-                    dec.auto_reclaim ? 1 : 0);
-            // Soft status nudge once per marker key (do not thrash user status)
+                    dec.auto_reclaim ? 1 : 0, returnVisibleSec);
             if (ui.status.find("RETURN") == std::string::npos)
-              ui.status = label.empty() ? "RETURN · POLL" : label;
+              ui.status = label.empty() ? "RETURN · SOFT ACK" : label;
+          } else if (wasActive) {
+            if (ui.status.find("RETURN") != std::string::npos)
+              ui.status = "CUBE · PANEL LIVE";
           }
           WebUI_MarkDirty(ui);
         }
