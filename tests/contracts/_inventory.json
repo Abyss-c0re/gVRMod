@@ -1017,6 +1017,58 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.ViewScaleLaw_Clamp",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_ComfortMax",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_ComfortMin",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_CubeDefault",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_IsFisheyeDecision",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_IsFisheyeRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_IsProjectionLive",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_Max",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_Min",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_PreferHmdProjection",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
+      "vrmod.utils.ViewScaleLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua"
+    ],
+    [
       "vrmod.utils.WallCollisionFilter",
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],

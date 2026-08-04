@@ -33,7 +33,8 @@ inline LaunchRequest LaunchRequestFromUI(const WebUIState& ui, const std::string
   // OpenXR backend (ladder indices → float). Live request; cold cfg caps via G29.
   int ssi = CubeSs_ClampIdx(ui.gfx.xr.ssIdx);
   lr.gfx.xrSupersample = CubeSs_LadderFromIdx(ssi);
-  lr.gfx.xrViewScale = ui.gfx.xr.viewScale;
+  // G35: clamp viewscale so cold Start never injects fisheye extremes
+  lr.gfx.xrViewScale = CubeViewScale_Clamp(ui.gfx.xr.viewScale);
   lr.gfx.xrFovScaleX = ui.gfx.xr.fovScaleX;
   lr.gfx.xrFovScaleY = ui.gfx.xr.fovScaleY;
   // G30: pure gate — write fovscale only when user touched SETTINGS FOV

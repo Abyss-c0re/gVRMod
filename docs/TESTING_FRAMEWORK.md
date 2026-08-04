@@ -470,6 +470,25 @@ Offline gate proves default `/actions/main` (driving in vehicle), insane |vel_z|
 
 Pure helpers: `FlyAwayLaw_ShouldSnapOrigin` / `FlyAwayLaw_Decide` / `FlyAwayLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.22 G35 viewscale fisheye law (manual)
+
+Offline gate proves default **1.0**, clamp **0.1..2.0**, comfort **0.75..1.25** risk flag; prefer **HMD projLive**. **Headset** for real fisheye.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Default viewscale 1.0 | Natural edges | Fisheye at default |
+| Extreme 0.1 / 2.0 | Clamped; comfort risk flagged | Crash / unbounded warp |
+| Cold Start cfg | `vrmod_viewscale` clamped | Wild scale injected |
+| Identity projection | Soft-refresh until projLive | Borders stuck forever |
+
+**Procedure (claim “G35 viewscale OK” only if walked):**
+
+1. Vision defaults / viewscale 1.0 — natural stereo.  
+2. Drag viewscale low then high — fisheye/tunnel expected; reset restores.  
+3. Cold Start after extreme SETTINGS — cfg clamped.
+
+Pure helpers: `ViewScaleLaw_Clamp` / `CubeViewScale_Decide` / `ViewScaleLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

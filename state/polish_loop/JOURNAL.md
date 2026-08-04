@@ -522,3 +522,13 @@ Append one block per cycle. Newest at bottom.
 - G34 partial — HMD walk open.
 - Tests: --fast PASS 4/4 (pure pending=0; 46 Lua).
 - Next: HMD walk backlog (G05/G12) or W8 fisheye / viewscale notes.
+
+## 2026-08-05 cycle 53 — G35 viewscale fisheye law (W8)
+
+- Theme: default 1.0; clamp 0.1..2.0; comfort 0.75..1.25 risk; prefer HMD projLive.
+- Pure Lua ViewScaleLaw_* + launcher CubeViewScale_*; cl_vrmod + gmod_spawn wire.
+- Also pushed user stereo tilt commit 423a178 (full tests green).
+- TESTING_FRAMEWORK §0.22; PURE_TESTED map.
+- G35 partial — HMD fisheye walk open.
+- Tests: full test_all PASS 6/6 (launcher 32; 47 Lua).
+- Next: HMD walk backlog (G05/G12) or W5 FOV/Z jitter notes.

@@ -215,6 +215,87 @@ inline float CubeHandoffLayerFadeAlpha(float fadeAmount) {
   return fadeAmount;
 }
 
+// G35: viewscale fisheye law (pure). W8: extreme viewscale warps projection → fisheye.
+// Product: default 1.0; clamp 0.1..2.0; comfort 0.75..1.25 flagged risk only.
+inline float CubeViewScale_Default() { return 1.0f; }
+inline float CubeViewScale_Min() { return 0.1f; }
+inline float CubeViewScale_Max() { return 2.0f; }
+inline float CubeViewScale_ComfortMin() { return 0.75f; }
+inline float CubeViewScale_ComfortMax() { return 1.25f; }
+
+inline float CubeViewScale_Clamp(float v) {
+  if (v < CubeViewScale_Min()) return CubeViewScale_Min();
+  if (v > CubeViewScale_Max()) return CubeViewScale_Max();
+  return v;
+}
+
+inline bool CubeViewScale_IsFisheyeRisk(float v) {
+  return v < CubeViewScale_ComfortMin() || v > CubeViewScale_ComfortMax();
+}
+
+struct ViewScaleDecision {
+  bool valid = true;
+  float requested = 1.0f;
+  float applied = 1.0f;
+  bool clamped = false;
+  bool fisheye_risk = false;
+  /// none | clamp | fisheye
+  std::string risk = "none";
+  std::string reason = "ok";
+};
+
+struct ViewScaleHmdExpect {
+  std::string verdict = "idle";
+  bool expect_natural = true;
+  std::string checklist = "G35 · IDLE · no viewscale decision";
+  std::string pass_line = "N/A";
+  std::string fail_line = "N/A";
+};
+
+inline ViewScaleDecision CubeViewScale_Decide(float requested) {
+  ViewScaleDecision d;
+  d.requested = requested;
+  d.applied = CubeViewScale_Clamp(requested);
+  d.clamped = d.applied < requested - 1e-4f || d.applied > requested + 1e-4f;
+  d.fisheye_risk = CubeViewScale_IsFisheyeRisk(d.applied);
+  if (d.clamped) {
+    d.risk = "clamp";
+    d.reason = "viewscale_clamped";
+  } else if (d.fisheye_risk) {
+    d.risk = "fisheye";
+    d.reason = "viewscale_outside_comfort";
+  } else {
+    d.risk = "none";
+    d.reason = "viewscale_ok";
+  }
+  return d;
+}
+
+inline std::string CubeViewScale_StatusLabel(const ViewScaleDecision& d) {
+  if (!d.valid) return "VS · IDLE";
+  if (d.risk == "clamp") return "VS · CLAMP";
+  if (d.risk == "fisheye") return "VS · FISHEYE RISK";
+  return "VS · OK";
+}
+
+inline ViewScaleHmdExpect CubeViewScale_HmdExpect(const ViewScaleDecision& d) {
+  ViewScaleHmdExpect e;
+  if (!d.valid) return e;
+  if (d.risk == "fisheye") {
+    e.verdict = "expect_fisheye_risk";
+    e.expect_natural = false;
+    e.checklist = "G35 · FISHEYE RISK · applied viewscale outside 0.75..1.25";
+    e.pass_line = "Reset viewscale to 1.0 / Vision defaults";
+    e.fail_line = "Everything fisheye or tunnel vision";
+    return e;
+  }
+  e.verdict = "expect_ok";
+  e.checklist = "G35 · OK · viewscale natural";
+  e.pass_line = "Natural edges; HMD projection live";
+  e.fail_line = "Fisheye at default 1.0";
+  return e;
+}
+
 // G29: supersample cold-start cap law (pure). Soft care: don't crank SS at Start.
 // Product: gvrmod_cube.cfg writes min(requested, cold_cap). Live ladder may go higher
 // after bring-up (user SETTINGS) — cold cfg must never inject 1.75/2.0 thrash.

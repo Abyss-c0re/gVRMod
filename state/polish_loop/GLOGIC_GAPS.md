@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 52
+Last updated: 2026-08-05 cycle 53
 
 ## P0 — seamless / feel broken
 
@@ -28,6 +28,7 @@ Last updated: 2026-08-04 cycle 52
 | G32 | Stereo ShareTexture / HMD self-test toast (W7) | StereoSelfTest_* cycle50; HMD walk open | **partial** cycle50 |
 | G33 | Swap-eyes content-only (W4; no dual pose) | SwapEyesLaw_* cycle51; HMD walk open | **partial** cycle51 |
 | G34 | Fly-away origin snap + action set (W12) | FlyAwayLaw_* cycle52; HMD walk open | **partial** cycle52 |
+| G35 | Viewscale fisheye clamp / comfort (W8) | ViewScaleLaw_* + CubeViewScale_* cycle53; HMD walk open | **partial** cycle53 |
 | G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
 | G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
 | G15 | Opaque black HUD / wall of Real | HudLaw composite cycle38; HMD walk open | **partial** cycle38 |
@@ -57,6 +58,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G35 | Viewscale fisheye clamp / comfort (W8) | ViewScaleLaw_* + CubeViewScale_* |
 | G34 | Fly-away origin snap + action set (W12) | FlyAwayLaw_* + cl_vrmod wire |
 | G33 | Swap-eyes content-only (W4) | SwapEyesLaw_* + cl_vrmod SBS wire |
 | G32 | Stereo ShareTexture / HMD self-test toast (W7) | StereoSelfTest_* + cl_vrmod wire |

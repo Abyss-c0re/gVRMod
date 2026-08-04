@@ -107,7 +107,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "vrmod_laserpointer 1\n"
       // G29: cold-start SS cap (pure) — never crank 1.75/2.0 into first frames
       << "vrmod_supersample " << CubeSs_ClampColdStart(g.xrSupersample) << "\n"
-      << "vrmod_viewscale " << g.xrViewScale << "\n"
+      // G35: viewscale clamp (fisheye band) — never inject wild scales at Start
+      << "vrmod_viewscale " << CubeViewScale_Clamp(g.xrViewScale) << "\n"
       << "mat_queue_mode 1\n"
       << "engine_no_focus_sleep 0\n";
   // G30: FOV archive write-only-when-touched (pure) — never clobber Vision cal

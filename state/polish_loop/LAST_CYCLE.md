@@ -1,29 +1,29 @@
 # Last cycle
 
-**Cycle:** 52  
-**Time:** 2026-08-04T23:52:00+03:00  
-**Focus:** G34 fly-away origin snap + action set law (W12)  
-**Commit (gVRMod):** `d2341f1`  
-**Commit (vrmod-x64):** `ca1bea2`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 46 Lua tests)  
+**Cycle:** 53  
+**Time:** 2026-08-05T00:05:00+03:00  
+**Focus:** G35 viewscale fisheye law (W8)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass (launcher 32; 47 Lua)  
 
 ## What changed
 
-1. **Pure** FlyAwayLaw_ResolveActionSet/ShouldSnapOrigin/Decide/HmdExpect  
-2. **cl_vrmod** action set + feet origin + one-shot snap timer  
-3. Unit test util.flyaway_law.origin_action_g34 + PURE_TESTED  
-4. TESTING_FRAMEWORK §0.21 fly-away walk  
-5. Gap G34 partial  
-6. Pushed existing FOV crop revert `3d24d92` (user WIP; Quest stereo)  
+1. **Pure Lua** ViewScaleLaw_Clamp/IsFisheyeRisk/Decide/HmdExpect  
+2. **Pure launcher** CubeViewScale_* + gmod_spawn/launch_fill clamp  
+3. **cl_vrmod** ComputeDisplayParams uses clamp + snapshot  
+4. Unit tests Lua + launcher; PURE_TESTED; §0.22  
+5. Gap G35 partial  
+6. Pushed stereo tilt settings `423a178` (user; tests green)  
 
 ## Pain points
 
-- Soft care: one-shot origin snap only; no every-frame thrash; climbing untouched.
+- Soft care: fisheye via extreme viewscale; prefer Vision defaults / 1.0.
 
 ## Gaps
 
-- G34 partial — HMD fly-away walk open  
-- Next: HMD walk backlog (G05/G12) or W8 fisheye / viewscale notes  
+- G35 partial — HMD fisheye walk open  
+- Next: HMD walk backlog (G05/G12) or W5 FOV/Z jitter notes  
 
 ## Notes
 

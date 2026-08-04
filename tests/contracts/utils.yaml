@@ -1087,6 +1087,58 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.math.vec_almost_equal]
+  - id: vrmod.utils.ViewScaleLaw_Clamp
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_ComfortMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_ComfortMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_CubeDefault
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_IsFisheyeDecision
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_IsFisheyeRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_IsProjectionLive
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_Max
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_Min
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_PreferHmdProjection
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
+  - id: vrmod.utils.ViewScaleLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_viewscale_law.lua
+    tier: pure
+    tests: [util.viewscale_law.fisheye_g35]
   - id: vrmod.utils.WallCollisionFilter
     file: addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua
     tier: seam

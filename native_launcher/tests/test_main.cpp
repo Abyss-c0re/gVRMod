@@ -517,6 +517,32 @@ TEST(launcher_stage_pack_head_y_sanity) {
     ASSERT_EQ(StagePack_NormalizeSpace("local"), std::string("LOCAL"));
 }
 
+// G35: viewscale fisheye law (clamp + comfort band)
+TEST(launcher_viewscale_fisheye_g35) {
+    ASSERT_NEAR(CubeViewScale_Default(), 1.0f, 1e-4f);
+    ASSERT_NEAR(CubeViewScale_Min(), 0.1f, 1e-4f);
+    ASSERT_NEAR(CubeViewScale_Max(), 2.0f, 1e-4f);
+    ASSERT_NEAR(CubeViewScale_Clamp(0.05f), 0.1f, 1e-4f);
+    ASSERT_NEAR(CubeViewScale_Clamp(3.0f), 2.0f, 1e-4f);
+    ASSERT_NEAR(CubeViewScale_Clamp(1.0f), 1.0f, 1e-4f);
+    ASSERT_TRUE(!CubeViewScale_IsFisheyeRisk(1.0f));
+    ASSERT_TRUE(CubeViewScale_IsFisheyeRisk(0.5f));
+    ASSERT_TRUE(CubeViewScale_IsFisheyeRisk(1.5f));
+    auto ok = CubeViewScale_Decide(1.0f);
+    ASSERT_EQ(ok.risk, std::string("none"));
+    ASSERT_EQ(CubeViewScale_StatusLabel(ok), std::string("VS · OK"));
+    auto he = CubeViewScale_HmdExpect(ok);
+    ASSERT_EQ(he.verdict, std::string("expect_ok"));
+    ASSERT_TRUE(he.checklist.find("G35") != std::string::npos);
+    auto fish = CubeViewScale_Decide(0.5f);
+    ASSERT_EQ(fish.risk, std::string("fisheye"));
+    ASSERT_EQ(CubeViewScale_StatusLabel(fish), std::string("VS · FISHEYE RISK"));
+    auto clamp = CubeViewScale_Decide(9.0f);
+    ASSERT_TRUE(clamp.clamped);
+    ASSERT_NEAR(clamp.applied, 2.0f, 1e-4f);
+    ASSERT_EQ(clamp.risk, std::string("clamp"));
+}
+
 // G30: FOV archive write-only-when-touched (never clobber Vision cal)
 TEST(launcher_fov_archive_write_touched_g30) {
     ASSERT_NEAR(CubeFov_DefaultScale(), 1.0f, 1e-4f);

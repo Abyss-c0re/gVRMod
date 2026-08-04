@@ -454,6 +454,43 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G35 pure viewscale fisheye law (W8)
+	H.TEST("util.viewscale_law.fisheye_g35", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.ViewScaleLaw_CubeDefault(), 1.0)
+		H.assert_eq(u.ViewScaleLaw_Min(), 0.1)
+		H.assert_eq(u.ViewScaleLaw_Max(), 2.0)
+		H.assert_eq(u.ViewScaleLaw_Clamp(0.05), 0.1)
+		H.assert_eq(u.ViewScaleLaw_Clamp(3.0), 2.0)
+		H.assert_eq(u.ViewScaleLaw_Clamp(1.0), 1.0)
+		H.assert_true(not u.ViewScaleLaw_IsFisheyeRisk(1.0))
+		H.assert_true(u.ViewScaleLaw_IsFisheyeRisk(0.5))
+		H.assert_true(u.ViewScaleLaw_IsFisheyeRisk(1.5))
+		H.assert_true(u.ViewScaleLaw_PreferHmdProjection())
+		local ok = u.ViewScaleLaw_Decide({ viewscale = 1.0, proj_live = true })
+		H.assert_true(ok.path_ok)
+		H.assert_eq(u.ViewScaleLaw_StatusLabel(ok), "VS · OK")
+		local he = u.ViewScaleLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G35", 1, true))
+		local fish = u.ViewScaleLaw_Decide({ viewscale = 0.5, proj_live = true })
+		H.assert_eq(fish.risk, "fisheye")
+		H.assert_true(u.ViewScaleLaw_IsFisheyeDecision(fish))
+		H.assert_eq(u.ViewScaleLaw_StatusLabel(fish), "VS · FISHEYE RISK")
+		local clamp = u.ViewScaleLaw_Decide({ viewscale = 9.0 })
+		H.assert_true(clamp.clamped)
+		H.assert_eq(clamp.applied, 2.0)
+		H.assert_eq(clamp.risk, "clamp")
+		local dead = u.ViewScaleLaw_Decide({
+			viewscale = 1.0,
+			proj_live = false,
+			require_proj_live = true,
+		})
+		H.assert_eq(dead.risk, "dead_proj")
+		local heD = u.ViewScaleLaw_HmdExpect(dead)
+		H.assert_eq(heD.verdict, "expect_dead_proj")
+	end)
+
 	-- G34 pure fly-away / origin snap + action set law (W12)
 	H.TEST("util.flyaway_law.origin_action_g34", function()
 		local u = env.vrmod.utils
