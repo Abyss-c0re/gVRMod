@@ -556,7 +556,31 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.WarmAttach_AllowChangelevelFromFlags
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_ChangelevelCmd
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_ChangelevelPlan
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
   - id: vrmod.utils.WarmAttach_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_ExecuteChangelevel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_ExecuteToast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_MapTokenOk
     file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
     tier: pure
     tests: [util.warm_attach.decide_g04]
@@ -565,6 +589,10 @@ symbols:
     tier: pure
     tests: [util.warm_attach.decide_g04]
   - id: vrmod.utils.WarmAttach_Parse
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_ShouldExecuteChangelevel
     file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
     tier: pure
     tests: [util.warm_attach.decide_g04]

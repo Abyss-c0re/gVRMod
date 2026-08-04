@@ -284,6 +284,30 @@ TEST(launcher_warm_attach_decide) {
     ASSERT_EQ(rej.action, std::string("reject"));
     ASSERT_TRUE(CubeWarmAttachToast(defer).find("deferred") != std::string::npos);
     ASSERT_TRUE(CubeWarmAttachToast(idle).empty());
+    // G04 careful changelevel plan — default off; map token gate
+    ASSERT_TRUE(CubeWarmAttach_MapTokenOk("gm_construct"));
+    ASSERT_TRUE(!CubeWarmAttach_MapTokenOk("gm_construct; quit"));
+    ASSERT_TRUE(!CubeWarmAttach_MapTokenOk(""));
+    ASSERT_TRUE(!CubeWarmChangelevelWantEnv(nullptr));
+    ASSERT_TRUE(CubeWarmChangelevelWantEnv("1"));
+    unsetenv("GVRMOD_WARM_CHANGELEVEL");
+    ASSERT_TRUE(!CubeWarmChangelevelEnabled());
+    WarmChangelevelAllowFlags none{};
+    ASSERT_TRUE(!CubeWarmAttach_AllowChangelevelFromFlags(none));
+    WarmChangelevelAllowFlags con{};
+    con.convar_on = true;
+    ASSERT_TRUE(CubeWarmAttach_AllowChangelevelFromFlags(con));
+    auto planDef = CubeWarmChangelevelPlanDecide(defer);
+    ASSERT_TRUE(!planDef.do_changelevel);
+    ASSERT_TRUE(!CubeWarmShouldExecuteChangelevel(planDef, true));
+    auto planOn = CubeWarmChangelevelPlanDecide(chg);
+    ASSERT_TRUE(planOn.do_changelevel);
+    ASSERT_EQ(planOn.method, std::string("changelevel"));
+    ASSERT_EQ(CubeWarmChangelevelCmd(planOn), std::string("changelevel gm_flatgrass"));
+    ASSERT_TRUE(!CubeWarmShouldExecuteChangelevel(planOn, false));
+    ASSERT_TRUE(CubeWarmShouldExecuteChangelevel(planOn, true));
+    auto et = CubeWarmChangelevelExecuteToast(true, true, "gm_flatgrass", "");
+    ASSERT_TRUE(et.find("changelevel") != std::string::npos);
 }
 
 // G12: ambient clip contract — pure should-play + format/parse + status label

@@ -485,7 +485,31 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
     [
+      "vrmod.utils.WarmAttach_AllowChangelevelFromFlags",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_ChangelevelCmd",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_ChangelevelPlan",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
       "vrmod.utils.WarmAttach_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_ExecuteChangelevel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_ExecuteToast",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_MapTokenOk",
       "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
     ],
     [
@@ -494,6 +518,10 @@
     ],
     [
       "vrmod.utils.WarmAttach_Parse",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_ShouldExecuteChangelevel",
       "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
     ],
     [

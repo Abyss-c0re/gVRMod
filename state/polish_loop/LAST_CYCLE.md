@@ -1,28 +1,27 @@
 # Last cycle
 
-**Cycle:** 30  
-**Time:** 2026-08-04T19:52:15+03:00  
-**Focus:** G13 soft reclaim ack (panel_live)  
-**Commit (gVRMod):** `ca487cb`  
-**Commit (vrmod-x64):** none  
+**Cycle:** 31  
+**Time:** 2026-08-04T20:03:17+03:00  
+**Focus:** G04 careful changelevel plan executor  
+**Commit (gVRMod):** (set after push)  
+**Commit (vrmod-x64):** `c3fefcd`  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **CubeReclaimAckPlanDecide** soft ack after 2.5s RETURN hold  
-2. **WriteCubeReturnMarker** I/O; phase=panel_live  
-3. Soft ack default ON; `GVRMOD_CUBE_RECLAIM` for experimental auto path  
-4. xr_app poll: ack + clear RETURN banner  
-5. Unit expanded reclaim soft-ack  
+1. **Pure Lua** WarmAttach_MapTokenOk / AllowChangelevelFromFlags / ChangelevelPlan / Cmd / ShouldExecute / ExecuteChangelevel / ExecuteToast  
+2. **Pure C++** CubeWarmChangelevel* plan + token gate + allow flags (env GVRMOD_WARM_CHANGELEVEL)  
+3. **openxr_launch** opt-in: `vrmod_warm_changelevel` or `warm_changelevel_enable.txt`; RCC only when armed  
+4. Unit + launcher tests; gen_contracts PURE_TESTED for new symbols  
 
 ## Pain points
 
-- Untouched; no XR session thrash.
+- Untouched; default still no auto changelevel.
 
 ## Gaps
 
-- G13 soft path shipped offline; full XR reclaim still open  
-- Next: G04 changelevel careful or G12 HMD volume  
+- G04 partial — HMD-proven warm reuse + changelevel still open  
+- Next: G05 HMD load-flash notes or G12 HMD volume taste  
 
 ## Notes
 

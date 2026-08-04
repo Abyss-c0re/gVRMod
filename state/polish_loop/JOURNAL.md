@@ -299,3 +299,14 @@ Append one block per cycle. Newest at bottom.
 - G13 partial → soft complete offline; full reclaim still open.
 - Tests: full test_all PASS 6/6.
 - Next: G04 changelevel careful or G05 HMD notes.
+
+## 2026-08-04 cycle 31 — G04 careful changelevel plan
+
+- Theme: opt-in warm map changelevel executor; product default still off.
+- Pure Lua: MapTokenOk/Allow/Plan/Cmd/ShouldExecute/Execute/ExecuteToast.
+- Pure C++: CubeWarmChangelevel* + MapTokenOk + AllowFromFlags.
+- openxr_launch: vrmod_warm_changelevel or warm_changelevel_enable.txt unlocks RCC.
+- Default path unchanged (deferred toast only).
+- G04 partial — HMD-proven default-on still open.
+- Tests: full test_all PASS 6/6.
+- Next: G05 HMD load-flash notes or G12 HMD volume taste.

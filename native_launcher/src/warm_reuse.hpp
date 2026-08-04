@@ -303,3 +303,108 @@ inline std::string CubeWarmAttachToast(const WarmAttachDecision& d) {
     return "Warm attach · rejected (" + d.reason + ")";
   return {};
 }
+
+// ── G04 careful changelevel plan (pure, default OFF) ───────────────────────
+// Product never auto-changelevels unless GVRMOD_WARM_CHANGELEVEL / GMod opt-in.
+// Map tokens must be [a-z0-9_]+ after normalize (console-safe).
+
+inline bool CubeWarmChangelevelWantEnv(const char* envVal) {
+  return CubeWarmReuseWantEnv(envVal);
+}
+
+// Default off. Careful HMD smoke: GVRMOD_WARM_CHANGELEVEL=1 (+ warm reuse path).
+inline bool CubeWarmChangelevelEnabled() {
+  return CubeWarmChangelevelWantEnv(std::getenv("GVRMOD_WARM_CHANGELEVEL"));
+}
+
+// Safe map token for changelevel cmd: lowercase alnum + underscore, 1..64.
+inline bool CubeWarmAttach_MapTokenOk(const std::string& raw) {
+  std::string s = CubeWarmAttach_NormalizeMap(raw);
+  if (s.empty() || s.size() > 64) return false;
+  for (char c : s) {
+    if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') continue;
+    return false;
+  }
+  return true;
+}
+
+// Pure allow gate (unit-tested). force/convar/file/env any true → allow.
+struct WarmChangelevelAllowFlags {
+  bool convar_on = false;
+  bool file_enable = false;
+  bool env_on = false;
+  bool force = false;
+};
+
+inline bool CubeWarmAttach_AllowChangelevelFromFlags(const WarmChangelevelAllowFlags& f) {
+  return f.force || f.convar_on || f.file_enable || f.env_on;
+}
+
+struct WarmChangelevelPlan {
+  bool valid = false;
+  bool do_changelevel = false;
+  std::string map;
+  std::string from_map;
+  std::string method = "none"; // none | changelevel
+  std::string reason = "none";
+  std::string cmd;
+};
+
+// Pure plan from attach decision. do_changelevel only when action=changelevel + token ok.
+inline WarmChangelevelPlan CubeWarmChangelevelPlanDecide(const WarmAttachDecision& d) {
+  WarmChangelevelPlan p;
+  p.valid = true;
+  if (!d.valid) {
+    p.valid = false;
+    p.reason = "invalid_decision";
+    return p;
+  }
+  p.map = CubeWarmAttach_NormalizeMap(d.request_map);
+  p.from_map = CubeWarmAttach_NormalizeMap(d.current_map);
+  if (d.action == "same_map") {
+    p.reason = "already_on_map";
+    return p;
+  }
+  if (d.action == "idle" || d.action == "reject") {
+    p.reason = d.reason.empty() ? d.action : d.reason;
+    return p;
+  }
+  if (d.action == "deferred") {
+    p.reason = "eligible_deferred";
+    return p;
+  }
+  if (d.action != "changelevel" || !d.would_changelevel) {
+    p.reason = "not_armed";
+    return p;
+  }
+  if (!CubeWarmAttach_MapTokenOk(p.map)) {
+    p.reason = "bad_map_token";
+    return p;
+  }
+  p.do_changelevel = true;
+  p.method = "changelevel";
+  p.reason = d.reason.empty() ? "eligible" : d.reason;
+  p.cmd = "changelevel " + p.map;
+  return p;
+}
+
+inline std::string CubeWarmChangelevelCmd(const WarmChangelevelPlan& p) {
+  if (!p.valid || !p.do_changelevel) return {};
+  if (!p.cmd.empty()) return p.cmd;
+  if (CubeWarmAttach_MapTokenOk(p.map)) return "changelevel " + p.map;
+  return {};
+}
+
+inline bool CubeWarmShouldExecuteChangelevel(const WarmChangelevelPlan& p, bool allow) {
+  if (!allow) return false;
+  if (!p.valid || !p.do_changelevel) return false;
+  if (p.method != "changelevel") return false;
+  return CubeWarmAttach_MapTokenOk(p.map);
+}
+
+inline std::string CubeWarmChangelevelExecuteToast(bool applied, bool ok, const std::string& map,
+                                                   const std::string& err) {
+  if (applied && ok) return "Warm attach · changelevel → " + map;
+  if (!err.empty()) return "Warm attach · changelevel failed · " + err;
+  return {};
+}
