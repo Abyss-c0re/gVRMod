@@ -5,7 +5,7 @@
   "cycle": 5,
   "status": "ok",
   "last_cycle_at": "2026-08-04T15:16:02+03:00",
-  "last_commit": "d31dcae",
+  "last_commit": "d10d4b2",
   "last_commit_repo": "gVRMod+vrmod-x64",
   "last_test": "test_all PASS 6/6",
   "last_focus": "G23 verify desktopview=4 follow-cam call sites",

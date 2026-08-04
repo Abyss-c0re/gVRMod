@@ -3,7 +3,7 @@
 **Cycle:** 5  
 **Time:** 2026-08-04T15:16:02+03:00  
 **Focus:** G23 desktopview=4 follow-cam call sites  
-**Commit (gVRMod):** `d31dcae`  
+**Commit (gVRMod):** `d10d4b2`  
 **Commit (vrmod-x64):** `8dc402c`  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
