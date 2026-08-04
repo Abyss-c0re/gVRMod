@@ -5,7 +5,7 @@
   "cycle": 30,
   "status": "ok",
   "last_cycle_at": "2026-08-04T19:52:15+03:00",
-  "last_commit": "pending",
+  "last_commit": "ca487cb",
   "last_commit_repo": "gVRMod",
   "last_test": "test_all PASS 6/6",
   "last_focus": "G13 soft reclaim ack (panel_live)",

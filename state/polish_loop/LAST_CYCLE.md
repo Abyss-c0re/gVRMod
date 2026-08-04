@@ -3,7 +3,7 @@
 **Cycle:** 30  
 **Time:** 2026-08-04T19:52:15+03:00  
 **Focus:** G13 soft reclaim ack (panel_live)  
-**Commit (gVRMod):** (pending)  
+**Commit (gVRMod):** `ca487cb`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
