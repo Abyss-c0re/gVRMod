@@ -3,7 +3,7 @@
 **Cycle:** 10  
 **Time:** 2026-08-04T16:11:22+03:00  
 **Focus:** G02 panel-side fade on take_xr (partial)  
-**Commit (gVRMod):** `afb0378`  
+**Commit (gVRMod):** `489d527`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
