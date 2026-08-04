@@ -3,8 +3,8 @@
 **Cycle:** 25  
 **Time:** 2026-08-04T18:56:00+03:00  
 **Focus:** G05 stereo-load IsLoading + toast (HMD proof open)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `9ec0277`  
+**Commit (vrmod-x64):** `44f3f2d`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
