@@ -110,12 +110,15 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "vrmod_viewscale " << g.xrViewScale << "\n"
       << "mat_queue_mode 1\n"
       << "engine_no_focus_sleep 0\n";
-  // FOV: only write when user touched XR FOV in SETTINGS — else preserve archive / Vision cal
-  if (g.xrWriteFov) {
-    cfg << "vrmod_fovscale_x " << g.xrFovScaleX << "\n"
-        << "vrmod_fovscale_y " << g.xrFovScaleY << "\n";
-  } else {
-    cfg << "// fovscale x/y omitted — preserve archived / Vision calibration\n";
+  // G30: FOV archive write-only-when-touched (pure) — never clobber Vision cal
+  {
+    const auto fov = CubeFov_Decide(g.xrWriteFov, g.xrFovScaleX, g.xrFovScaleY);
+    if (fov.write) {
+      cfg << "vrmod_fovscale_x " << fov.scale_x << "\n"
+          << "vrmod_fovscale_y " << fov.scale_y << "\n";
+    } else {
+      cfg << CubeFov_OmitComment() << "\n";
+    }
   }
   cfg << "vrmod_scalefactor " << g.xrScaleFactor << "\n"
       << "vrmod_eyescale " << g.xrEyeScale << "\n"

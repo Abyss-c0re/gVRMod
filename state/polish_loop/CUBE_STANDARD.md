@@ -20,6 +20,7 @@ Never submit eng texture. Never dual pose truth.
 - Seamless launcher: hold XR → STARTING GMOD → take_xr → release (no early void)
 - G28 partial: soft handoff timeouts **90s** (GMod up) / **180s** hard; never racey early release; `CubeHandoffTimeout_*`; §0.15 open
 - G29 partial: supersample cold Start **cap 1.4**; don’t crank SS at bring-up; `CubeSs_*`; §0.16 open
+- G30 partial: FOV archive **write only when SETTINGS touched**; omit fovscale to preserve Vision cal; `CubeFov_*`; §0.17 open
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoad_IsLoading` + dual-hold toast + `StereoLoad_HmdExpect` checklist; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD walk still open (TESTING_FRAMEWORK §0.1)

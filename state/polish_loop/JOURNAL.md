@@ -471,3 +471,13 @@ Append one block per cycle. Newest at bottom.
 - G29 partial — product already capped 1.4; law offline-tested.
 - Tests: full test_all PASS 6/6 (launcher 30 tests).
 - Next: HMD walk backlog (G05/G12) or FOV archive write-only-when-touched notes.
+
+## 2026-08-04 cycle 48 — G30 FOV archive write-only-when-touched
+
+- Theme: omit fovscale unless user touched SETTINGS FOV (Vision cal soft care).
+- Pure: CubeFov_Default/Min/Max/Clamp/ShouldWrite/Decide/OmitComment/HmdExpect.
+- gmod_spawn cfg + launch_fill wire pure helpers.
+- TESTING_FRAMEWORK §0.17 FOV archive walk.
+- G30 partial — product already omit-when-untouched; law offline-tested.
+- Tests: full test_all PASS 6/6 (launcher 31 tests).
+- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.

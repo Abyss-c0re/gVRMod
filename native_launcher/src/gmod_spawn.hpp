@@ -439,6 +439,96 @@ inline HandoffTimeoutHmdExpect CubeHandoffTimeout_HmdExpect(const HandoffTimeout
   return e;
 }
 
+// G30: FOV archive write-only-when-touched law (pure). Soft care: Vision/border cal archives.
+// Product: gvrmod_cube.cfg omits vrmod_fovscale_x/y unless user edited XR FOV in SETTINGS.
+// Linked Start defaults (1.0/1.0) must never clobber asymmetric Vision cal left on disk.
+// UI: fovTouched flips only when user cycles FOV scale; presets reset touched=false.
+inline float CubeFov_DefaultScale() { return 1.0f; }
+inline float CubeFov_MinScale() { return 0.1f; }
+inline float CubeFov_MaxScale() { return 2.0f; }
+
+/// Clamp one axis for cfg write (only used when writing).
+inline float CubeFov_ClampScale(float s) {
+  if (s < CubeFov_MinScale()) return CubeFov_MinScale();
+  if (s > CubeFov_MaxScale()) return CubeFov_MaxScale();
+  return s;
+}
+
+/// Law: write fovscale only when user intentionally touched SETTINGS FOV.
+inline bool CubeFov_ShouldWrite(bool userTouched) { return userTouched; }
+
+struct FovArchiveDecision {
+  bool valid = true;
+  bool user_touched = false;
+  bool write = false;
+  float scale_x = 1.0f;
+  float scale_y = 1.0f;
+  /// none | write_user | keep_archive | clamp_write
+  std::string risk = "none";
+  std::string reason = "ok";
+};
+
+struct FovArchiveHmdExpect {
+  std::string verdict = "idle"; // idle | expect_keep_archive | expect_write_user
+  bool expect_vision_preserved = true;
+  std::string checklist = "G30 · IDLE · no FOV archive decision";
+  std::string pass_line = "N/A";
+  std::string fail_line = "N/A";
+};
+
+inline FovArchiveDecision CubeFov_Decide(bool userTouched, float scaleX, float scaleY) {
+  FovArchiveDecision d;
+  d.user_touched = userTouched;
+  d.write = CubeFov_ShouldWrite(userTouched);
+  const float cx = CubeFov_ClampScale(scaleX);
+  const float cy = CubeFov_ClampScale(scaleY);
+  d.scale_x = d.write ? cx : scaleX;
+  d.scale_y = d.write ? cy : scaleY;
+  if (!d.write) {
+    d.risk = "keep_archive";
+    d.reason = "omit_fovscale_preserve_vision";
+  } else if (cx != scaleX || cy != scaleY) {
+    d.risk = "clamp_write";
+    d.reason = "user_touched_clamped";
+  } else {
+    d.risk = "write_user";
+    d.reason = "user_touched_settings";
+  }
+  return d;
+}
+
+inline std::string CubeFov_StatusLabel(const FovArchiveDecision& d) {
+  if (!d.valid) return "FOV · IDLE";
+  if (!d.write) return "FOV · KEEP ARCHIVE";
+  if (d.risk == "clamp_write") return "FOV · WRITE CLAMP";
+  return "FOV · WRITE USER";
+}
+
+/// Comment/line for cfg when omitting (product uses this string path).
+inline std::string CubeFov_OmitComment() {
+  return "// fovscale x/y omitted — preserve archived / Vision calibration";
+}
+
+inline FovArchiveHmdExpect CubeFov_HmdExpect(const FovArchiveDecision& d) {
+  FovArchiveHmdExpect e;
+  if (!d.valid) return e;
+  if (!d.write) {
+    e.verdict = "expect_keep_archive";
+    e.expect_vision_preserved = true;
+    e.checklist = "G30 · KEEP · no fovscale lines in cold cfg";
+    e.pass_line = "Vision/border FOV archive intact after Start without FOV edit";
+    e.fail_line = "Cold Start rewrites fovscale 1.0/1.0 over asymmetric cal";
+    return e;
+  }
+  e.verdict = "expect_write_user";
+  e.expect_vision_preserved = false;
+  e.checklist = "G30 · WRITE · x=" + std::to_string(d.scale_x).substr(0, 4) +
+                " y=" + std::to_string(d.scale_y).substr(0, 4);
+  e.pass_line = "User SETTINGS FOV applied once touched";
+  e.fail_line = "Touched FOV ignored or silent archive clobber without touch";
+  return e;
+}
+
 // G12: handoff ambient gain law (0..1). Pure contract for optional Cube ambient clip.
 // No audio engine required — panel status + future OpenAL/Sound source share this curve.
 // Intent: hold presence while GMod boots, duck at take_xr, silence when session releases.

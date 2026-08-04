@@ -374,6 +374,25 @@ Offline gate proves cold cfg **≤ 1.4**, live ladder up to **2.0**, default Cub
 
 Pure helpers: `CubeSs_ClampColdStart` / `CubeSs_Decide` / `CubeSs_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.17 G30 FOV archive write-only-when-touched (manual)
+
+Offline gate proves cold cfg **omits** `vrmod_fovscale_x/y` unless user touched SETTINGS FOV; write path clamps **0.1..2.0**. **Headset** for Vision cal survival.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Start without FOV edit | `gvrmod_cube.cfg` has omit comment, no fovscale lines | Default 1.0/1.0 clobbers Vision archive |
+| SETTINGS FOV cycled then Start | cfg writes both axes at chosen scales | Touched FOV ignored |
+| Extreme values | Clamped to 0.1..2.0 | Out-of-range crash / silent 0 |
+| After Vision calibrate | Untouched Start keeps asymmetric cal | Linked rewrite overwrites cal |
+
+**Procedure (claim “G30 FOV archive OK” only if walked):**
+
+1. Run Vision/border cal; note fovscale x≠y if asymmetric.  
+2. Cube Start without touching XR FOV — cfg omits fovscale; HMD FOV matches cal.  
+3. SETTINGS cycle FOV scale → Start — cfg writes scales; HMD reflects user choice.
+
+Pure helpers: `CubeFov_ShouldWrite` / `CubeFov_Decide` / `CubeFov_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

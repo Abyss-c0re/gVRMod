@@ -517,6 +517,42 @@ TEST(launcher_stage_pack_head_y_sanity) {
     ASSERT_EQ(StagePack_NormalizeSpace("local"), std::string("LOCAL"));
 }
 
+// G30: FOV archive write-only-when-touched (never clobber Vision cal)
+TEST(launcher_fov_archive_write_touched_g30) {
+    ASSERT_NEAR(CubeFov_DefaultScale(), 1.0f, 1e-4f);
+    ASSERT_NEAR(CubeFov_MinScale(), 0.1f, 1e-4f);
+    ASSERT_NEAR(CubeFov_MaxScale(), 2.0f, 1e-4f);
+    ASSERT_TRUE(!CubeFov_ShouldWrite(false));
+    ASSERT_TRUE(CubeFov_ShouldWrite(true));
+    ASSERT_NEAR(CubeFov_ClampScale(0.05f), 0.1f, 1e-4f);
+    ASSERT_NEAR(CubeFov_ClampScale(3.0f), 2.0f, 1e-4f);
+    ASSERT_NEAR(CubeFov_ClampScale(1.1f), 1.1f, 1e-4f);
+    auto keep = CubeFov_Decide(false, 1.0f, 1.0f);
+    ASSERT_TRUE(!keep.write);
+    ASSERT_EQ(keep.risk, std::string("keep_archive"));
+    ASSERT_EQ(CubeFov_StatusLabel(keep), std::string("FOV · KEEP ARCHIVE"));
+    ASSERT_TRUE(CubeFov_OmitComment().find("preserve") != std::string::npos);
+    auto heKeep = CubeFov_HmdExpect(keep);
+    ASSERT_EQ(heKeep.verdict, std::string("expect_keep_archive"));
+    ASSERT_TRUE(heKeep.expect_vision_preserved);
+    ASSERT_TRUE(heKeep.checklist.find("G30") != std::string::npos);
+    auto write = CubeFov_Decide(true, 0.95f, 1.05f);
+    ASSERT_TRUE(write.write);
+    ASSERT_NEAR(write.scale_x, 0.95f, 1e-4f);
+    ASSERT_NEAR(write.scale_y, 1.05f, 1e-4f);
+    ASSERT_EQ(write.risk, std::string("write_user"));
+    ASSERT_EQ(CubeFov_StatusLabel(write), std::string("FOV · WRITE USER"));
+    auto heW = CubeFov_HmdExpect(write);
+    ASSERT_EQ(heW.verdict, std::string("expect_write_user"));
+    ASSERT_TRUE(!heW.expect_vision_preserved);
+    auto clamp = CubeFov_Decide(true, 0.01f, 9.0f);
+    ASSERT_TRUE(clamp.write);
+    ASSERT_NEAR(clamp.scale_x, 0.1f, 1e-4f);
+    ASSERT_NEAR(clamp.scale_y, 2.0f, 1e-4f);
+    ASSERT_EQ(clamp.risk, std::string("clamp_write"));
+    ASSERT_EQ(CubeFov_StatusLabel(clamp), std::string("FOV · WRITE CLAMP"));
+}
+
 // G29: supersample cold-start cap (never crank SS at Start)
 TEST(launcher_supersample_cold_cap_g29) {
     ASSERT_NEAR(CubeSs_ColdStartCap(), 1.4f, 1e-4f);

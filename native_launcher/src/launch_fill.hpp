@@ -36,7 +36,8 @@ inline LaunchRequest LaunchRequestFromUI(const WebUIState& ui, const std::string
   lr.gfx.xrViewScale = ui.gfx.xr.viewScale;
   lr.gfx.xrFovScaleX = ui.gfx.xr.fovScaleX;
   lr.gfx.xrFovScaleY = ui.gfx.xr.fovScaleY;
-  lr.gfx.xrWriteFov = ui.gfx.xr.fovTouched;
+  // G30: pure gate — write fovscale only when user touched SETTINGS FOV
+  lr.gfx.xrWriteFov = CubeFov_ShouldWrite(ui.gfx.xr.fovTouched);
   lr.gfx.xrScaleFactor = ui.gfx.xr.scaleFactor;
   lr.gfx.xrEyeScale = ui.gfx.xr.eyeScale;
   lr.gfx.xrZNear = ui.gfx.xr.zNear;
