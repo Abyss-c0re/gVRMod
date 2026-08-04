@@ -3,7 +3,7 @@
 **Cycle:** 34  
 **Time:** 2026-08-04T20:35:04+03:00  
 **Focus:** G13 careful XR reclaim plan (panel refresh)  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `2c03ca0`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
