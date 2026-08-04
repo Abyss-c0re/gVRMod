@@ -440,3 +440,14 @@ Append one block per cycle. Newest at bottom.
 - G26 partial — product already deduped; law offline-tested.
 - Tests: --fast PASS 4/4 (pure pending=0; menu API tests still green).
 - Next: engine blacklist never-call law (W2) or HMD walk backlog.
+
+## 2026-08-04 cycle 45 — G27 engine blacklist never-call law
+
+- Theme: never call GMod x64 Blocked_ConCommands / lifecycle bans (W2).
+- Pure: EngineBlacklist_IsBlocked/Lifecycle/AllowWrite/FilterMap/Decide/HmdExpect.
+- cl_vrmod: setConvarValue gate + EnsurePinned _engineBlacklist snapshot.
+- TESTING_FRAMEWORK §0.14 console walk.
+- G27 partial — product already skipped blocked; law offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Note: preserved FOV crop commit 6aa0b36 (not thrash).
+- Next: HMD walk backlog or soft handoff timeout notes.
