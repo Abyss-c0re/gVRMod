@@ -1,19 +1,18 @@
 # Last cycle
 
-**Cycle:** 5  
-**Time:** 2026-08-04T15:16:02+03:00  
-**Focus:** G23 desktopview=4 follow-cam call sites  
-**Commit (gVRMod):** `d10d4b2`  
-**Commit (vrmod-x64):** `8dc402c`  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass  
+**Cycle:** 6  
+**Time:** 2026-08-04T15:26:39+03:00  
+**Focus:** G20 residual TryParseColor (cube_framework / laser / beam)  
+**Commit (gVRMod):** `1b566b5`  
+**Commit (vrmod-x64):** `f9d5d8a`  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **cl_vrmod** — mode 4 never falls into stereo eye crop; uses IsFollowMode/IsEyeCropMode  
-2. **cl_desktop_cam** — Clamp/Cycle/Label/IsEyeCropMode pure helpers  
-3. **ComputeDesktopCrop** — mode 1 and 4 return unused 0,0  
-4. **Launcher** — RIGHT label explicit; last_play clamps desktopview  
-5. **docs/DESKTOP_BROADCAST.md** — call-site law table  
+1. **`TryParseColor`** pure nil-on-fail helper; `ParseColor` wraps it  
+2. **cl_cube_framework** ParseAccent → TryParseColor  
+3. **laser / beam** prefer TryParseColor (no bad-string red flash)  
+4. Unit test util.color.try_parse  
 
 ## Pain points
 
@@ -21,8 +20,8 @@
 
 ## Gaps
 
-- G23 → **done**  
-- Next: G20 residual color parse or G21 contracts  
+- G20 → **done**  
+- Next: G21 contracts inventory  
 
 ## Notes
 

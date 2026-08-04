@@ -55,3 +55,12 @@ Append one block per cycle. Newest at bottom.
 - Tests: full test_all PASS 6/6 (+desktop enum unit + clamp test).
 - Commits: vrmod-x64 8dc402c; gVRMod submodule + launcher + docs + state.
 - Next: G20 residual (cube_framework color) or inventory G21; avoid G02 fade without plan.
+
+## 2026-08-04 cycle 6 — G20 residual color SoT
+
+- Theme: TryParseColor + rewire cube_framework accent, laser, beam.
+- Pure: vrmod.utils.TryParseColor (nil on fail); ParseColor uses it.
+- Tests: --fast PASS 4/4 (+try_parse unit).
+- Commits: vrmod-x64 f9d5d8a; gVRMod tests + submodule + state.
+- G20 → done (core color/finger rewires complete).
+- Next: G21 contracts inventory lag (gen after symbols) or safe docs G24.

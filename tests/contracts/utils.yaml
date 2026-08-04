@@ -407,6 +407,11 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.TryParseColor
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
+    tier: pure
+    tests: [pending]
+    notes: "needs unit test"
   - id: vrmod.utils.UnblockInputActions
     file: addon/vrmod-x64/lua/vrmod/utils/sh_system.lua
     tier: seam

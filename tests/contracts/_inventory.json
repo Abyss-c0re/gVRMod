@@ -341,6 +341,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
     [
+      "vrmod.utils.TryParseColor",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
+    ],
+    [
       "vrmod.utils.UnblockInputActions",
       "addon/vrmod-x64/lua/vrmod/utils/sh_system.lua"
     ],
@@ -561,6 +565,10 @@
     [
       "vrmod.Experience_ShouldRun",
       "addon/vrmod-x64/lua/vrmod/ui/cl_onboarding.lua"
+    ],
+    [
+      "vrmod.Experience_ShouldRunFromState",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_experience.lua"
     ],
     [
       "vrmod.Experience_Start",
@@ -1129,6 +1137,10 @@
     [
       "vrmod.IsMenuSecondaryClick",
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
+      "vrmod.IsNativeWrapperLaunch",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua"
     ],
     [
       "vrmod.IsOpenVR",
