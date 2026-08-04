@@ -3,7 +3,7 @@
 **Cycle:** 8  
 **Time:** 2026-08-04T15:49:35+03:00  
 **Focus:** G24 document offline vs HMD smoke bar  
-**Commit (gVRMod):** `6a5ded5`  
+**Commit (gVRMod):** `d76ca7b`  
 **Commit (vrmod-x64):** none  
 **Tests:** n/a (docs only — no product code)  
 
