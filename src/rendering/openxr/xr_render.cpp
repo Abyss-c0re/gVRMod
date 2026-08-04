@@ -574,20 +574,18 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
       g_xrEyePosesValid = true;
     }
 
-    // NUCLEAR (2026-08-05): always one SBS engine RT, crop L/R halves.
-    // Disabled: collector + gen-steal "per-eye" (rightFBO=0 junk) → 1/8 strip / black eye.
-    // Lua paints dual RenderView into one SBS RT (mat_queue 0/1). Do not invent dual RTs.
+    // Always one SBS engine RT, crop L/R halves. Never gen-steal dual (rightFBO=0).
+    // Prefer stolenTexture (ShareTextureFinish id from Lua) first — g_vrRtColorTex can lag.
     GLuint perEyeSrc[2] = {0, 0};
     bool havePerEye = false;
     GLuint srcTex = 0;
-    if (g_vrRtColorTex) srcTex = g_vrRtColorTex;
-    if (!srcTex && stolenTexture) srcTex = stolenTexture;
+    if (stolenTexture) srcTex = stolenTexture;
+    if (!srcTex && g_vrRtColorTex) srcTex = g_vrRtColorTex;
     if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
     if (!srcTex && g_captureTexture) srcTex = g_captureTexture;
     if (srcTex) {
         perEyeSrc[0] = perEyeSrc[1] = srcTex;
     }
-    // Ignore collector prefer for submit — stages were fed from broken dual/gen path.
     g_preferCollectedEyes = false;
     if ((s_submitCallCount % 30) == 0) {
         VRMOD_LOG_INFO("Submit SBS-only srcTex=%u rtFBO=%u known=%dx%d (no per-eye/collector)",
@@ -714,37 +712,21 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 glReadBuffer(GL_COLOR_ATTACHMENT0);
                 glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
-                // SBS full halves only. Ignore Lua crop / collector / false dual —
-                // ComputeSubmitBounds was emitting u0≈-0.09 and gen-steal PER-EYE
-                // left a 1/8 strip + black eye on WiVRn (mat_queue 1 dual RenderView).
+                // Full SBS halves (no Lua crop). Ordered V + dest-Y flip on Linux
+                // (inverted-src path was leaving near-black HMD in Quest screenshots).
                 const float ins = 0.003f;
-                float u0, u1, v0, v1;
-                if (eye == 0) {
-                    u0 = ins;
-                    u1 = 0.5f;
-                } else {
-                    u0 = 0.5f;
-                    u1 = 1.0f - ins;
-                }
-                // Linux GL RT → OpenXR: one V flip via inverted src Y (blit flips).
-                if (g_rtTextureNeedsVFlip) {
-                    v0 = 1.0f - ins;
-                    v1 = ins;
-                } else {
-                    v0 = ins;
-                    v1 = 1.0f - ins;
-                }
+                float u0 = (eye == 0) ? ins : 0.5f;
+                float u1 = (eye == 0) ? 0.5f : (1.0f - ins);
+                float v0 = ins;
+                float v1 = 1.0f - ins;
                 (void)textureBounds;
                 (void)havePerEye;
                 (void)g_submitCropMode;
 
-                // Source rect in texels (OpenGL origin = bottom-left).
-                // srcY0 > srcY1 is allowed: glBlitFramebuffer flips when src Y is inverted.
                 GLint srcX0 = (GLint)(u0 * eyeSrcW);
                 GLint srcX1 = (GLint)(u1 * eyeSrcW);
                 GLint srcY0 = (GLint)(v0 * eyeSrcH);
                 GLint srcY1 = (GLint)(v1 * eyeSrcH);
-                // Clamp X into texture
                 if (srcX0 < 0) srcX0 = 0;
                 if (srcX1 < 0) srcX1 = 0;
                 if (srcX0 > eyeSrcW) srcX0 = eyeSrcW;
@@ -753,7 +735,6 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     if (srcX1 < eyeSrcW) srcX1 = srcX0 + 1;
                     else srcX0 = srcX1 - 1;
                 }
-                // Clamp Y independently (order may be flipped)
                 if (srcY0 < 0) srcY0 = 0;
                 if (srcY1 < 0) srcY1 = 0;
                 if (srcY0 > eyeSrcH) srcY0 = eyeSrcH;
@@ -763,20 +744,10 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     else srcY0 = srcY1 - 1;
                 }
 
-                // Primary path: glBlitFramebuffer.
-                // No glReadPixels here — that forces a full GPU sync and races
-                // mat_queue_mode 2 workers ("Illegal termination of worker thread").
-                // OpenXR OpenGL swapchain: first row = top of view. Source Engine GL RTs
-                // store top-of-scene at high Y. When bounds already invert src Y (Linux),
-                // the blit itself flips. When bounds are ordered low→high, invert dest Y
-                // on Linux so the image is not upside-down in the HMD.
+                // Linux: invert dest Y (OpenXR top-left vs GL bottom-left). One flip only.
                 GLint dstY0 = 0;
                 GLint dstY1 = (GLint)g_xrSwapchainHeight;
-                const bool srcYFlips = (srcY0 > srcY1);
-                // Need one vertical flip total for Linux GL→OpenXR.
-                // - If src Y already inverted (blit flips): dest identity.
-                // - Else if g_rtTextureNeedsVFlip (or default Linux): invert dest Y.
-                if (!srcYFlips && g_rtTextureNeedsVFlip) {
+                if (g_rtTextureNeedsVFlip) {
                     dstY0 = (GLint)g_xrSwapchainHeight;
                     dstY1 = 0;
                 }
