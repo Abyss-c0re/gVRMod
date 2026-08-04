@@ -1,29 +1,29 @@
 # Last cycle
 
-**Cycle:** 60  
-**Time:** 2026-08-05T02:05:52+03:00  
-**Focus:** G45 primary-hand left SoT (LaserLaw_Decide)  
-**Commit (gVRMod):** `9094d10`  
-**Commit (vrmod-x64):** `fcad81a` (branch `cube-stereo-g45`; origin/main non-ff)  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 56 Lua)  
+**Cycle:** 61  
+**Time:** 2026-08-05T02:16:45+03:00  
+**Focus:** G46 desktop mirror vs HMD isolation  
+**Commit (gVRMod):** `365e525`  
+**Commit (vrmod-x64):** `ae962c6` (branch `cube-stereo-g45`)  
+**Tests:** full `./scripts/test_all.sh` — 6/6 pass (pure pending=0; 57 Lua; module 68; launcher 33)  
 
 ## What changed
 
-1. **Pure** LaserLaw_Decide / AllowLaserFromHand / IsWrongHandPrimaryClick  
-2. **cl_ui** laser path snapshot _laserLaw + HmdExpect  
-3. Unit tests G45 steal/dual + submit_bounds V-offset under clampHalf  
-4. TESTING_FRAMEWORK §0.32; HmdWalk G45; GLOGIC_GAPS G45  
-5. Pushed addon to `cube-stereo-g45` (main blocked by remote mq2 revert)  
+1. **Pure** DesktopMirror_* — no live RT eye-crop after submit  
+2. **cl_vrmod** PresentDesktopMirror holds 2/3; follow-cam private RT OK  
+3. **C++** XR submit prefers stolenTexture; ordered V + dest flip (one flip)  
+4. Unit test util.desktop_mirror_law.hmd_g46 + §0.33 walk  
+5. Finished mid-cycle stereo black WIP safely (Quest autotest evidence)  
 
 ## Pain points
 
-- Soft care: no climb thrash; left primary only.
+- Soft care: no mq=2; desktop secondary to HMD.
 
 ## Gaps
 
-- G45 partial — HMD primary-left walk open  
-- **Attention:** vrmod-x64 origin/main diverged (revert mq2 mono vs local stereo fixes)  
+- G46 partial — HMD proof still open  
+- **Attention:** vrmod-x64 origin/main still diverged (mq2 revert vs cube-stereo-g45)  
 
 ## Notes
 
-- cubalc_mirror left unstaged.
+- cubalc_mirror + gvrmod_autotest_shots.sh left unstaged (scratch/tooling).
