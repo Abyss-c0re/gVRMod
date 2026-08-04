@@ -464,6 +464,49 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G46 pure desktop mirror isolation (no live stereo RT after submit)
+	H.TEST("util.desktop_mirror_law.hmd_g46", function()
+		local u = env.vrmod.utils
+		H.assert_true(not u.DesktopMirror_AllowSampleStereoRtAfterSubmit())
+		H.assert_true(not u.DesktopMirror_AllowEyeCropFromLiveRt())
+		H.assert_true(u.DesktopMirror_PreferFollowPrivateRt())
+		H.assert_true(u.DesktopMirror_PresentOnlyAfterSubmit())
+		H.assert_true(u.DesktopMirror_IsEyeCropMode(2))
+		H.assert_true(u.DesktopMirror_IsEyeCropMode(3))
+		H.assert_true(u.DesktopMirror_IsFollowMode(4))
+		H.assert_true(u.DesktopMirror_IsNoneMode(1))
+		H.assert_true(not u.DesktopMirror_AllowPresent({
+			vr_active = true, after_submit = true, desktop_view = 2,
+		}))
+		H.assert_true(u.DesktopMirror_AllowPresent({
+			vr_active = true, after_submit = true, desktop_view = 4,
+		}))
+		H.assert_true(not u.DesktopMirror_AllowPresent({
+			vr_active = true, after_submit = false, desktop_view = 4,
+		}))
+		local hold = u.DesktopMirror_Decide({
+			vr_active = true, after_submit = true, desktop_view = 2,
+			sample_stereo_rt = true, attempt_present = true,
+		})
+		H.assert_true(not hold.allow_present)
+		H.assert_eq(hold.risk, "live_rt")
+		H.assert_true(u.DesktopMirror_IsBlackRisk(hold))
+		H.assert_eq(u.DesktopMirror_HmdExpect(hold).verdict, "expect_black_risk")
+		local crop = u.DesktopMirror_Decide({
+			vr_active = true, after_submit = true, desktop_view = 3,
+		})
+		H.assert_eq(crop.risk, "black_hmd")
+		H.assert_eq(u.DesktopMirror_StatusLabel(crop), "DESK · EYE CROP HOLD")
+		local follow = u.DesktopMirror_Decide({
+			vr_active = true, after_submit = true, desktop_view = 4,
+		})
+		H.assert_true(follow.allow_present)
+		H.assert_eq(u.DesktopMirror_StatusLabel(follow), "DESK · FOLLOW")
+		local he = u.DesktopMirror_HmdExpect(follow)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G46", 1, true))
+	end)
+
 	-- G41 pure HMD walk inventory (manual backlog; never offline smoke claim)
 	H.TEST("util.hmd_walk_law.inventory_g41", function()
 		local u = env.vrmod.utils

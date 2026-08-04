@@ -306,6 +306,54 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
     tier: pure
     tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.DesktopMirror_AllowEyeCropFromLiveRt
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_AllowPresent
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_AllowSampleStereoRtAfterSubmit
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_IsBlackRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_IsEyeCropMode
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_IsFollowMode
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_IsNoneMode
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_PreferFollowPrivateRt
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_PresentOnlyAfterSubmit
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
   - id: vrmod.utils.DrawDeathAnimation
     file: addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua
     tier: seam

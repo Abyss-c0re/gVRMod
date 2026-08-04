@@ -603,3 +603,13 @@ Append one block per cycle. Newest at bottom.
 - vrmod-x64 pushed branch cube-stereo-g45 (main non-ff: remote has mq2 mono revert).
 - Tests: --fast PASS 4/4 (pure pending=0; 56 Lua).
 - Next: Walk G05/G12 or primary-left on HMD; resolve vrmod-x64 main vs cube-stereo-g45.
+
+## 2026-08-05 cycle 61 — G46 desktop mirror vs HMD isolation
+
+- Theme: finish WIP stereo black recovery; never sample live stereo RT for desktop 2/3.
+- Pure: DesktopMirror_AllowPresent/Decide/HmdExpect (eye-crop hold; follow private RT).
+- cl_vrmod PresentDesktopMirror wires pure law; C++ submit prefers stolenTexture + ordered V/dest flip.
+- TESTING_FRAMEWORK §0.33; HmdWalk G46; full test_all 6/6.
+- vrmod-x64 still on cube-stereo-g45 (origin/main non-ff mq2 revert).
+- Tests: full test_all PASS 6/6 (pure pending=0; 57 Lua; module 68; launcher 33).
+- Next: HMD walk G05/G46 with desktopview 1 then 2; resolve vrmod-x64 main carefully.

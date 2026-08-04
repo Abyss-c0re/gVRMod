@@ -234,6 +234,21 @@ Offline gate proves **Decide** + wrong-hand steal + primary-only laser ray. **He
 
 Pure helpers: `LaserLaw_AllowLaserFromHand` / `LaserLaw_IsWrongHandPrimaryClick` / `LaserLaw_Decide` (unit-tested; offline ≠ HMD OK).
 
+### 0.33 G46 desktop mirror vs HMD isolation (manual)
+
+Offline gate proves **no live stereo RT sample** for desktop eye-crop after submit; follow-cam private RT OK. **Headset** required for black-eye claim.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| desktopview 1 | HMD clear stereo | HMD black |
+| desktopview 2/3 | Eye crop **held** (no live RT bind); HMD clear | HMD near-black after crop |
+| desktopview 4 | Follow private RT; HMD clear | Shared RT thrash |
+| Submit | Ordered V + dest flip Linux; prefer stolenTexture | 1/8 strip / black eye |
+
+**Procedure:** Quest/WiVRn autotest with `vrmod_desktopview 1` then 2 — HMD stays stereo pair.
+
+Pure helpers: `DesktopMirror_AllowPresent` / `DesktopMirror_Decide` / `DesktopMirror_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 ### 0.9 G17 mat_queue pin (manual)
 
 Offline gate proves pin prefer **1**, dual only when mq&lt;2, **never write** from VR. **Headset** optional for feel; console check is enough for write law.

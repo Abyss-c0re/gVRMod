@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 60
+Last updated: 2026-08-05 cycle 61
 
 ## P0 — seamless / feel broken
 
@@ -17,6 +17,7 @@ Last updated: 2026-08-05 cycle 60
 | G29 | Supersample cold-start cap (no crank) | CubeSs_* cycle47; HMD walk open | **partial** cycle47 |
 | G30 | FOV archive write-only-when-touched | CubeFov_* cycle48; HMD Vision walk open | **partial** cycle48 |
 | G40 | Vision border fill / black bars (W1) | BorderLaw_* cycle58; HMD fill walk open | **partial** cycle58 |
+| G46 | Desktop live-RT bind blacks HMD | DesktopMirror_* + PresentDesktop hold cycle61 | **partial** cycle61 |
 
 ## P1 — Cube experience polish
 
@@ -74,6 +75,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G46 | Desktop mirror vs HMD RT isolation | DesktopMirror_* + eye-crop hold |
 | G45 | Primary-hand left Decide + steal law | LaserLaw_* + cl_ui snapshot |
 | G41–G44 | Parent pure offline gate for ship-bar laws | tests + PURE_TESTED cycle59 |
 | G40 | Vision border fill law (W1) | BorderLaw_* + cl_border_calibrate |

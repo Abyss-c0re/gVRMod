@@ -289,6 +289,54 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
     ],
     [
+      "vrmod.utils.DesktopMirror_AllowEyeCropFromLiveRt",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_AllowPresent",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_AllowSampleStereoRtAfterSubmit",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_IsBlackRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_IsEyeCropMode",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_IsFollowMode",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_IsNoneMode",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_PreferFollowPrivateRt",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_PresentOnlyAfterSubmit",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
+      "vrmod.utils.DesktopMirror_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
       "vrmod.utils.DrawDeathAnimation",
       "addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua"
     ],
