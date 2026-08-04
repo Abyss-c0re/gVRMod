@@ -218,3 +218,13 @@ Append one block per cycle. Newest at bottom.
 - G12 partial — audible paplay/OpenAL still open.
 - Tests: full test_all PASS 6/6 (+player decide unit); launcher builds.
 - Next: G04 map attach or ambient backend careful.
+
+## 2026-08-04 cycle 23 — G04 map attach design
+
+- Theme: pure warm map-attach decide; never auto changelevel.
+- Pure C++: CubeWarmAttach_NormalizeMap/Decide/Toast.
+- Pure Lua: sh_warm_attach.lua Parse/Decide/Toast.
+- openxr_launch noteWarmAttachOnce toast after VR live; allow_changelevel=false.
+- G04 partial — skip-spawn + real changelevel still open.
+- Tests: full test_all PASS 6/6 (+attach unit Lua/C++).
+- Next: G12 paplay backend careful or G05 careful.

@@ -445,6 +445,22 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
     [
+      "vrmod.utils.WarmAttach_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_NormalizeMap",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_Parse",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
+      "vrmod.utils.WarmAttach_Toast",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
       "vrmod.utils.WepInfo",
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],

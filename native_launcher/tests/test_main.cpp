@@ -222,6 +222,27 @@ TEST(launcher_warm_reuse_decide) {
     ASSERT_TRUE(CubeWarmReuseDetail(defer).find("warm_request") != std::string::npos);
 }
 
+// G04: map attach decide — default no changelevel; normalize map tokens
+TEST(launcher_warm_attach_decide) {
+    ASSERT_EQ(CubeWarmAttach_NormalizeMap("maps/GM_Construct.bsp"), std::string("gm_construct"));
+    auto idle = CubeWarmAttachDecide(false, "gm_construct", "warm_request", "gm_construct");
+    ASSERT_EQ(idle.action, std::string("idle"));
+    auto same = CubeWarmAttachDecide(true, "gm_flatgrass", "warm_request", "GM_Flatgrass");
+    ASSERT_EQ(same.action, std::string("same_map"));
+    ASSERT_TRUE(!same.would_changelevel);
+    auto defer = CubeWarmAttachDecide(true, "gm_flatgrass", "warm_request", "gm_construct", false);
+    ASSERT_EQ(defer.action, std::string("deferred"));
+    ASSERT_EQ(defer.reason, std::string("eligible_deferred"));
+    ASSERT_TRUE(!defer.would_changelevel);
+    auto chg = CubeWarmAttachDecide(true, "gm_flatgrass", "warm_request", "gm_construct", true);
+    ASSERT_EQ(chg.action, std::string("changelevel"));
+    ASSERT_TRUE(chg.would_changelevel);
+    auto rej = CubeWarmAttachDecide(true, "", "warm_request", "gm_construct");
+    ASSERT_EQ(rej.action, std::string("reject"));
+    ASSERT_TRUE(CubeWarmAttachToast(defer).find("deferred") != std::string::npos);
+    ASSERT_TRUE(CubeWarmAttachToast(idle).empty());
+}
+
 // G12: ambient clip contract — pure should-play + format/parse + status label
 TEST(launcher_ambient_clip_contract) {
     ASSERT_TRUE(CubeAmbient_ShouldPlay(1.f, true));

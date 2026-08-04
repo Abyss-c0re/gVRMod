@@ -516,6 +516,22 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.WarmAttach_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_NormalizeMap
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_Parse
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_Toast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
   - id: vrmod.utils.WepInfo
     file: addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua
     tier: seam

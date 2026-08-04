@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 22  
-**Time:** 2026-08-04T18:23:39+03:00  
-**Focus:** G12 ambient asset+player (partial — player hard-off)  
-**Commit (gVRMod):** `131ab3f`  
-**Commit (vrmod-x64):** none  
+**Cycle:** 23  
+**Time:** 2026-08-04T18:34:25+03:00  
+**Focus:** G04 map attach design (partial — changelevel hard-off)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **cube_hold.ogg** soft hold tone under `native_launcher/assets/ambient/` (install copy next to binary)  
-2. **ambient_clip.hpp** PlayerDecide / AssetsDirCandidates / clip_present format + StatusLabelEx  
-3. **CubeAmbientPlayerEnabled()** hard-off — no paplay/OpenAL spawn yet  
-4. **ResolveCubeAmbientAssetsDir** + FillCubeAmbientClipPaths; handoff panel AUDIO uses real presence  
-5. Unit: `launcher_ambient_player_decide`  
+1. **warm_reuse.hpp** CubeWarmAttach_NormalizeMap / Decide / Toast (pure)  
+2. **sh_warm_attach.lua** Parse + Decide + Toast (allow_changelevel=false)  
+3. **cl_openxr_launch** noteWarmAttachOnce toast after VR live (no changelevel)  
+4. Units: launcher_warm_attach_decide + util.warm_attach.decide_g04  
+5. PURE_TESTED map for WarmAttach_*  
 
 ## Pain points
 
-- Untouched.
+- Untouched; no auto changelevel / skip-spawn.
 
 ## Gaps
 
-- G12 still **partial** — real backend play path open (feature gate)  
-- Next: G04 map attach, or G03 apply design, or ambient paplay careful  
+- G04 still **partial** — real skip-spawn + changelevel path open  
+- Next: G12 paplay backend careful, or G05 HMD notes  
 
 ## Notes
 

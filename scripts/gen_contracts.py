@@ -56,6 +56,11 @@ PURE_TESTED = {
     "vrmod.utils.CubeReturn_PhaseLabel": "util.cube_return.protocol_g13",
     "vrmod.utils.CubeReturn_ShouldNotifyCube": "util.cube_return.protocol_g13",
     "vrmod.utils.CubeReturn_DetailForPhase": "util.cube_return.protocol_g13",
+    # G04 pure warm map-attach (no auto changelevel)
+    "vrmod.utils.WarmAttach_NormalizeMap": "util.warm_attach.decide_g04",
+    "vrmod.utils.WarmAttach_Parse": "util.warm_attach.decide_g04",
+    "vrmod.utils.WarmAttach_Decide": "util.warm_attach.decide_g04",
+    "vrmod.utils.WarmAttach_Toast": "util.warm_attach.decide_g04",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.DedupInGameMenuItems": "api.menu.dedup_function",
     "vrmod.RemoveInGameMenuItem": "api.menu.dedupe_name",

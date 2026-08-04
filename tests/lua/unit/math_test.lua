@@ -277,6 +277,46 @@ return function(H, env)
 		H.assert_true(u.CubeReturn_Parse("") == nil)
 	end)
 
+	-- G04 pure warm map-attach decide (no auto changelevel)
+	H.TEST("util.warm_attach.decide_g04", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.WarmAttach_NormalizeMap("maps/GM_Construct.bsp"), "gm_construct")
+		H.assert_true(u.WarmAttach_Parse("") == nil)
+		local body = table.concat({
+			"v=1",
+			"action=warm_request",
+			"reason=eligible_deferred",
+			"map=gm_flatgrass",
+			"source=cube_webui",
+			"ts=7",
+		}, "\n")
+		local req = u.WarmAttach_Parse(body)
+		H.assert_true(req ~= nil)
+		H.assert_eq(req.map, "gm_flatgrass")
+		local same = u.WarmAttach_Decide(req, {
+			current_map = "gm_flatgrass",
+			allow_changelevel = false,
+		})
+		H.assert_eq(same.action, "same_map")
+		H.assert_true(not same.would_changelevel)
+		local defer = u.WarmAttach_Decide(req, {
+			current_map = "gm_construct",
+			allow_changelevel = false,
+		})
+		H.assert_eq(defer.action, "deferred")
+		H.assert_eq(defer.reason, "eligible_deferred")
+		H.assert_true(not defer.would_changelevel)
+		local chg = u.WarmAttach_Decide(req, {
+			current_map = "gm_construct",
+			allow_changelevel = true,
+		})
+		H.assert_eq(chg.action, "changelevel")
+		H.assert_true(chg.would_changelevel)
+		local toast = u.WarmAttach_Toast(defer)
+		H.assert_true(type(toast) == "string" and string.find(toast, "deferred", 1, true))
+		H.assert_true(u.WarmAttach_Toast(u.WarmAttach_Decide(nil, {})) == nil)
+	end)
+
 	-- G05 pure stereo-load policy (never dual under mat_queue 2)
 	H.TEST("util.stereo_load.policy_g05", function()
 		local u = env.vrmod.utils

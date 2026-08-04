@@ -139,3 +139,107 @@ inline std::string CubeWarmReuseDetail(const WarmReuseDecision& d) {
     return "force cold · Steam/hl2 spawn";
   return "cold Steam/hl2 · holding OpenXR · GMod booting";
 }
+
+// ── G04 map attach (pure) ──────────────────────────────────────────────────
+// When a warm process is up, Cube files cube_warm.txt with target map.
+// GMod may later changelevel / attach without a second Steam spawn.
+// Law: allow_changelevel defaults false — no auto changelevel until HMD-proven.
+
+struct WarmAttachDecision {
+  // idle | same_map | changelevel | deferred | reject
+  std::string action = "idle";
+  std::string reason = "none";
+  std::string request_map;
+  std::string current_map;
+  bool would_changelevel = false;
+  bool valid = false;
+};
+
+// Normalize map token for compare: trim, lower, strip maps/, strip .bsp
+inline std::string CubeWarmAttach_NormalizeMap(const std::string& raw) {
+  std::string s = raw;
+  WarmReuse_Trim(s);
+  for (char& c : s) {
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    if (c == '\\') c = '/';
+  }
+  // strip leading maps/
+  if (s.rfind("maps/", 0) == 0) s = s.substr(5);
+  // strip .bsp
+  if (s.size() > 4 && s.compare(s.size() - 4, 4, ".bsp") == 0)
+    s = s.substr(0, s.size() - 4);
+  WarmReuse_Trim(s);
+  return s;
+}
+
+// Pure attach decision from warm request + live map.
+// allow_changelevel=false → maps differ becomes deferred (product default).
+inline WarmAttachDecision CubeWarmAttachDecide(bool requestValid, const std::string& requestMap,
+                                              const std::string& requestAction,
+                                              const std::string& currentMap,
+                                              bool allowChangelevel = false) {
+  WarmAttachDecision d;
+  d.valid = true;
+  d.request_map = CubeWarmAttach_NormalizeMap(requestMap);
+  d.current_map = CubeWarmAttach_NormalizeMap(currentMap);
+  if (!requestValid) {
+    d.action = "idle";
+    d.reason = "no_request";
+    return d;
+  }
+  if (d.request_map.empty()) {
+    d.action = "reject";
+    d.reason = "no_map";
+    return d;
+  }
+  // Optional: only warm_request / warm_reuse actions are attach-relevant
+  std::string act = requestAction;
+  WarmReuse_Trim(act);
+  for (char& c : act) {
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+  }
+  if (!act.empty() && act != "warm_request" && act != "warm_reuse") {
+    d.action = "reject";
+    d.reason = "bad_action";
+    return d;
+  }
+  if (d.current_map.empty()) {
+    // No live map yet (menu) — defer change until in-game map known
+    d.action = allowChangelevel ? "changelevel" : "deferred";
+    d.reason = allowChangelevel ? "menu_or_unknown" : "eligible_deferred";
+    d.would_changelevel = allowChangelevel;
+    return d;
+  }
+  if (d.request_map == d.current_map) {
+    d.action = "same_map";
+    d.reason = "already_on_map";
+    d.would_changelevel = false;
+    return d;
+  }
+  if (allowChangelevel) {
+    d.action = "changelevel";
+    d.reason = "eligible";
+    d.would_changelevel = true;
+  } else {
+    d.action = "deferred";
+    d.reason = "eligible_deferred";
+    d.would_changelevel = false;
+  }
+  return d;
+}
+
+inline std::string CubeWarmAttachToast(const WarmAttachDecision& d) {
+  if (!d.valid || d.action == "idle") return {};
+  if (d.action == "same_map")
+    return "Warm attach · same map · changelevel not needed";
+  if (d.action == "deferred") {
+    if (!d.current_map.empty())
+      return "Warm attach · want " + d.request_map + " · on " + d.current_map + " · deferred";
+    return "Warm attach · want " + d.request_map + " · changelevel deferred";
+  }
+  if (d.action == "changelevel")
+    return "Warm attach · changelevel → " + d.request_map;
+  if (d.action == "reject")
+    return "Warm attach · rejected (" + d.reason + ")";
+  return {};
+}

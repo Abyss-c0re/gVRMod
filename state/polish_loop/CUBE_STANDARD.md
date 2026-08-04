@@ -21,7 +21,7 @@ Never submit eng texture. Never dual pose truth.
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoadPolicy` keeps dual-eye paint through load when mat_queue&lt;2; never dual under mq≥2
-- G04 partial: every Start still cold-spawns; `cube_warm.txt` records warm intent when process up (`CubeWarmReuseEnabled` hard-off)
+- G04 partial: every Start still cold-spawns; `cube_warm.txt` + GMod WarmAttach decide/toast; changelevel/`CubeWarmReuseEnabled` hard-off
 - G13 partial: VR exit writes `cube_return.txt`; Cube polls + RETURN panel line; **does not** auto-reclaim XR (`CubeReclaimEnabled` hard-off)
 - G03 partial: Cube writes `cube_stage_pack.txt`; GMod parses + `StagePack_ApplyDecision` (allow_apply=false); **must not** auto-jump origin/height without HMD-proven apply
 - G12 partial: gain law + `cube_hold.ogg` asset + presence resolve; `CubeAmbientPlayerEnabled` hard-off (no audible yet)
