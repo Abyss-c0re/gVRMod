@@ -28,3 +28,12 @@ Append one block per cycle. Newest at bottom.
 - Tests: test_all --fast PASS 4/4.
 - Commits: vrmod-x64 70ff998; gVRMod (tests + submodule + state).
 - Next: G20 pure utils rewire or G11 Quick Play (safe).
+
+## 2026-08-04 cycle 3 — G20 pure utils rewire
+
+- Theme: laser/beam color + finger curl call sites → sh_math helpers.
+- ParseColor: cl_laser_pointer, cl_ui beam.
+- FingerDigitIndex + LerpFingerAngle: cl_character_hands, sh_character_fbt, cl_character_ik.
+- Tests: test_all --fast PASS 4/4.
+- Commits: vrmod-x64 a0b9d2e; gVRMod submodule + state.
+- G20 partial (more sites remain e.g. cube_framework color); next G11 Quick Play or G23 follow-cam verify.

@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 2
+Last updated: 2026-08-04 cycle 3
 
 ## P0 — seamless / feel broken
 
@@ -28,7 +28,7 @@ Last updated: 2026-08-04 cycle 2
 
 | ID | Gap | Notes | Status |
 |----|-----|-------|--------|
-| G20 | Pure utils not fully rewired at call sites | laser/beam/finger → sh_math helpers | open |
+| G20 | Pure utils not fully rewired at call sites | laser/beam/finger → sh_math helpers | **partial** cycle3 (laser/beam/finger core) |
 | G21 | Contract inventory lag for new symbols | gen_contracts after new vrmod.* | open |
 | G22 | VERSION drift in cubalc mirror | informational; don’t “fix” upstream VERSION | n/a |
 | G23 | Desktop follow-cam call sites incomplete | follow cam landed; verify all desktopview=4 paths | open |
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G20 | Laser/beam ParseColor + finger curl SoT | vrmod-x64 a0b9d2e |
 | G10 | Skip Experience re-spam wrapper+cal | vrmod-x64 70ff998 |
 | G01 | Phase-aware handoff panel + map_ready | launcher helpers + vrmod-x64 b1ada40 |
 | — | No forced -noborder | 70ea961 / 1dbb1b5 |
