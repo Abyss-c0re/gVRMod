@@ -787,17 +787,30 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                         u1 = 1.0f - ins;
                     }
                 } else if (!singleEyeTex && cropMode != 1) {
-                    // Clamp Lua UV into the correct SBS half. ComputeSubmitBounds can
-                    // emit u0≈-0.09 / u1≈0.40 under extreme offset×scale (seen in logs);
-                    // unclamped sample = black bars / thin strip on WiVRn.
-                    if (eye == 0) {
-                        if (u0 < ins) u0 = ins;
-                        if (u1 > 0.5f) u1 = 0.5f;
-                        if (u0 > u1 - 0.01f) { u0 = ins; u1 = 0.5f; }
+                    // Shift (preserve span) into the correct SBS half.
+                    // Pin-only on u0 shrunk FOV (u0=-0.09,u1=0.40 → thin strip).
+                    const float halfLo = (eye == 0) ? 0.0f : 0.5f;
+                    const float halfHi = (eye == 0) ? 0.5f : 1.0f;
+                    const float lo = halfLo + ins;
+                    const float hi = (eye == 0) ? 0.5f : (1.0f - ins);
+                    float span = u1 - u0;
+                    if (!(span > 0.01f) || span > (hi - lo + 0.001f)) {
+                        u0 = lo;
+                        u1 = hi;
                     } else {
-                        if (u0 < 0.5f) u0 = 0.5f;
-                        if (u1 > 1.0f - ins) u1 = 1.0f - ins;
-                        if (u0 > u1 - 0.01f) { u0 = 0.5f; u1 = 1.0f - ins; }
+                        if (u0 < lo) {
+                            u0 = lo;
+                            u1 = u0 + span;
+                        }
+                        if (u1 > hi) {
+                            u1 = hi;
+                            u0 = u1 - span;
+                        }
+                        if (u0 < lo) u0 = lo;
+                        if (u1 <= u0 + 0.01f) {
+                            u0 = lo;
+                            u1 = hi;
+                        }
                     }
                 }
                 // V: empty only → full. Inverted V intentional on SBS (flip via blit).
