@@ -3,8 +3,8 @@
 **Cycle:** 54  
 **Time:** 2026-08-05T00:16:00+03:00  
 **Focus:** G36 FOV/Z soft-refresh law (W5)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `09b030c`  
+**Commit (vrmod-x64):** `704554c`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 48 Lua)  
 
 ## What changed
