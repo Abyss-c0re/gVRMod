@@ -1123,9 +1123,22 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         };
         drawHandLaser(aimValidL, panelHitL, aimOL, aimDL, hitPtL, 0.55f, 0.55f, 0.6f);
         drawHandLaser(aimValidR, panelHitR, aimOR, aimDR, hitPtR, 0.55f, 0.55f, 0.6f);
-        // G02: full eye-buffer fade (panel dim + world content) during take_xr release
-        if (ui.handoff && ui.handoffFade > 0.001f)
-          GlFadeEyeBufferTowardBlack(CubeHandoffLayerFadeAlpha(ui.handoffFade));
+        // G02 + matrix rain: take_xr reality blend (passthrough → rain → black/GMod)
+        if (ui.handoff && ui.handoffFade > 0.001f) {
+          const float fa = CubeHandoffLayerFadeAlpha(ui.handoffFade);
+          // Tick rain once per stereo frame (eye 0 only); both eyes draw same field
+          float dt = 0.f;
+          if (eye == 0) {
+            static double s_prevWait = -1.0;
+            dt = 0.016f;
+            if (s_prevWait >= 0.0 && handoffExitWait >= s_prevWait)
+              dt = float(handoffExitWait - s_prevWait);
+            if (dt < 0.001f) dt = 0.016f;
+            if (dt > 0.05f) dt = 0.05f;
+            s_prevWait = handoffExitWait;
+          }
+          GlMatrixRainHandoffOverlay(fa, dt);
+        }
         GlUnbindFbo();
         glDisable(GL_DEPTH_TEST);
 

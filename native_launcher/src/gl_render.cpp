@@ -1,5 +1,6 @@
 #include "gl_render.hpp"
 #include "panel_config.hpp"
+#include "matrix_rain.hpp"
 
 #include <GL/glx.h>
 #include <cmath>
@@ -207,5 +208,70 @@ void GlFadeEyeBufferTowardBlack(float fade) {
   glPopMatrix();
   glMatrixMode(GL_MODELVIEW);
   glColor4f(1.f, 1.f, 1.f, 1.f);
+  glDisable(GL_BLEND);
+}
+
+void GlMatrixRainHandoffOverlay(float fade, float dtSec) {
+  if (fade < 0.f) fade = 0.f;
+  if (fade > 1.f) fade = 1.f;
+  if (fade < 0.02f) return;
+
+  static MatrixRainState rain;
+  static bool rainReady = false;
+  if (!rainReady) {
+    MatrixRain_Init(&rain, 48, 0xC0BEA11Cu);
+    rainReady = true;
+  }
+  MatrixRain_Tick(&rain, dtSec > 0.f ? dtSec : 0.016f);
+  const float density = MatrixRain_DensityFromFade(fade);
+
+  // Soft black underlay so passthrough dissolves under rain
+  GlFadeEyeBufferTowardBlack(fade * 0.72f);
+
+  static MatrixRainPoint pts[MATRIX_RAIN_MAX_COLS * MATRIX_RAIN_MAX_TRAIL];
+  const int n = MatrixRain_BuildPoints(rain, density, pts, (int)(sizeof(pts) / sizeof(pts[0])));
+  if (n <= 0) return;
+
+  glDisable(GL_TEXTURE_2D);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+  glMatrixMode(GL_PROJECTION);
+  glPushMatrix();
+  glLoadIdentity();
+  glOrtho(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
+  glMatrixMode(GL_MODELVIEW);
+  glPushMatrix();
+  glLoadIdentity();
+
+  glPointSize(3.f);
+  glBegin(GL_POINTS);
+  for (int i = 0; i < n; ++i) {
+    const float a = pts[i].a;
+    if ((pts[i].glyph % 7) == 0)
+      glColor4f(0.75f, 1.f, 0.55f, a);
+    else
+      glColor4f(0.05f, 0.85f, 0.25f, a * 0.85f);
+    glVertex2f(pts[i].x, pts[i].y);
+  }
+  glEnd();
+
+  glLineWidth(1.5f);
+  glBegin(GL_LINES);
+  for (int i = 0; i < n; ++i) {
+    if ((pts[i].glyph & 3) != 0) continue;
+    glColor4f(0.1f, 0.7f, 0.2f, pts[i].a * 0.55f);
+    glVertex2f(pts[i].x, pts[i].y);
+    glVertex2f(pts[i].x, pts[i].y - 0.04f);
+  }
+  glEnd();
+
+  glPopMatrix();
+  glMatrixMode(GL_PROJECTION);
+  glPopMatrix();
+  glMatrixMode(GL_MODELVIEW);
+  glColor4f(1.f, 1.f, 1.f, 1.f);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glDisable(GL_BLEND);
 }

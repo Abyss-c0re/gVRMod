@@ -24,3 +24,7 @@ void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb);
 // G02: full-eye black overlay after content (panel + lasers). fade 0..1.
 // Covers the whole swapchain view so take_xr feels intentional before release.
 void GlFadeEyeBufferTowardBlack(float fade);
+
+// Matrix rain + optional black underlay during take_xr (reality blend).
+// fade 0..1 from CubeHandoffFadeAmount; rain pure-sim tick internal.
+void GlMatrixRainHandoffOverlay(float fade, float dtSec);

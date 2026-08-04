@@ -7,6 +7,7 @@
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
 #include "window_chrome.hpp"
+#include "matrix_rain.hpp"
 #include <algorithm>
 #include <cstdlib>
 
@@ -126,6 +127,28 @@ TEST(launcher_handoff_layer_fade_alpha) {
     // Exit ramp end → solid black overlay before session drop
     float end = CubeHandoffFadeAmount("take_xr", true, 2.5f);
     ASSERT_NEAR(CubeHandoffLayerFadeAlpha(end), 1.f, 1e-5f);
+}
+
+// Matrix rain pure sim — take_xr reality blend (no GL)
+TEST(launcher_matrix_rain_pure) {
+    MatrixRainState st{};
+    MatrixRain_Init(&st, 32, 0xC0BEu);
+    ASSERT_TRUE(st.inited);
+    ASSERT_EQ(st.n, 32);
+    ASSERT_NEAR(MatrixRain_DensityFromFade(0.f), 0.f, 1e-5f);
+    ASSERT_TRUE(MatrixRain_DensityFromFade(0.5f) > 0.3f);
+    ASSERT_TRUE(MatrixRain_DensityFromFade(1.f) > 0.f);
+    float h0 = st.cols[0].head;
+    MatrixRain_Tick(&st, 0.05f);
+    ASSERT_TRUE(st.cols[0].head != h0 || st.cols[1].head != st.cols[1].head);
+    MatrixRainPoint pts[512];
+    int n = MatrixRain_BuildPoints(st, 0.8f, pts, 512);
+    ASSERT_TRUE(n > 10);
+    ASSERT_TRUE(pts[0].a > 0.f);
+    // Deterministic seed: same init → same first column x
+    MatrixRainState st2{};
+    MatrixRain_Init(&st2, 32, 0xC0BEu);
+    ASSERT_NEAR(st2.cols[0].x, st.cols[0].x, 1e-6f);
 }
 
 // G13: reverse handoff pure labels (Cube reclaim not auto)
