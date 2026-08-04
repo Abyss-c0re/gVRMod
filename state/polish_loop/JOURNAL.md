@@ -257,3 +257,14 @@ Append one block per cycle. Newest at bottom.
 - G03 partial — real seatedoffset SetFloat still HMD-gated.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: G04 skip-spawn design or ambient default-on careful.
+
+## 2026-08-04 cycle 27 — G04 skip-spawn plan
+
+- Theme: pure skip-spawn attach plan + markers without Steam; env opt-in.
+- Pure: CubeWarmSkipSpawnPlanDecide / phase labels; GVRMOD_WARM_REUSE WantEnv.
+- WriteWarmAttachMarkers (openxr_launch + handoff phase=warm_attach).
+- xr_app skip branch: markers + stage pack + last_play when feature on.
+- Default still cold-spawn (env unset).
+- G04 partial — changelevel on warm map-mismatch still open.
+- Tests: full test_all PASS 6/6 (+skip spawn plan unit).
+- Next: ambient default-on careful or G03 plan executor careful.

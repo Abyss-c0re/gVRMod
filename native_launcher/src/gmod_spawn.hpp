@@ -84,6 +84,11 @@ std::string FillCubeAmbientClipPaths(AmbientClipSnapshot& snap);
 // G04: write cube_warm.txt when process already up (intent only; still cold-spawns).
 bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot& snap);
 
+// G04: warm attach markers without Steam spawn (openxr_launch + handoff phase).
+// Used only when skip-spawn plan is active (CubeWarmReuseEnabled / env).
+bool WriteWarmAttachMarkers(const std::string& gmodRoot, const std::string& map,
+                            const std::string& phase = "warm_attach");
+
 // G13: read cube_return.txt (reverse handoff marker). Pure parse lives in cube_return.hpp.
 // Returns true when file present and body parses. Does not auto-reclaim XR.
 bool ReadCubeReturnMarker(const std::string& gmodRoot, CubeReturnSnapshot& out);
@@ -135,6 +140,12 @@ inline std::string CubeHandoffDetailForPhase(const std::string& phase, bool gmod
     return gmodUp ? "GMod process up · waiting Lua…" : "spawned · booting hl2…";
   if (phase == "gmod_process")
     return "GMod live · waiting addon signal…";
+  if (phase == "warm_attach")
+    return "warm process · attach markers · waiting take_xr…";
+  if (phase == "warm_wait_map")
+    return "warm attach · map continuity · waiting GMod…";
+  if (phase == "warm_ready")
+    return "warm attach ready · preparing take_xr…";
   if (phase == "waiting_process")
     return "cold Steam/hl2 boot · panel holds OpenXR…";
   return gmodUp ? "GMod live · waiting take_xr (seamless)"
@@ -145,6 +156,9 @@ inline std::string CubeHandoffDetailForPhase(const std::string& phase, bool gmod
 inline float CubeHandoffProgressForPhase(const std::string& phase) {
   if (phase == "waiting_process") return 0.08f;
   if (phase == "spawned" || phase == "SPAWNED") return 0.12f;
+  if (phase == "warm_attach") return 0.28f;
+  if (phase == "warm_wait_map") return 0.35f;
+  if (phase == "warm_ready") return 0.48f;
   if (phase == "gmod_process") return 0.22f;
   if (phase == "boot") return 0.38f;
   if (phase == "map_ready") return 0.52f;
@@ -161,6 +175,9 @@ inline std::string CubeHandoffPhaseLabel(const std::string& phase) {
   if (phase == "spawned" || phase == "SPAWNED") return "SPAWNED";
   if (phase == "waiting_process") return "WAITING PROCESS";
   if (phase == "gmod_process") return "GMOD PROCESS";
+  if (phase == "warm_attach") return "WARM ATTACH";
+  if (phase == "warm_wait_map") return "WARM WAIT MAP";
+  if (phase == "warm_ready") return "WARM READY";
   if (phase == "boot") return "LUA BOOT";
   if (phase == "map_ready") return "MAP READY";
   if (phase == "wait_module") return "WAIT MODULE";

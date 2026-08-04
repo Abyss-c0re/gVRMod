@@ -325,15 +325,38 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         wr.source = "cube_webui";
         WriteCubeWarmRequest(gmodRoot, wr);
       }
-      if (CubeLaunchShouldSkipSpawn(warm)) {
-        // Only when CubeWarmReuseEnabled() — not active; keep branch for future attach
+      // G04: pure skip-spawn plan (markers + stage pack; no Steam when feature on)
+      WarmSkipSpawnPlan skipPlan = CubeWarmSkipSpawnPlanDecide(warm);
+      if (CubeLaunchShouldSkipSpawn(warm) && skipPlan.skip_spawn) {
         ui.wantStart = false;
-        ui.status = "WARM REUSE · MAP ATTACH (EXPERIMENTAL)";
+        ui.status = "WARM REUSE · SKIP STEAM · ATTACH";
         ui.handoff = true;
         ui.handoffMap = lr.map;
-        ui.handoffPhase = "gmod_process";
-        ui.handoffDetail = CubeWarmReuseDetail(warm);
+        ui.handoffPhase = skipPlan.initial_phase.empty() ? "warm_attach" : skipPlan.initial_phase;
+        ui.handoffDetail = skipPlan.detail.empty() ? CubeWarmReuseDetail(warm) : skipPlan.detail;
         ui.handoffElapsed = 0.f;
+        if (skipPlan.write_markers)
+          WriteWarmAttachMarkers(gmodRoot, lr.map, ui.handoffPhase);
+        if (skipPlan.write_stage_pack) {
+          StagePackSnapshot pack;
+          pack.refSpace = spaceName ? spaceName : "LOCAL";
+          pack.headX = lastHeadX;
+          pack.headY = lastHeadY;
+          pack.headZ = lastHeadZ;
+          pack.headOk = lastHeadOk;
+          pack.viewScale = lr.gfx.xrViewScale;
+          pack.scaleFactor = lr.gfx.xrScaleFactor;
+          pack.supersample = lr.gfx.xrSupersample;
+          pack.map = lr.map;
+          pack.source = "cube_webui_warm_attach";
+          WriteCubeStagePack(gmodRoot, pack);
+          ui.handoffRefSpace = StagePack_NormalizeSpace(pack.refSpace);
+          ui.handoffHeadY = pack.headY;
+          ui.handoffHeadOk = pack.headOk;
+        }
+        WebUI_SaveLastPlay(ui);
+        fprintf(stderr, "[cube_webui] skip-spawn warm attach map=%s phase=%s\n",
+                lr.map.c_str(), ui.handoffPhase.c_str());
       } else {
       std::string err;
       int rc = SpawnGModFromWebUI(lr, err);

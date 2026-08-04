@@ -26,8 +26,18 @@ struct WarmRequestSnapshot {
   bool valid = false;
 };
 
-// Hard off until attach/map-change path is HMD-proven. Do not flip lightly.
-inline bool CubeWarmReuseEnabled() { return false; }
+// Env opt-in pure (unit-tested). Product default off when env unset.
+inline bool CubeWarmReuseWantEnv(const char* envVal) {
+  if (!envVal || !envVal[0]) return false;
+  char c = envVal[0];
+  return c == '1' || c == 'y' || c == 'Y' || c == 't' || c == 'T';
+}
+
+// Default off. Careful HMD smoke: GVRMOD_WARM_REUSE=1 (skip Steam when process up).
+// Map attach still GMod-side; changelevel remains allow_changelevel=false there.
+inline bool CubeWarmReuseEnabled() {
+  return CubeWarmReuseWantEnv(std::getenv("GVRMOD_WARM_REUSE"));
+}
 
 inline void WarmReuse_Trim(std::string& s) {
   while (!s.empty() && (s.back() == '\r' || s.back() == ' ' || s.back() == '\t')) s.pop_back();
@@ -138,6 +148,56 @@ inline std::string CubeWarmReuseDetail(const WarmReuseDecision& d) {
   if (d.reason == "force_cold")
     return "force cold · Steam/hl2 spawn";
   return "cold Steam/hl2 · holding OpenXR · GMod booting";
+}
+
+// ── G04 skip-spawn plan (pure) ─────────────────────────────────────────────
+// When process is up and feature on: file markers + enter handoff without Steam.
+// Does not know live GMod map (attach is GMod-side). Never changelevels here.
+
+struct WarmSkipSpawnPlan {
+  bool skip_spawn = false;
+  bool write_markers = false; // openxr_launch + handoff phase + warm already written
+  bool write_stage_pack = false;
+  std::string initial_phase = "warm_attach"; // cube_handoff.txt phase
+  std::string detail;
+  std::string reason = "none";
+  bool valid = false;
+};
+
+// Pure plan from reuse decision. featureEnabled defaults to product gate.
+inline WarmSkipSpawnPlan CubeWarmSkipSpawnPlanDecide(const WarmReuseDecision& reuse,
+                                                     bool featureEnabled = CubeWarmReuseEnabled()) {
+  WarmSkipSpawnPlan p;
+  p.valid = true;
+  if (!reuse.valid) {
+    p.reason = "invalid_reuse";
+    p.detail = "cold Steam/hl2 · holding OpenXR · GMod booting";
+    return p;
+  }
+  if (!featureEnabled || !reuse.skip_spawn || reuse.action != "warm_reuse") {
+    p.skip_spawn = false;
+    p.write_markers = false;
+    p.write_stage_pack = false;
+    p.reason = reuse.skip_spawn ? "feature_off" : reuse.reason;
+    p.detail = CubeWarmReuseDetail(reuse);
+    p.initial_phase = "spawned";
+    return p;
+  }
+  // Feature on + skip_spawn: no Steam; file attach markers; wait take_xr
+  p.skip_spawn = true;
+  p.write_markers = true;
+  p.write_stage_pack = true;
+  p.initial_phase = "warm_attach";
+  p.reason = "skip_spawn_attach";
+  p.detail = "warm process · skip Steam · attach markers · waiting take_xr…";
+  return p;
+}
+
+inline std::string CubeWarmSkipSpawnPhaseLabel(const std::string& phase) {
+  if (phase == "warm_attach") return "WARM ATTACH";
+  if (phase == "warm_wait_map") return "WARM WAIT MAP";
+  if (phase == "warm_ready") return "WARM READY";
+  return phase;
 }
 
 // ── G04 map attach (pure) ──────────────────────────────────────────────────

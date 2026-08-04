@@ -327,6 +327,30 @@ bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot
   return true;
 }
 
+bool WriteWarmAttachMarkers(const std::string& gmodRoot, const std::string& map,
+                            const std::string& phase) {
+  if (gmodRoot.empty()) return false;
+  const std::string dataDir = gmodRoot + "/garrysmod/data/vrmod";
+  mkdir((gmodRoot + "/garrysmod/data").c_str(), 0755);
+  mkdir(dataDir.c_str(), 0755);
+  const long ts = (long)time(nullptr);
+  std::string ph = phase.empty() ? "warm_attach" : phase;
+  // openxr_launch so GMod treats this as native Cube wrapper session (no Steam relaunch)
+  std::ostringstream mark;
+  mark << "mode=hub\nprefer_backend=openxr\nautostart=1\nmenu_vr=0\nhub=1\n"
+       << "bg_map=" << map << "\nmap_mode=full\nnative_wrapper=1\n"
+       << "warm_attach=1\n"
+       << "ts=" << ts << "\n";
+  if (!WriteFile(dataDir + "/openxr_launch.txt", mark.str())) return false;
+  if (!WriteFile(dataDir + "/cube_handoff.txt",
+                 "phase=" + ph + "\nts=" + std::to_string(ts) + "\n"))
+    return false;
+  unlink((dataDir + "/cube_ready.txt").c_str());
+  fprintf(stderr, "[cube_webui] warm attach markers → map=%s phase=%s (no steam)\n",
+          map.c_str(), ph.c_str());
+  return true;
+}
+
 bool ReadCubeReturnMarker(const std::string& gmodRoot, CubeReturnSnapshot& out) {
   out = CubeReturnSnapshot{};
   if (gmodRoot.empty()) return false;

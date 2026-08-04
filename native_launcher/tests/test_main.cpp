@@ -195,6 +195,9 @@ TEST(launcher_cold_start_boot_kind) {
 
 // G04: warm reuse pure decision — feature off → warm_request, never skip spawn
 TEST(launcher_warm_reuse_decide) {
+    ASSERT_TRUE(!CubeWarmReuseWantEnv(nullptr));
+    ASSERT_TRUE(CubeWarmReuseWantEnv("1"));
+    unsetenv("GVRMOD_WARM_REUSE");
     ASSERT_TRUE(!CubeWarmReuseEnabled());
     auto cold = CubeWarmReuseDecide(false, false, "gm_construct");
     ASSERT_EQ(cold.action, std::string("cold_spawn"));
@@ -208,7 +211,7 @@ TEST(launcher_warm_reuse_decide) {
     ASSERT_EQ(forced.action, std::string("cold_spawn"));
     auto nomap = CubeWarmReuseDecide(true, false, "  ");
     ASSERT_EQ(nomap.reason, std::string("no_map"));
-    // Feature-on path (unit only — product keeps CubeWarmReuseEnabled false)
+    // Feature-on path (unit only — product default off unless GVRMOD_WARM_REUSE=1)
     auto reuse = CubeWarmReuseDecide(true, false, "gm_flatgrass", /*featureEnabled=*/true);
     ASSERT_EQ(reuse.action, std::string("warm_reuse"));
     ASSERT_TRUE(reuse.skip_spawn);
@@ -222,6 +225,28 @@ TEST(launcher_warm_reuse_decide) {
     ASSERT_TRUE(CubeWarmReuse_Parse(CubeWarmReuse_Format(a), b));
     ASSERT_EQ(b.map, std::string("gm_construct"));
     ASSERT_TRUE(CubeWarmReuseDetail(defer).find("warm_request") != std::string::npos);
+}
+
+// G04: skip-spawn plan — markers + warm_attach phase only when feature on
+TEST(launcher_warm_skip_spawn_plan) {
+    unsetenv("GVRMOD_WARM_REUSE");
+    auto defer = CubeWarmReuseDecide(true, false, "gm_construct", false);
+    auto planOff = CubeWarmSkipSpawnPlanDecide(defer, false);
+    ASSERT_TRUE(!planOff.skip_spawn);
+    ASSERT_TRUE(!planOff.write_markers);
+
+    auto reuse = CubeWarmReuseDecide(true, false, "gm_flatgrass", true);
+    auto planOn = CubeWarmSkipSpawnPlanDecide(reuse, true);
+    ASSERT_TRUE(planOn.skip_spawn);
+    ASSERT_TRUE(planOn.write_markers);
+    ASSERT_TRUE(planOn.write_stage_pack);
+    ASSERT_EQ(planOn.initial_phase, std::string("warm_attach"));
+    ASSERT_TRUE(planOn.detail.find("skip Steam") != std::string::npos
+                || planOn.detail.find("attach") != std::string::npos);
+    ASSERT_EQ(CubeWarmSkipSpawnPhaseLabel("warm_attach"), std::string("WARM ATTACH"));
+    ASSERT_TRUE(CubeHandoffDetailForPhase("warm_attach", true).find("warm") != std::string::npos);
+    ASSERT_TRUE(CubeHandoffProgressForPhase("warm_attach") > 0.2f);
+    ASSERT_EQ(CubeHandoffPhaseLabel("warm_attach"), std::string("WARM ATTACH"));
 }
 
 // G04: map attach decide — default no changelevel; normalize map tokens

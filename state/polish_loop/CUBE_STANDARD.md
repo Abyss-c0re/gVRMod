@@ -21,7 +21,7 @@ Never submit eng texture. Never dual pose truth.
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoad_IsLoading` + dual-hold toast; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD proof open
-- G04 partial: every Start still cold-spawns; `cube_warm.txt` + GMod WarmAttach decide/toast; changelevel/`CubeWarmReuseEnabled` hard-off
+- G04 partial: default cold-spawns; skip-spawn plan + `WriteWarmAttachMarkers` when `GVRMOD_WARM_REUSE=1`; GMod changelevel still off
 - G13 partial: VR exit writes `cube_return.txt`; Cube polls + RETURN panel line; **does not** auto-reclaim XR (`CubeReclaimEnabled` hard-off)
 - G03 partial: pack + ApplyDecision + ComputeApplyPlan seated preview; allow_apply=false / empty mutations; **must not** auto-jump without HMD-proven apply
 - G12 partial: gain law + `cube_hold.ogg` + ffplay/paplay backend; audible only with `GVRMOD_AMBIENT_PLAY=1` (default silent)
