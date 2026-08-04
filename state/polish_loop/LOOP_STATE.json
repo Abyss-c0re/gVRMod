@@ -5,7 +5,7 @@
   "cycle": 13,
   "status": "ok",
   "last_cycle_at": "2026-08-04T16:44:00+03:00",
-  "last_commit": "pending",
+  "last_commit": "7747c88",
   "last_commit_repo": "gVRMod",
   "last_test": "test_all PASS 6/6",
   "last_focus": "G12 handoff ambient gain law (partial)",

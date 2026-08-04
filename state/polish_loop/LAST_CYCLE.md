@@ -3,7 +3,7 @@
 **Cycle:** 13  
 **Time:** 2026-08-04T16:44:00+03:00  
 **Focus:** G12 handoff ambient gain law (partial — no clip yet)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `7747c88`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
