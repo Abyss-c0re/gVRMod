@@ -52,10 +52,8 @@ vrmod_autostart 1
 vrmod_start force
 CFG
 
-# Kill gmod by exact name only
-for pid in $(pgrep -x gmod 2>/dev/null || true); do kill -TERM "$pid" 2>/dev/null || true; done
-sleep 1
-for pid in $(pgrep -x gmod 2>/dev/null || true); do kill -9 "$pid" 2>/dev/null || true; done
+# Kill any leftover gmod from prior runs
+kill_gmod
 sleep 0.5
 
 : > "$GAME_DIR/vrmod_debug.log" || true
@@ -147,3 +145,8 @@ PY
 
 echo "DONE=$SHOT_DIR" | tee -a "$SHOT_DIR/meta.txt"
 ls -la "$SHOT_DIR"
+# trap EXIT kills gmod — also explicit for clarity
+echo "[autotest] teardown: kill gmod" | tee -a "$SHOT_DIR/meta.txt"
+kill_gmod
+# prevent double-kill noise on EXIT
+trap - EXIT INT TERM

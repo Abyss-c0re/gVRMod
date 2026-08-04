@@ -236,16 +236,16 @@ Pure helpers: `LaserLaw_AllowLaserFromHand` / `LaserLaw_IsWrongHandPrimaryClick`
 
 ### 0.33 G46 desktop mirror vs HMD isolation (manual)
 
-Offline gate proves **no live stereo RT sample** for desktop eye-crop after submit; follow-cam private RT OK. **Headset** required for black-eye claim.
+Product path (2026-08-05): **b1a5e9e mid-frame** CullMode(1)+NDC eye-crop restored by user ask. Pure law allows mid-frame live RT as **legacy risk**; **post-submit** live RT sample still forbidden.
 
 | Check | Expect | FAIL if |
 |-------|--------|---------|
-| desktopview 1 | HMD clear stereo | HMD black |
-| desktopview 2/3 | Eye crop **held** (no live RT bind); HMD clear | HMD near-black after crop |
+| desktopview 1 | HMD clear stereo (preferred) | HMD black |
+| desktopview 2/3 mid-frame | Legacy NDC crop; HMD still clear | HMD near-black |
+| desktopview 2/3 after submit | No second live RT bind | Black HMD |
 | desktopview 4 | Follow private RT; HMD clear | Shared RT thrash |
-| Submit | Ordered V + dest flip Linux; prefer stolenTexture | 1/8 strip / black eye |
 
-**Procedure:** Quest/WiVRn autotest with `vrmod_desktopview 1` then 2 — HMD stays stereo pair.
+**Procedure:** prefer `vrmod_desktopview 1` for product HMD; if using 2/3, walk HMD both eyes.
 
 Pure helpers: `DesktopMirror_AllowPresent` / `DesktopMirror_Decide` / `DesktopMirror_HmdExpect` (unit-tested; offline ≠ HMD OK).
 

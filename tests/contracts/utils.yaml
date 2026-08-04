@@ -342,6 +342,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
     tier: pure
     tests: [util.desktop_mirror_law.hmd_g46]
+  - id: vrmod.utils.DesktopMirror_PreferDesktopViewForHmd
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
+    tier: pure
+    tests: [util.desktop_mirror_law.hmd_g46]
   - id: vrmod.utils.DesktopMirror_PreferFollowPrivateRt
     file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
     tier: pure

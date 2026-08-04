@@ -371,6 +371,7 @@ PURE_TESTED = {
     "vrmod.utils.DesktopMirror_StatusLabel": "util.desktop_mirror_law.hmd_g46",
     "vrmod.utils.DesktopMirror_HmdExpect": "util.desktop_mirror_law.hmd_g46",
     "vrmod.utils.DesktopMirror_IsBlackRisk": "util.desktop_mirror_law.hmd_g46",
+    "vrmod.utils.DesktopMirror_PreferDesktopViewForHmd": "util.desktop_mirror_law.hmd_g46",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",

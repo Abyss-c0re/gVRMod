@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 61
+Last updated: 2026-08-05 cycle 62
 
 ## P0 — seamless / feel broken
 
@@ -17,7 +17,7 @@ Last updated: 2026-08-05 cycle 61
 | G29 | Supersample cold-start cap (no crank) | CubeSs_* cycle47; HMD walk open | **partial** cycle47 |
 | G30 | FOV archive write-only-when-touched | CubeFov_* cycle48; HMD Vision walk open | **partial** cycle48 |
 | G40 | Vision border fill / black bars (W1) | BorderLaw_* cycle58; HMD fill walk open | **partial** cycle58 |
-| G46 | Desktop live-RT bind blacks HMD | DesktopMirror_* + PresentDesktop hold cycle61 | **partial** cycle61 |
+| G46 | Desktop live-RT bind blacks HMD | b1a5e9e mid-frame restored; post-submit still banned cycle62 | **partial** cycle62 |
 
 ## P1 — Cube experience polish
 

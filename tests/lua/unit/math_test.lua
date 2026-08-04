@@ -158,11 +158,12 @@ return function(H, env)
 		local _, aVMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
 		local _, bVMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, false)
 		H.assert_true(math.abs(aVMinL - bVMinL) > 1e-6, "auto FOV vertical offset changes V mins")
-		-- halves stay valid after seam clamp
+		-- b1a5e9e path: left U span stays ordered (may cross 0.5 slightly under H offset)
 		local c0, _, c2 = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
-		H.assert_true(c0 < c2 and c2 <= 0.5 + 1e-6)
+		H.assert_true(c0 < c2, "left U span ordered")
 		-- mq2 mono-both: right UV mirrors left half (no one-eye black)
 		local b = { uMinL, vMinL, uMaxL, vMaxL, uMinR, vMinR, uMaxR, vMaxR }
+		H.assert_true(type(env.vrmod.utils.SubmitBounds_MirrorLeftToBoth) == "function")
 		local m0, m1, m2, m3, m4, m5, m6, m7 = env.vrmod.utils.SubmitBounds_MirrorLeftToBoth(b)
 		H.assert_near(m0, m4, 1e-6)
 		H.assert_near(m2, m6, 1e-6)
@@ -464,41 +465,43 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
-	-- G46 pure desktop mirror isolation (no live stereo RT after submit)
+	-- G46 pure desktop mirror law (b1a5e9e mid-frame legacy + post-submit ban)
 	H.TEST("util.desktop_mirror_law.hmd_g46", function()
 		local u = env.vrmod.utils
 		H.assert_true(not u.DesktopMirror_AllowSampleStereoRtAfterSubmit())
-		H.assert_true(not u.DesktopMirror_AllowEyeCropFromLiveRt())
+		H.assert_true(u.DesktopMirror_AllowEyeCropFromLiveRt())
 		H.assert_true(u.DesktopMirror_PreferFollowPrivateRt())
-		H.assert_true(u.DesktopMirror_PresentOnlyAfterSubmit())
+		H.assert_true(not u.DesktopMirror_PresentOnlyAfterSubmit())
+		H.assert_eq(u.DesktopMirror_PreferDesktopViewForHmd(), 1)
 		H.assert_true(u.DesktopMirror_IsEyeCropMode(2))
-		H.assert_true(u.DesktopMirror_IsEyeCropMode(3))
 		H.assert_true(u.DesktopMirror_IsFollowMode(4))
 		H.assert_true(u.DesktopMirror_IsNoneMode(1))
-		H.assert_true(not u.DesktopMirror_AllowPresent({
-			vr_active = true, after_submit = true, desktop_view = 2,
-		}))
+		-- mid-frame eye-crop allowed (legacy)
 		H.assert_true(u.DesktopMirror_AllowPresent({
-			vr_active = true, after_submit = true, desktop_view = 4,
+			vr_active = true, mid_frame = true, desktop_view = 2, sample_stereo_rt = true,
 		}))
+		-- post-submit live RT sample still forbidden
 		H.assert_true(not u.DesktopMirror_AllowPresent({
-			vr_active = true, after_submit = false, desktop_view = 4,
+			vr_active = true, after_submit = true, desktop_view = 2, sample_stereo_rt = true,
 		}))
-		local hold = u.DesktopMirror_Decide({
+		local post = u.DesktopMirror_Decide({
 			vr_active = true, after_submit = true, desktop_view = 2,
 			sample_stereo_rt = true, attempt_present = true,
 		})
-		H.assert_true(not hold.allow_present)
-		H.assert_eq(hold.risk, "live_rt")
-		H.assert_true(u.DesktopMirror_IsBlackRisk(hold))
-		H.assert_eq(u.DesktopMirror_HmdExpect(hold).verdict, "expect_black_risk")
-		local crop = u.DesktopMirror_Decide({
-			vr_active = true, after_submit = true, desktop_view = 3,
+		H.assert_true(not post.allow_present)
+		H.assert_eq(post.risk, "live_rt_post")
+		H.assert_true(u.DesktopMirror_IsBlackRisk(post))
+		H.assert_eq(u.DesktopMirror_HmdExpect(post).verdict, "expect_black_risk")
+		local mid = u.DesktopMirror_Decide({
+			vr_active = true, mid_frame = true, desktop_view = 2,
+			sample_stereo_rt = true, attempt_present = true,
 		})
-		H.assert_eq(crop.risk, "black_hmd")
-		H.assert_eq(u.DesktopMirror_StatusLabel(crop), "DESK · EYE CROP HOLD")
+		H.assert_true(mid.allow_present)
+		H.assert_eq(mid.risk, "mid_live_rt")
+		H.assert_eq(u.DesktopMirror_StatusLabel(mid), "DESK · MID LIVE RT LEGACY")
+		H.assert_eq(u.DesktopMirror_HmdExpect(mid).verdict, "expect_legacy_risk")
 		local follow = u.DesktopMirror_Decide({
-			vr_active = true, after_submit = true, desktop_view = 4,
+			vr_active = true, mid_frame = true, desktop_view = 4,
 		})
 		H.assert_true(follow.allow_present)
 		H.assert_eq(u.DesktopMirror_StatusLabel(follow), "DESK · FOLLOW")

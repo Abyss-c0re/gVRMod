@@ -613,3 +613,13 @@ Append one block per cycle. Newest at bottom.
 - vrmod-x64 still on cube-stereo-g45 (origin/main non-ff mq2 revert).
 - Tests: full test_all PASS 6/6 (pure pending=0; 57 Lua; module 68; launcher 33).
 - Next: HMD walk G05/G46 with desktopview 1 then 2; resolve vrmod-x64 main carefully.
+
+## 2026-08-05 cycle 62 — G46 realign + b1a5e9e restore honesty
+
+- Theme: user restored mid-frame desktop NDC path; pure law tracks product truth.
+- DesktopMirror: mid_live_rt legacy risk; post-submit live RT still forbidden.
+- Soft NaN guards on ComputeDesktopCrop; mid-frame snapshot wire.
+- Fix submit_bounds test for unclamped U span under H offset.
+- Push product on cube-stereo-g45 (do not force main over mq2 mono revert).
+- Tests: full test_all PASS 6/6 (pure pending=0; 57 Lua).
+- Next: HMD walk desktopview 1 vs 2; merge cube-stereo-g45→main only with user OK.

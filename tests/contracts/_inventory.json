@@ -325,6 +325,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
     ],
     [
+      "vrmod.utils.DesktopMirror_PreferDesktopViewForHmd",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
+    ],
+    [
       "vrmod.utils.DesktopMirror_PreferFollowPrivateRt",
       "addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua"
     ],
