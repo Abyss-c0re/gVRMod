@@ -3,7 +3,7 @@
 **Cycle:** 22  
 **Time:** 2026-08-04T18:23:39+03:00  
 **Focus:** G12 ambient asset+player (partial — player hard-off)  
-**Commit (gVRMod):** (pending)  
+**Commit (gVRMod):** `131ab3f`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
