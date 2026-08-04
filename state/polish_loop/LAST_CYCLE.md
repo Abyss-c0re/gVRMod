@@ -3,7 +3,7 @@
 **Cycle:** 32  
 **Time:** 2026-08-04T20:12:43+03:00  
 **Focus:** G05 HMD load-flash expect + checklist  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `0b6fffd`  
 **Commit (vrmod-x64):** (set after push)  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
