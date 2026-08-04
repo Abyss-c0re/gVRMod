@@ -2,13 +2,13 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 (loop bootstrap)
+Last updated: 2026-08-04 cycle 1
 
 ## P0 — seamless / feel broken
 
 | ID | Gap | Notes | Status |
 |----|-----|-------|--------|
-| G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | open |
+| G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |
 | G02 | No coordinated fade on take_xr | Compositor cut visible | open |
 | G03 | Cal / STAGE not packed into handoff | Height/playspace can jump after claim | open |
 | G04 | Cold Steam/hl2 every Start | Long Facepunch gap | open (warm process is larger) |
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G01 | Phase-aware handoff panel + map_ready | launcher helpers + vrmod-x64 b1ada40 |
 | — | No forced -noborder | 70ea961 / 1dbb1b5 |
 | — | quest media find patterns | b79d72c |
 | — | desktop follow cam + broadcast | vrmod-x64 1beb0cf |

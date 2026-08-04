@@ -1,4 +1,5 @@
 #include "ui_panel.hpp"
+#include "gmod_spawn.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -1072,8 +1073,10 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     snprintf(line, sizeof(line), "MAP     %s", s.handoffMap.empty() ? "..." : s.handoffMap.c_str());
     DrawText(rgba, 24, 130, line, CT_RGB(CubeTheme::TEXT), 2);
 
-    snprintf(line, sizeof(line), "PHASE   %s",
-             s.handoffPhase.empty() ? "SPAWNING" : s.handoffPhase.c_str());
+    {
+      std::string plabel = CubeHandoffPhaseLabel(s.handoffPhase);
+      snprintf(line, sizeof(line), "PHASE   %s", plabel.c_str());
+    }
     DrawText(rgba, 24, 180, line, CT_RGB(CubeTheme::CRIMSON_HOT), 2);
 
     if (!s.handoffDetail.empty())
@@ -1082,7 +1085,10 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     float t = s.handoffElapsed;
     float pulse = 0.35f + 0.65f * (0.5f + 0.5f * std::sin(t * 2.2f));
     int barW = UI_W - 48;
-    int fill = (int)(barW * std::min(0.95f, 0.08f + t / 40.f));
+    // G01: prefer phase progress when known; else time fallback (pre-Lua cold boot)
+    float phaseP = CubeHandoffProgressForPhase(s.handoffPhase);
+    float frac = (phaseP >= 0.f) ? phaseP : std::min(0.95f, 0.08f + t / 40.f);
+    int fill = (int)(barW * frac);
     FillRect(rgba, 24, 300, barW, 32, CT_RGB(CubeTheme::ROW), 255);
     FillRect(rgba, 24, 300, std::max(8, fill), 32,
              (int)(196 * pulse), (int)(30 * pulse), (int)(58 * pulse), 255);

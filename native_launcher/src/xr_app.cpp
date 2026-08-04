@@ -330,8 +330,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       std::string phase = ReadCubeHandoffPhase(gmodRoot);
       if (phase.empty()) phase = gmodUp ? "gmod_process" : "waiting_process";
       ui.handoffPhase = phase;
-      ui.handoffDetail = gmodUp ? "GMod live · waiting take_xr (seamless)"
-                                : "booting GMod · panel holds OpenXR…";
+      // G01: phase-aware detail (status file tokens → intentional copy, not opaque hold)
+      ui.handoffDetail = CubeHandoffDetailForPhase(phase, gmodUp);
       WebUI_MarkDirty(ui);
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
       // Soft only after long wait if process is up but never signaled (was 40s — race window)

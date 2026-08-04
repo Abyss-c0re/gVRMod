@@ -1,5 +1,6 @@
 #include "../../tests/test_framework.h"
 #include "math3d.hpp"
+#include "gmod_spawn.hpp"
 
 TEST(launcher_math3d_normalize) {
     Vec3 n = Normalize(V3(3.f, 0.f, 0.f));
@@ -24,6 +25,34 @@ TEST(launcher_desktop_cycle_1_to_4) {
     };
     ASSERT_EQ(cycle(3, 1), 4); // right → follow
     ASSERT_EQ(cycle(4, 1), 1);
+}
+
+// G01: handoff phase → panel detail / progress (pure, no I/O)
+TEST(launcher_handoff_detail_known_phases) {
+    auto d_map = CubeHandoffDetailForPhase("map_ready", true);
+    ASSERT_TRUE(d_map.find("map loaded") != std::string::npos);
+    auto d_take = CubeHandoffDetailForPhase("take_xr", true);
+    ASSERT_TRUE(d_take.find("claims OpenXR") != std::string::npos);
+    auto d_wait = CubeHandoffDetailForPhase("waiting_process", false);
+    ASSERT_TRUE(d_wait.find("booting GMod") != std::string::npos);
+}
+
+TEST(launcher_handoff_progress_monotone) {
+    float p_spawn = CubeHandoffProgressForPhase("spawned");
+    float p_boot = CubeHandoffProgressForPhase("boot");
+    float p_map = CubeHandoffProgressForPhase("map_ready");
+    float p_take = CubeHandoffProgressForPhase("take_xr");
+    float p_vr = CubeHandoffProgressForPhase("vr_active");
+    ASSERT_TRUE(p_spawn > 0.f && p_spawn < p_boot);
+    ASSERT_TRUE(p_boot < p_map && p_map < p_take && p_take < p_vr);
+    ASSERT_TRUE(p_vr <= 1.f);
+    ASSERT_TRUE(CubeHandoffProgressForPhase("unknown_token") < 0.f);
+}
+
+TEST(launcher_handoff_phase_label) {
+    ASSERT_EQ(CubeHandoffPhaseLabel(""), std::string("SPAWNING"));
+    ASSERT_EQ(CubeHandoffPhaseLabel("map_ready"), std::string("MAP READY"));
+    ASSERT_EQ(CubeHandoffPhaseLabel("take_xr"), std::string("TAKE XR"));
 }
 
 int main() {

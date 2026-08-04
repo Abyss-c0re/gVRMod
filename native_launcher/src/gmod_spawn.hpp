@@ -62,3 +62,58 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut);
 bool GModProcessRunning();
 std::string ReadCubeHandoffPhase(const std::string& gmodRoot);
 void ClearCubeHandoffMarkers(const std::string& gmodRoot);
+
+// Pure helpers for Cube handoff panel (G01) — no I/O; unit-tested offline.
+// Map status-file phase tokens → human detail / progress / display label.
+inline std::string CubeHandoffDetailForPhase(const std::string& phase, bool gmodUp) {
+  if (phase == "take_xr" || phase == "ready")
+    return "GMod claims OpenXR · releasing session…";
+  if (phase == "starting_xr")
+    return "starting OpenXR in GMod…";
+  if (phase == "vr_active")
+    return "VR live in GMod · handoff complete";
+  if (phase == "wait_module")
+    return "GMod up · loading vrmod module…";
+  if (phase == "map_ready")
+    return "map loaded · preparing VR start…";
+  if (phase == "boot")
+    return "Lua boot · openxr launch path…";
+  if (phase == "spawned" || phase == "SPAWNED")
+    return gmodUp ? "GMod process up · waiting Lua…" : "spawned · booting hl2…";
+  if (phase == "gmod_process")
+    return "GMod live · waiting addon signal…";
+  if (phase == "waiting_process")
+    return "booting GMod · panel holds OpenXR…";
+  return gmodUp ? "GMod live · waiting take_xr (seamless)"
+                : "booting GMod · panel holds OpenXR…";
+}
+
+// Progress 0..1 for known phases; negative → caller uses time-based fallback.
+inline float CubeHandoffProgressForPhase(const std::string& phase) {
+  if (phase == "waiting_process") return 0.08f;
+  if (phase == "spawned" || phase == "SPAWNED") return 0.12f;
+  if (phase == "gmod_process") return 0.22f;
+  if (phase == "boot") return 0.38f;
+  if (phase == "map_ready") return 0.52f;
+  if (phase == "wait_module") return 0.62f;
+  if (phase == "take_xr" || phase == "ready") return 0.78f;
+  if (phase == "starting_xr") return 0.88f;
+  if (phase == "vr_active") return 0.98f;
+  return -1.f;
+}
+
+// Display label for PHASE line (uppercase words; empty phase → SPAWNING).
+inline std::string CubeHandoffPhaseLabel(const std::string& phase) {
+  if (phase.empty()) return "SPAWNING";
+  if (phase == "spawned" || phase == "SPAWNED") return "SPAWNED";
+  if (phase == "waiting_process") return "WAITING PROCESS";
+  if (phase == "gmod_process") return "GMOD PROCESS";
+  if (phase == "boot") return "LUA BOOT";
+  if (phase == "map_ready") return "MAP READY";
+  if (phase == "wait_module") return "WAIT MODULE";
+  if (phase == "take_xr") return "TAKE XR";
+  if (phase == "starting_xr") return "STARTING XR";
+  if (phase == "vr_active") return "VR ACTIVE";
+  if (phase == "ready") return "READY";
+  return phase;
+}
