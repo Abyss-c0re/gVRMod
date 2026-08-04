@@ -188,9 +188,17 @@ struct EyeUV {
     float u0, u1, v0, v1;
 };
 
-static EyeUV ResolveSubmitUV(bool fromCollector, int eye, const float bounds[8]) {
+// Mirror submit policy (xr_render.cpp):
+// - SBS: Lua textureBounds L/R halves
+// - Per-eye / collector: FOV-derived crop in full-eye UV (not full 0..1, not SBS halves)
+static EyeUV ResolveSubmitUV(bool perEyeOrCollector, int eye, const float bounds[8],
+                             float fovU0 = -1.f, float fovU1 = -1.f,
+                             float fovV0 = -1.f, float fovV1 = -1.f) {
     const float ins = 0.003f;
-    if (fromCollector) {
+    if (perEyeOrCollector) {
+        // Prefer FOV crop; fall back to inset full if FOV not provided
+        if (fovU1 > fovU0 + 0.01f && fovV1 > fovV0 + 0.01f)
+            return {fovU0, fovU1, fovV0, fovV1};
         return {ins, 1.f - ins, ins, 1.f - ins};
     }
     float u0 = bounds[eye * 4 + 0];
@@ -205,17 +213,19 @@ static EyeUV ResolveSubmitUV(bool fromCollector, int eye, const float bounds[8])
     return {u0, u1, v0, v1};
 }
 
-TEST(SubmitUV_CollectorUsesFullRect) {
+TEST(SubmitUV_CollectorUsesFovCropNotSbsHalves) {
     float sbs[8] = {0.f, 0.f, 0.5f, 1.f, 0.5f, 0.f, 1.f, 1.f};
-    EyeUV L = ResolveSubmitUV(true, 0, sbs);
-    EyeUV R = ResolveSubmitUV(true, 1, sbs);
-    ASSERT_NEAR(L.u0, 0.003f, 0.0001f);
-    ASSERT_NEAR(L.u1, 0.997f, 0.0001f);
-    ASSERT_NEAR(R.u0, 0.003f, 0.0001f);
-    ASSERT_NEAR(R.u1, 0.997f, 0.0001f);
-    // Not SBS halves
+    // Typical asymmetric left eye crop inside full-eye RT (Quest-ish)
+    EyeUV L = ResolveSubmitUV(true, 0, sbs, 0.02f, 0.96f, 0.01f, 0.99f);
+    EyeUV R = ResolveSubmitUV(true, 1, sbs, 0.04f, 0.98f, 0.01f, 0.99f);
+    // Full-eye UV space (not SBS 0..0.5 / 0.5..1)
     ASSERT_TRUE(L.u1 > 0.9f);
     ASSERT_TRUE(R.u0 < 0.1f);
+    // Cropped (not full 0..1) — asymmetric FOV correction
+    ASSERT_TRUE(L.u0 > 0.001f);
+    ASSERT_TRUE(L.u1 < 0.999f);
+    ASSERT_TRUE(R.u0 > 0.001f);
+    ASSERT_TRUE(R.u1 < 0.999f);
 }
 
 // Collect must copy identity V; submit applies exactly one Linux flip.
