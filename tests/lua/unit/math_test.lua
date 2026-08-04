@@ -454,6 +454,51 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G27 pure engine blacklist law (never call blocked convars / W2)
+	H.TEST("util.engine_blacklist_law.never_call_g27", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.EngineBlacklist_IsBlocked("viewmodel_fov"))
+		H.assert_true(u.EngineBlacklist_IsBlocked("r_shadowrendertotexture"))
+		H.assert_true(u.EngineBlacklist_IsBlocked("mat_reduceparticles"))
+		H.assert_true(u.EngineBlacklist_IsLifecycleBan("mat_queue_mode"))
+		H.assert_true(u.EngineBlacklist_IsLifecycleBan("gmod_mcore_test"))
+		H.assert_true(not u.EngineBlacklist_AllowWrite("viewmodel_fov"))
+		H.assert_true(not u.EngineBlacklist_AllowWrite("mat_queue_mode"))
+		H.assert_true(u.EngineBlacklist_AllowWrite("engine_no_focus_sleep"))
+		H.assert_true(not u.EngineBlacklist_AllowRunConsoleCommand("viewmodel_fov"))
+		local filtered, dropped = u.EngineBlacklist_FilterMap({
+			mat_disable_bloom = "1",
+			viewmodel_fov = "54",
+			mat_queue_mode = "1",
+			engine_no_focus_sleep = "0",
+		})
+		H.assert_true(filtered.mat_disable_bloom == "1")
+		H.assert_true(filtered.engine_no_focus_sleep == "0")
+		H.assert_true(filtered.viewmodel_fov == nil)
+		H.assert_true(filtered.mat_queue_mode == nil)
+		H.assert_true(#dropped >= 2)
+		local clean = u.EngineBlacklist_Decide({
+			vr_active = true,
+			performance_map = { mat_disable_bloom = "1", engine_no_focus_sleep = "0" },
+			attempted = { "engine_no_focus_sleep" },
+		})
+		H.assert_true(clean.path_ok)
+		H.assert_eq(u.EngineBlacklist_StatusLabel(clean), "ENG · CLEAN")
+		local he = u.EngineBlacklist_HmdExpect(clean)
+		H.assert_eq(he.verdict, "expect_clean")
+		H.assert_true(string.find(he.checklist, "G27", 1, true))
+		local bad = u.EngineBlacklist_Decide({
+			attempted = { "viewmodel_fov", "r_shadowrendertotexture" },
+		})
+		H.assert_true(not bad.path_ok)
+		H.assert_eq(bad.risk, "blocked_spam")
+		H.assert_true(u.EngineBlacklist_IsWriteRisk(bad))
+		local life = u.EngineBlacklist_Decide({ attempted = { "mat_queue_mode" } })
+		H.assert_eq(life.risk, "lifecycle_write")
+		local names = u.EngineBlacklist_BlockedNames()
+		H.assert_true(type(names) == "table" and #names >= 3)
+	end)
+
 	-- G26 pure menu thrash / QM dedupe law (VRClimb id collapse)
 	H.TEST("util.menu_law.dedupe_g26", function()
 		local u = env.vrmod.utils

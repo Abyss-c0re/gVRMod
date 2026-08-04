@@ -316,6 +316,25 @@ Offline gate proves stable **id/name** keys, climb aliases → `vrclimb`, DedupL
 
 Pure helpers: `MenuLaw_ItemsMatch` / `MenuLaw_Decide` / `MenuLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.14 G27 engine blacklist never-call (manual)
+
+Offline gate proves **blocked** names (`viewmodel_fov`, `r_shadowrendertotexture`, `mat_reduceparticles`) and **lifecycle** bans (`mat_queue_mode`, `gmod_mcore_test`) refuse write. **Console** walk is enough; HMD optional.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Enter VR | No `Command is blocked!` spam | Product Set/RCC blocked cvars |
+| PERFORMANCE pins | No blocked keys in pin map | viewmodel_fov / shadow RT in pin list |
+| mat_queue | VR never SetInt (G17 + G27 lifecycle) | CThread thrash from mq write |
+| Debug | `g_VR._engineBlacklistLabel` → `ENG · CLEAN` | `BLOCKED SPAM` / `LIFECYCLE BAN` |
+
+**Procedure (claim “G27 engine OK” only if walked):**
+
+1. Start VR — watch developer console for blocked spam.  
+2. Optional: `print(g_VR._engineBlacklistLabel)`.  
+3. Confirm no viewmodel_fov thrash (VR draws own VM path).
+
+Pure helpers: `EngineBlacklist_AllowWrite` / `EngineBlacklist_Decide` / `EngineBlacklist_HmdExpect` (unit-tested; offline ≠ console walk).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

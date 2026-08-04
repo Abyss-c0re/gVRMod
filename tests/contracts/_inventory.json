@@ -129,6 +129,54 @@
       "addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua"
     ],
     [
+      "vrmod.utils.EngineBlacklist_AllowRunConsoleCommand",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_AllowWrite",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_BlockedNames",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_FilterMap",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_IsBlocked",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_IsLifecycleBan",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_IsWriteRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_LifecycleNames",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_NormalizeName",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
+      "vrmod.utils.EngineBlacklist_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
+    ],
+    [
       "vrmod.utils.FindPickupBySteamIDAndHand",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],

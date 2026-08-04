@@ -147,6 +147,54 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.EngineBlacklist_AllowRunConsoleCommand
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_AllowWrite
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_BlockedNames
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_FilterMap
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_IsBlocked
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_IsLifecycleBan
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_IsWriteRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_LifecycleNames
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_NormalizeName
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EngineBlacklist_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
+    tier: pure
+    tests: [util.engine_blacklist_law.never_call_g27]
   - id: vrmod.utils.FindPickupBySteamIDAndHand
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

@@ -39,12 +39,13 @@ Never submit eng texture. Never dual pose truth.
 - G19 partial: submit **dual OUT RGBA8** only; never eng IN / virgin OUT; `SubmitLaw_*`; HmdExpect §0.11 open
 - G25 partial: pose **single path** raw→tracking→modifiers; no dual angvel/public SoT; `PoseSoT_*`; HmdExpect §0.12 open
 - G26 partial: menu **dedupe** by id/name; VRClimb aliases one id; `MenuLaw_*`; HmdExpect §0.13 open
+- G27 partial: never call engine **blocked** / lifecycle convars; `EngineBlacklist_*`; HmdExpect §0.14 open
 
 ## Compatibility
 
 - Module &lt; 20 refuse; 20–22 degrade; ≥23 crisp SS path
 - Optional args / version gates for new features
-- Engine blacklists: never call blocked convars
+- Engine blacklists: never call blocked convars (G27 partial: `EngineBlacklist_*`; HmdExpect §0.14 open)
 
 ## Ship bar (two layers — G24)
 
