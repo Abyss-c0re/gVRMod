@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 49  
-**Time:** 2026-08-04T23:20:00+03:00  
-**Focus:** G31 action-manifest self-heal + honest toast law (W6)  
-**Commit (gVRMod):** `b0a70a5`  
-**Commit (vrmod-x64):** `8ad16c5`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 43 Lua tests)  
+**Cycle:** 50  
+**Time:** 2026-08-04T23:31:00+03:00  
+**Focus:** G32 stereo ShareTexture / HMD self-test toast law (W7)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 44 Lua tests)  
 
 ## What changed
 
-1. **Pure** BindingsLaw_ForceRewrite/ShouldRetry/Abort/Toast/Decide/HmdExpect  
-2. **cl_vrmod** SetupActions wires pure law + decision snapshot  
-3. Unit test util.bindings_law.self_heal_g31 + PURE_TESTED map  
-4. TESTING_FRAMEWORK §0.18 bindings walk  
-5. Gap G31 partial  
+1. **Pure** StereoSelfTest_ShouldToast*/ShareOk/Decide/HmdExpect  
+2. **cl_vrmod** ShareTexture fail + delayed selftest wire pure law  
+3. Unit test util.stereo_selftest_law.w7_toast_g32 + PURE_TESTED  
+4. TESTING_FRAMEWORK §0.19 stereo self-test walk  
+5. Gap G32 partial  
 
 ## Pain points
 
-- Soft care: bindings force-rewrite intentional self-heal; don't break toast path.
+- Soft care: honest toast on share/HMD fail; never silent black HMD.
 
 ## Gaps
 
-- G31 partial — HMD/SteamVR walk open  
-- Next: HMD walk backlog (G05/G12) or W7 submit fail toast law notes  
+- G32 partial — HMD black walk open  
+- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects  
 
 ## Notes
 

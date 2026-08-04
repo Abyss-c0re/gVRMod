@@ -412,6 +412,26 @@ Offline gate proves force-rewrite on start, one retry, **never abort VR**, toast
 
 Pure helpers: `BindingsLaw_Decide` / `BindingsLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.19 G32 stereo ShareTexture / HMD self-test toast (manual)
+
+Offline gate proves ShareTexture begin/finish fail **must toast**, delayed (~2.5s) no-HMD toast, unhealthy-share hint, **never abort VR**. **Headset** for real black-HMD cases.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| ShareTexture begin fail | Error toast with RT size | Silent black HMD |
+| ShareTexture finish fail | Error toast | Desktop OK / HMD black no toast |
+| No HMD pose ~2.5s | Error toast once | Silent loading forever |
+| Share unhealthy + pose | Soft hint toast | No guidance |
+| Fail paths | VR session continues | Abort start |
+
+**Procedure (claim “G32 stereo self-test OK” only if walked):**
+
+1. Normal Start — both eyes; no share/HMD error toast.  
+2. Optional: induce share fail (bad SS / module) — toast visible; desktop may still show.  
+3. Optional: unplug/runtime kill mid-start — no-HMD toast; restart SteamVR path clear.
+
+Pure helpers: `StereoSelfTest_Decide` / `StereoSelfTest_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

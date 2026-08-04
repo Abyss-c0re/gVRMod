@@ -813,6 +813,82 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua
     tier: pure
     tests: [util.stereo_load.policy_g05]
+  - id: vrmod.utils.StereoSelfTest_AbortVrOnFail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_DelaySeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_IsSilentFailRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_NoHmdToast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_RequireToastOnNoHmd
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_RequireToastOnShareFail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShareBeginToast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShareFinishToast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShareHintSeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShareOk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShouldToastNoHmd
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShouldToastShareBegin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShouldToastShareFinish
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ShouldToastUnhealthyShare
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_ToastSeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
+  - id: vrmod.utils.StereoSelfTest_UnhealthyShareToast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
+    tier: pure
+    tests: [util.stereo_selftest_law.w7_toast_g32]
   - id: vrmod.utils.SubVec
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure

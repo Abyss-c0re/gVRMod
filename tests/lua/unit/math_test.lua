@@ -454,6 +454,64 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G32 pure stereo ShareTexture / HMD self-test law (W7 honest toast)
+	H.TEST("util.stereo_selftest_law.w7_toast_g32", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.StereoSelfTest_DelaySeconds(), 2.5)
+		H.assert_true(u.StereoSelfTest_RequireToastOnShareFail())
+		H.assert_true(u.StereoSelfTest_RequireToastOnNoHmd())
+		H.assert_true(not u.StereoSelfTest_AbortVrOnFail())
+		H.assert_true(u.StereoSelfTest_ShouldToastShareBegin(false))
+		H.assert_true(not u.StereoSelfTest_ShouldToastShareBegin(true))
+		H.assert_true(u.StereoSelfTest_ShouldToastShareFinish(false))
+		H.assert_true(u.StereoSelfTest_ShareOk(true, true))
+		H.assert_true(not u.StereoSelfTest_ShareOk(true, false))
+		H.assert_true(u.StereoSelfTest_ShouldToastNoHmd(false, false))
+		H.assert_true(not u.StereoSelfTest_ShouldToastNoHmd(true, false))
+		H.assert_true(not u.StereoSelfTest_ShouldToastNoHmd(false, true))
+		H.assert_true(u.StereoSelfTest_ShouldToastUnhealthyShare(true, false, false))
+		H.assert_true(not u.StereoSelfTest_ShouldToastUnhealthyShare(false, false, false))
+		H.assert_true(string.find(u.StereoSelfTest_NoHmdToast(), "HMD", 1, true))
+		local ok = u.StereoSelfTest_Decide({
+			ok_begin = true,
+			ok_finish = true,
+			has_hmd = true,
+			share_ok = true,
+			selftest_done = true,
+		})
+		H.assert_true(ok.path_ok)
+		H.assert_eq(u.StereoSelfTest_StatusLabel(ok), "STEREO · OK")
+		local he = u.StereoSelfTest_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G32", 1, true))
+		local beginFail = u.StereoSelfTest_Decide({
+			ok_begin = false,
+			ok_finish = true,
+			toast_share_begin = true,
+		})
+		H.assert_eq(beginFail.risk, "share_begin")
+		H.assert_eq(u.StereoSelfTest_StatusLabel(beginFail), "STEREO · SHARE BEGIN FAIL")
+		local noHmd = u.StereoSelfTest_Decide({
+			ok_begin = true,
+			ok_finish = true,
+			has_hmd = false,
+			selftest_done = false,
+			toast_no_hmd = true,
+		})
+		H.assert_eq(noHmd.risk, "no_hmd")
+		H.assert_eq(u.StereoSelfTest_StatusLabel(noHmd), "STEREO · NO HMD")
+		local heF = u.StereoSelfTest_HmdExpect(noHmd)
+		H.assert_eq(heF.verdict, "expect_fail_honest")
+		local silent = u.StereoSelfTest_Decide({
+			ok_begin = false,
+			ok_finish = true,
+			toast_share_begin = false,
+		})
+		H.assert_eq(silent.risk, "silent_fail")
+		H.assert_true(u.StereoSelfTest_IsSilentFailRisk(silent))
+		H.assert_eq(u.StereoSelfTest_StatusLabel(silent), "STEREO · SILENT FAIL")
+	end)
+
 	-- G31 pure bindings self-heal law (W6 force-rewrite + honest toast)
 	H.TEST("util.bindings_law.self_heal_g31", function()
 		local u = env.vrmod.utils

@@ -491,3 +491,13 @@ Append one block per cycle. Newest at bottom.
 - G31 partial — product already self-healed; law offline-tested.
 - Tests: --fast PASS 4/4 (pure pending=0; 43 Lua).
 - Next: HMD walk backlog (G05/G12) or W7 submit fail toast law notes.
+
+## 2026-08-04 cycle 50 — G32 stereo ShareTexture / HMD self-test toast (W7)
+
+- Theme: toast on share begin/finish fail; delayed no-HMD toast; never silent black.
+- Pure: StereoSelfTest_* ShouldToast/ShareOk/Decide/HmdExpect.
+- cl_vrmod share path + delayed selftest wire pure law + snapshot.
+- TESTING_FRAMEWORK §0.19; PURE_TESTED map.
+- G32 partial — product already toasted; law offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0; 44 Lua).
+- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.
