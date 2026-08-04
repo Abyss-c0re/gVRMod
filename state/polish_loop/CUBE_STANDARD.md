@@ -24,6 +24,7 @@ Never submit eng texture. Never dual pose truth.
 - G31 partial: action-manifest **force-rewrite self-heal** + one retry; toast on fail; never abort VR; `BindingsLaw_*`; §0.18 open
 - G32 partial: ShareTexture/HMD self-test **honest toast** (W7); delayed no-HMD; never silent black; `StereoSelfTest_*`; §0.19 open
 - G33 partial: swap-eyes **SBS content only** (W4); IPD/FOV/pose single path; `SwapEyesLaw_*`; §0.20 open
+- G34 partial: fly-away **one-shot origin snap** + `/actions/main` before input (W12); `FlyAwayLaw_*`; §0.21 open
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoad_IsLoading` + dual-hold toast + `StereoLoad_HmdExpect` checklist; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD walk still open (TESTING_FRAMEWORK §0.1)

@@ -511,3 +511,14 @@ Append one block per cycle. Newest at bottom.
 - G33 partial — product already content-only swap; law offline-tested.
 - Tests: --fast PASS 4/4 (pure pending=0; 45 Lua).
 - Next: HMD walk backlog (G05/G12) or W12 fly-away / origin snap notes.
+
+## 2026-08-04 cycle 52 — G34 fly-away origin snap + action set (W12)
+
+- Theme: /actions/main before input; insane |vel_z|>1500 → one-shot origin to feet in 3s window.
+- Pure: FlyAwayLaw_ResolveActionSet/ShouldSnapOrigin/Decide/HmdExpect.
+- cl_vrmod SetupActions + SetupNetworkAndOrigin wire; deferred snap timer.
+- Also pushed user FOV crop revert 3d24d92 (Quest stereo recovery).
+- TESTING_FRAMEWORK §0.21; PURE_TESTED map.
+- G34 partial — HMD walk open.
+- Tests: --fast PASS 4/4 (pure pending=0; 46 Lua).
+- Next: HMD walk backlog (G05/G12) or W8 fisheye / viewscale notes.

@@ -451,6 +451,25 @@ Offline gate proves default **off**, SBS half resolve L↔R on toggle, **no dual
 
 Pure helpers: `SwapEyesLaw_ResolveSbsHalves` / `SwapEyesLaw_Decide` / `SwapEyesLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.21 G34 fly-away origin snap + action set (manual)
+
+Offline gate proves default `/actions/main` (driving in vehicle), insane |vel_z| **> 1500** → one-shot origin snap to feet within **3s** start window. **Headset** for real fly-away.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Cold VR start | Origin at player feet; main actions live | Spawn in sky / dead sticks |
+| Insane head vel early | One origin snap; log G34 | Keep flying or every-frame thrash |
+| After 3s window | No automatic snap | Late origin thrash |
+| Vehicle enter | `/actions/driving` active | Main set stuck; dead drive input |
+
+**Procedure (claim “G34 fly-away OK” only if walked):**
+
+1. Start VR standing — feet stable; laser/stick work first frames.  
+2. Optional: induce tracking glitch — at most one snap, then stable.  
+3. Enter vehicle — driving action set; stick drives.
+
+Pure helpers: `FlyAwayLaw_ShouldSnapOrigin` / `FlyAwayLaw_Decide` / `FlyAwayLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

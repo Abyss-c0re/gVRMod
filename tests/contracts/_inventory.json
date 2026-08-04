@@ -249,6 +249,62 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.FlyAwayLaw_ActionSetBase",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_ActionSetDriving",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_ActionSetMain",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_InsaneHorizontalVel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_InsaneVerticalVel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_IsFlyAwayRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_IsInsaneHorizontal",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_IsInsaneVertical",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_ResolveActionSet",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_ShouldSnapOrigin",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_StartWindowSec",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
+      "vrmod.utils.FlyAwayLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua"
+    ],
+    [
       "vrmod.utils.FormatColor",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],

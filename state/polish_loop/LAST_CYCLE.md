@@ -1,28 +1,29 @@
 # Last cycle
 
-**Cycle:** 51  
-**Time:** 2026-08-04T23:42:00+03:00  
-**Focus:** G33 swap-eyes content-only law (W4)  
-**Commit (gVRMod):** `7cc2086`  
-**Commit (vrmod-x64):** `ae7e483`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 45 Lua tests)  
+**Cycle:** 52  
+**Time:** 2026-08-04T23:52:00+03:00  
+**Focus:** G34 fly-away origin snap + action set law (W12)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 46 Lua tests)  
 
 ## What changed
 
-1. **Pure** SwapEyesLaw_FromAny/ResolveSbsHalves/Decide/HmdExpect  
-2. **cl_vrmod** stereo SBS write uses pure ResolveSbsHalves + snapshot  
-3. Unit test util.swap_eyes_law.content_only_g33 + PURE_TESTED  
-4. TESTING_FRAMEWORK §0.20 swap-eyes walk  
-5. Gap G33 partial  
+1. **Pure** FlyAwayLaw_ResolveActionSet/ShouldSnapOrigin/Decide/HmdExpect  
+2. **cl_vrmod** action set + feet origin + one-shot snap timer  
+3. Unit test util.flyaway_law.origin_action_g34 + PURE_TESTED  
+4. TESTING_FRAMEWORK §0.21 fly-away walk  
+5. Gap G34 partial  
+6. Pushed existing FOV crop revert `3d24d92` (user WIP; Quest stereo)  
 
 ## Pain points
 
-- Soft care: no dual pose fork; swap content halves only.
+- Soft care: one-shot origin snap only; no every-frame thrash; climbing untouched.
 
 ## Gaps
 
-- G33 partial — HMD inverted-stereo walk open  
-- Next: HMD walk backlog (G05/G12) or W12 fly-away / origin snap notes  
+- G34 partial — HMD fly-away walk open  
+- Next: HMD walk backlog (G05/G12) or W8 fisheye / viewscale notes  
 
 ## Notes
 

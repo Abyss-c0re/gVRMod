@@ -269,6 +269,62 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.fingers.digit_index]
+  - id: vrmod.utils.FlyAwayLaw_ActionSetBase
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_ActionSetDriving
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_ActionSetMain
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_InsaneHorizontalVel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_InsaneVerticalVel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_IsFlyAwayRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_IsInsaneHorizontal
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_IsInsaneVertical
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_ResolveActionSet
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_ShouldSnapOrigin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_StartWindowSec
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
+  - id: vrmod.utils.FlyAwayLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
+    tier: pure
+    tests: [util.flyaway_law.origin_action_g34]
   - id: vrmod.utils.FormatColor
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure

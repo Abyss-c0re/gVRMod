@@ -454,6 +454,79 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G34 pure fly-away / origin snap + action set law (W12)
+	H.TEST("util.flyaway_law.origin_action_g34", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.FlyAwayLaw_ActionSetMain(), "/actions/main")
+		H.assert_eq(u.FlyAwayLaw_ActionSetDriving(), "/actions/driving")
+		H.assert_eq(u.FlyAwayLaw_ActionSetBase(), "/actions/base")
+		H.assert_eq(u.FlyAwayLaw_ResolveActionSet(false), "/actions/main")
+		H.assert_eq(u.FlyAwayLaw_ResolveActionSet(true), "/actions/driving")
+		H.assert_eq(u.FlyAwayLaw_InsaneVerticalVel(), 1500)
+		H.assert_true(u.FlyAwayLaw_IsInsaneVertical(2000))
+		H.assert_true(u.FlyAwayLaw_IsInsaneVertical(-2000))
+		H.assert_true(not u.FlyAwayLaw_IsInsaneVertical(100))
+		H.assert_true(u.FlyAwayLaw_IsInsaneHorizontal(3000, 0))
+		H.assert_true(not u.FlyAwayLaw_ShouldSnapOrigin({
+			elapsed_sec = 0.5,
+			already_snapped = false,
+			vel_z = 100,
+			has_player_pos = true,
+		}))
+		H.assert_true(u.FlyAwayLaw_ShouldSnapOrigin({
+			elapsed_sec = 0.5,
+			already_snapped = false,
+			vel_z = 2000,
+			has_player_pos = true,
+		}))
+		H.assert_true(not u.FlyAwayLaw_ShouldSnapOrigin({
+			elapsed_sec = 0.5,
+			already_snapped = true,
+			vel_z = 2000,
+			has_player_pos = true,
+		}))
+		H.assert_true(not u.FlyAwayLaw_ShouldSnapOrigin({
+			elapsed_sec = 10,
+			already_snapped = false,
+			vel_z = 2000,
+			has_player_pos = true,
+		}))
+		local ok = u.FlyAwayLaw_Decide({
+			in_vehicle = false,
+			action_set = "/actions/main",
+			origin_set_to_feet = true,
+			expect_action_set = true,
+			vel_z = 0,
+			has_player_pos = true,
+			elapsed_sec = 0.5,
+		})
+		H.assert_true(ok.path_ok)
+		H.assert_eq(u.FlyAwayLaw_StatusLabel(ok), "FLY · OK")
+		local he = u.FlyAwayLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G34", 1, true))
+		local fly = u.FlyAwayLaw_Decide({
+			origin_set_to_feet = true,
+			has_player_pos = true,
+			elapsed_sec = 0.2,
+			vel_z = 3000,
+			action_set = "/actions/main",
+			expect_action_set = true,
+		})
+		H.assert_true(fly.should_snap)
+		H.assert_eq(fly.risk, "fly_away")
+		H.assert_true(u.FlyAwayLaw_IsFlyAwayRisk(fly))
+		H.assert_eq(u.FlyAwayLaw_StatusLabel(fly), "FLY · SNAP ORIGIN")
+		local dead = u.FlyAwayLaw_Decide({
+			origin_set_to_feet = true,
+			action_set = "",
+			expect_action_set = true,
+		})
+		H.assert_eq(dead.risk, "dead_input")
+		local heD = u.FlyAwayLaw_HmdExpect(dead)
+		H.assert_eq(heD.verdict, "expect_dead_input")
+	end)
+
 	-- G33 pure swap-eyes content-only law (W4; no dual pose fork)
 	H.TEST("util.swap_eyes_law.content_only_g33", function()
 		local u = env.vrmod.utils
