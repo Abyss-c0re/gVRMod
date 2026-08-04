@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 39
+Last updated: 2026-08-04 cycle 40
 
 ## P0 — seamless / feel broken
 
@@ -25,6 +25,7 @@ Last updated: 2026-08-04 cycle 39
 | G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
 | G15 | Opaque black HUD / wall of Real | HudLaw composite cycle38; HMD walk open | **partial** cycle38 |
 | G16 | Laser + trigger UI sacred | LaserLaw pure cycle39; HMD walk open | **partial** cycle39 |
+| G17 | mat_queue_mode pin (never 2 from VR) | MatQueueLaw cycle40; confirm open | **partial** cycle40 |
 
 ## P2 — code quality / glogic hygiene
 
@@ -44,6 +45,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G17 | mat_queue pin law (never VR-write 2) | MatQueueLaw_* + cl_vrmod |
 | G16 | Laser sacred law (primary+focus) | LaserLaw_* + cl_ui wire |
 | G15 | HUD additive law (PROPHECY) | HudLaw_Decide + cl_hud wire |
 | G04 | Warm HmdExpect + §0.6 smoke walk | WarmAttach_HmdExpect + CubeWarm |

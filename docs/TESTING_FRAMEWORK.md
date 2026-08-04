@@ -219,6 +219,26 @@ Offline gate proves primary-hand SoT + click action map + first-eye focus solve.
 
 Pure helpers: `LaserLaw_IsMenuPrimaryClick` / `LaserLaw_ShouldSolveFocus` / `LaserLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.9 G17 mat_queue pin (manual)
+
+Offline gate proves pin prefer **1**, dual only when mq&lt;2, **never write** from VR. **Headset** optional for feel; console check is enough for write law.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Live prefer | `mat_queue_mode` **1** during VR (user/console before map) | Product SetInt mq mid-session |
+| Dual stereo | Legal under mq 0/1 | Dual nested RenderView under mq **2** |
+| mq2 (must not ship as default) | Single-pass only if user forced 2 | Dual under 2 → CThread risk |
+| VR exit | No thrash rewrite of mq | Exit restores thrash / worker death |
+
+**Procedure (claim “G17 mq OK” only if walked):**
+
+1. Before map: `mat_queue_mode 1` (or leave default).  
+2. Enter VR — dual stereo; no console spam about mq writes.  
+3. Optional: `print(g_VR._matQueueLabel)` → `MQ · LIVE 1 · PIN`.  
+4. Never set mq 2 “for perf” during polish.
+
+Pure helpers: `MatQueueLaw_Decide` / `MatQueueLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

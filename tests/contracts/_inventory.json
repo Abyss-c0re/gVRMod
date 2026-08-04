@@ -361,6 +361,38 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.MatQueueLaw_AllowDualEye",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
+      "vrmod.utils.MatQueueLaw_ClampRead",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
+      "vrmod.utils.MatQueueLaw_CubePin",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
+      "vrmod.utils.MatQueueLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
+      "vrmod.utils.MatQueueLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
+      "vrmod.utils.MatQueueLaw_IsWriteRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
+      "vrmod.utils.MatQueueLaw_ShouldWrite",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
+      "vrmod.utils.MatQueueLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua"
+    ],
+    [
       "vrmod.utils.MeleeFilter",
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],

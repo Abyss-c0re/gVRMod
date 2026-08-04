@@ -59,6 +59,15 @@ PURE_TESTED = {
     "vrmod.utils.StagePack_ExecuteToast": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_HmdExpect": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_HeightJumpRiskIsBad": "util.stage_pack.parse_and_hint",
+    # G17 pure mat_queue pin law (Cube pin 1; never VR-write 2)
+    "vrmod.utils.MatQueueLaw_CubePin": "util.mat_queue_law.pin_g17",
+    "vrmod.utils.MatQueueLaw_ClampRead": "util.mat_queue_law.pin_g17",
+    "vrmod.utils.MatQueueLaw_ShouldWrite": "util.mat_queue_law.pin_g17",
+    "vrmod.utils.MatQueueLaw_AllowDualEye": "util.mat_queue_law.pin_g17",
+    "vrmod.utils.MatQueueLaw_Decide": "util.mat_queue_law.pin_g17",
+    "vrmod.utils.MatQueueLaw_StatusLabel": "util.mat_queue_law.pin_g17",
+    "vrmod.utils.MatQueueLaw_HmdExpect": "util.mat_queue_law.pin_g17",
+    "vrmod.utils.MatQueueLaw_IsWriteRisk": "util.mat_queue_law.pin_g17",
     # G16 pure laser / menu primary-click sacred law
     "vrmod.utils.LaserLaw_PrimaryHandFromInt": "util.laser_law.sacred_g16",
     "vrmod.utils.LaserLaw_SecondaryHand": "util.laser_law.sacred_g16",

@@ -390,3 +390,13 @@ Append one block per cycle. Newest at bottom.
 - G16 partial — HMD UI walk open.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: HMD walk backlog (G05/G12) or mat_queue pin notes.
+
+## 2026-08-04 cycle 40 — G17 mat_queue pin law
+
+- Theme: Cube pin prefer 1; VR never SetInt mat_queue; dual only mq<2.
+- Pure: MatQueueLaw_CubePin/ClampRead/ShouldWrite/AllowDualEye/Decide/HmdExpect.
+- cl_vrmod WantedMatQueueMode uses pure clamp + decision snapshot.
+- TESTING_FRAMEWORK §0.9 mq walk.
+- G17 partial — product already never writes; law now offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: HMD walk backlog (G05/G12) or -noborder framed law notes.

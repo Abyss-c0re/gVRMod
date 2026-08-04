@@ -408,6 +408,38 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.fingers.curl_lerp_unit]
+  - id: vrmod.utils.MatQueueLaw_AllowDualEye
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
+  - id: vrmod.utils.MatQueueLaw_ClampRead
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
+  - id: vrmod.utils.MatQueueLaw_CubePin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
+  - id: vrmod.utils.MatQueueLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
+  - id: vrmod.utils.MatQueueLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
+  - id: vrmod.utils.MatQueueLaw_IsWriteRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
+  - id: vrmod.utils.MatQueueLaw_ShouldWrite
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
+  - id: vrmod.utils.MatQueueLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
+    tier: pure
+    tests: [util.mat_queue_law.pin_g17]
   - id: vrmod.utils.MeleeFilter
     file: addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua
     tier: seam
