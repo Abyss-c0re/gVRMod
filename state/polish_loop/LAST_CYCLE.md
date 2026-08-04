@@ -3,7 +3,7 @@
 **Cycle:** 6  
 **Time:** 2026-08-04T15:26:39+03:00  
 **Focus:** G20 residual TryParseColor (cube_framework / laser / beam)  
-**Commit (gVRMod):** `1b566b5`  
+**Commit (gVRMod):** `4806bf5`  
 **Commit (vrmod-x64):** `f9d5d8a`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
