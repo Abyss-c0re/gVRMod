@@ -1,30 +1,30 @@
 # Last cycle
 
-**Cycle:** 45  
-**Time:** 2026-08-04T22:40:00+03:00  
-**Focus:** G27 engine blacklist never-call law (W2)  
-**Commit (gVRMod):** `f02994f`  
-**Commit (vrmod-x64):** `d63c6c1`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
+**Cycle:** 46  
+**Time:** 2026-08-04T22:52:00+03:00  
+**Focus:** G28 soft handoff timeout law  
+**Commit (gVRMod):** `67b2826`  
+**Commit (vrmod-x64):** (unchanged)  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **Pure** sh_engine_blacklist_law.lua — blocked W2 names + lifecycle bans; AllowWrite/FilterMap/Decide/HmdExpect  
-2. **cl_vrmod** setConvarValue/overrideConvar gate via AllowWrite; EnsurePinned stores `_engineBlacklist*`  
-3. PURE_TESTED + unit test util.engine_blacklist_law.never_call_g27  
-4. TESTING_FRAMEWORK §0.14 engine walk  
-5. Gap G27 partial  
+1. **Pure** CubeHandoffTimeout_Decide/HmdExpect — soft 90s (GMod up), hard 180s, refuse racey  
+2. **xr_app** release gate uses pure Decide + reason log  
+3. Launcher unit test launcher_handoff_timeout_law_g28  
+4. TESTING_FRAMEWORK §0.15 handoff timeout walk  
+5. Gap G28 partial  
 
 ## Pain points
 
-- Reinforces never fighting engine blacklists; lifecycle ban aligns with mat_queue never-write (#3).
+- Soft care reinforced: OpenXR handoff 90s/180s; never racey early release.
 
 ## Gaps
 
-- G27 partial — console walk confirm open  
-- Next: HMD walk backlog or soft handoff timeout notes  
+- G28 partial — HMD seamless hold walk open  
+- Next: HMD walk backlog (G05/G12) or supersample cold-start cap notes  
 
 ## Notes
 
-- Left unrelated Quest FOV crop commit (`6aa0b36`) untouched.  
 - cubalc_mirror dirty flood left unstaged.
+- vrmod-x64 not touched this cycle.

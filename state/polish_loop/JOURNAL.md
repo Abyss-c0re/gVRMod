@@ -451,3 +451,13 @@ Append one block per cycle. Newest at bottom.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Note: preserved FOV crop commit 6aa0b36 (not thrash).
 - Next: HMD walk backlog or soft handoff timeout notes.
+
+## 2026-08-04 cycle 46 — G28 soft handoff timeout law
+
+- Theme: soft 90s (GMod up) / hard 180s; never racey early release.
+- Pure: CubeHandoffSoft/HardReleaseSeconds + Timeout_Decide/HmdExpect/StatusLabel.
+- xr_app: release gate via pure Decide; log reason=…
+- TESTING_FRAMEWORK §0.15 handoff timeout walk.
+- G28 partial — product already used 90/180; law offline-tested.
+- Tests: full test_all PASS 6/6 (launcher 29 tests).
+- Next: HMD walk backlog (G05/G12) or supersample cold-start cap notes.
