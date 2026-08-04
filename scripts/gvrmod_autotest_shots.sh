@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # gVRMod autotest with Quest adb screenshots + log scrape.
+# ALWAYS kills gmod on exit (success, fail, or signal).
 # Usage: ./scripts/gvrmod_autotest_shots.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -8,6 +9,24 @@ QUEST="${QUEST_ADB:-192.168.8.186:5555}"
 SHOT_DIR="$ROOT/.scratch/autotest_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$SHOT_DIR"
 echo "SHOT_DIR=$SHOT_DIR" | tee "$SHOT_DIR/meta.txt"
+
+kill_gmod() {
+  # Exact binary name only — never pkill -f (self-matches the wrapper).
+  local pid
+  for pid in $(pgrep -x gmod 2>/dev/null || true); do
+    echo "[autotest] kill gmod pid=$pid" | tee -a "$SHOT_DIR/meta.txt" 2>/dev/null || true
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  sleep 0.8
+  for pid in $(pgrep -x gmod 2>/dev/null || true); do
+    kill -9 "$pid" 2>/dev/null || true
+  done
+  # hl2.sh reaper leftovers
+  for pid in $(pgrep -x hl2_linux 2>/dev/null || true); do
+    kill -9 "$pid" 2>/dev/null || true
+  done
+}
+trap 'kill_gmod' EXIT INT TERM
 
 # Deploy current build
 if [[ -f "$ROOT/install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll" ]]; then
@@ -58,13 +77,25 @@ for i in $(seq 1 70); do
 done
 [[ -n "$GMOD_PID" ]] || { echo FAIL_NO_GMOD | tee -a "$SHOT_DIR/meta.txt"; exit 1; }
 
-for i in $(seq 1 80); do
-  if grep -qE 'SBS-only|session begun|Submit SBS|legacy SBS' "$GAME_DIR/vrmod_debug.log" 2>/dev/null; then
+VR_OK=0
+for i in $(seq 1 100); do
+  if grep -qE 'SBS-only|Submit SBS|legacy SBS|BLIT eye' "$GAME_DIR/vrmod_debug.log" 2>/dev/null; then
     echo "VR_OK at ${i}s" | tee -a "$SHOT_DIR/meta.txt"
+    VR_OK=1
     break
   fi
   sleep 1
 done
+if [[ "$VR_OK" != "1" ]]; then
+  echo "FAIL_NO_VR_SUBMIT" | tee -a "$SHOT_DIR/meta.txt"
+  tail -40 "$GAME_DIR/vrmod_debug.log" > "$SHOT_DIR/log_tail.txt" 2>/dev/null || true
+  # still grab a few shots for diagnosis
+  for n in 1 2 3; do
+    adb -s "$QUEST" shell screencap -p /sdcard/gvrmod_auto.png >/dev/null 2>&1 || true
+    adb -s "$QUEST" pull /sdcard/gvrmod_auto.png "$SHOT_DIR/quest_fail_${n}.png" >/dev/null 2>&1 || true
+  done
+  exit 2
+fi
 
 if command -v xdotool >/dev/null 2>&1; then
   WID=$(xdotool search --name 'Garry' 2>/dev/null | head -1 || true)
