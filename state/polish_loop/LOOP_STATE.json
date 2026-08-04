@@ -5,7 +5,7 @@
   "cycle": 1,
   "status": "ok",
   "last_cycle_at": "2026-08-04T14:32:46+03:00",
-  "last_commit": "c53f0e7",
+  "last_commit": "44caa41",
   "last_commit_repo": "gVRMod+vrmod-x64",
   "last_test": "test_all PASS 6/6",
   "last_focus": "G01 handoff progress phases on Cube panel",

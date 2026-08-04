@@ -3,7 +3,7 @@
 **Cycle:** 1  
 **Time:** 2026-08-04T14:41:00+03:00  
 **Focus:** G01 handoff progress phases on Cube panel  
-**Commit (gVRMod):** `c53f0e7`  
+**Commit (gVRMod):** `44caa41`  
 **Commit (vrmod-x64):** `b1ada40`  
 **Tests:** `./scripts/test_all.sh` — 6/6 suites pass (incl. 3 new launcher handoff unit tests)  
 
