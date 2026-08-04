@@ -3,7 +3,7 @@
 **Cycle:** 37  
 **Time:** 2026-08-04T21:08:28+03:00  
 **Focus:** G04 warm HmdExpect + §0.6 smoke  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `13ffbf1`  
 **Commit (vrmod-x64):** (set after push)  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
