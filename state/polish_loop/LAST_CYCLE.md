@@ -3,7 +3,7 @@
 **Cycle:** 27  
 **Time:** 2026-08-04T19:18:23+03:00  
 **Focus:** G04 skip-spawn plan (env opt-in)  
-**Commit (gVRMod):** (pending)  
+**Commit (gVRMod):** `118120f`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
