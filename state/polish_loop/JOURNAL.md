@@ -430,3 +430,13 @@ Append one block per cycle. Newest at bottom.
 - G25 partial — product path already single SoT; law offline-tested.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.
+
+## 2026-08-04 cycle 44 — G26 menu thrash / QM dedupe law
+
+- Theme: register once; dedupe by id/name; VRClimb aliases → vrclimb (pain #9).
+- Pure: MenuLaw_Normalize/StableKey/ItemsMatch/DedupList/Decide/HmdExpect.
+- cl_api: wire pure helpers + _menuLaw snapshot after DedupInGameMenuItems.
+- TESTING_FRAMEWORK §0.13 menu walk.
+- G26 partial — product already deduped; law offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0; menu API tests still green).
+- Next: engine blacklist never-call law (W2) or HMD walk backlog.
