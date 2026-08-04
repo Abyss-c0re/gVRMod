@@ -106,6 +106,35 @@ if(NOT WIN32)
 endif()
 
 # ==============================================================
+#  QUEST thin module (gVRLink) — opt-in only; does not touch OpenXR
+#  require("vrmod_quest") → gmcl_vrmod_quest_linux64.dll
+# ==============================================================
+option(VRMOD_BUILD_QUEST "Build gmcl_vrmod_quest_* thin link module" ON)
+
+if(VRMOD_BUILD_QUEST AND NOT WIN32)
+    add_library(vrmod_quest SHARED
+        ${CORE_SOURCES}
+        src/quest/quest_link.cpp
+        src/quest/quest_lua.cpp
+    )
+    target_include_directories(vrmod_quest PRIVATE
+        ${VRMOD_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}/shared/gvlink
+    )
+    target_compile_options(vrmod_quest PRIVATE -O3 -m64 -Wall -Wno-unused-parameter)
+    target_link_libraries(vrmod_quest PRIVATE dl pthread)
+    set_target_properties(vrmod_quest PROPERTIES
+        OUTPUT_NAME "gmcl_vrmod_quest_linux64"
+        PREFIX ""
+        SUFFIX ".dll"
+        LIBRARY_OUTPUT_DIRECTORY "${OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_DIR}"
+        BUILD_RPATH "\$ORIGIN"
+        INSTALL_RPATH "\$ORIGIN"
+    )
+endif()
+
+# ==============================================================
 #  DEV target: test runner executable (no game, no GL, no real VR)
 # ==============================================================
 if(VRMOD_BUILD_TESTS)
