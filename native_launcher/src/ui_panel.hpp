@@ -114,6 +114,8 @@ struct WebUIState {
   std::string handoffRefSpace;
   float handoffHeadY = 0.f;
   bool handoffHeadOk = false;
+  // G04: COLD_SPAWN | WARM_DETECTED (warm reuse not shipped — inventory only)
+  std::string handoffBootKind;
 
   // Laser cursor (software reticle — optional; laser usually enough)
   bool cursorVisible = false;

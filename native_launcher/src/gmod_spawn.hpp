@@ -68,6 +68,30 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot);
 // Applying pack in GMod is intentionally separate — this only persists continuity data.
 bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pack);
 
+// G04: cold Steam/hl2 Start inventory — pure strategy labels (warm process reuse not shipped).
+// Current product always cold_spawns via steam -applaunch / hl2.sh. Warm reuse needs a
+// map-change/attach protocol before skip-spawn is safe.
+inline std::string CubeLaunchBootKind(bool gmodAlreadyRunning, bool forceCold = false) {
+  if (forceCold) return "COLD_SPAWN";
+  if (gmodAlreadyRunning) return "WARM_DETECTED";
+  return "COLD_SPAWN";
+}
+
+inline std::string CubeLaunchBootLabel(const std::string& kind) {
+  if (kind == "WARM_DETECTED") return "WARM DETECTED · REUSE FUTURE";
+  if (kind == "WARM_REUSE") return "WARM REUSE"; // reserved — not active
+  return "COLD SPAWN · STEAM/HL2";
+}
+
+// Honest cold Facepunch gap for time-based progress fallback (seconds).
+inline float CubeColdStartProgressSeconds() { return 55.f; }
+
+// Skip steam relaunch only when true warm-reuse protocol exists (always false for now).
+inline bool CubeLaunchShouldSkipSpawn(const std::string& kind) {
+  (void)kind;
+  return false;
+}
+
 // Pure helpers for Cube handoff panel (G01) — no I/O; unit-tested offline.
 // Map status-file phase tokens → human detail / progress / display label.
 inline std::string CubeHandoffDetailForPhase(const std::string& phase, bool gmodUp) {
@@ -88,9 +112,9 @@ inline std::string CubeHandoffDetailForPhase(const std::string& phase, bool gmod
   if (phase == "gmod_process")
     return "GMod live · waiting addon signal…";
   if (phase == "waiting_process")
-    return "booting GMod · panel holds OpenXR…";
+    return "cold Steam/hl2 boot · panel holds OpenXR…";
   return gmodUp ? "GMod live · waiting take_xr (seamless)"
-                : "booting GMod · panel holds OpenXR…";
+                : "cold Steam/hl2 boot · panel holds OpenXR…";
 }
 
 // Progress 0..1 for known phases; negative → caller uses time-based fallback.

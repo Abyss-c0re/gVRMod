@@ -150,3 +150,12 @@ Append one block per cycle. Newest at bottom.
 - Tests: --fast PASS 4/4 (33 Lua, pure pending=0).
 - Commits: vrmod-x64 879a551; gVRMod submodule + tests + state.
 - Next: G04 cold Start note, or G03 apply design-only.
+
+## 2026-08-04 cycle 16 — G04 cold Start inventory
+
+- Theme: name cold Steam/hl2 gap; detect warm process without unsafe reuse.
+- Pure: CubeLaunchBootKind/Label/ColdStartProgressSeconds/ShouldSkipSpawn.
+- Panel BOOT line; 55s cold progress fallback; still always cold-spawn.
+- G04 partial — warm reuse needs map-change/attach protocol.
+- Tests: full test_all PASS 6/6 (+cold start unit).
+- Next: G03 apply design-only or G12 ambient clip.

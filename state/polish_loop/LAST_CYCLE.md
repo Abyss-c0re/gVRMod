@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 15  
-**Time:** 2026-08-04T17:05:39+03:00  
-**Focus:** G05 stereo-load policy (partial — dual paint through load)  
-**Commit (gVRMod):** `f0c6b20`  
-**Commit (vrmod-x64):** `879a551`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
+**Cycle:** 16  
+**Time:** 2026-08-04T17:16:00+03:00  
+**Focus:** G04 cold Start inventory (partial — no warm reuse yet)  
+**Commit (gVRMod):** (pending close)  
+**Commit (vrmod-x64):** none  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **sh_stereo_load.lua** pure StereoLoadPolicy / ShouldPaintStereoThisFrame / ToastHint  
-2. **cl_vrmod** RenderScene: policy-driven paint during load; never dual under mq≥2  
-3. Unit test `util.stereo_load.policy_g05`; PURE_TESTED updated  
-4. HMD stereo fill quality still needs headset smoke (G05 residual)
+1. **CubeLaunchBootKind / BootLabel / ColdStartProgressSeconds / ShouldSkipSpawn** pure  
+2. **xr_app** classifies cold vs warm-detected at Start; still always cold-spawns  
+3. Panel **BOOT** line; honest 55s cold progress fallback; cold detail copy  
+4. Warm process reuse reserved (`ShouldSkipSpawn` always false)
 
 ## Pain points
 
-- mat_queue≥2 single-pass law preserved; climbing/noborder untouched.
+- Untouched.
 
 ## Gaps
 
-- G05 → **partial** (policy + keep dual paint; full load flash HMD proof open)  
-- Next: G04 cold Start inventory, or G03 apply design-only, or G12 ambient clip  
+- G04 → **partial** (inventory + UX honesty; warm attach/map-change open)  
+- Next: G03 apply design-only, or G12 ambient clip, or G13 reverse handoff note  
 
 ## Notes
 

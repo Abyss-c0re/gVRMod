@@ -36,7 +36,8 @@ TEST(launcher_handoff_detail_known_phases) {
     auto d_take = CubeHandoffDetailForPhase("take_xr", true);
     ASSERT_TRUE(d_take.find("claims OpenXR") != std::string::npos);
     auto d_wait = CubeHandoffDetailForPhase("waiting_process", false);
-    ASSERT_TRUE(d_wait.find("booting GMod") != std::string::npos);
+    // G04: cold Steam/hl2 wording (still means booting while panel holds XR)
+    ASSERT_TRUE(d_wait.find("cold") != std::string::npos || d_wait.find("holds OpenXR") != std::string::npos);
 }
 
 TEST(launcher_handoff_progress_monotone) {
@@ -119,6 +120,20 @@ TEST(launcher_handoff_layer_fade_alpha) {
     // Exit ramp end → solid black overlay before session drop
     float end = CubeHandoffFadeAmount("take_xr", true, 2.5f);
     ASSERT_NEAR(CubeHandoffLayerFadeAlpha(end), 1.f, 1e-5f);
+}
+
+// G04: cold Start inventory — boot kind labels; skip-spawn never true yet
+TEST(launcher_cold_start_boot_kind) {
+    ASSERT_EQ(CubeLaunchBootKind(false, false), std::string("COLD_SPAWN"));
+    ASSERT_EQ(CubeLaunchBootKind(true, false), std::string("WARM_DETECTED"));
+    ASSERT_EQ(CubeLaunchBootKind(true, true), std::string("COLD_SPAWN"));
+    ASSERT_TRUE(CubeLaunchBootLabel("COLD_SPAWN").find("COLD") != std::string::npos);
+    ASSERT_TRUE(CubeLaunchBootLabel("WARM_DETECTED").find("WARM") != std::string::npos);
+    ASSERT_TRUE(!CubeLaunchShouldSkipSpawn("WARM_DETECTED"));
+    ASSERT_TRUE(!CubeLaunchShouldSkipSpawn("COLD_SPAWN"));
+    ASSERT_TRUE(CubeColdStartProgressSeconds() >= 40.f);
+    auto d = CubeHandoffDetailForPhase("waiting_process", false);
+    ASSERT_TRUE(d.find("cold") != std::string::npos || d.find("Steam") != std::string::npos);
 }
 
 // G12: ambient gain law — full during hold, duck at take_xr, 0 on exit complete

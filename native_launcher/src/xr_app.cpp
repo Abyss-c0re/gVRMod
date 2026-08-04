@@ -309,9 +309,18 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       WebUI_SaveBindingsIfDirty(ui);
       LaunchRequest lr = LaunchRequestFromUI(ui, gmodRoot);
       ClearCubeHandoffMarkers(gmodRoot);
+      // G04: classify cold vs warm-detected (still cold-spawn; reuse protocol not shipped)
+      const bool alreadyUp = GModProcessRunning();
+      ui.handoffBootKind = CubeLaunchBootKind(alreadyUp, /*forceCold=*/false);
+      if (CubeLaunchShouldSkipSpawn(ui.handoffBootKind)) {
+        // Reserved: warm attach/map-change path (always false today)
+        ui.wantStart = false;
+        ui.status = "WARM REUSE NOT SHIPPED";
+      } else {
       std::string err;
       int rc = SpawnGModFromWebUI(lr, err);
-      fprintf(stderr, "[cube_webui] StartGame map=%s rc=%d %s\n", lr.map.c_str(), rc, err.c_str());
+      fprintf(stderr, "[cube_webui] StartGame map=%s rc=%d boot=%s %s\n",
+              lr.map.c_str(), rc, ui.handoffBootKind.c_str(), err.c_str());
       ui.wantStart = false;
       if (rc == 0) {
         // G11: remember map + gfx for next Cube session Quick Play
@@ -319,7 +328,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         ui.handoff = true;
         ui.handoffMap = lr.map;
         ui.handoffPhase = "SPAWNED";
-        ui.handoffDetail = "holding OpenXR · GMod booting";
+        ui.handoffDetail = (ui.handoffBootKind == "WARM_DETECTED")
+                               ? "process was up · still cold-spawn path · holding XR"
+                               : "cold Steam/hl2 · holding OpenXR · GMod booting";
         ui.handoffElapsed = 0.f;
         ui.status = "HANDOFF — STAY IN VR";
         // G03: pack STAGE/LOCAL + head sample for GMod (no apply yet — continuity data only)
@@ -343,6 +354,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       } else {
         ui.status = "SPAWN FAIL: " + err;
       }
+      } // else cold-spawn path
     }
 
     // Orderly OpenXR release (research-3): never destroy mid-frame without exit session.

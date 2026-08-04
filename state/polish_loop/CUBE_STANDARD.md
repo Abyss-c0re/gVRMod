@@ -21,6 +21,7 @@ Never submit eng texture. Never dual pose truth.
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoadPolicy` keeps dual-eye paint through load when mat_queue&lt;2; never dual under mq≥2
+- G04 partial: every Start is still cold Steam/hl2 (`CubeLaunchBootKind`); warm process reuse not shipped
 - G03 partial: Cube writes `cube_stage_pack.txt`; GMod parses + toasts (`StagePack_*`); **must not** auto-jump origin/height without careful apply
 - G12 partial: handoff ambient uses `CubeHandoffAudioGain` (duck to silence); actual clip optional future — panel shows AUDIO line
 

@@ -494,6 +494,7 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.handoffRefSpace.clear();
   s.handoffHeadY = 0.f;
   s.handoffHeadOk = false;
+  s.handoffBootKind.clear();
   s.cursorVisible = false;
   s.cursorX = 0;
   s.cursorY = 0;
@@ -1237,6 +1238,13 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     if (!s.handoffDetail.empty())
       DrawText(rgba, 24, 230, s.handoffDetail.c_str(), CT_RGB(CubeTheme::MUTED), 1);
 
+    // G04: cold vs warm-detected boot (warm reuse not shipped)
+    if (!s.handoffBootKind.empty()) {
+      std::string bl = CubeLaunchBootLabel(s.handoffBootKind);
+      snprintf(line, sizeof(line), "BOOT    %s", bl.c_str());
+      DrawText(rgba, 24, 250, line, CT_RGB(CubeTheme::MUTED), 1);
+    }
+
     // G03: show Cube shell ref space + head Y (packed for GMod continuity)
     if (!s.handoffRefSpace.empty()) {
       if (s.handoffHeadOk)
@@ -1245,15 +1253,17 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
       else
         snprintf(line, sizeof(line), "SPACE   %s  ·  HEAD  —  ·  PACKED",
                  s.handoffRefSpace.c_str());
-      DrawText(rgba, 24, 260, line, CT_RGB(CubeTheme::MUTED), 1);
+      DrawText(rgba, 24, 270, line, CT_RGB(CubeTheme::MUTED), 1);
     }
 
     float t = s.handoffElapsed;
     float pulse = 0.35f + 0.65f * (0.5f + 0.5f * std::sin(t * 2.2f));
     int barW = UI_W - 48;
-    // G01: prefer phase progress when known; else time fallback (pre-Lua cold boot)
+    // G01: prefer phase progress when known; else cold-start time fallback (G04 honest gap)
     float phaseP = CubeHandoffProgressForPhase(s.handoffPhase);
-    float frac = (phaseP >= 0.f) ? phaseP : std::min(0.95f, 0.08f + t / 40.f);
+    float coldSec = CubeColdStartProgressSeconds();
+    if (coldSec < 20.f) coldSec = 55.f;
+    float frac = (phaseP >= 0.f) ? phaseP : std::min(0.95f, 0.08f + t / coldSec);
     // G02: progress bar fills through release dim
     if (s.handoffFade > 0.f)
       frac = std::min(0.99f, std::max(frac, 0.78f + 0.2f * s.handoffFade));
