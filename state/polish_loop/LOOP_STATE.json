@@ -5,7 +5,7 @@
   "cycle": 36,
   "status": "ok",
   "last_cycle_at": "2026-08-04T20:57:02+03:00",
-  "last_commit": "pending",
+  "last_commit": "60e0d95",
   "last_commit_repo": "gVRMod+vrmod-x64",
   "last_test": "test_all --fast PASS 4/4",
   "last_focus": "G14 Glide HmdExpect + \u00a70.5 smoke",

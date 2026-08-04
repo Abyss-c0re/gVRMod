@@ -3,7 +3,7 @@
 **Cycle:** 36  
 **Time:** 2026-08-04T20:57:00+03:00  
 **Focus:** G14 Glide HmdExpect + §0.5 smoke  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `60e0d95`  
 **Commit (vrmod-x64):** (set after push)  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
