@@ -561,6 +561,42 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.SubmitLaw_AllowCollect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_AllowSubmitEngIn",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_AllowVirginOut",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_IsEngInRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_PreferTextureKind",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_RequireBlitBeforeSubmit",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
+      "vrmod.utils.SubmitLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua"
+    ],
+    [
       "vrmod.utils.TempSetDamping",
       "addon/vrmod-x64/lua/vrmod/utils/sh_npc2rag.lua"
     ],

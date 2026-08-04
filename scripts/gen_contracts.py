@@ -68,6 +68,16 @@ PURE_TESTED = {
     "vrmod.utils.MatQueueLaw_StatusLabel": "util.mat_queue_law.pin_g17",
     "vrmod.utils.MatQueueLaw_HmdExpect": "util.mat_queue_law.pin_g17",
     "vrmod.utils.MatQueueLaw_IsWriteRisk": "util.mat_queue_law.pin_g17",
+    # G19 pure submit path law (dual OUT RGBA8; never eng IN / virgin OUT)
+    "vrmod.utils.SubmitLaw_PreferTextureKind": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_AllowSubmitEngIn": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_AllowVirginOut": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_RequireBlitBeforeSubmit": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_AllowCollect": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_Decide": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_StatusLabel": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_HmdExpect": "util.submit_law.path_g19",
+    "vrmod.utils.SubmitLaw_IsEngInRisk": "util.submit_law.path_g19",
     # G16 pure laser / menu primary-click sacred law
     "vrmod.utils.LaserLaw_PrimaryHandFromInt": "util.laser_law.sacred_g16",
     "vrmod.utils.LaserLaw_SecondaryHand": "util.laser_law.sacred_g16",

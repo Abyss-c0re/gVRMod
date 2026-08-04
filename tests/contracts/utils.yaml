@@ -621,6 +621,42 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.math.sub_add_mul]
+  - id: vrmod.utils.SubmitLaw_AllowCollect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_AllowSubmitEngIn
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_AllowVirginOut
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_IsEngInRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_PreferTextureKind
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_RequireBlitBeforeSubmit
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
+  - id: vrmod.utils.SubmitLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
+    tier: pure
+    tests: [util.submit_law.path_g19]
   - id: vrmod.utils.TempSetDamping
     file: addon/vrmod-x64/lua/vrmod/utils/sh_npc2rag.lua
     tier: seam

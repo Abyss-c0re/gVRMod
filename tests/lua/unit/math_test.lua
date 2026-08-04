@@ -454,6 +454,59 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G19 pure submit path law (never eng IN / virgin OUT)
+	H.TEST("util.submit_law.path_g19", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.SubmitLaw_PreferTextureKind(), "dual_out_rgba8")
+		H.assert_true(not u.SubmitLaw_AllowSubmitEngIn())
+		H.assert_true(not u.SubmitLaw_AllowVirginOut())
+		H.assert_true(u.SubmitLaw_AllowCollect({ mat_queue_mode = 1 }))
+		H.assert_true(not u.SubmitLaw_AllowCollect({ mat_queue_mode = 2 }))
+		local ok = u.SubmitLaw_Decide({
+			mat_queue_mode = 1,
+			vr_active = true,
+			painted = true,
+			collected = true,
+			keep_submit = true,
+			submit_texture = "dual_out_rgba8",
+		})
+		H.assert_true(ok.allow_submit)
+		H.assert_eq(ok.risk, "none")
+		H.assert_eq(u.SubmitLaw_StatusLabel(ok), "SUBMIT · BLIT OUT")
+		local he = u.SubmitLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_dual_out")
+		H.assert_true(he.expect_dual_out)
+		H.assert_true(string.find(he.checklist, "G19", 1, true))
+		local eng = u.SubmitLaw_Decide({
+			vr_active = true,
+			keep_submit = true,
+			painted = true,
+			submit_texture = "eng_in",
+		})
+		H.assert_true(not eng.allow_submit)
+		H.assert_eq(eng.risk, "eng_in")
+		H.assert_true(u.SubmitLaw_IsEngInRisk(eng))
+		local heEng = u.SubmitLaw_HmdExpect(eng)
+		H.assert_eq(heEng.verdict, "expect_eng_in_fail")
+		local virgin = u.SubmitLaw_Decide({
+			vr_active = true,
+			keep_submit = true,
+			submit_texture = "virgin_out",
+		})
+		H.assert_true(not virgin.allow_submit)
+		H.assert_eq(virgin.risk, "virgin_out")
+		local mq2 = u.SubmitLaw_Decide({
+			mat_queue_mode = 2,
+			vr_active = true,
+			painted = true,
+			keep_submit = true,
+			submit_texture = "dual_out_rgba8",
+		})
+		H.assert_true(mq2.allow_submit)
+		H.assert_eq(mq2.risk, "mq2_no_collect")
+		H.assert_eq(u.SubmitLaw_StatusLabel(mq2), "SUBMIT · MQ2 OUT")
+	end)
+
 	-- G17 pure mat_queue pin law (never write 2 from VR)
 	H.TEST("util.mat_queue_law.pin_g17", function()
 		local u = env.vrmod.utils

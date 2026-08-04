@@ -259,6 +259,25 @@ Offline gate proves Cube pin **windowed + framed** (`noborder=false`), never inv
 
 Pure helpers: `WindowChrome_Decide` / `WindowChrome_BuildArgs` / `WindowChrome_HmdExpect` (unit-tested; offline ≠ desktop walk).
 
+### 0.11 G19 submit path — dual OUT only (manual)
+
+Offline gate proves **never eng IN**, **never virgin OUT**, prefer `dual_out_rgba8`, collect only when mq&lt;2. **Headset** required to claim no flash.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Live VR mq=1 | Submit dual OUT after paint (+ optional Collect blit) | eng RT id submitted; one-eye trash |
+| Cold first frames | No virgin black flash both eyes | Empty OUT before blit |
+| mq≥2 (must not ship default) | No live Collect; still OUT path if present | Dual live blit under mq2 |
+| Debug | `g_VR._submitLawLabel` → `SUBMIT · BLIT OUT` / `DUAL OUT` | `FORBID ENG IN` |
+
+**Procedure (claim “G19 submit OK” only if walked):**
+
+1. Enter VR — both eyes clear; no first-frame virgin wall.  
+2. Optional: `print(g_VR._submitLawLabel, g_VR._submitLawHmdExpect and g_VR._submitLawHmdExpect.checklist)`.  
+3. Confirm stereo stays dual OUT through load (G05) without eng-IN flash.
+
+Pure helpers: `SubmitLaw_Decide` / `SubmitLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law
