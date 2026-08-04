@@ -19,3 +19,12 @@ Append one block per cycle. Newest at bottom.
 - Tests: full test_all green; +3 launcher unit tests.
 - Commits: vrmod-x64 b1ada40; gVRMod (launcher + state + submodule).
 - Next: G10 first-run gates re-spam (or G20 pure utils).
+
+## 2026-08-04 cycle 2 — G10 first-run re-spam
+
+- Theme: skip Cube Experience on native_wrapper when Vision cal (border_profile) exists.
+- Pure: Experience_ShouldRunFromState in utils/sh_experience.lua (+ 6 unit tests).
+- Launch marker stores native_wrapper; IsNativeWrapperLaunch helper.
+- Tests: test_all --fast PASS 4/4.
+- Commits: vrmod-x64 70ff998; gVRMod (tests + submodule + state).
+- Next: G20 pure utils rewire or G11 Quick Play (safe).

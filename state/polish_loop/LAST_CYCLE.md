@@ -1,34 +1,31 @@
 # Last cycle
 
-**Cycle:** 1  
-**Time:** 2026-08-04T14:41:00+03:00  
-**Focus:** G01 handoff progress phases on Cube panel  
-**Commit (gVRMod):** `44caa41`  
-**Commit (vrmod-x64):** `b1ada40`  
-**Tests:** `./scripts/test_all.sh` — 6/6 suites pass (incl. 3 new launcher handoff unit tests)  
+**Cycle:** 2  
+**Time:** 2026-08-04T14:43:54+03:00  
+**Focus:** G10 first-run gates re-spam when cal + native_wrapper  
+**Commit (gVRMod):** `e2a0847`  
+**Commit (vrmod-x64):** `70ff998`  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (+6 experience unit tests)  
 
 ## What changed
 
-1. **Pure helpers** in `native_launcher/src/gmod_spawn.hpp`:
-   - `CubeHandoffDetailForPhase` — status-file phase → human detail copy
-   - `CubeHandoffProgressForPhase` — known phases → 0..1 bar fraction
-   - `CubeHandoffPhaseLabel` — PHASE line display labels
-2. **`xr_app.cpp`** — uses phase-aware detail instead of binary “holding XR / process up”.
-3. **`ui_panel.cpp`** — friendly PHASE label + phase-based progress bar (time fallback when unknown).
-4. **Lua** `cl_openxr_launch.lua` — writes `map_ready` on InitPostEntity for launch sessions.
-5. **Launcher tests** — offline coverage for detail / progress monotone / labels.
+1. **`utils/sh_experience.lua`** — pure `Experience_ShouldRunFromState` (force / disabled / complete / G10 wrapper+cal).
+2. **`cl_onboarding.lua`** — `Experience_ShouldRun` uses pure helper; prior cal = `border_profile.txt`.
+3. **`cl_openxr_launch.lua`** — store `native_wrapper` from marker; `IsNativeWrapperLaunch()`; cfg path marks wrapper.
+4. **Tests** — `tests/lua/unit/experience_test.lua` + runner wire-up.
 
 ## Pain points
 
 - Untouched: climbing, -noborder, mat_queue_mode, dual pose, HUD, force-push.
-- Handoff soft/timeout 90s/180s unchanged.
+- First-run without border profile still runs Welcome → Vision → Posture.
+- `vrmod_experience_force` still overrides skip.
 
 ## Gaps
 
-- G01 → **done** (phase surface intentional; remaining feel is G02 fade / G03 cal).
-- Next focus: G10 first-run gates re-spam (safe Lua) or G20 pure utils if G10 blocked.
+- G10 → **done**
+- Next: G20 pure utils rewire (or G11 Quick Play)
 
 ## Notes
 
 - cubalc_mirror dirty flood left unstaged.
-- Submodule vrmod-x64 advanced to `b1ada40`.
+- Submodule vrmod-x64 → `70ff998`.
