@@ -238,3 +238,13 @@ Append one block per cycle. Newest at bottom.
 - G12 partial — product default still silent until HMD-proven default-on.
 - Tests: full test_all PASS 6/6 (+backend argv unit); launcher builds.
 - Next: G05 stereo-load HMD notes or ambient default-on careful.
+
+## 2026-08-04 cycle 25 — G05 stereo-load detect + toast
+
+- Theme: pure loading detector + status/toast gate; wire cl_vrmod.
+- Pure: StereoLoad_IsLoading / StatusLabel / ShouldToast.
+- RenderScene uses IsLoading flags; one-shot dual-hold toast; clear on exit.
+- TESTING_FRAMEWORK §0 G05 HMD checklist item.
+- G05 partial — HMD load-flash proof still open.
+- Tests: --fast PASS 4/4 (35 Lua, pure pending=0).
+- Next: G03 apply careful or G04 skip-spawn design or ambient default-on.

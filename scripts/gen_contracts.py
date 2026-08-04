@@ -49,6 +49,9 @@ PURE_TESTED = {
     "vrmod.utils.StereoLoadPolicy": "util.stereo_load.policy_g05",
     "vrmod.utils.ShouldPaintStereoThisFrame": "util.stereo_load.policy_g05",
     "vrmod.utils.StereoLoadToastHint": "util.stereo_load.policy_g05",
+    "vrmod.utils.StereoLoad_IsLoading": "util.stereo_load.policy_g05",
+    "vrmod.utils.StereoLoad_StatusLabel": "util.stereo_load.policy_g05",
+    "vrmod.utils.StereoLoad_ShouldToast": "util.stereo_load.policy_g05",
     # G13 pure return-to-Cube reverse protocol
     "vrmod.utils.CubeReturn_NormalizePhase": "util.cube_return.protocol_g13",
     "vrmod.utils.CubeReturn_Format": "util.cube_return.protocol_g13",

@@ -40,10 +40,12 @@ Two layers. Do not conflate them in commits, PR claims, or polish-loop status.
 1. **Boot** — Cube panel or openxr launch → tracking valid (not origin-stuck).  
 2. **Handoff** — Start Game → phase labels progress → GMod claims XR without long black void.  
 3. **Stereo** — both eyes clear; no eng-IN submit / virgin OUT flash.  
-4. **UI** — laser + trigger click menus; no menu id thrash.  
-5. **Desktop** — `vrmod_desktopview` 1/2/3/4 (follow-cam) as intended; mirror is secondary.  
-6. **Cal** — Experience once (or skip forever); border profile reload on later boots.  
-7. **Pain points** — no force `-noborder`; `mat_queue_mode` stays 1; climb/wall not thrashing.
+4. **G05 stereo-load** — during map load / early after `take_xr`: both eyes still stereo (not flat mono void); toast may say “dual-eye hold through load”; `mat_queue_mode` stays **1** (mq2 must never dual-paint).  
+5. **UI** — laser + trigger click menus; no menu id thrash.  
+6. **Desktop** — `vrmod_desktopview` 1/2/3/4 (follow-cam) as intended; mirror is secondary.  
+7. **Cal** — Experience once (or skip forever); border profile reload on later boots.  
+8. **Pain points** — no force `-noborder`; `mat_queue_mode` stays 1; climb/wall not thrashing.  
+9. **Ambient (optional)** — with `GVRMOD_AMBIENT_PLAY=1`, soft hold tone during Cube handoff; default remains silent.
 
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 

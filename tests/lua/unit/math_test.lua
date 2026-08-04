@@ -320,6 +320,16 @@ return function(H, env)
 	-- G05 pure stereo-load policy (never dual under mat_queue 2)
 	H.TEST("util.stereo_load.policy_g05", function()
 		local u = env.vrmod.utils
+		-- Loading detector
+		H.assert_true(u.StereoLoad_IsLoading({ is_in_game = false }))
+		H.assert_true(u.StereoLoad_IsLoading({ is_in_game = true, local_player_valid = false }))
+		H.assert_true(u.StereoLoad_IsLoading({ is_in_game = true, local_player_valid = true, map_name = "" }))
+		H.assert_true(u.StereoLoad_IsLoading({ map_changing = true }))
+		H.assert_true(not u.StereoLoad_IsLoading({
+			is_in_game = true,
+			local_player_valid = true,
+			map_name = "gm_construct",
+		}))
 		local dual = u.StereoLoadPolicy({
 			mat_queue_mode = 1,
 			vr_active = true,
@@ -329,7 +339,11 @@ return function(H, env)
 		H.assert_true(dual.dual_eye)
 		H.assert_true(dual.prefer_paint_while_load)
 		H.assert_true(dual.keep_submit)
+		H.assert_true(dual.loading)
 		H.assert_true(u.ShouldPaintStereoThisFrame(dual, false))
+		H.assert_eq(u.StereoLoad_StatusLabel(dual), "STEREO · DUAL HOLD LOAD")
+		H.assert_true(u.StereoLoad_ShouldToast(dual, false))
+		H.assert_true(not u.StereoLoad_ShouldToast(dual, true))
 		local mq2 = u.StereoLoadPolicy({
 			mat_queue_mode = 2,
 			vr_active = true,
@@ -341,6 +355,7 @@ return function(H, env)
 		H.assert_true(not mq2.prefer_paint_while_load)
 		H.assert_true(u.ShouldPaintStereoThisFrame(mq2, true))
 		H.assert_true(not u.ShouldPaintStereoThisFrame(mq2, false))
+		H.assert_true(string.find(u.StereoLoad_StatusLabel(mq2), "MQ2", 1, true))
 		local idle = u.StereoLoadPolicy({
 			mat_queue_mode = 1,
 			vr_active = false,

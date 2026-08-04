@@ -389,6 +389,18 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
     ],
     [
+      "vrmod.utils.StereoLoad_IsLoading",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
+    ],
+    [
+      "vrmod.utils.StereoLoad_ShouldToast",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
+    ],
+    [
+      "vrmod.utils.StereoLoad_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
+    ],
+    [
       "vrmod.utils.SubVec",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],

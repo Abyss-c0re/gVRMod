@@ -20,7 +20,7 @@ Never submit eng texture. Never dual pose truth.
 - Seamless launcher: hold XR → STARTING GMOD → take_xr → release (no early void)
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
-- G05 partial: `StereoLoadPolicy` keeps dual-eye paint through load when mat_queue&lt;2; never dual under mq≥2
+- G05 partial: `StereoLoad_IsLoading` + dual-hold toast; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD proof open
 - G04 partial: every Start still cold-spawns; `cube_warm.txt` + GMod WarmAttach decide/toast; changelevel/`CubeWarmReuseEnabled` hard-off
 - G13 partial: VR exit writes `cube_return.txt`; Cube polls + RETURN panel line; **does not** auto-reclaim XR (`CubeReclaimEnabled` hard-off)
 - G03 partial: Cube writes `cube_stage_pack.txt`; GMod parses + `StagePack_ApplyDecision` (allow_apply=false); **must not** auto-jump origin/height without HMD-proven apply

@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 24  
-**Time:** 2026-08-04T18:45:49+03:00  
-**Focus:** G12 paplay/ffplay ambient backend (env opt-in)  
-**Commit (gVRMod):** `a80a832`  
-**Commit (vrmod-x64):** none  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass  
+**Cycle:** 25  
+**Time:** 2026-08-04T18:56:00+03:00  
+**Focus:** G05 stereo-load IsLoading + toast (HMD proof open)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **ambient_backend.cpp** fork/exec ffplay (loop+volume) / paplay fallback  
-2. Pure **PlayArgv / VolumePercent / ShouldRestartForGain / WantEnv**  
-3. **GVRMOD_AMBIENT_PLAY=1** opt-in (default still silent)  
-4. xr_app Apply on decide; stop when env off  
-5. Unit: `launcher_ambient_backend_argv`  
+1. **StereoLoad_IsLoading** pure multi-flag load detector  
+2. **StereoLoad_StatusLabel / ShouldToast** pure gates  
+3. **cl_vrmod** RenderScene uses IsLoading; one-shot dual-hold toast; clear on exit  
+4. **TESTING_FRAMEWORK** §0 G05 HMD checklist item  
+5. Unit expanded util.stereo_load.policy_g05  
 
 ## Pain points
 
-- Untouched.
+- Untouched; never dual under mq≥2.
 
 ## Gaps
 
-- G12 still **partial** — default silent; HMD smoke with env; OpenAL future  
-- Next: G05 stereo-load notes, or default-on ambient after HMD proof  
+- G05 still **partial** — HMD load-flash observation open  
+- Next: G03/G04 careful or ambient default-on  
 
 ## Notes
 

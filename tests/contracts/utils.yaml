@@ -449,6 +449,18 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua
     tier: pure
     tests: [util.stereo_load.policy_g05]
+  - id: vrmod.utils.StereoLoad_IsLoading
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua
+    tier: pure
+    tests: [util.stereo_load.policy_g05]
+  - id: vrmod.utils.StereoLoad_ShouldToast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua
+    tier: pure
+    tests: [util.stereo_load.policy_g05]
+  - id: vrmod.utils.StereoLoad_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua
+    tier: pure
+    tests: [util.stereo_load.policy_g05]
   - id: vrmod.utils.SubVec
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
