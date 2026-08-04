@@ -118,6 +118,30 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.CubeReturn_DetailForPhase
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: pure
+    tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.CubeReturn_Format
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: pure
+    tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.CubeReturn_NormalizePhase
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: pure
+    tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.CubeReturn_Parse
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: pure
+    tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.CubeReturn_PhaseLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: pure
+    tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.CubeReturn_ShouldNotifyCube
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: pure
+    tests: [util.cube_return.protocol_g13]
   - id: vrmod.utils.DrawDeathAnimation
     file: addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua
     tier: seam

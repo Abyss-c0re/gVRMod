@@ -49,6 +49,13 @@ PURE_TESTED = {
     "vrmod.utils.StereoLoadPolicy": "util.stereo_load.policy_g05",
     "vrmod.utils.ShouldPaintStereoThisFrame": "util.stereo_load.policy_g05",
     "vrmod.utils.StereoLoadToastHint": "util.stereo_load.policy_g05",
+    # G13 pure return-to-Cube reverse protocol
+    "vrmod.utils.CubeReturn_NormalizePhase": "util.cube_return.protocol_g13",
+    "vrmod.utils.CubeReturn_Format": "util.cube_return.protocol_g13",
+    "vrmod.utils.CubeReturn_Parse": "util.cube_return.protocol_g13",
+    "vrmod.utils.CubeReturn_PhaseLabel": "util.cube_return.protocol_g13",
+    "vrmod.utils.CubeReturn_ShouldNotifyCube": "util.cube_return.protocol_g13",
+    "vrmod.utils.CubeReturn_DetailForPhase": "util.cube_return.protocol_g13",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.DedupInGameMenuItems": "api.menu.dedup_function",
     "vrmod.RemoveInGameMenuItem": "api.menu.dedupe_name",

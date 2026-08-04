@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 17  
-**Time:** 2026-08-04T17:26:58+03:00  
-**Focus:** G03 StagePack apply gate (design — still no auto height)  
-**Commit (gVRMod):** `9fc48a6`  
-**Commit (vrmod-x64):** `82a0a6d`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
+**Cycle:** 18  
+**Time:** 2026-08-04T17:38:00+03:00  
+**Focus:** G13 reverse handoff protocol (partial — no auto reclaim)  
+**Commit (gVRMod):** (pending close)  
+**Commit (vrmod-x64):** `b1dc55f`  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **StagePack_ApplyDecision / ApplyToast** pure band gate (close / far / deferred)  
-2. **cl_openxr_launch** stores `g_VR._cubeStagePackApply`; allow_apply=false hard  
-3. Toast from decision reason; **no** scale/seatedoffset/origin mutation  
-4. Unit coverage inside util.stage_pack.parse_and_hint  
+1. **sh_cube_return.lua** pure Format/Parse/PhaseLabel/ShouldNotifyCube/Detail  
+2. **VRUtilClientExit** writes `cube_return.txt` (vr_exit → xr_released) for Cube sessions  
+3. **CubeReverse*** pure labels in launcher; clear return marker on Start  
+4. Toast: relaunch Cube shell — **no** auto OpenXR reclaim  
 
 ## Pain points
 
-- Untouched; FOV archives and dual pose law preserved.
+- Untouched; soft handoff timeouts unchanged.
 
 ## Gaps
 
-- G03 still **partial** — full HMD-proven apply path open (gate ready)  
-- Next: G12 ambient clip, G13 reverse handoff note, or G04 warm reuse design  
+- G13 → **partial** (protocol + marker; Cube reclaim process open)  
+- Next: G12 ambient clip, or G04 warm reuse, or G13 Cube poll reclaim  
 
 ## Notes
 

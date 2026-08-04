@@ -169,3 +169,13 @@ Append one block per cycle. Newest at bottom.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Commits: vrmod-x64 82a0a6d; gVRMod submodule + tests + state.
 - Next: G12 ambient clip or G13 reverse handoff design-only.
+
+## 2026-08-04 cycle 18 — G13 reverse handoff protocol
+
+- Theme: return-to-Cube marker contract without auto reclaim.
+- Pure: CubeReturn_* Lua + CubeReverse* launcher labels.
+- VR exit writes cube_return.txt; Start clears it; toast relaunch hint.
+- G13 partial — Cube shell reclaim still future.
+- Tests: full test_all PASS 6/6.
+- Commits: vrmod-x64 b1dc55f; gVRMod submodule + launcher + state.
+- Next: G12 ambient clip or G04 warm reuse design.

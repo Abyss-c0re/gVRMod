@@ -101,6 +101,30 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
     [
+      "vrmod.utils.CubeReturn_DetailForPhase",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
+      "vrmod.utils.CubeReturn_Format",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
+      "vrmod.utils.CubeReturn_NormalizePhase",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
+      "vrmod.utils.CubeReturn_Parse",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
+      "vrmod.utils.CubeReturn_PhaseLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
+      "vrmod.utils.CubeReturn_ShouldNotifyCube",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
       "vrmod.utils.DrawDeathAnimation",
       "addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua"
     ],

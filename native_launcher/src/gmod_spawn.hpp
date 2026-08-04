@@ -92,6 +92,33 @@ inline bool CubeLaunchShouldSkipSpawn(const std::string& kind) {
   return false;
 }
 
+// G13: reverse handoff (GMod exit VR → Cube reclaim) — pure labels only.
+// Product today: GMod writes cube_return.txt; Cube does not auto-reclaim yet.
+inline std::string CubeReversePhaseLabel(const std::string& phase) {
+  if (phase == "vr_exit") return "VR EXIT";
+  if (phase == "xr_released") return "XR RELEASED";
+  if (phase == "cube_claim") return "CUBE CLAIM";
+  if (phase == "panel_live") return "PANEL LIVE";
+  if (phase.empty()) return "RETURN IDLE";
+  return phase;
+}
+
+inline std::string CubeReverseDetailForPhase(const std::string& phase) {
+  if (phase == "vr_exit") return "GMod left VR · Cube reclaim not auto yet";
+  if (phase == "xr_released") return "OpenXR free · relaunch Cube shell to reclaim";
+  if (phase == "cube_claim") return "Cube claiming OpenXR…";
+  if (phase == "panel_live") return "Cube panel live · reverse handoff complete";
+  return "return-to-Cube protocol (future)";
+}
+
+inline float CubeReverseProgressForPhase(const std::string& phase) {
+  if (phase == "vr_exit") return 0.25f;
+  if (phase == "xr_released") return 0.5f;
+  if (phase == "cube_claim") return 0.75f;
+  if (phase == "panel_live") return 1.f;
+  return -1.f;
+}
+
 // Pure helpers for Cube handoff panel (G01) — no I/O; unit-tested offline.
 // Map status-file phase tokens → human detail / progress / display label.
 inline std::string CubeHandoffDetailForPhase(const std::string& phase, bool gmodUp) {

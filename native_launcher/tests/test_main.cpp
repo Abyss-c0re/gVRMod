@@ -122,6 +122,16 @@ TEST(launcher_handoff_layer_fade_alpha) {
     ASSERT_NEAR(CubeHandoffLayerFadeAlpha(end), 1.f, 1e-5f);
 }
 
+// G13: reverse handoff pure labels (Cube reclaim not auto)
+TEST(launcher_reverse_handoff_phases) {
+    ASSERT_EQ(CubeReversePhaseLabel("vr_exit"), std::string("VR EXIT"));
+    ASSERT_EQ(CubeReversePhaseLabel("panel_live"), std::string("PANEL LIVE"));
+    ASSERT_TRUE(CubeReverseDetailForPhase("xr_released").find("relaunch") != std::string::npos);
+    ASSERT_TRUE(CubeReverseProgressForPhase("vr_exit") > 0.f);
+    ASSERT_TRUE(CubeReverseProgressForPhase("panel_live") >= 0.99f);
+    ASSERT_TRUE(CubeReverseProgressForPhase("unknown") < 0.f);
+}
+
 // G04: cold Start inventory — boot kind labels; skip-spawn never true yet
 TEST(launcher_cold_start_boot_kind) {
     ASSERT_EQ(CubeLaunchBootKind(false, false), std::string("COLD_SPAWN"));

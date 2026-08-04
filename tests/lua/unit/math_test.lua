@@ -261,6 +261,22 @@ return function(H, env)
 		H.assert_true(type(at) == "string" and string.find(at, "deferred", 1, true))
 	end)
 
+	-- G13 pure return-to-Cube reverse protocol
+	H.TEST("util.cube_return.protocol_g13", function()
+		local u = env.vrmod.utils
+		H.assert_true(not u.CubeReturn_ShouldNotifyCube(false, true))
+		H.assert_true(u.CubeReturn_ShouldNotifyCube(true, true))
+		H.assert_true(not u.CubeReturn_ShouldNotifyCube(true, false))
+		local body = u.CubeReturn_Format("vr_exit", { map = "gm_construct", ts = 9, source = "t" })
+		local p = u.CubeReturn_Parse(body)
+		H.assert_true(p ~= nil)
+		H.assert_eq(p.phase, "vr_exit")
+		H.assert_eq(p.map, "gm_construct")
+		H.assert_eq(u.CubeReturn_PhaseLabel("xr_released"), "XR RELEASED")
+		H.assert_true(string.find(u.CubeReturn_DetailForPhase("vr_exit"), "reclaim", 1, true))
+		H.assert_true(u.CubeReturn_Parse("") == nil)
+	end)
+
 	-- G05 pure stereo-load policy (never dual under mat_queue 2)
 	H.TEST("util.stereo_load.policy_g05", function()
 		local u = env.vrmod.utils

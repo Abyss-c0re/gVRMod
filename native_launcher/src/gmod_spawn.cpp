@@ -226,6 +226,8 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot) {
   const std::string d = gmodRoot + "/garrysmod/data/vrmod/";
   unlink((d + "cube_handoff.txt").c_str());
   unlink((d + "cube_ready.txt").c_str());
+  // G13: clear prior return marker so a new Start does not look like reverse mid-flight
+  unlink((d + "cube_return.txt").c_str());
   // G03: keep cube_stage_pack.txt so GMod can read after claim (overwritten on next Start)
 }
 
