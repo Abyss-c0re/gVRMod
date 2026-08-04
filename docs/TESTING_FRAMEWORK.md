@@ -297,6 +297,25 @@ Offline gate proves **one path** raw → tracking → modifiers; guns read **tra
 
 Pure helpers: `PoseSoT_Decide` / `PoseSoT_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.13 G26 menu thrash / QM dedupe (manual)
+
+Offline gate proves stable **id/name** keys, climb aliases → `vrclimb`, DedupList drops dupes. **Headset** required to claim one VRClimb tile.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Open Quick Menu | One button per layout id | Duplicate tiles (esp. VRClimb ×2) |
+| Re-Start VR | Update-in-place; no second register | Thrash grow every Start |
+| Debug | After dedupe: `g_VR._menuLawLabel` → `MENU · DEDUPED` | `CLIMB DUPE` / `THRASH` sticky |
+| Climb names | “VRClimb” / “VR Climb” / “VR Climbing” same id | Three climb entries |
+
+**Procedure (claim “G26 menu OK” only if walked):**
+
+1. Enter VR → open Quick Menu — scan for duplicate labels.  
+2. Exit/re-enter VR once — count stays stable.  
+3. Optional: `print(g_VR._menuLawLabel, #g_VR.menuItems)`.
+
+Pure helpers: `MenuLaw_ItemsMatch` / `MenuLaw_Decide` / `MenuLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

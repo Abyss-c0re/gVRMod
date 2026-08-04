@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 43
+Last updated: 2026-08-04 cycle 44
 
 ## P0 — seamless / feel broken
 
@@ -29,6 +29,7 @@ Last updated: 2026-08-04 cycle 43
 | G18 | Framed desktop chrome (never force -noborder) | WindowChrome_* cycle41; desktop walk open | **partial** cycle41 |
 | G19 | Submit eng IN / virgin OUT forbidden | SubmitLaw_* cycle42; HMD walk open | **partial** cycle42 |
 | G25 | Dual-truth pose/angvel SoT forks | PoseSoT_* cycle43; HMD walk open | **partial** cycle43 |
+| G26 | QM menu thrash / VRClimb dupes | MenuLaw_* cycle44; HMD walk open | **partial** cycle44 |
 
 ## P2 — code quality / glogic hygiene
 
@@ -48,6 +49,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G26 | Menu thrash / VRClimb dedupe by id | MenuLaw_* + cl_api wire |
 | G25 | Pose single path (no dual angvel/public SoT) | PoseSoT_* + cl_vrmod snapshot |
 | G19 | Submit dual OUT only (never eng IN / virgin) | SubmitLaw_* + cl_vrmod snapshot |
 | G18 | Framed window chrome (never force -noborder) | WindowChrome_* + gmod_spawn BuildArgs |

@@ -445,6 +445,46 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.MenuLaw_CanonicalClimbId
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_DedupList
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_IsClimbName
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_IsThrashRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_ItemsMatch
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_NormalizeName
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_StableKey
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [util.menu_law.dedupe_g26]
   - id: vrmod.utils.MulVec
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure

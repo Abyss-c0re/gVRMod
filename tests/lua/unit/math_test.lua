@@ -454,6 +454,45 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G26 pure menu thrash / QM dedupe law (VRClimb id collapse)
+	H.TEST("util.menu_law.dedupe_g26", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.MenuLaw_NormalizeName("  VRClimb "), "vrclimb")
+		H.assert_eq(u.MenuLaw_StableKey("Spawn Menu", "spawn"), "id:spawn")
+		H.assert_eq(u.MenuLaw_StableKey("Chat", nil), "name:chat")
+		H.assert_eq(u.MenuLaw_CanonicalClimbId(), "vrclimb")
+		H.assert_true(u.MenuLaw_IsClimbName("VR Climb"))
+		H.assert_true(u.MenuLaw_ItemsMatch({ name = "VRClimb", id = "vrclimb" }, "VR Climb", "vrclimb"))
+		H.assert_true(u.MenuLaw_ItemsMatch({ name = "Spawn Menu", id = "spawn" }, "Spawn Menu", nil))
+		H.assert_true(not u.MenuLaw_ItemsMatch({ name = "Chat", id = "chat" }, "Settings", "settings"))
+		local list, dropped = u.MenuLaw_DedupList({
+			{ name = "VRClimb", id = "vrclimb" },
+			{ name = "VR Climb", id = "vrclimb" },
+			{ name = "Chat", id = "chat" },
+		})
+		H.assert_eq(#list, 2)
+		H.assert_eq(dropped, 1)
+		local dirty = u.MenuLaw_Decide({
+			items = {
+				{ name = "VRClimb", id = "vrclimb" },
+				{ name = "VR Climbing", id = "vrclimb" },
+			},
+		})
+		H.assert_true(not dirty.path_ok or dirty.climb_dupes > 0 or dirty.dropped > 0)
+		H.assert_true(u.MenuLaw_IsThrashRisk(dirty) or dirty.climb_dupes > 0)
+		local clean = u.MenuLaw_Decide({
+			items = {
+				{ name = "VRClimb", id = "vrclimb" },
+				{ name = "Chat", id = "chat" },
+			},
+		})
+		H.assert_true(clean.path_ok)
+		H.assert_eq(u.MenuLaw_StatusLabel(clean), "MENU · DEDUPED")
+		local he = u.MenuLaw_HmdExpect(clean)
+		H.assert_eq(he.verdict, "expect_clean")
+		H.assert_true(string.find(he.checklist, "G26", 1, true))
+	end)
+
 	-- G25 pure pose SoT law (no dual-truth pose/angvel forks)
 	H.TEST("util.pose_sot_law.single_path_g25", function()
 		local u = env.vrmod.utils

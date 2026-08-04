@@ -78,6 +78,17 @@ PURE_TESTED = {
     "vrmod.utils.SubmitLaw_StatusLabel": "util.submit_law.path_g19",
     "vrmod.utils.SubmitLaw_HmdExpect": "util.submit_law.path_g19",
     "vrmod.utils.SubmitLaw_IsEngInRisk": "util.submit_law.path_g19",
+    # G26 pure menu thrash / QM dedupe law (VRClimb id collapse)
+    "vrmod.utils.MenuLaw_NormalizeName": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_StableKey": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_CanonicalClimbId": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_IsClimbName": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_ItemsMatch": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_DedupList": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_Decide": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_StatusLabel": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_HmdExpect": "util.menu_law.dedupe_g26",
+    "vrmod.utils.MenuLaw_IsThrashRisk": "util.menu_law.dedupe_g26",
     # G25 pure pose SoT law (one energy path; no dual-truth pose/angvel forks)
     "vrmod.utils.PoseSoT_PipelineSteps": "util.pose_sot_law.single_path_g25",
     "vrmod.utils.PoseSoT_PublicSource": "util.pose_sot_law.single_path_g25",

@@ -30,7 +30,7 @@ Never submit eng texture. Never dual pose truth.
 ## UI / interaction
 
 - Laser + trigger click is sacred and must stay responsive (G16: pure primary-hand SoT + first-eye focus; §0.8 walk open)
-- No menu thrash (register once; dedupe by id)
+- No menu thrash (register once; dedupe by id) — G26 partial: `MenuLaw_*` stable key + VRClimb collapse; HmdExpect §0.13 open
 - No grab_end storms / left-trigger silence regressions
 - World panel: world-locked by default; grip repositions
 - G15 partial: HUD composite law — clear plate translucent; dim plate **additive** (PROPHECY); never opaque black slab; HMD walk §0.7 open
@@ -38,6 +38,7 @@ Never submit eng texture. Never dual pose truth.
 - G18 partial: desktop chrome **framed** (windowed, no force `-noborder`); `WindowChrome_*` pure; HmdExpect §0.10 open
 - G19 partial: submit **dual OUT RGBA8** only; never eng IN / virgin OUT; `SubmitLaw_*`; HmdExpect §0.11 open
 - G25 partial: pose **single path** raw→tracking→modifiers; no dual angvel/public SoT; `PoseSoT_*`; HmdExpect §0.12 open
+- G26 partial: menu **dedupe** by id/name; VRClimb aliases one id; `MenuLaw_*`; HmdExpect §0.13 open
 
 ## Compatibility
 

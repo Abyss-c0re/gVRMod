@@ -397,6 +397,46 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
     [
+      "vrmod.utils.MenuLaw_CanonicalClimbId",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_DedupList",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_IsClimbName",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_IsThrashRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_ItemsMatch",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_NormalizeName",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_StableKey",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
       "vrmod.utils.MulVec",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
