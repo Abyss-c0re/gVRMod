@@ -102,3 +102,13 @@ Append one block per cycle. Newest at bottom.
 - Full XR layer fade still open (G02 partial).
 - Tests: full test_all PASS 6/6 (+fade unit test).
 - Next: G03 cal/STAGE pack (careful) or G12 audio design-only.
+
+## 2026-08-04 cycle 11 — G03 STAGE pack (write only)
+
+- Theme: pack STAGE/LOCAL + head sample into handoff for cal continuity (no apply).
+- Pure: stage_pack.hpp Format/Parse/IsUsable (+ 3 launcher unit tests).
+- Write cube_stage_pack.txt on Start + refresh at take_xr; panel SPACE line.
+- Keep pack across ClearCubeHandoffMarkers (GMod reads after claim).
+- G03 partial — GMod origin/height apply still open (pain-point careful).
+- Tests: full test_all PASS 6/6 (14 launcher tests).
+- Next: careful G03 apply hint, or G12 audio design-only, or G02 layer fade.

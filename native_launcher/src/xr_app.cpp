@@ -10,6 +10,7 @@
 #include "host_cmd.hpp"
 #include "launch_fill.hpp"
 #include "gmod_spawn.hpp"
+#include "stage_pack.hpp"
 #include "ui_panel.hpp"
 #include "smx_player.hpp"
 #include "math3d.hpp"
@@ -184,6 +185,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
   }
   fprintf(stderr, "[cube_webui] content space=%s (panel+laser+eyes same space)\n", spaceName);
+  // G03: last valid head sample in content space (for stage pack continuity)
+  float lastHeadX = 0.f, lastHeadY = 0.f, lastHeadZ = 0.f;
+  bool lastHeadOk = false;
   XrSpace viewSpace = XR_NULL_HANDLE;
   rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
   xrCreateReferenceSpace(session, &rsci, &viewSpace);
@@ -318,6 +322,24 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         ui.handoffDetail = "holding OpenXR · GMod booting";
         ui.handoffElapsed = 0.f;
         ui.status = "HANDOFF — STAY IN VR";
+        // G03: pack STAGE/LOCAL + head sample for GMod (no apply yet — continuity data only)
+        {
+          StagePackSnapshot pack;
+          pack.refSpace = spaceName ? spaceName : "LOCAL";
+          pack.headX = lastHeadX;
+          pack.headY = lastHeadY;
+          pack.headZ = lastHeadZ;
+          pack.headOk = lastHeadOk;
+          pack.viewScale = lr.gfx.xrViewScale;
+          pack.scaleFactor = lr.gfx.xrScaleFactor;
+          pack.supersample = lr.gfx.xrSupersample;
+          pack.map = lr.map;
+          pack.source = "cube_webui";
+          WriteCubeStagePack(gmodRoot, pack);
+          ui.handoffRefSpace = StagePack_NormalizeSpace(pack.refSpace);
+          ui.handoffHeadY = pack.headY;
+          ui.handoffHeadOk = pack.headOk;
+        }
       } else {
         ui.status = "SPAWN FAIL: " + err;
       }
@@ -346,6 +368,30 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         handoffExitWait = 0.f;
         fprintf(stderr, "[cube_webui] handoff release phase=%s t=%.1f (orderly xrRequestExitSession)\n",
                 phase.c_str(), ui.handoffElapsed);
+        // G03: refresh stage pack with final head sample before runtime release
+        {
+          StagePackSnapshot pack;
+          pack.refSpace = spaceName ? spaceName : "LOCAL";
+          pack.headX = lastHeadX;
+          pack.headY = lastHeadY;
+          pack.headZ = lastHeadZ;
+          pack.headOk = lastHeadOk;
+          pack.viewScale = ui.gfx.xr.viewScale;
+          pack.scaleFactor = ui.gfx.xr.scaleFactor;
+          {
+            static const float kSs[] = {0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
+            int i = ui.gfx.xr.ssIdx;
+            if (i < 0) i = 0;
+            if (i > 5) i = 5;
+            pack.supersample = kSs[i];
+          }
+          pack.map = ui.handoffMap;
+          pack.source = "cube_webui_take_xr";
+          WriteCubeStagePack(gmodRoot, pack);
+          ui.handoffRefSpace = StagePack_NormalizeSpace(pack.refSpace);
+          ui.handoffHeadY = pack.headY;
+          ui.handoffHeadOk = pack.headOk;
+        }
         if (sessionRunning) xrRequestExitSession(session);
         else running = false;
       }
@@ -419,6 +465,17 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           headOk = acceptHead(viewsHead[0].pose, XR_SPACE_LOCATION_POSITION_VALID_BIT |
                                                      XR_SPACE_LOCATION_ORIENTATION_VALID_BIT);
         }
+      }
+    }
+    // G03: remember last good head for stage pack (Start + take_xr)
+    if (headOk) {
+      lastHeadX = headWorld.position.x;
+      lastHeadY = headWorld.position.y;
+      lastHeadZ = headWorld.position.z;
+      lastHeadOk = true;
+      if (ui.handoff) {
+        ui.handoffHeadY = lastHeadY;
+        ui.handoffHeadOk = true;
       }
     }
 

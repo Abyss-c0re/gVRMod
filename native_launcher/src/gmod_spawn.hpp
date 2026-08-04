@@ -1,4 +1,5 @@
 #pragma once
+#include "stage_pack.hpp"
 #include <string>
 
 // GMod/Source graphics + OpenXR (vrmod_*) applied via +exec cfg
@@ -62,6 +63,10 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut);
 bool GModProcessRunning();
 std::string ReadCubeHandoffPhase(const std::string& gmodRoot);
 void ClearCubeHandoffMarkers(const std::string& gmodRoot);
+
+// G03: write cube_stage_pack.txt (STAGE/LOCAL + head sample). Does not clear on handoff markers.
+// Applying pack in GMod is intentionally separate — this only persists continuity data.
+bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pack);
 
 // Pure helpers for Cube handoff panel (G01) — no I/O; unit-tested offline.
 // Map status-file phase tokens → human detail / progress / display label.

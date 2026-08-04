@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 10
+Last updated: 2026-08-04 cycle 11
 
 ## P0 — seamless / feel broken
 
@@ -10,7 +10,7 @@ Last updated: 2026-08-04 cycle 10
 |----|-----|-------|--------|
 | G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |
 | G02 | No coordinated fade on take_xr | Panel dim landed cycle10; full XR layer fade still open | **partial** cycle10 |
-| G03 | Cal / STAGE not packed into handoff | Height/playspace can jump after claim | open |
+| G03 | Cal / STAGE not packed into handoff | Pack file + head sample landed cycle11; GMod apply still open | **partial** cycle11 |
 | G04 | Cold Steam/hl2 every Start | Long Facepunch gap | open (warm process is larger) |
 | G05 | Loading after take_xr may not be stereo | Black or flat load flash | open |
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G03 | STAGE pack write (no apply) | stage_pack.hpp + cube_stage_pack.txt |
 | G02 | Panel dim on take_xr / release | CubeHandoffFadeAmount |
 | G14 | Glide stick SoT helpers + toast | vrmod-x64 e8318a9 |
 | G24 | Offline vs HMD ship bar documented | TESTING_FRAMEWORK §0 |

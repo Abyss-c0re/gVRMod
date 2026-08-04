@@ -1,5 +1,6 @@
 #include "gmod_spawn.hpp"
 #include "panel_config.hpp"
+#include "stage_pack.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -225,4 +226,21 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot) {
   const std::string d = gmodRoot + "/garrysmod/data/vrmod/";
   unlink((d + "cube_handoff.txt").c_str());
   unlink((d + "cube_ready.txt").c_str());
+  // G03: keep cube_stage_pack.txt so GMod can read after claim (overwritten on next Start)
+}
+
+bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pack) {
+  if (gmodRoot.empty()) return false;
+  const std::string dataDir = gmodRoot + "/garrysmod/data/vrmod";
+  mkdir((gmodRoot + "/garrysmod/data").c_str(), 0755);
+  mkdir(dataDir.c_str(), 0755);
+  StagePackSnapshot s = pack;
+  if (s.ts <= 0) s.ts = (long)time(nullptr);
+  s.refSpace = StagePack_NormalizeSpace(s.refSpace);
+  s.valid = true;
+  const std::string path = dataDir + "/cube_stage_pack.txt";
+  if (!WriteFile(path, StagePack_Format(s))) return false;
+  fprintf(stderr, "[cube_webui] stage pack → %s space=%s head_ok=%d y=%.3f\n",
+          path.c_str(), s.refSpace.c_str(), s.headOk ? 1 : 0, s.headY);
+  return true;
 }

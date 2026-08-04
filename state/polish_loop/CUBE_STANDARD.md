@@ -20,6 +20,7 @@ Never submit eng texture. Never dual pose truth.
 - Seamless launcher: hold XR → STARTING GMOD → take_xr → release (no early void)
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 partial: Cube panel dims on take_xr / release (`CubeHandoffFadeAmount`); full OpenXR layer crossfade still open
+- G03 partial: Cube writes `cube_stage_pack.txt` (ref space STAGE/LOCAL + head Y + scales) at Start/take_xr; GMod must not auto-jump origin without careful apply
 
 ## UI / interaction
 

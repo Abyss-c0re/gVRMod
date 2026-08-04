@@ -108,6 +108,10 @@ struct WebUIState {
   float handoffElapsed = 0.f;
   // G02: 0..1 intentional dim during take_xr / xrRequestExitSession (panel-side, not layer fade)
   float handoffFade = 0.f;
+  // G03: STAGE/LOCAL continuity (from Cube shell content space + last head sample)
+  std::string handoffRefSpace;
+  float handoffHeadY = 0.f;
+  bool handoffHeadOk = false;
 
   // Laser cursor (software reticle — optional; laser usually enough)
   bool cursorVisible = false;

@@ -2,6 +2,7 @@
 #include "math3d.hpp"
 #include "gmod_spawn.hpp"
 #include "last_play.hpp"
+#include "stage_pack.hpp"
 
 TEST(launcher_math3d_normalize) {
     Vec3 n = Normalize(V3(3.f, 0.f, 0.f));
@@ -106,6 +107,46 @@ TEST(launcher_handoff_fade_amount) {
     ASSERT_TRUE(mid > take);
     ASSERT_NEAR(end, 1.f, 1e-5f);
     ASSERT_TRUE(CubeHandoffPhaseLabel("take_xr").find("FADE") != std::string::npos);
+}
+
+// G03: STAGE/cal pack — pure format/parse + usability (no auto-apply height)
+TEST(launcher_stage_pack_roundtrip) {
+    StagePackSnapshot a;
+    a.refSpace = "stage";
+    a.headX = 0.1f;
+    a.headY = 1.65f;
+    a.headZ = -0.2f;
+    a.headOk = true;
+    a.viewScale = 1.0f;
+    a.scaleFactor = 1.05f;
+    a.supersample = 1.5f;
+    a.map = "gm_construct";
+    a.source = "cube_webui";
+    a.ts = 12345;
+    std::string body = StagePack_Format(a);
+    StagePackSnapshot b;
+    ASSERT_TRUE(StagePack_Parse(body, b));
+    ASSERT_EQ(b.refSpace, std::string("STAGE"));
+    ASSERT_NEAR(b.headY, 1.65f, 1e-4f);
+    ASSERT_TRUE(b.headOk);
+    ASSERT_NEAR(b.scaleFactor, 1.05f, 1e-4f);
+    ASSERT_EQ(b.map, std::string("gm_construct"));
+    ASSERT_TRUE(StagePack_IsUsable(b));
+}
+
+TEST(launcher_stage_pack_rejects_empty) {
+    StagePackSnapshot b;
+    ASSERT_TRUE(!StagePack_Parse("v=1\nmap=gm_construct\n", b));
+    ASSERT_TRUE(!StagePack_IsUsable(b));
+}
+
+TEST(launcher_stage_pack_head_y_sanity) {
+    // Extreme head Y clears head_ok (still valid space pack)
+    StagePackSnapshot b;
+    ASSERT_TRUE(StagePack_Parse("v=1\nref_space=LOCAL\nhead_y_m=9.0\nhead_ok=1\n", b));
+    ASSERT_TRUE(StagePack_IsUsable(b));
+    ASSERT_TRUE(!b.headOk);
+    ASSERT_EQ(StagePack_NormalizeSpace("local"), std::string("LOCAL"));
 }
 
 int main() {

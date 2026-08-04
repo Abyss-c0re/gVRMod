@@ -490,6 +490,9 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.handoffDetail.clear();
   s.handoffElapsed = 0.f;
   s.handoffFade = 0.f;
+  s.handoffRefSpace.clear();
+  s.handoffHeadY = 0.f;
+  s.handoffHeadOk = false;
   s.cursorVisible = false;
   s.cursorX = 0;
   s.cursorY = 0;
@@ -1232,6 +1235,17 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
 
     if (!s.handoffDetail.empty())
       DrawText(rgba, 24, 230, s.handoffDetail.c_str(), CT_RGB(CubeTheme::MUTED), 1);
+
+    // G03: show Cube shell ref space + head Y (packed for GMod continuity)
+    if (!s.handoffRefSpace.empty()) {
+      if (s.handoffHeadOk)
+        snprintf(line, sizeof(line), "SPACE   %s  ·  HEAD Y %.2fm  ·  PACKED",
+                 s.handoffRefSpace.c_str(), s.handoffHeadY);
+      else
+        snprintf(line, sizeof(line), "SPACE   %s  ·  HEAD  —  ·  PACKED",
+                 s.handoffRefSpace.c_str());
+      DrawText(rgba, 24, 260, line, CT_RGB(CubeTheme::MUTED), 1);
+    }
 
     float t = s.handoffElapsed;
     float pulse = 0.35f + 0.65f * (0.5f + 0.5f * std::sin(t * 2.2f));
