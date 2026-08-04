@@ -80,14 +80,18 @@ Never nests under the stereo RT (avoids nested-portal crash).
 
 ## Call-site law (G23 — verified)
 
-| Path | Mode 4 behavior |
+| Path | Behavior |
 |------|-----------------|
-| `cl_vrmod` RenderScene desktop blit | Follow path only; **never** stereo eye crop when `dv==4` |
-| `ComputeDesktopCrop(4)` | Returns `0,0` (unused crop) |
+| Stereo paint | Dual eyes into `g_VR.rt` only |
+| OpenXR Collect + Submit | **Before** any desktop present |
+| `PresentDesktopMirror` | **After** submit (left/right crop or follow blit) |
+| `ComputeDesktopCrop(1\|4)` | Returns `0,0` (unused crop); L/R UVs clamped safe |
 | `DesktopCam.SyncFromDesktopView` | Start/stop session from cvar + frame loop |
 | Settings catalog combo | value `4` = “follow camera” |
 | Cube launcher XR DESKTOP VIEW | cycles 1→2→3→4; labels NONE/LEFT/RIGHT/FOLLOW CAM |
 | `cube_last_play` snapshot | clamps `xr_desktopview` to 1..4 |
+
+**Law:** never bind `g_VR.rt` as a screen material before Collect/Submit. Mid-frame CullMode NDC eye crop was breaking HMD stereo when desktopview was left/right/none.
 
 Helpers: `IsFollowMode`, `IsEyeCropMode`, `ClampDesktopView`, `CycleDesktopView`, `DesktopViewLabel`.
 
