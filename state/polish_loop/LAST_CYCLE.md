@@ -3,8 +3,8 @@
 **Cycle:** 53  
 **Time:** 2026-08-05T00:05:00+03:00  
 **Focus:** G35 viewscale fisheye law (W8)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `81e19df`  
+**Commit (vrmod-x64):** `c126533`  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass (launcher 32; 47 Lua)  
 
 ## What changed
