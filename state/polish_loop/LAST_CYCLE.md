@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 31  
-**Time:** 2026-08-04T20:03:17+03:00  
-**Focus:** G04 careful changelevel plan executor  
-**Commit (gVRMod):** `65e66a9`  
-**Commit (vrmod-x64):** `c3fefcd`  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass  
+**Cycle:** 32  
+**Time:** 2026-08-04T20:12:43+03:00  
+**Focus:** G05 HMD load-flash expect + checklist  
+**Commit (gVRMod):** (set after push)  
+**Commit (vrmod-x64):** (set after push)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **Pure Lua** WarmAttach_MapTokenOk / AllowChangelevelFromFlags / ChangelevelPlan / Cmd / ShouldExecute / ExecuteChangelevel / ExecuteToast  
-2. **Pure C++** CubeWarmChangelevel* plan + token gate + allow flags (env GVRMOD_WARM_CHANGELEVEL)  
-3. **openxr_launch** opt-in: `vrmod_warm_changelevel` or `warm_changelevel_enable.txt`; RCC only when armed  
-4. Unit + launcher tests; gen_contracts PURE_TESTED for new symbols  
+1. **Pure Lua** StereoLoad_HmdExpect / FlashRiskIsBad (observer contract tokens)  
+2. **cl_vrmod** one-shot log of HMD checklist when dual-hold toasts  
+3. **TESTING_FRAMEWORK §0.1** G05 load-flash walk table + procedure  
+4. Unit + PURE_TESTED for new symbols  
 
 ## Pain points
 
-- Untouched; default still no auto changelevel.
+- Untouched; mq≥2 still never dual-paint.
 
 ## Gaps
 
-- G04 partial — HMD-proven warm reuse + changelevel still open  
-- Next: G05 HMD load-flash notes or G12 HMD volume taste  
+- G05 partial — actual HMD walk still open  
+- Next: G12 HMD volume taste or G13 XR reclaim env  
 
 ## Notes
 

@@ -20,7 +20,7 @@ Never submit eng texture. Never dual pose truth.
 - Seamless launcher: hold XR → STARTING GMOD → take_xr → release (no early void)
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
-- G05 partial: `StereoLoad_IsLoading` + dual-hold toast; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD proof open
+- G05 partial: `StereoLoad_IsLoading` + dual-hold toast + `StereoLoad_HmdExpect` checklist; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD walk still open (TESTING_FRAMEWORK §0.1)
 - G04 partial: default cold-spawns; skip-spawn plan + `WriteWarmAttachMarkers` when `GVRMOD_WARM_REUSE=1`; careful changelevel plan executor opt-in (`vrmod_warm_changelevel` / `warm_changelevel_enable.txt` / `GVRMOD_WARM_CHANGELEVEL`) — **default off**
 - G13 partial: VR exit writes `cube_return.txt`; Cube soft-acks to `panel_live` after RETURN banner; XR rebind still env `GVRMOD_CUBE_RECLAIM` (off)
 - G03 partial: pack + plan + opt-in executor (`vrmod_stage_apply` 1 or `stage_apply_enable.txt`); **default off** — no auto height jump

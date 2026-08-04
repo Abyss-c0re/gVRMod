@@ -310,3 +310,13 @@ Append one block per cycle. Newest at bottom.
 - G04 partial — HMD-proven default-on still open.
 - Tests: full test_all PASS 6/6.
 - Next: G05 HMD load-flash notes or G12 HMD volume taste.
+
+## 2026-08-04 cycle 32 — G05 HMD load-flash expect
+
+- Theme: pure HMD observer contract + smoke checklist docs; no render thrash.
+- Pure: StereoLoad_HmdExpect / FlashRiskIsBad (verdict, flash_risk, checklist).
+- cl_vrmod logs G05 HMD checklist once with dual-hold toast.
+- TESTING_FRAMEWORK §0.1 walk table + procedure.
+- G05 partial — headset walk still required for 'OK'.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: G12 HMD volume taste or G13 XR reclaim careful.

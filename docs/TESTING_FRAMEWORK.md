@@ -40,12 +40,33 @@ Two layers. Do not conflate them in commits, PR claims, or polish-loop status.
 1. **Boot** — Cube panel or openxr launch → tracking valid (not origin-stuck).  
 2. **Handoff** — Start Game → phase labels progress → GMod claims XR without long black void.  
 3. **Stereo** — both eyes clear; no eng-IN submit / virgin OUT flash.  
-4. **G05 stereo-load** — during map load / early after `take_xr`: both eyes still stereo (not flat mono void); toast may say “dual-eye hold through load”; `mat_queue_mode` stays **1** (mq2 must never dual-paint).  
+4. **G05 stereo-load** — see **§0.1** below (load-flash walk).  
 5. **UI** — laser + trigger click menus; no menu id thrash.  
 6. **Desktop** — `vrmod_desktopview` 1/2/3/4 (follow-cam) as intended; mirror is secondary.  
 7. **Cal** — Experience once (or skip forever); border profile reload on later boots.  
 8. **Pain points** — no force `-noborder`; `mat_queue_mode` stays 1; climb/wall not thrashing.  
 9. **Ambient** — soft hold tone during Cube handoff when `cube_hold.ogg` is present (default ON; silence with `GVRMOD_AMBIENT_PLAY=0`).
+
+### 0.1 G05 HMD load-flash walk (manual)
+
+Offline gate proves pure `StereoLoad_*` helpers only. **Headset** still required to claim load-flash OK.
+
+| When | Expect in HMD | Offline label / toast | FAIL if |
+|------|---------------|------------------------|---------|
+| After `take_xr`, map still loading / LocalPlayer not ready | Both eyes content (may dim/black **pair**, not flat mono) | toast once: “dual-eye hold through load”; label `STEREO · DUAL HOLD LOAD`; log `G05 HMD · DUAL HOLD LOAD …` | One eye only, desktop-flat void, long virgin black wall |
+| Live play, mq=1 | Clear stereo L/R | label `STEREO · DUAL` | eng-IN submit flash; mono mirror only |
+| If mq ever ≥2 (must not ship) | Single-pass; right intentional clear | label `STEREO · MQ2 SINGLE` — **never dual-paint** | Dual forced under mq2 (CThread risk) |
+| VR inactive | No submit | skip G05 row | Unexpected stereo thrash |
+
+**Procedure (claim “G05 HMD OK” only if walked):**
+
+1. Start Cube → Start Game → watch handoff phases → `take_xr`.  
+2. During first map paint / any changelevel: both eyes remain a stereo pair (black pair OK; mono void FAIL).  
+3. Confirm one toast at most for dual-hold; `mat_queue_mode` stays **1**.  
+4. After spawn: clear dual stereo; laser UI still works.  
+5. Optional: in-game `lua_run print(g_VR._stereoLoadLabel)` / `g_VR._stereoLoadHmdExpect` during load.
+
+Pure helper: `vrmod.utils.StereoLoad_HmdExpect(policy)` → `checklist` / `pass_line` / `fail_line` / `flash_risk` (unit-tested; does **not** prove headset).
 
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 

@@ -417,6 +417,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
     ],
     [
+      "vrmod.utils.StereoLoad_FlashRiskIsBad",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
+    ],
+    [
+      "vrmod.utils.StereoLoad_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
+    ],
+    [
       "vrmod.utils.StereoLoad_IsLoading",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
     ],
