@@ -3,7 +3,7 @@
 **Cycle:** 18  
 **Time:** 2026-08-04T17:38:00+03:00  
 **Focus:** G13 reverse handoff protocol (partial — no auto reclaim)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `bbbffa4`  
 **Commit (vrmod-x64):** `b1dc55f`  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
