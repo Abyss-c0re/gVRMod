@@ -22,7 +22,7 @@ Never submit eng texture. Never dual pose truth.
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoadPolicy` keeps dual-eye paint through load when mat_queue&lt;2; never dual under mq≥2
 - G04 partial: every Start still cold-spawns; `cube_warm.txt` records warm intent when process up (`CubeWarmReuseEnabled` hard-off)
-- G13 partial: VR exit writes `cube_return.txt`; Cube does **not** auto-reclaim XR yet (relaunch shell)
+- G13 partial: VR exit writes `cube_return.txt`; Cube polls + RETURN panel line; **does not** auto-reclaim XR (`CubeReclaimEnabled` hard-off)
 - G03 partial: Cube writes `cube_stage_pack.txt`; GMod parses + `StagePack_ApplyDecision` (allow_apply=false); **must not** auto-jump origin/height without HMD-proven apply
 - G12 partial: `CubeHandoffAudioGain` + `cube_ambient.txt` clip contract (`ambient/cube_hold.ogg`); OpenAL player optional future
 

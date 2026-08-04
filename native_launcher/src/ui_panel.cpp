@@ -495,6 +495,11 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.handoffHeadY = 0.f;
   s.handoffHeadOk = false;
   s.handoffBootKind.clear();
+  s.returnActive = false;
+  s.returnPhase.clear();
+  s.returnLabel.clear();
+  s.returnDetail.clear();
+  s.returnMap.clear();
   s.cursorVisible = false;
   s.cursorX = 0;
   s.cursorY = 0;
@@ -1558,6 +1563,12 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   bool startFoc = (s.focusCol == 3);
   FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? CubeTheme::CRIMSON_HOT[0] : CubeTheme::CRIMSON[0], startFoc ? CubeTheme::CRIMSON_HOT[1] : CubeTheme::CRIMSON[1], startFoc ? CubeTheme::CRIMSON_HOT[2] : CubeTheme::CRIMSON[2], 255);
   DrawText(rgba, setX + 36, by + 14, "START GAME", 255, 255, 255, 2);
+
+  // G13: reverse handoff RETURN banner when cube_return.txt polled (auto reclaim off)
+  if (s.returnActive && !s.returnLabel.empty()) {
+    FillRect(rgba, 8, UI_H - 64, UI_W - 16, 22, CT_RGB(CubeTheme::ROW), 255);
+    DrawText(rgba, 16, UI_H - 58, s.returnLabel.c_str(), CT_RGB(CubeTheme::CRIMSON_HOT), 1);
+  }
 
   FillRect(rgba, 8, UI_H - 36, 92, 28, CT_RGB(CubeTheme::CLOSE), 255);
   DrawText(rgba, 22, UI_H - 28, "CLOSE", 255, 255, 255, 1);

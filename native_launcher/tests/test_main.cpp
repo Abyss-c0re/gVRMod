@@ -4,6 +4,7 @@
 #include "last_play.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
+#include "cube_return.hpp"
 #include "warm_reuse.hpp"
 
 TEST(launcher_math3d_normalize) {
@@ -132,6 +133,48 @@ TEST(launcher_reverse_handoff_phases) {
     ASSERT_TRUE(CubeReverseProgressForPhase("vr_exit") > 0.f);
     ASSERT_TRUE(CubeReverseProgressForPhase("panel_live") >= 0.99f);
     ASSERT_TRUE(CubeReverseProgressForPhase("unknown") < 0.f);
+}
+
+// G13: reclaim poll decide + format/parse (feature hard-off → notify only)
+TEST(launcher_cube_return_reclaim_poll) {
+    ASSERT_TRUE(!CubeReclaimEnabled());
+    CubeReturnSnapshot empty;
+    auto idle = CubeReclaimDecide(false, empty);
+    ASSERT_EQ(idle.action, std::string("idle"));
+    ASSERT_TRUE(!idle.auto_reclaim);
+    ASSERT_TRUE(!idle.show_panel);
+
+    CubeReturnSnapshot a;
+    a.phase = "vr_exit";
+    a.map = "gm_construct";
+    a.source = "vrmod";
+    a.ts = 11;
+    CubeReturnSnapshot b;
+    ASSERT_TRUE(CubeReturn_Parse(CubeReturn_Format(a), b));
+    ASSERT_EQ(b.phase, std::string("vr_exit"));
+    ASSERT_EQ(b.map, std::string("gm_construct"));
+
+    auto notify = CubeReclaimDecide(true, b);
+    ASSERT_EQ(notify.action, std::string("notify"));
+    ASSERT_EQ(notify.reason, std::string("eligible_deferred"));
+    ASSERT_TRUE(notify.show_panel);
+    ASSERT_TRUE(!notify.auto_reclaim);
+    ASSERT_TRUE(CubeReclaimPanelLabel(notify).find("POLL") != std::string::npos);
+    ASSERT_TRUE(CubeReclaimDetail(notify).find("reclaim") != std::string::npos);
+
+    // Feature-on path (unit only — product keeps CubeReclaimEnabled false)
+    auto autoR = CubeReclaimDecide(true, b, /*featureEnabled=*/true);
+    ASSERT_EQ(autoR.action, std::string("reclaim_auto"));
+    ASSERT_TRUE(autoR.auto_reclaim);
+
+    CubeReturnSnapshot live;
+    live.phase = "panel_live";
+    live.valid = true;
+    auto done = CubeReclaimDecide(true, live);
+    ASSERT_EQ(done.action, std::string("idle"));
+    ASSERT_TRUE(!done.show_panel);
+
+    ASSERT_TRUE(CubeReturn_Parse("", b) == false);
 }
 
 // G04: cold Start inventory — boot kind labels; skip-spawn never true yet

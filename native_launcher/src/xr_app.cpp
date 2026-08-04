@@ -12,6 +12,7 @@
 #include "gmod_spawn.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
+#include "cube_return.hpp"
 #include "warm_reuse.hpp"
 #include "ui_panel.hpp"
 #include "smx_player.hpp"
@@ -452,6 +453,43 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
                   sessionRunning ? 1 : 0, handoffExitWait);
           running = false;
           continue;
+        }
+      }
+    } else {
+      // G13: poll cube_return.txt while Cube panel is live (not during Start handoff).
+      // Auto reclaim remains hard-off — surface RETURN line only.
+      static float returnPollAccum = 0.f;
+      static std::string lastReturnKey;
+      returnPollAccum += 1.f / 72.f;
+      if (returnPollAccum >= 1.f) {
+        returnPollAccum = 0.f;
+        CubeReturnSnapshot ret;
+        const bool have = ReadCubeReturnMarker(gmodRoot, ret);
+        CubeReclaimDecision dec = CubeReclaimDecide(have, ret);
+        // Feature branch reserved: never execute auto reclaim while hard-off
+        if (dec.auto_reclaim && CubeReclaimEnabled()) {
+          // Future: orderly reverse claim path. Intentionally empty.
+        }
+        const bool active = dec.show_panel;
+        std::string label = CubeReclaimPanelLabel(dec);
+        std::string detail = CubeReclaimDetail(dec);
+        std::string key = active ? (dec.phase + "|" + dec.map + "|" + dec.action) : std::string();
+        if (key != lastReturnKey) {
+          lastReturnKey = key;
+          ui.returnActive = active;
+          ui.returnPhase = active ? dec.phase : std::string();
+          ui.returnMap = active ? dec.map : std::string();
+          ui.returnLabel = label;
+          ui.returnDetail = detail;
+          if (active) {
+            fprintf(stderr, "[cube_webui] G13 return poll phase=%s action=%s map=%s reclaim=%d\n",
+                    dec.phase.c_str(), dec.action.c_str(), dec.map.c_str(),
+                    dec.auto_reclaim ? 1 : 0);
+            // Soft status nudge once per marker key (do not thrash user status)
+            if (ui.status.find("RETURN") == std::string::npos)
+              ui.status = label.empty() ? "RETURN · POLL" : label;
+          }
+          WebUI_MarkDirty(ui);
         }
       }
     }

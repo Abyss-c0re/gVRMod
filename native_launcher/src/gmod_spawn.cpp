@@ -2,6 +2,7 @@
 #include "panel_config.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
+#include "cube_return.hpp"
 #include "warm_reuse.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -282,4 +283,15 @@ bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot
   fprintf(stderr, "[cube_webui] warm request → %s action=%s map=%s reason=%s\n",
           path.c_str(), s.action.c_str(), s.map.c_str(), s.reason.c_str());
   return true;
+}
+
+bool ReadCubeReturnMarker(const std::string& gmodRoot, CubeReturnSnapshot& out) {
+  out = CubeReturnSnapshot{};
+  if (gmodRoot.empty()) return false;
+  const std::string path = gmodRoot + "/garrysmod/data/vrmod/cube_return.txt";
+  std::ifstream f(path);
+  if (!f) return false;
+  std::ostringstream ss;
+  ss << f.rdbuf();
+  return CubeReturn_Parse(ss.str(), out);
 }

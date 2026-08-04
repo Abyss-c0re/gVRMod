@@ -197,3 +197,13 @@ Append one block per cycle. Newest at bottom.
 - G04 partial — real map attach/warm_reuse open.
 - Tests: full test_all PASS 6/6 (+warm reuse unit).
 - Next: G13 Cube reclaim poll or ambient player careful.
+
+## 2026-08-04 cycle 21 — G13 Cube reclaim poll
+
+- Theme: poll cube_return.txt on Cube panel; pure reclaim decide hard-off.
+- Pure: cube_return.hpp Format/Parse + CubeReclaimDecide/PanelLabel.
+- ReadCubeReturnMarker; xr_app 1Hz poll when !handoff; New Game RETURN banner.
+- CubeReclaimEnabled hard-off — auto reclaim branch empty.
+- G13 partial — true reverse reclaim still open.
+- Tests: full test_all PASS 6/6 (+reclaim poll unit); cube_webui_launcher builds.
+- Next: G12 ambient asset+player careful or G04 map attach.

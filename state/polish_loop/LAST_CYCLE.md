@@ -1,27 +1,28 @@
 # Last cycle
 
-**Cycle:** 20  
-**Time:** 2026-08-04T18:00:30+03:00  
-**Focus:** G04 warm reuse design (partial — feature hard-off)  
-**Commit (gVRMod):** `ed814eb`  
+**Cycle:** 21  
+**Time:** 2026-08-04T18:12:00+03:00  
+**Focus:** G13 Cube reclaim poll (partial — feature hard-off)  
+**Commit (gVRMod):** (pending)  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **warm_reuse.hpp** pure CubeWarmReuseDecide / Format / Parse / Detail  
-2. **CubeWarmReuseEnabled()** hard-off — never skip steam spawn in product  
-3. **cube_warm.txt** written when process already up (intent marker)  
-4. Panel boot kind **WARM DETECTED · REQUEST FILED**; still cold-spawns  
+1. **cube_return.hpp** pure Format/Parse + CubeReclaimDecide / PanelLabel / Detail  
+2. **CubeReclaimEnabled()** hard-off — never auto reverse reclaim XR  
+3. **ReadCubeReturnMarker** I/O; labels moved from gmod_spawn into pure header  
+4. **xr_app** ~1 Hz poll when not in Start handoff; panel RETURN banner on New Game  
+5. Unit: `launcher_cube_return_reclaim_poll`  
 
 ## Pain points
 
-- Untouched; no risky skip-spawn.
+- Untouched; no auto reclaim, no climb/border/mq thrash.
 
 ## Gaps
 
-- G04 still **partial** — map-change/attach warm_reuse path open  
-- Next: G13 Cube reclaim poll, or ambient asset+player careful  
+- G13 still **partial** — auto reclaim path empty even if feature flipped  
+- Next: G12 ambient asset+player careful, or G04 map attach  
 
 ## Notes
 

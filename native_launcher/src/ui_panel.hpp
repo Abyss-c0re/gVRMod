@@ -117,6 +117,13 @@ struct WebUIState {
   // G04: COLD_SPAWN | WARM_DETECTED (warm reuse not shipped — inventory only)
   std::string handoffBootKind;
 
+  // G13: reverse handoff poll (cube_return.txt) — panel only; auto reclaim hard-off
+  bool returnActive = false;
+  std::string returnPhase;
+  std::string returnLabel;  // one-liner for panel RETURN row
+  std::string returnDetail;
+  std::string returnMap;
+
   // Laser cursor (software reticle — optional; laser usually enough)
   bool cursorVisible = false;
   int cursorX = 0, cursorY = 0;
