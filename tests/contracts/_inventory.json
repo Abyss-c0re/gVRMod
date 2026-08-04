@@ -313,6 +313,42 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
     [
+      "vrmod.utils.LaserLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_IsMenuCloseAction",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_IsMenuPrimaryClick",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_IsMenuSecondaryClick",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_PrimaryHandFromInt",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_QmAttachModeFromInt",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_SecondaryHand",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_ShouldSolveFocus",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
       "vrmod.utils.LengthSqr",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],

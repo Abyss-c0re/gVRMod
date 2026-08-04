@@ -197,6 +197,28 @@ Offline gate proves composite law (`HudLaw_Decide`). **Headset** required to cla
 
 Pure helpers: `vrmod.utils.HudLaw_Decide` / `HudLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.8 G16 laser + primary click (manual)
+
+Offline gate proves primary-hand SoT + click action map + first-eye focus solve. **Headset** required to claim UI OK.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Laser | Primary hand only (default right) | Dual free-for-all lasers |
+| Hover | Stable focus; second eye reuses solve | Per-eye thrash / hover flicker |
+| Trigger | Primary fire = LMB click once | Miss / double / wrong hand |
+| Secondary | Secondary fire closes / RMB | Grab_end storms |
+| Left primary | `vrmod_primary_hand 1` → left laser+click | Right still steals click |
+
+**Procedure (claim “G16 laser OK” only if walked):**
+
+1. Open Cube hub / settings — laser points from primary hand.  
+2. Hover buttons stable both eyes.  
+3. Trigger click opens/activates once.  
+4. Optional left-hand primary — laser+click follow.  
+5. Secondary closes menus cleanly.
+
+Pure helpers: `LaserLaw_IsMenuPrimaryClick` / `LaserLaw_ShouldSolveFocus` / `LaserLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

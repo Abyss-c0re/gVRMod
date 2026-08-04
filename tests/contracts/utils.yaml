@@ -360,6 +360,42 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.LaserLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_IsMenuCloseAction
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_IsMenuPrimaryClick
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_IsMenuSecondaryClick
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_PrimaryHandFromInt
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_QmAttachModeFromInt
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_SecondaryHand
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_ShouldSolveFocus
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
   - id: vrmod.utils.LengthSqr
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure

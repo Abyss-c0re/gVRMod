@@ -454,6 +454,34 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G16 pure laser / primary-click sacred law
+	H.TEST("util.laser_law.sacred_g16", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.LaserLaw_PrimaryHandFromInt(0), "right")
+		H.assert_eq(u.LaserLaw_PrimaryHandFromInt(1), "left")
+		H.assert_eq(u.LaserLaw_SecondaryHand("right"), "left")
+		H.assert_true(u.LaserLaw_IsMenuPrimaryClick("boolean_primaryfire", "right"))
+		H.assert_true(not u.LaserLaw_IsMenuPrimaryClick("boolean_left_primaryfire", "right"))
+		H.assert_true(u.LaserLaw_IsMenuPrimaryClick("boolean_left_primaryfire", "left"))
+		H.assert_true(u.LaserLaw_IsMenuPrimaryClick("boolean_car_mouse_left", "right"))
+		H.assert_true(u.LaserLaw_IsMenuSecondaryClick("boolean_secondaryfire"))
+		H.assert_true(u.LaserLaw_IsMenuCloseAction("boolean_chat"))
+		H.assert_eq(u.LaserLaw_QmAttachModeFromInt(2), "float")
+		H.assert_true(u.LaserLaw_ShouldSolveFocus({ stereo_eye = "left", stereo_frame = 1, focus_frame = 1 }))
+		H.assert_true(not u.LaserLaw_ShouldSolveFocus({ stereo_eye = "right", stereo_frame = 1, focus_frame = 1 }))
+		H.assert_true(u.LaserLaw_ShouldSolveFocus({ stereo_eye = "right", stereo_frame = 2, focus_frame = 1 }))
+		local he = u.LaserLaw_HmdExpect({
+			vr_active = true,
+			laser_on = true,
+			has_primary_pose = true,
+			menu_focus = true,
+			primary_hand = "right",
+		})
+		H.assert_eq(he.verdict, "expect_focus")
+		H.assert_true(string.find(he.checklist, "FOCUS", 1, true))
+		H.assert_eq(u.LaserLaw_StatusLabel(he), "LASER · FOCUS")
+	end)
+
 	-- G15 pure HUD composite law (never black wall of the Real)
 	H.TEST("util.hud_law.composite_g15", function()
 		local u = env.vrmod.utils

@@ -380,3 +380,13 @@ Append one block per cycle. Newest at bottom.
 - G15 partial — HMD proof open.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: HMD walk backlog (G05/G12) or laser sacred notes.
+
+## 2026-08-04 cycle 39 — G16 laser sacred law
+
+- Theme: pure primary-hand SoT + first-eye focus solve; laser+trigger sacred.
+- Pure: LaserLaw_PrimaryHand/Click/ShouldSolveFocus/HmdExpect.
+- cl_ui: hand + click + focus resolve use pure helpers (fallback preserved).
+- TESTING_FRAMEWORK §0.8 laser walk.
+- G16 partial — HMD UI walk open.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: HMD walk backlog (G05/G12) or mat_queue pin notes.

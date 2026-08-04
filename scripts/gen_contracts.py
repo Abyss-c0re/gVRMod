@@ -59,6 +59,16 @@ PURE_TESTED = {
     "vrmod.utils.StagePack_ExecuteToast": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_HmdExpect": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_HeightJumpRiskIsBad": "util.stage_pack.parse_and_hint",
+    # G16 pure laser / menu primary-click sacred law
+    "vrmod.utils.LaserLaw_PrimaryHandFromInt": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_SecondaryHand": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_IsMenuPrimaryClick": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_IsMenuSecondaryClick": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_IsMenuCloseAction": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_QmAttachModeFromInt": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_ShouldSolveFocus": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_HmdExpect": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_StatusLabel": "util.laser_law.sacred_g16",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",
