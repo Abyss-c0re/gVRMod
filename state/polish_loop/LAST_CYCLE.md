@@ -3,8 +3,8 @@
 **Cycle:** 55  
 **Time:** 2026-08-05T00:27:00+03:00  
 **Focus:** G37 hand vs bullet filter law (W9)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `de6f3c9`  
+**Commit (vrmod-x64):** `d2b88d0`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 49 Lua)  
 
 ## What changed
