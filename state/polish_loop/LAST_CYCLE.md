@@ -3,7 +3,7 @@
 **Cycle:** 28  
 **Time:** 2026-08-04T19:28:24+03:00  
 **Focus:** G12 ambient default-on (careful)  
-**Commit (gVRMod):** (pending)  
+**Commit (gVRMod):** `027a008`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
