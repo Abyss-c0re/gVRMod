@@ -1349,6 +1349,46 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.WorldModelLaw_AllowDualGhost
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_AllowDualWeaponDraw
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_CubePreferFloatingHands
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_FromBool
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_IsDualRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_ResolvePath
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_Sanitize
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
+  - id: vrmod.utils.WorldModelLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
+    tier: pure
+    tests: [util.worldmodel_law.single_path_g38]
   - id: vrmod.utils._FinalizePickupRemoval
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

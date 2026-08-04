@@ -454,6 +454,62 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G38 pure worldmodel single-path law (W10; no dual ghost)
+	H.TEST("util.worldmodel_law.single_path_g38", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.WorldModelLaw_CubePreferFloatingHands())
+		H.assert_true(not u.WorldModelLaw_AllowDualGhost())
+		H.assert_true(not u.WorldModelLaw_AllowDualWeaponDraw())
+		H.assert_eq(u.WorldModelLaw_ResolvePath({ floating_hands = true }), "floating_hands")
+		H.assert_eq(u.WorldModelLaw_ResolvePath({
+			use_worldmodels = true,
+			floating_hands = false,
+			draw_viewmodel = false,
+			draw_worldmodel_vm = true,
+		}), "worldmodel")
+		H.assert_eq(u.WorldModelLaw_ResolvePath({ floating_hands = false }), "player_body")
+		H.assert_eq(u.WorldModelLaw_ResolvePath({
+			draw_viewmodel = true,
+			draw_worldmodel_vm = true,
+		}), "dual_ghost")
+		H.assert_eq(u.WorldModelLaw_ResolvePath({
+			floating_hands = true,
+			draw_player_body = true,
+		}), "dual_ghost")
+		local ok = u.WorldModelLaw_Decide({ floating_hands = true })
+		H.assert_true(ok.path_ok)
+		H.assert_eq(ok.path, "floating_hands")
+		H.assert_eq(u.WorldModelLaw_StatusLabel(ok), "WM · FLOATING")
+		local he = u.WorldModelLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G38", 1, true))
+		local dual = u.WorldModelLaw_Decide({
+			draw_viewmodel = true,
+			draw_worldmodel_vm = true,
+			floating_hands = false,
+		})
+		H.assert_eq(dual.raw_path, "dual_ghost")
+		H.assert_true(dual.sanitized)
+		H.assert_eq(dual.path, "floating_hands") -- Cube prefer
+		H.assert_eq(u.WorldModelLaw_StatusLabel(dual), "WM · SANITIZED")
+		H.assert_true(not u.WorldModelLaw_IsDualRisk(dual))
+		local unsan = {
+			valid = true,
+			risk = "dual_ghost",
+			sanitized = false,
+			path = "dual_ghost",
+		}
+		H.assert_true(u.WorldModelLaw_IsDualRisk(unsan))
+		local wm = u.WorldModelLaw_Decide({
+			use_world_model = true,
+			floating_hands = false,
+			draw_viewmodel = false,
+			draw_worldmodel_vm = true,
+		})
+		H.assert_eq(wm.path, "worldmodel")
+		H.assert_eq(u.WorldModelLaw_StatusLabel(wm), "WM · WORLDMODEL")
+	end)
+
 	-- G37 pure hand vs bullet filter law (W9)
 	H.TEST("util.hand_bullet_law.filter_g37", function()
 		local u = env.vrmod.utils

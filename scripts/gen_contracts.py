@@ -208,6 +208,17 @@ PURE_TESTED = {
     "vrmod.utils.HandBulletLaw_StatusLabel": "util.hand_bullet_law.filter_g37",
     "vrmod.utils.HandBulletLaw_HmdExpect": "util.hand_bullet_law.filter_g37",
     "vrmod.utils.HandBulletLaw_IsBlockRisk": "util.hand_bullet_law.filter_g37",
+    # G38 pure worldmodel single-path law (W10; no dual ghost)
+    "vrmod.utils.WorldModelLaw_CubePreferFloatingHands": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_AllowDualGhost": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_AllowDualWeaponDraw": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_FromBool": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_ResolvePath": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_Sanitize": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_Decide": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_StatusLabel": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_HmdExpect": "util.worldmodel_law.single_path_g38",
+    "vrmod.utils.WorldModelLaw_IsDualRisk": "util.worldmodel_law.single_path_g38",
     # G26 pure menu thrash / QM dedupe law (VRClimb id collapse)
     "vrmod.utils.MenuLaw_NormalizeName": "util.menu_law.dedupe_g26",
     "vrmod.utils.MenuLaw_StableKey": "util.menu_law.dedupe_g26",

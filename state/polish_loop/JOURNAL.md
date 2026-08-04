@@ -552,3 +552,13 @@ Append one block per cycle. Newest at bottom.
 - G37 partial — HMD/MP bullet walk open.
 - Tests: --fast PASS 4/4 (pure pending=0; 49 Lua).
 - Next: HMD walk backlog (G05/G12) or W10 worldmodel single path notes.
+
+## 2026-08-05 cycle 56 — G38 worldmodel single-path law (W10)
+
+- Theme: one draw path floating hands OR worldmodel; dual ghost forbidden/sanitized.
+- Pure: WorldModelLaw_ResolvePath/Sanitize/Decide/HmdExpect.
+- cl_vrmod SetupModelAndPlayerHooks wires path + skip dual VM draw.
+- TESTING_FRAMEWORK §0.25; PURE_TESTED map.
+- G38 partial — HMD dual-ghost walk open.
+- Tests: --fast PASS 4/4 (pure pending=0; 50 Lua).
+- Next: HMD walk backlog (G05/G12) or W11 VR_Init error surface notes.

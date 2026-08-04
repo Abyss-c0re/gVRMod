@@ -529,6 +529,25 @@ Offline gate proves hand damage scale **0.45**, head **10×**, non-bullet absorb
 Pure helpers: `HandBulletLaw_Decide` / `HandBulletLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).  
 **Do not** rewrite climb/wall coll while verifying.
 
+### 0.25 G38 worldmodel single path (manual)
+
+Offline gate proves **one** path: floating_hands | worldmodel | player_body; dual ghost sanitized. **Headset** for double-draw ghosts.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Floating hands on | Body hidden; clear arms | Body + arms ghosted |
+| Worldmodel weapon path | WorldModelVM only; no HL2 VM | VM + worldmodel both |
+| Toggle Session | Single path switches cleanly | Dual ghost residual |
+| Default clarity | Prefer floating hands | Forced dual |
+
+**Procedure (claim “G38 worldmodel OK” only if walked):**
+
+1. Floating hands on — body gone, arms clear.  
+2. Per-weapon use worldmodel — gun only once.  
+3. No double-ghost hands/gun.
+
+Pure helpers: `WorldModelLaw_ResolvePath` / `WorldModelLaw_Decide` / `WorldModelLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

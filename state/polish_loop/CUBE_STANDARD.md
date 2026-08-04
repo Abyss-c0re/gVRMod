@@ -28,6 +28,7 @@ Never submit eng texture. Never dual pose truth.
 - G35 partial: viewscale **default 1.0** clamp 0.1..2.0; comfort 0.75..1.25 fisheye risk (W8); `ViewScaleLaw_*` / `CubeViewScale_*`; §0.22 open
 - G36 partial: FOV/Z **soft-refresh only** (W5); no mid-frame UV+FOV fight; `FovZLaw_*`; §0.23 open
 - G37 partial: hands **Real for grabs**; bullets filtered/redirected (hand 0.45 / head 10×) (W9); `HandBulletLaw_*`; §0.24 open
+- G38 partial: worldmodel **single path** (W10); floating hands OR worldmodel, no dual ghost; `WorldModelLaw_*`; §0.25 open
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoad_IsLoading` + dual-hold toast + `StereoLoad_HmdExpect` checklist; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD walk still open (TESTING_FRAMEWORK §0.1)

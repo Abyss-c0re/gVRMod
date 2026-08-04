@@ -1277,6 +1277,46 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
     [
+      "vrmod.utils.WorldModelLaw_AllowDualGhost",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_AllowDualWeaponDraw",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_CubePreferFloatingHands",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_FromBool",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_IsDualRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_ResolvePath",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_Sanitize",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
+      "vrmod.utils.WorldModelLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
+    ],
+    [
       "vrmod.utils._FinalizePickupRemoval",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
