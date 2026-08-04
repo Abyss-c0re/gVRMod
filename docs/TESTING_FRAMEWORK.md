@@ -278,6 +278,25 @@ Offline gate proves **never eng IN**, **never virgin OUT**, prefer `dual_out_rgb
 
 Pure helpers: `SubmitLaw_Decide` / `SubmitLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.12 G25 pose SoT — single energy path (manual)
+
+Offline gate proves **one path** raw → tracking → modifiers; guns read **tracking**; no second angvel/public pose fork. **Headset** required to claim hands/guns feel locked.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Live VR | Hands + gun follow one tracking SoT after collisions/modifiers | Gun glued to raw while hands blocked (dual truth) |
+| Head motion | Head vel from device raw sample once | Competing angvel stream jitter |
+| Debug | `g_VR._poseSoTLabel` → `POSE · SINGLE PATH` | `ANGVEL FORK` / `GUN FORK` / `DUAL PUBLIC` |
+| Pipeline | WaitGetPoses → raw → copy → modifiers → consumers | Second pose table for same limb |
+
+**Procedure (claim “G25 pose OK” only if walked):**
+
+1. Enter VR — hands track cleanly; gun stays on right hand through wall block.  
+2. Optional: `print(g_VR._poseSoTLabel, g_VR._poseSoTHmdExpect and g_VR._poseSoTHmdExpect.checklist)`.  
+3. Move quickly — no desync between laser origin and hand mesh from dual SoT.
+
+Pure helpers: `PoseSoT_Decide` / `PoseSoT_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

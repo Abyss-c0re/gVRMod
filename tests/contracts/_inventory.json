@@ -421,6 +421,54 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
     [
+      "vrmod.utils.PoseSoT_AllowDualPublicPose",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_AllowSecondAngvelSoT",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_GunReadsSource",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_HeadVelSource",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_IsForkRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_NormalizeSource",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_PipelineSteps",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_PublicSource",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_RawSource",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
+      "vrmod.utils.PoseSoT_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
+    ],
+    [
       "vrmod.utils.ReleasePickupEntry",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],

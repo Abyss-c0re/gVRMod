@@ -473,6 +473,54 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.PoseSoT_AllowDualPublicPose
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_AllowSecondAngvelSoT
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_GunReadsSource
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_HeadVelSource
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_IsForkRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_NormalizeSource
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_PipelineSteps
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_PublicSource
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_RawSource
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.PoseSoT_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
+    tier: pure
+    tests: [util.pose_sot_law.single_path_g25]
   - id: vrmod.utils.ReleasePickupEntry
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

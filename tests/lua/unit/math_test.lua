@@ -454,6 +454,56 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G25 pure pose SoT law (no dual-truth pose/angvel forks)
+	H.TEST("util.pose_sot_law.single_path_g25", function()
+		local u = env.vrmod.utils
+		local steps = u.PoseSoT_PipelineSteps()
+		H.assert_true(type(steps) == "table" and #steps >= 4)
+		H.assert_eq(u.PoseSoT_PublicSource(), "tracking")
+		H.assert_eq(u.PoseSoT_RawSource(), "rawTracking")
+		H.assert_true(not u.PoseSoT_AllowSecondAngvelSoT())
+		H.assert_true(not u.PoseSoT_AllowDualPublicPose())
+		H.assert_eq(u.PoseSoT_GunReadsSource(), "tracking")
+		H.assert_eq(u.PoseSoT_HeadVelSource(), "raw")
+		H.assert_eq(u.PoseSoT_NormalizeSource("g_VR.tracking"), "tracking")
+		H.assert_eq(u.PoseSoT_NormalizeSource("rawTracking"), "raw")
+		local ok = u.PoseSoT_Decide({
+			vr_active = true,
+			has_raw = true,
+			has_tracking = true,
+			gun_reads = "tracking",
+			head_vel_from = "raw",
+			second_angvel_sot = false,
+			dual_public = false,
+			modifiers_in_place = true,
+		})
+		H.assert_true(ok.path_ok)
+		H.assert_eq(ok.risk, "none")
+		H.assert_eq(u.PoseSoT_StatusLabel(ok), "POSE · SINGLE PATH")
+		local he = u.PoseSoT_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_single_path")
+		H.assert_true(he.expect_single_path)
+		H.assert_true(string.find(he.checklist, "G25", 1, true))
+		local fork = u.PoseSoT_Decide({
+			vr_active = true,
+			has_tracking = true,
+			gun_reads = "fork",
+			second_angvel_sot = false,
+		})
+		H.assert_true(not fork.path_ok)
+		H.assert_true(u.PoseSoT_IsForkRisk(fork))
+		local ang = u.PoseSoT_Decide({
+			vr_active = true,
+			has_tracking = true,
+			gun_reads = "tracking",
+			second_angvel_sot = true,
+		})
+		H.assert_eq(ang.risk, "second_angvel")
+		H.assert_eq(u.PoseSoT_StatusLabel(ang), "POSE · ANGVEL FORK")
+		local heBad = u.PoseSoT_HmdExpect(ang)
+		H.assert_eq(heBad.verdict, "expect_fork_fail")
+	end)
+
 	-- G19 pure submit path law (never eng IN / virgin OUT)
 	H.TEST("util.submit_law.path_g19", function()
 		local u = env.vrmod.utils

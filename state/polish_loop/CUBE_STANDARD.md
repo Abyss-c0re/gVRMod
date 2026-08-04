@@ -37,6 +37,7 @@ Never submit eng texture. Never dual pose truth.
 - G17 partial: `mat_queue_mode` Cube pin prefer **1**; VR never SetInt mq; dual only if mq&lt;2; HmdExpect §0.9 open
 - G18 partial: desktop chrome **framed** (windowed, no force `-noborder`); `WindowChrome_*` pure; HmdExpect §0.10 open
 - G19 partial: submit **dual OUT RGBA8** only; never eng IN / virgin OUT; `SubmitLaw_*`; HmdExpect §0.11 open
+- G25 partial: pose **single path** raw→tracking→modifiers; no dual angvel/public SoT; `PoseSoT_*`; HmdExpect §0.12 open
 
 ## Compatibility
 
