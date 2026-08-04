@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 56  
-**Time:** 2026-08-05T00:38:00+03:00  
-**Focus:** G38 worldmodel single-path law (W10)  
-**Commit (gVRMod):** `68b2ced`  
-**Commit (vrmod-x64):** `3952a64`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 50 Lua)  
+**Cycle:** 57  
+**Time:** 2026-08-05T00:49:00+03:00  
+**Focus:** G39 VR_Init human error surface (W11)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 51 Lua)  
 
 ## What changed
 
-1. **Pure** WorldModelLaw_ResolvePath/Sanitize/Decide/HmdExpect  
-2. **cl_vrmod** SetupModelAndPlayerHooks path + skip dual VM draw  
-3. Unit test util.worldmodel_law.single_path_g38 + PURE_TESTED  
-4. TESTING_FRAMEWORK §0.25 worldmodel walk  
-5. Gap G38 partial  
+1. **Pure** InitLaw_ParseCode/Humanize/Decide/HmdExpect (108/215 + module zip)  
+2. **cl_vrmod** PerformStartup toast + overlay via pure law  
+3. Unit test util.init_law.surface_g39 + PURE_TESTED  
+4. TESTING_FRAMEWORK §0.26 init surface walk  
+5. Gap G39 partial  
 
 ## Pain points
 
-- Soft care: presentation only; no climb/wall thrash.
+- Soft care: honest toast only; no climbing/wall thrash.
 
 ## Gaps
 
-- G38 partial — HMD dual-ghost walk open  
-- Next: HMD walk backlog (G05/G12) or W11 VR_Init error surface notes  
+- G39 partial — runtime fail walk open  
+- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects inventory  
 
 ## Notes
 

@@ -548,6 +548,25 @@ Offline gate proves **one** path: floating_hands | worldmodel | player_body; dua
 
 Pure helpers: `WorldModelLaw_ResolvePath` / `WorldModelLaw_Decide` / `WorldModelLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.26 G39 VR_Init human error surface (manual)
+
+Offline gate proves codes **108/215** humanized, module zip linked, toast required on fail. **Headset/runtime** for real init fails.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| No runtime / no HMD | Toast names issue; overlay has module URL | Silent fail / crash only |
+| Code 108-like | HMD not found guidance | Opaque “Init failed” |
+| Code 215-like | Runtime busy / restart SteamVR tip | No triage |
+| Module missing/old | Zip link + version | No download path |
+
+**Procedure (claim “G39 init surface OK” only if walked):**
+
+1. Stop SteamVR/OpenXR — Start VR → human toast + overlay.  
+2. Module missing — clear install path.  
+3. Success path — no false error toast.
+
+Pure helpers: `InitLaw_Humanize` / `InitLaw_Decide` / `InitLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

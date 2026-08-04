@@ -618,6 +618,70 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
     tier: pure
     tests: [util.hud_law.composite_g15]
+  - id: vrmod.utils.InitLaw_CrispModuleVersion
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_Humanize
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_IsModuleHint
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_IsNoHmdHint
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_IsRuntimeHint
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_IsSilentFailRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_KnownCodeMessage
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_MinModuleVersion
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_ModuleZipUrl
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_ParseCode
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_RequireToastOnFail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_SilentFailForbidden
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
+  - id: vrmod.utils.InitLaw_ToastSeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua
+    tier: pure
+    tests: [util.init_law.surface_g39]
   - id: vrmod.utils.InitPickupController
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

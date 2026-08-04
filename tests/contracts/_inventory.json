@@ -581,6 +581,70 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua"
     ],
     [
+      "vrmod.utils.InitLaw_CrispModuleVersion",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_Humanize",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_IsModuleHint",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_IsNoHmdHint",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_IsRuntimeHint",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_IsSilentFailRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_KnownCodeMessage",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_MinModuleVersion",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_ModuleZipUrl",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_ParseCode",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_RequireToastOnFail",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_SilentFailForbidden",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
+      "vrmod.utils.InitLaw_ToastSeconds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua"
+    ],
+    [
       "vrmod.utils.InitPickupController",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],

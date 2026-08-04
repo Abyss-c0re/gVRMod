@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 56
+Last updated: 2026-08-05 cycle 57
 
 ## P0 — seamless / feel broken
 
@@ -32,6 +32,7 @@ Last updated: 2026-08-05 cycle 56
 | G36 | FOV/Z soft-refresh no mid-frame UV fight (W5) | FovZLaw_* cycle54; HMD walk open | **partial** cycle54 |
 | G37 | Hand vs bullet filter (W9) | HandBulletLaw_* cycle55; HMD walk open | **partial** cycle55 |
 | G38 | Worldmodel single path (W10; no dual ghost) | WorldModelLaw_* cycle56; HMD walk open | **partial** cycle56 |
+| G39 | VR_Init human error surface (W11 108/215) | InitLaw_* cycle57; runtime walk open | **partial** cycle57 |
 | G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
 | G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
 | G15 | Opaque black HUD / wall of Real | HudLaw composite cycle38; HMD walk open | **partial** cycle38 |
@@ -61,6 +62,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G39 | VR_Init human error surface (W11) | InitLaw_* + PerformStartup |
 | G38 | Worldmodel single path (W10) | WorldModelLaw_* + cl_vrmod draw path |
 | G37 | Hand vs bullet filter (W9) | HandBulletLaw_* + sv_collision_proxies |
 | G36 | FOV/Z soft-refresh no mid-frame UV fight (W5) | FovZLaw_* + cl_vrmod Bind* |

@@ -454,6 +454,56 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G39 pure VR_Init human error surface (W11 codes 108/215)
+	H.TEST("util.init_law.surface_g39", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.InitLaw_RequireToastOnFail())
+		H.assert_true(u.InitLaw_SilentFailForbidden())
+		H.assert_eq(u.InitLaw_MinModuleVersion(), 20)
+		H.assert_true(string.find(u.InitLaw_ModuleZipUrl(), "github", 1, true))
+		H.assert_true(string.find(u.InitLaw_KnownCodeMessage(108), "HMD", 1, true))
+		H.assert_true(string.find(u.InitLaw_KnownCodeMessage(215), "runtime", 1, true)
+			or string.find(u.InitLaw_KnownCodeMessage(215), "SteamVR", 1, true)
+			or string.find(u.InitLaw_KnownCodeMessage(215), "215", 1, true))
+		H.assert_eq(u.InitLaw_ParseCode("VR init failed code 108"), 108)
+		H.assert_eq(u.InitLaw_ParseCode("xrCreateInstance failed (215)"), 215)
+		H.assert_true(u.InitLaw_IsNoHmdHint("No HMD found"))
+		H.assert_true(u.InitLaw_IsRuntimeHint("OpenXR loader missing"))
+		local h = u.InitLaw_Humanize({
+			err = "HMD not found (108)",
+			module_version = 23,
+			backend = "openxr",
+		})
+		H.assert_eq(h.code, 108)
+		H.assert_true(string.find(h.toast, "HMD", 1, true) or string.find(h.toast, "108", 1, true))
+		H.assert_true(string.find(h.overlay, "Module", 1, true))
+		H.assert_true(string.find(h.overlay, "github", 1, true))
+		local ok = u.InitLaw_Decide({ ok = true, module_version = 23 })
+		H.assert_true(ok.path_ok)
+		H.assert_eq(u.InitLaw_StatusLabel(ok), "INIT · OK")
+		local he = u.InitLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G39", 1, true))
+		local fail = u.InitLaw_Decide({
+			ok = false,
+			err = "init code 108",
+			module_version = 22,
+			toast_shown = true,
+		})
+		H.assert_true(not fail.path_ok)
+		H.assert_eq(fail.risk, "init_fail")
+		H.assert_eq(u.InitLaw_StatusLabel(fail), "INIT · FAIL 108")
+		local heF = u.InitLaw_HmdExpect(fail)
+		H.assert_eq(heF.verdict, "expect_fail_honest")
+		local silent = u.InitLaw_Decide({
+			ok = false,
+			err = "fail",
+			toast_shown = false,
+		})
+		H.assert_eq(silent.risk, "silent_fail")
+		H.assert_true(u.InitLaw_IsSilentFailRisk(silent))
+	end)
+
 	-- G38 pure worldmodel single-path law (W10; no dual ghost)
 	H.TEST("util.worldmodel_law.single_path_g38", function()
 		local u = env.vrmod.utils
