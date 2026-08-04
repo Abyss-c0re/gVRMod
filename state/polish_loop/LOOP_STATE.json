@@ -5,7 +5,7 @@
   "cycle": 15,
   "status": "ok",
   "last_cycle_at": "2026-08-04T17:05:39+03:00",
-  "last_commit": "pending",
+  "last_commit": "f0c6b20",
   "last_commit_repo": "gVRMod+vrmod-x64",
   "last_test": "test_all --fast PASS 4/4",
   "last_focus": "G05 stereo-load policy (partial)",

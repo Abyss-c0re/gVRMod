@@ -3,7 +3,7 @@
 **Cycle:** 15  
 **Time:** 2026-08-04T17:05:39+03:00  
 **Focus:** G05 stereo-load policy (partial — dual paint through load)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `f0c6b20`  
 **Commit (vrmod-x64):** `879a551`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
