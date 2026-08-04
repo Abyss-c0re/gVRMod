@@ -3,8 +3,8 @@
 **Cycle:** 29  
 **Time:** 2026-08-04T19:39:39+03:00  
 **Focus:** G03 StagePack plan executor (opt-in)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `5b2afa4`  
+**Commit (vrmod-x64):** `3d98cb4`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
