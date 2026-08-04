@@ -450,14 +450,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       }
       WebUI_MarkDirty(ui);
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
-      // Soft only after long wait if process is up but never signaled (was 40s — race window)
-      bool soft = gmodUp && ui.handoffElapsed > 90.f;
-      bool timeout = ui.handoffElapsed > 180.f;
-      if ((takeXr || soft || timeout) && !handoffExitRequested) {
+      // G28: soft 90s / hard 180s pure gate — never racey early release (was 40s void).
+      HandoffTimeoutDecision ht =
+          CubeHandoffTimeout_Decide(takeXr, gmodUp, ui.handoffElapsed);
+      if (ht.should_release && !handoffExitRequested) {
         handoffExitRequested = true;
         handoffExitWait = 0.f;
-        fprintf(stderr, "[cube_webui] handoff release phase=%s t=%.1f (orderly xrRequestExitSession)\n",
-                phase.c_str(), ui.handoffElapsed);
+        fprintf(stderr,
+                "[cube_webui] handoff release phase=%s t=%.1f reason=%s (orderly xrRequestExitSession)\n",
+                phase.c_str(), ui.handoffElapsed, ht.reason.c_str());
         // G03: refresh stage pack with final head sample before runtime release
         {
           StagePackSnapshot pack;

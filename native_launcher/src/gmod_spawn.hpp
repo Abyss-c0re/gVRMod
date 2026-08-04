@@ -215,6 +215,119 @@ inline float CubeHandoffLayerFadeAlpha(float fadeAmount) {
   return fadeAmount;
 }
 
+// G28: soft handoff timeout law (pure). Pain soft-care: 90s/180s; never racey early release.
+// Soft: GMod process up but never signaled take_xr — wait long enough for cold boot.
+// Hard: absolute panel-hold ceiling, then orderly xrRequestExitSession (not mid-frame destroy).
+// Racey: releasing before soft when process is down and phase is not take_xr (void/gap).
+inline float CubeHandoffSoftReleaseSeconds() { return 90.f; }
+inline float CubeHandoffHardTimeoutSeconds() { return 180.f; }
+
+struct HandoffTimeoutDecision {
+  bool valid = true;
+  bool take_xr = false;
+  bool gmod_up = false;
+  float elapsed = 0.f;
+  float soft_sec = 90.f;
+  float hard_sec = 180.f;
+  bool soft_due = false;
+  bool hard_due = false;
+  bool should_release = false;
+  bool racey = false; // true if product would release too early (must not ship)
+  /// none | take_xr | soft | hard | hold
+  std::string risk = "none";
+  std::string reason = "ok";
+};
+
+struct HandoffTimeoutHmdExpect {
+  std::string verdict = "idle"; // idle | expect_hold | expect_take_xr | expect_soft | expect_hard | expect_race_fail
+  bool expect_orderly = true;
+  std::string checklist = "G28 · IDLE · no handoff timeout decision";
+  std::string pass_line = "N/A";
+  std::string fail_line = "N/A";
+};
+
+/// Pure release gate. elapsed_sec is panel hold time during ui.handoff.
+inline HandoffTimeoutDecision CubeHandoffTimeout_Decide(bool takeXrSignal, bool gmodUp, float elapsedSec) {
+  HandoffTimeoutDecision d;
+  d.take_xr = takeXrSignal;
+  d.gmod_up = gmodUp;
+  d.elapsed = elapsedSec < 0.f ? 0.f : elapsedSec;
+  d.soft_sec = CubeHandoffSoftReleaseSeconds();
+  d.hard_sec = CubeHandoffHardTimeoutSeconds();
+  d.soft_due = gmodUp && d.elapsed > d.soft_sec;
+  d.hard_due = d.elapsed > d.hard_sec;
+  d.should_release = d.take_xr || d.soft_due || d.hard_due;
+  // Race: release without take_xr when process not up and before hard ceiling.
+  d.racey = d.should_release && !d.take_xr && !gmodUp && !d.hard_due;
+  if (d.racey) {
+    d.risk = "racey";
+    d.reason = "early_release_no_gmod";
+    d.should_release = false; // law: refuse racey path
+  } else if (d.take_xr) {
+    d.risk = "take_xr";
+    d.reason = "phase_take_xr";
+  } else if (d.soft_due) {
+    d.risk = "soft";
+    d.reason = "soft_90s_gmod_up_no_signal";
+  } else if (d.hard_due) {
+    d.risk = "hard";
+    d.reason = "hard_180s_ceiling";
+  } else {
+    d.risk = "hold";
+    d.reason = "panel_holds_openxr";
+  }
+  return d;
+}
+
+inline std::string CubeHandoffTimeout_StatusLabel(const HandoffTimeoutDecision& d) {
+  if (!d.valid) return "HAND · IDLE";
+  if (d.racey) return "HAND · RACEY FORBID";
+  if (d.risk == "take_xr") return "HAND · TAKE XR";
+  if (d.risk == "soft") return "HAND · SOFT 90S";
+  if (d.risk == "hard") return "HAND · HARD 180S";
+  if (d.should_release) return "HAND · RELEASE";
+  return "HAND · HOLD";
+}
+
+inline HandoffTimeoutHmdExpect CubeHandoffTimeout_HmdExpect(const HandoffTimeoutDecision& d) {
+  HandoffTimeoutHmdExpect e;
+  if (!d.valid) return e;
+  if (d.racey) {
+    e.verdict = "expect_race_fail";
+    e.expect_orderly = false;
+    e.checklist = "G28 · RACEY · must not early-release without GMod";
+    e.pass_line = "Hold XR until take_xr / soft 90s with process / hard 180s";
+    e.fail_line = "Session dropped while GMod still booting (void)";
+    return e;
+  }
+  if (d.risk == "take_xr") {
+    e.verdict = "expect_take_xr";
+    e.checklist = "G28 · TAKE XR · orderly release after claim";
+    e.pass_line = "Coordinated fade then xrRequestExitSession";
+    e.fail_line = "Hard destroy mid-frame or no fade";
+    return e;
+  }
+  if (d.risk == "soft") {
+    e.verdict = "expect_soft";
+    e.checklist = "G28 · SOFT 90S · GMod up · no take_xr signal";
+    e.pass_line = "Orderly release after long wait with process live";
+    e.fail_line = "Race release before 90s without take_xr";
+    return e;
+  }
+  if (d.risk == "hard") {
+    e.verdict = "expect_hard";
+    e.checklist = "G28 · HARD 180S · absolute ceiling";
+    e.pass_line = "Release after 180s even if stuck";
+    e.fail_line = "Infinite hold with dead handoff";
+    return e;
+  }
+  e.verdict = "expect_hold";
+  e.checklist = "G28 · HOLD · panel owns OpenXR · t=" + std::to_string((int)d.elapsed) + "s";
+  e.pass_line = "Seamless hold through cold Steam/hl2 boot";
+  e.fail_line = "Early void / racey release";
+  return e;
+}
+
 // G12: handoff ambient gain law (0..1). Pure contract for optional Cube ambient clip.
 // No audio engine required — panel status + future OpenAL/Sound source share this curve.
 // Intent: hold presence while GMod boots, duck at take_xr, silence when session releases.

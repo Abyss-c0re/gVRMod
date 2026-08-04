@@ -517,6 +517,38 @@ TEST(launcher_stage_pack_head_y_sanity) {
     ASSERT_EQ(StagePack_NormalizeSpace("local"), std::string("LOCAL"));
 }
 
+// G28: soft handoff timeout law (90s soft / 180s hard; never racey)
+TEST(launcher_handoff_timeout_law_g28) {
+    ASSERT_NEAR(CubeHandoffSoftReleaseSeconds(), 90.f, 1e-3f);
+    ASSERT_NEAR(CubeHandoffHardTimeoutSeconds(), 180.f, 1e-3f);
+    auto hold = CubeHandoffTimeout_Decide(false, false, 30.f);
+    ASSERT_TRUE(!hold.should_release);
+    ASSERT_TRUE(!hold.racey);
+    ASSERT_EQ(hold.risk, std::string("hold"));
+    ASSERT_EQ(CubeHandoffTimeout_StatusLabel(hold), std::string("HAND · HOLD"));
+    auto take = CubeHandoffTimeout_Decide(true, true, 5.f);
+    ASSERT_TRUE(take.should_release);
+    ASSERT_EQ(take.risk, std::string("take_xr"));
+    auto softEarly = CubeHandoffTimeout_Decide(false, true, 50.f);
+    ASSERT_TRUE(!softEarly.should_release); // need >90 with gmod up
+    auto soft = CubeHandoffTimeout_Decide(false, true, 91.f);
+    ASSERT_TRUE(soft.should_release);
+    ASSERT_EQ(soft.risk, std::string("soft"));
+    ASSERT_EQ(CubeHandoffTimeout_StatusLabel(soft), std::string("HAND · SOFT 90S"));
+    auto hard = CubeHandoffTimeout_Decide(false, false, 181.f);
+    ASSERT_TRUE(hard.should_release);
+    ASSERT_EQ(hard.risk, std::string("hard"));
+    // Soft without process must NOT fire before hard (race window)
+    auto noSoft = CubeHandoffTimeout_Decide(false, false, 100.f);
+    ASSERT_TRUE(!noSoft.should_release);
+    ASSERT_TRUE(!noSoft.soft_due);
+    auto he = CubeHandoffTimeout_HmdExpect(take);
+    ASSERT_EQ(he.verdict, std::string("expect_take_xr"));
+    ASSERT_TRUE(he.checklist.find("G28") != std::string::npos);
+    auto heHold = CubeHandoffTimeout_HmdExpect(hold);
+    ASSERT_EQ(heHold.verdict, std::string("expect_hold"));
+}
+
 // G18: framed window chrome law (never force -noborder)
 TEST(launcher_window_chrome_cube_default) {
     ASSERT_TRUE(WindowChrome_CubeWindowed());

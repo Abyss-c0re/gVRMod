@@ -335,6 +335,26 @@ Offline gate proves **blocked** names (`viewmodel_fov`, `r_shadowrendertotexture
 
 Pure helpers: `EngineBlacklist_AllowWrite` / `EngineBlacklist_Decide` / `EngineBlacklist_HmdExpect` (unit-tested; offline ≠ console walk).
 
+### 0.15 G28 soft handoff timeout (manual)
+
+Offline gate proves **soft 90s** (GMod up, no take_xr), **hard 180s** ceiling, **no racey** early release without process. **Headset** required to claim seamless hold feel.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Cold Start | Panel holds XR through Steam/hl2 boot | Session drops at ~40s void |
+| take_xr signal | Orderly release soon after claim | Mid-frame destroy |
+| GMod up, no signal | Soft release after **>90s** | Soft before 90s / without process |
+| Stuck forever | Hard release after **>180s** | Infinite hold / hard kill |
+| Log | `reason=phase_take_xr` / `soft_90s…` / `hard_180s…` | Silent race |
+
+**Procedure (claim “G28 handoff timeout OK” only if walked):**
+
+1. Cube Start Game — stay in headset; phases progress; no early void.  
+2. Normal path: take_xr → fade → GMod owns XR.  
+3. Optional stuck test: kill GMod mid-boot — hard ceiling ~180s orderly exit.
+
+Pure helpers: `CubeHandoffTimeout_Decide` / `CubeHandoffTimeout_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law
