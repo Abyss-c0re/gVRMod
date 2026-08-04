@@ -953,6 +953,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         };
         drawHandLaser(aimValidL, panelHitL, aimOL, aimDL, hitPtL, 0.55f, 0.55f, 0.6f);
         drawHandLaser(aimValidR, panelHitR, aimOR, aimDR, hitPtR, 0.55f, 0.55f, 0.6f);
+        // G02: full eye-buffer fade (panel dim + world content) during take_xr release
+        if (ui.handoff && ui.handoffFade > 0.001f)
+          GlFadeEyeBufferTowardBlack(CubeHandoffLayerFadeAlpha(ui.handoffFade));
         GlUnbindFbo();
         glDisable(GL_DEPTH_TEST);
 

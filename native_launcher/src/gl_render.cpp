@@ -178,3 +178,34 @@ void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb) {
   glColor4f(1.f, 1.f, 1.f, 1.f);
   glDisable(GL_BLEND);
 }
+
+void GlFadeEyeBufferTowardBlack(float fade) {
+  if (fade < 0.f) fade = 0.f;
+  if (fade > 1.f) fade = 1.f;
+  if (fade < 0.001f) return;
+  glDisable(GL_TEXTURE_2D);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glMatrixMode(GL_PROJECTION);
+  glPushMatrix();
+  glLoadIdentity();
+  glOrtho(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
+  glMatrixMode(GL_MODELVIEW);
+  glPushMatrix();
+  glLoadIdentity();
+  glColor4f(0.f, 0.f, 0.f, fade);
+  glBegin(GL_QUADS);
+  glVertex2f(-1.f, -1.f);
+  glVertex2f(1.f, -1.f);
+  glVertex2f(1.f, 1.f);
+  glVertex2f(-1.f, 1.f);
+  glEnd();
+  glPopMatrix();
+  glMatrixMode(GL_PROJECTION);
+  glPopMatrix();
+  glMatrixMode(GL_MODELVIEW);
+  glColor4f(1.f, 1.f, 1.f, 1.f);
+  glDisable(GL_BLEND);
+}

@@ -131,3 +131,12 @@ Append one block per cycle. Newest at bottom.
 - G12 partial — actual ambient clip still open.
 - Tests: full test_all PASS 6/6 (+audio gain unit).
 - Next: G02 XR layer design note, or G05/G04 careful inventory.
+
+## 2026-08-04 cycle 14 — G02 eye-buffer layer fade
+
+- Theme: coordinated fade on take_xr for full HMD content (not panel-only).
+- Pure: CubeHandoffLayerFadeAlpha; GlFadeEyeBufferTowardBlack overlay.
+- xr_app both eyes after lasers; panel LAYER FADE % copy.
+- G02 shell done; GMod-side black/load flash still G05.
+- Tests: full test_all PASS 6/6 (+layer alpha unit).
+- Next: G05 stereo-during-load pure gate/inventory, or G03 apply design.

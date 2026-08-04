@@ -20,3 +20,7 @@ void GlLoadProjectionFov(const XrFovf& fov, float nearZ = 0.05f, float farZ = 50
 // eyeWorld: current eye pose so we can UV-correct when viewing the back face
 void GlDrawWorldPanel(GLuint tex, const XrPosef& eyeWorld);
 void GlDrawLaser(Vec3 a, Vec3 b, float cr, float cg, float cb);
+
+// G02: full-eye black overlay after content (panel + lasers). fade 0..1.
+// Covers the whole swapchain view so take_xr feels intentional before release.
+void GlFadeEyeBufferTowardBlack(float fade);

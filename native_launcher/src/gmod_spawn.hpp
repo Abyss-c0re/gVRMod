@@ -123,8 +123,9 @@ inline std::string CubeHandoffPhaseLabel(const std::string& phase) {
   return phase;
 }
 
-// G02: intentional panel dim toward black during take_xr / session release (not OpenXR layer fade).
-// Returns 0..1. Full compositor crossfade still future; this makes the cut feel deliberate.
+// G02: intentional fade toward black during take_xr / session release.
+// Returns 0..1. Used for (1) panel buffer dim and (2) full eye-swapchain overlay alpha.
+// Runtime XR composition-layer flag fade is not required — content fade is enough for cut.
 inline float CubeHandoffFadeAmount(const std::string& phase, bool exitRequested, float exitWaitSec) {
   if (exitRequested) {
     // Ramp over ~2.5s of orderly release (matches Lua wait budget)
@@ -137,6 +138,13 @@ inline float CubeHandoffFadeAmount(const std::string& phase, bool exitRequested,
   if (phase == "starting_xr") return 0.45f;
   if (phase == "vr_active") return 0.65f;
   return 0.f;
+}
+
+// G02: clamp black-overlay alpha for eye buffers (0 clear · 1 solid black).
+inline float CubeHandoffLayerFadeAlpha(float fadeAmount) {
+  if (fadeAmount < 0.f) return 0.f;
+  if (fadeAmount > 1.f) return 1.f;
+  return fadeAmount;
 }
 
 // G12: handoff ambient gain law (0..1). Pure contract for optional Cube ambient clip.

@@ -1265,7 +1265,8 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     FillRect(rgba, 24, 300, 6, 32, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
 
     if (s.handoffFade > 0.05f)
-      snprintf(line, sizeof(line), "%.0fs  ·  FADE %.0f%%  ·  RELEASING TO GMOD", t, s.handoffFade * 100.f);
+      snprintf(line, sizeof(line), "%.0fs  ·  LAYER FADE %.0f%%  ·  RELEASING TO GMOD",
+               t, s.handoffFade * 100.f);
     else
       snprintf(line, sizeof(line), "%.0fs  ·  HOLDING OPENXR FOR GMOD", t);
     DrawText(rgba, 24, 360, line, CT_RGB(CubeTheme::MUTED), 1);
@@ -1284,7 +1285,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     }
     DrawText(rgba, 24, 400, "THEME = LUA CUBE  ·  BINDINGS CARRY OVER  ·  NO BLACK GAP",
              CT_RGB(CubeTheme::MUTED), 1);
-    DrawText(rgba, 24, 440, "When GMod signals take_xr, panel dims then releases the runtime.",
+    DrawText(rgba, 24, 440, "When GMod signals take_xr, both eyes fade black then release XR.",
              160, 120, 130, 1);
     DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 255, 200, 210, 1);
     // Intentional dim before compositor cut (panel-side; full XR layer fade is future)

@@ -109,6 +109,18 @@ TEST(launcher_handoff_fade_amount) {
     ASSERT_TRUE(CubeHandoffPhaseLabel("take_xr").find("FADE") != std::string::npos);
 }
 
+// G02: eye-layer black overlay alpha clamp
+TEST(launcher_handoff_layer_fade_alpha) {
+    ASSERT_NEAR(CubeHandoffLayerFadeAlpha(0.f), 0.f, 1e-5f);
+    ASSERT_NEAR(CubeHandoffLayerFadeAlpha(0.5f), 0.5f, 1e-5f);
+    ASSERT_NEAR(CubeHandoffLayerFadeAlpha(1.f), 1.f, 1e-5f);
+    ASSERT_NEAR(CubeHandoffLayerFadeAlpha(-1.f), 0.f, 1e-5f);
+    ASSERT_NEAR(CubeHandoffLayerFadeAlpha(2.f), 1.f, 1e-5f);
+    // Exit ramp end → solid black overlay before session drop
+    float end = CubeHandoffFadeAmount("take_xr", true, 2.5f);
+    ASSERT_NEAR(CubeHandoffLayerFadeAlpha(end), 1.f, 1e-5f);
+}
+
 // G12: ambient gain law — full during hold, duck at take_xr, 0 on exit complete
 TEST(launcher_handoff_audio_gain) {
     ASSERT_NEAR(CubeHandoffAudioGain("waiting_process", false, 0.f), 1.f, 1e-5f);

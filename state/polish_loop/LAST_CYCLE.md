@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 13  
-**Time:** 2026-08-04T16:44:00+03:00  
-**Focus:** G12 handoff ambient gain law (partial — no clip yet)  
-**Commit (gVRMod):** `7747c88`  
+**Cycle:** 14  
+**Time:** 2026-08-04T16:55:00+03:00  
+**Focus:** G02 full eye-buffer layer fade on take_xr  
+**Commit (gVRMod):** (pending close)  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **CubeHandoffAudioGain** pure phase/exit gain curve (inverse of visual fade on release)  
-2. **handoffAudioGain** on WebUIState; xr_app drives it  
-3. **ui_panel** AUDIO HOLD / DUCK / SILENT status line  
-4. No OpenAL/ambient asset — gain law is the G12 contract for future clip  
+1. **CubeHandoffLayerFadeAlpha** pure clamp  
+2. **GlFadeEyeBufferTowardBlack** — fullscreen black overlay after panel+lasers  
+3. **xr_app** applies overlay when handoffFade > 0 (both eyes)  
+4. Panel status **LAYER FADE %**  
 
 ## Pain points
 
-- Untouched.
+- Untouched; soft timeouts unchanged.
 
 ## Gaps
 
-- G12 → **partial** (gain law + panel; real ambient clip open)  
-- Next: G02 XR layer fade note, or G05 load stereo, or careful G03 apply design  
+- G02 → **done** for Cube shell (panel dim + eye content fade). GMod load stereo remains G05.  
+- Next: G05 load stereo inventory/pure gate, or G04 warm process note  
 
 ## Notes
 
