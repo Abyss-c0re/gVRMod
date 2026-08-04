@@ -8,38 +8,8 @@
 #include <GL/glx.h>
 #include <cstring>
 #include <cstdio>
-#include <cmath>
 #include <vector>
 #include <algorithm>
-
-// Map asymmetric OpenXR FOV → UV crop inside a *symmetric* overrender eye texture.
-// Source RenderView only does symmetric FOV+aspect; without this crop the compositor
-// samples the wrong frustum and the image warps under head pitch/roll (Quest 3).
-// Convention: u0 < u1, v0 < v1 with v0 = top of crop (D3D-style; GL flip handled below).
-static void AsymmetricFovToUvCrop(const XrFovf& fov, float* u0, float* u1, float* v0, float* v1) {
-    const float tanL = tanf(fov.angleLeft);
-    const float tanR = tanf(fov.angleRight);
-    const float tanU = tanf(fov.angleUp);
-    const float tanD = tanf(fov.angleDown);
-    float halfTanX = fmaxf(fabsf(tanL), fabsf(tanR));
-    float halfTanY = fmaxf(fabsf(tanU), fabsf(tanD));
-    if (halfTanX < 1e-6f) halfTanX = 1e-6f;
-    if (halfTanY < 1e-6f) halfTanY = 1e-6f;
-    *u0 = (tanL + halfTanX) / (2.0f * halfTanX);
-    *u1 = (tanR + halfTanX) / (2.0f * halfTanX);
-    *v0 = (halfTanY - tanU) / (2.0f * halfTanY);
-    *v1 = (halfTanY - tanD) / (2.0f * halfTanY);
-    // Clamp / order safety
-    if (*u1 < *u0) { float t = *u0; *u0 = *u1; *u1 = t; }
-    if (*v1 < *v0) { float t = *v0; *v0 = *v1; *v1 = t; }
-    const float ins = 0.003f;
-    if (*u0 < ins) *u0 = ins;
-    if (*u1 > 1.0f - ins) *u1 = 1.0f - ins;
-    if (*v0 < ins) *v0 = ins;
-    if (*v1 > 1.0f - ins) *v1 = 1.0f - ins;
-    if (!(*u1 > *u0 + 0.01f)) { *u0 = ins; *u1 = 1.0f - ins; }
-    if (!(*v1 > *v0 + 0.01f)) { *v0 = ins; *v1 = 1.0f - ins; }
-}
 
 // The hmd pose (defined in xr_input.cpp) and conversion - used to feed live layer view pose
 // back to the game's tracking so RenderViews use current head pose.
@@ -733,28 +703,33 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 glReadBuffer(GL_COLOR_ATTACHMENT0);
                 glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
-                // Rect selection.
-                // - SBS path: Lua textureBounds (L/R U halves + optional auto FOV offset).
-                // - Per-eye / collector: single-eye texture. Source rendered a *symmetric*
-                //   overrender; crop with AsymmetricFovToUvCrop so the blit matches the
-                //   OpenXR composition FOV (fixes Quest head-tilt warp). Never full 0..1.
-                // IMPORTANT: Linux SBS ComputeSubmitBounds returns inverted V (v0>v1).
-                // That must NOT be treated as "invalid full rect" — resets U → doubled image.
+                // Rect selection from Lua textureBounds.
+                // IMPORTANT: Linux ComputeSubmitBounds returns inverted V (v0>v1) for OpenVR
+                // UV convention. That must NOT be treated as "invalid full rect" — doing so
+                // resets U to 0..1 and each eye blits the entire SBS RT → doubled image,
+                // no stereo. Only repair the broken axis; keep L/R U halves for SBS.
                 float u0 = (eye == 0) ? textureBounds[0] : textureBounds[4];
                 float u1 = (eye == 0) ? textureBounds[2] : textureBounds[6];
                 float v0 = (eye == 0) ? textureBounds[1] : textureBounds[5];
                 float v1 = (eye == 0) ? textureBounds[3] : textureBounds[7];
 
                 const float ins = 0.003f;
+                // Staging = engine GL orientation, one full eye (no SBS U halves).
                 const bool fromCollector = g_preferCollectedEyes && g_eyeStageReady
                     && perEyeSrc[eye] == g_eyeStage[eye][g_eyeStageRead];
-                // Per-eye engine RTs or collector staging: FOV-derived crop in full-eye UV.
-                if (fromCollector || havePerEye) {
-                    AsymmetricFovToUvCrop(g_views[eye].fov, &u0, &u1, &v0, &v1);
+                if (fromCollector) {
+                    u0 = ins;
+                    u1 = 1.0f - ins;
+                    // Ordered V; one flip applied below via dest Y (same as engine RT path).
+                    v0 = ins;
+                    v1 = 1.0f - ins;
                 }
-                // SBS fallback: require ordered min<max U; repair only broken axis.
+                // U: require ordered min<max. If bad, default to correct SBS half for this eye.
                 else if (!(u1 > u0 + 0.001f)) {
-                    if (eye == 0) {
+                    if (havePerEye) {
+                        u0 = ins;
+                        u1 = 1.0f - ins;
+                    } else if (eye == 0) {
                         u0 = ins;
                         u1 = 0.5f;
                     } else {
@@ -763,7 +738,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     }
                 }
                 // V: empty (zero height) only → full. Inverted V is intentional (flip via blit).
-                if (!(fromCollector || havePerEye) && std::fabs(v1 - v0) < 0.001f) {
+                if (!fromCollector && std::fabs(v1 - v0) < 0.001f) {
                     v0 = ins;
                     v1 = 1.0f - ins;
                 }
