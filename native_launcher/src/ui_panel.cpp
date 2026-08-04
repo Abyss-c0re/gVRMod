@@ -1,10 +1,13 @@
 #include "ui_panel.hpp"
 #include "gmod_spawn.hpp"
+#include "last_play.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 
 static uint8_t Glyph(char c, int row) {
   static const uint8_t A[] = {0x0E,0x11,0x11,0x1F,0x11,0x11,0x11};
@@ -520,8 +523,129 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   SyncResFromIdx(s.gfx);
   Addons_Load(s.addons, gmodRoot);
   Bindings_Load(s.bindings, gmodRoot);
-  s.status = "NEW GAME · ADDONS · SETTINGS · BINDINGS";
+  // G11: restore last map + gfx so Quick Play / START reuse prior session
+  s.hasLastPlay = false;
+  s.lastPlayMap.clear();
+  if (WebUI_LoadLastPlay(s) && WebUI_ApplyLastPlayMap(s)) {
+    s.status = "QUICK PLAY · " + s.lastPlayMap;
+  } else {
+    s.status = "NEW GAME · ADDONS · SETTINGS · BINDINGS";
+  }
   WebUI_MarkDirty(s);
+}
+
+static std::string LastPlayPath(const std::string& gmodRoot) {
+  if (gmodRoot.empty()) return {};
+  return gmodRoot + "/garrysmod/data/vrmod/cube_last_play.txt";
+}
+
+static LastPlaySnapshot SnapshotFromUI(const WebUIState& s) {
+  LastPlaySnapshot lp;
+  lp.map = WebUI_SelectedMap(s);
+  lp.gamemode = s.gamemode;
+  lp.maxPlayers = WebUI_MaxPlayers(s);
+  lp.svLan = s.svLan;
+  lp.p2p = s.p2p;
+  lp.p2pFriends = s.p2pFriends;
+  lp.gfxPreset = s.gfx.preset;
+  lp.matPicmip = s.gfx.matPicmip;
+  lp.rRootLod = s.gfx.rRootLod;
+  lp.matAntialias = s.gfx.matAntialias;
+  lp.matForceAniso = s.gfx.matForceAniso;
+  lp.matHdrLevel = s.gfx.matHdrLevel;
+  lp.shadows = s.gfx.shadows;
+  lp.multicore = s.gfx.multicore;
+  lp.fpsMax = s.gfx.fpsMax;
+  lp.winW = s.gfx.winW;
+  lp.winH = s.gfx.winH;
+  lp.windowed = s.gfx.windowed;
+  lp.noborder = s.gfx.noborder; // never force on save of false default
+  lp.xrSsIdx = s.gfx.xr.ssIdx;
+  lp.xrViewScale = s.gfx.xr.viewScale;
+  lp.xrScaleFactor = s.gfx.xr.scaleFactor;
+  lp.xrDesktopView = s.gfx.xr.desktopView;
+  lp.valid = !lp.map.empty();
+  return lp;
+}
+
+bool WebUI_SaveLastPlay(const WebUIState& s) {
+  const std::string path = LastPlayPath(s.gmodRoot);
+  if (path.empty()) return false;
+  LastPlaySnapshot lp = SnapshotFromUI(s);
+  if (!lp.valid) return false;
+  std::ofstream f(path);
+  if (!f) return false;
+  f << LastPlay_Format(lp);
+  fprintf(stderr, "[cube_webui] last play saved map=%s → %s\n", lp.map.c_str(), path.c_str());
+  return true;
+}
+
+bool WebUI_LoadLastPlay(WebUIState& s) {
+  const std::string path = LastPlayPath(s.gmodRoot);
+  if (path.empty()) return false;
+  std::ifstream f(path);
+  if (!f) return false;
+  std::ostringstream body;
+  body << f.rdbuf();
+  LastPlaySnapshot lp;
+  if (!LastPlay_Parse(body.str(), lp)) return false;
+  // Stash onto state via fields we apply next; temporary use of lastPlayMap
+  s.lastPlayMap = lp.map;
+  s.hasLastPlay = true;
+  // Apply gfx/server immediately; map selection in WebUI_ApplyLastPlayMap
+  s.gamemode = lp.gamemode.empty() ? "sandbox" : lp.gamemode;
+  s.svLan = lp.svLan;
+  s.p2p = lp.p2p;
+  s.p2pFriends = lp.p2pFriends;
+  for (int i = 0; i < 8; ++i) {
+    if (s.maxPlayersOpts[i] == lp.maxPlayers) {
+      s.maxPlayersIdx = i;
+      break;
+    }
+  }
+  s.gfx.preset = lp.gfxPreset;
+  s.gfx.matPicmip = lp.matPicmip;
+  s.gfx.rRootLod = lp.rRootLod;
+  s.gfx.matAntialias = lp.matAntialias;
+  s.gfx.matForceAniso = lp.matForceAniso;
+  s.gfx.matHdrLevel = lp.matHdrLevel;
+  s.gfx.shadows = lp.shadows;
+  s.gfx.multicore = lp.multicore;
+  s.gfx.fpsMax = lp.fpsMax;
+  s.gfx.winW = lp.winW;
+  s.gfx.winH = lp.winH;
+  s.gfx.windowed = lp.windowed;
+  // Pain point: never force borderless from corrupt snapshot alone
+  s.gfx.noborder = lp.noborder;
+  s.gfx.xr.ssIdx = std::clamp(lp.xrSsIdx, 0, 5);
+  s.gfx.xr.viewScale = lp.xrViewScale;
+  s.gfx.xr.scaleFactor = lp.xrScaleFactor;
+  s.gfx.xr.desktopView = lp.xrDesktopView;
+  // Match resIdx if window size is a known ladder entry
+  for (int i = 0; i < kResN; ++i) {
+    if (kRes[i].w == s.gfx.winW && kRes[i].h == s.gfx.winH) {
+      s.gfx.resIdx = i;
+      break;
+    }
+  }
+  return true;
+}
+
+bool WebUI_ApplyLastPlayMap(WebUIState& s) {
+  if (!s.hasLastPlay || s.lastPlayMap.empty()) return false;
+  const std::string& want = s.lastPlayMap;
+  for (size_t ci = 0; ci < s.categories.size(); ++ci) {
+    const auto& maps = s.categories[ci].maps;
+    for (size_t mi = 0; mi < maps.size(); ++mi) {
+      if (maps[mi] == want) {
+        s.catIndex = (int)ci;
+        s.mapIndex = (int)mi;
+        return true;
+      }
+    }
+  }
+  // Map missing from disk scan — keep lastPlayMap label but no selection change
+  return false;
 }
 
 bool WebUI_SaveBindingsIfDirty(WebUIState& s) {
@@ -865,6 +989,16 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   if (px >= setX + 8 && px <= setX + setW - 8 && py >= 240 && py <= 270) {
     s.page = WebUIPage::Settings;
     s.status = "GMOD GRAPHICS + ENGINE";
+    return true;
+  }
+
+  // G11 Quick Play — one click last map + gfx
+  int qy = UI_H - 120;
+  if (s.hasLastPlay && px >= setX + 12 && px <= setX + setW - 12 && py >= qy && py <= qy + 36) {
+    s.focusCol = 3;
+    WebUI_ApplyLastPlayMap(s);
+    s.wantStart = true;
+    s.status = "QUICK PLAY · " + s.lastPlayMap;
     return true;
   }
 
@@ -1346,6 +1480,17 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   float ss = kSs[std::clamp(s.gfx.xr.ssIdx, 0, kSsN - 1)];
   snprintf(line, sizeof(line), "XR SS %.2f  AA%d", ss, s.gfx.matAntialias);
   DrawText(rgba, setX + 16, 266, line, CT_RGB(CubeTheme::MUTED), 1);
+
+  // G11 Quick Play button (last map + gfx) when snapshot exists
+  int qy = UI_H - 120;
+  if (s.hasLastPlay) {
+    FillRect(rgba, setX + 12, qy, setW - 24, 36, CT_RGB(CubeTheme::BTN_HOVER), 255);
+    DrawText(rgba, setX + 28, qy + 10, "QUICK PLAY", 255, 240, 244, 1);
+    // short map label under-ish in status; button stays one line
+    char qp[48];
+    snprintf(qp, sizeof(qp), "%.18s", s.lastPlayMap.c_str());
+    DrawText(rgba, setX + 28, qy + 22, qp, CT_RGB(CubeTheme::MUTED), 1);
+  }
 
   int by = UI_H - 70;
   bool startFoc = (s.focusCol == 3);

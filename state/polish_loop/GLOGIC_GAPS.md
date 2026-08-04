@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 3
+Last updated: 2026-08-04 cycle 4
 
 ## P0 — seamless / feel broken
 
@@ -19,7 +19,7 @@ Last updated: 2026-08-04 cycle 3
 | ID | Gap | Notes | Status |
 |----|-----|-------|--------|
 | G10 | First-run gates re-spam on wrapper autostart | Should skip if cal exists + native_wrapper | **done** cycle2 |
-| G11 | Quick Play (last map + gfx) missing | Reduces menu friction | open |
+| G11 | Quick Play (last map + gfx) missing | Reduces menu friction | **done** cycle4 |
 | G12 | Audio dead during handoff | Optional ambient crossfade | open |
 | G13 | Return-to-Cube reverse handoff | Exit VR → Cube reclaims XR | open |
 | G14 | Glide vehicle input SoT | Watchlist W3; partial | open |
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G11 | Quick Play last map+gfx snapshot | last_play.hpp + Cube UI |
 | G20 | Laser/beam ParseColor + finger curl SoT | vrmod-x64 a0b9d2e |
 | G10 | Skip Experience re-spam wrapper+cal | vrmod-x64 70ff998 |
 | G01 | Phase-aware handoff panel + map_ready | launcher helpers + vrmod-x64 b1ada40 |

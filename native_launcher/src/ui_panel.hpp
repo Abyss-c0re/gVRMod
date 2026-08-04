@@ -96,6 +96,10 @@ struct WebUIState {
   bool wantStart = false;
   bool wantQuit = false;
 
+  // G11 Quick Play — last map + gfx snapshot loaded from cube_last_play.txt
+  bool hasLastPlay = false;
+  std::string lastPlayMap; // display label when hasLastPlay
+
   // Seamless StartGame handoff
   bool handoff = false;
   std::string handoffMap;
@@ -133,6 +137,12 @@ void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible);
 bool WebUI_PointerClick(WebUIState& s, int px, int py);
 // Persist dirty bindings to garrysmod/data/vrmod/vrmod_openxr_bindings.json
 bool WebUI_SaveBindingsIfDirty(WebUIState& s);
+
+// G11: persist / restore last map + gfx for Quick Play
+bool WebUI_SaveLastPlay(const WebUIState& s);
+bool WebUI_LoadLastPlay(WebUIState& s);
+// Apply snapshot into UI (map selection + server + gfx). Returns false if map missing.
+bool WebUI_ApplyLastPlayMap(WebUIState& s);
 
 // Mark content dirty (input, meta apply, page change, handoff anim).
 void WebUI_MarkDirty(WebUIState& s);

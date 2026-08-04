@@ -1,6 +1,7 @@
 #include "../../tests/test_framework.h"
 #include "math3d.hpp"
 #include "gmod_spawn.hpp"
+#include "last_play.hpp"
 
 TEST(launcher_math3d_normalize) {
     Vec3 n = Normalize(V3(3.f, 0.f, 0.f));
@@ -53,6 +54,38 @@ TEST(launcher_handoff_phase_label) {
     ASSERT_EQ(CubeHandoffPhaseLabel(""), std::string("SPAWNING"));
     ASSERT_EQ(CubeHandoffPhaseLabel("map_ready"), std::string("MAP READY"));
     ASSERT_EQ(CubeHandoffPhaseLabel("take_xr"), std::string("TAKE XR"));
+}
+
+// G11: Quick Play last map + gfx snapshot round-trip
+TEST(launcher_last_play_roundtrip) {
+    LastPlaySnapshot a;
+    a.map = "gm_construct";
+    a.gamemode = "sandbox";
+    a.maxPlayers = 4;
+    a.svLan = true;
+    a.p2p = false;
+    a.gfxPreset = 2;
+    a.matPicmip = 0;
+    a.matAntialias = 4;
+    a.winW = 720;
+    a.winH = 480;
+    a.noborder = false;
+    a.xrSsIdx = 3;
+    a.valid = true;
+    std::string body = LastPlay_Format(a);
+    LastPlaySnapshot b;
+    ASSERT_TRUE(LastPlay_Parse(body, b));
+    ASSERT_EQ(b.map, std::string("gm_construct"));
+    ASSERT_EQ(b.maxPlayers, 4);
+    ASSERT_EQ(b.matAntialias, 4);
+    ASSERT_EQ(b.winW, 720);
+    ASSERT_TRUE(!b.noborder);
+    ASSERT_EQ(b.xrSsIdx, 3);
+}
+
+TEST(launcher_last_play_rejects_empty) {
+    LastPlaySnapshot b;
+    ASSERT_TRUE(!LastPlay_Parse("v=1\ngamemode=sandbox\n", b));
 }
 
 int main() {

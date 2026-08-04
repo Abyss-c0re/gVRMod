@@ -37,3 +37,12 @@ Append one block per cycle. Newest at bottom.
 - Tests: test_all --fast PASS 4/4.
 - Commits: vrmod-x64 a0b9d2e; gVRMod submodule + state.
 - G20 partial (more sites remain e.g. cube_framework color); next G11 Quick Play or G23 follow-cam verify.
+
+## 2026-08-04 cycle 4 — G11 Quick Play
+
+- Theme: last map + gfx snapshot for Cube Quick Play (safe UI/status file).
+- Pure: last_play.hpp Format/Parse (+ 2 launcher unit tests).
+- Save cube_last_play.txt on successful Start; restore on WebUI_Init; QUICK PLAY button.
+- No -noborder force; mat_queue untouched.
+- Tests: full test_all PASS 6/6; cube_webui_launcher builds.
+- Next: G23 follow-cam paths verify or G02 fade (careful).

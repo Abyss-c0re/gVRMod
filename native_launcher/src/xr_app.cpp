@@ -310,6 +310,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       fprintf(stderr, "[cube_webui] StartGame map=%s rc=%d %s\n", lr.map.c_str(), rc, err.c_str());
       ui.wantStart = false;
       if (rc == 0) {
+        // G11: remember map + gfx for next Cube session Quick Play
+        WebUI_SaveLastPlay(ui);
         ui.handoff = true;
         ui.handoffMap = lr.map;
         ui.handoffPhase = "SPAWNED";
