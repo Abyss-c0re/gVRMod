@@ -3,7 +3,7 @@
 **Cycle:** 3  
 **Time:** 2026-08-04T14:53:56+03:00  
 **Focus:** G20 pure utils rewire (laser/beam/finger)  
-**Commit (gVRMod):** `ff5bb53`  
+**Commit (gVRMod):** `72ee4bb`  
 **Commit (vrmod-x64):** `a0b9d2e`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 

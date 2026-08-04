@@ -5,7 +5,7 @@
   "cycle": 3,
   "status": "ok",
   "last_cycle_at": "2026-08-04T14:53:56+03:00",
-  "last_commit": "ff5bb53",
+  "last_commit": "72ee4bb",
   "last_commit_repo": "gVRMod+vrmod-x64",
   "last_test": "test_all --fast PASS 4/4",
   "last_focus": "G20 pure utils rewire laser/beam/finger call sites",
