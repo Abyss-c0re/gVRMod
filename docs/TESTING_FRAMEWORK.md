@@ -489,6 +489,25 @@ Offline gate proves default **1.0**, clamp **0.1..2.0**, comfort **0.75..1.25** 
 
 Pure helpers: `ViewScaleLaw_Clamp` / `CubeViewScale_Decide` / `ViewScaleLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.23 G36 FOV/Z soft-refresh (manual)
+
+Offline gate proves FOV cvars → **soft_display**, borders → **submit_bounds**, znear → **session**; **no mid-frame UV+FOV fight**; FOV clamp **0.1..2.0**. **Headset** for one-eye jitter.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Live FOV scale change | SoftRefresh only; both eyes stable | Right eye wrap / freeze |
+| Border H/V/scale | Submit bounds only | FOV recomputed mid-eye |
+| Znear change | Session view.znear; no UV fight | Jitter / freeze on Z spam |
+| Extreme FOV | Clamped; prefer Border guide | Unbounded wrap |
+
+**Procedure (claim “G36 FOV/Z OK” only if walked):**
+
+1. VR active — nudge FOV X/Y slowly; both eyes stable.  
+2. Border offsets live — no freeze.  
+3. Avoid Z spam; use Border calibrate for edges.
+
+Pure helpers: `FovZLaw_RefreshKind` / `FovZLaw_Decide` / `FovZLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

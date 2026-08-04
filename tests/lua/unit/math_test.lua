@@ -454,6 +454,59 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G36 pure FOV/Z soft-refresh law (W5; no mid-frame UV fight)
+	H.TEST("util.fovz_law.soft_refresh_g36", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.FovZLaw_ClampFovScale(0.05), 0.1)
+		H.assert_eq(u.FovZLaw_ClampFovScale(3.0), 2.0)
+		H.assert_eq(u.FovZLaw_ClampZnear(0.01), 0.1)
+		H.assert_eq(u.FovZLaw_ClampZnear(1.0), 1.0)
+		H.assert_true(not u.FovZLaw_AllowMidFrameUvFight())
+		H.assert_true(not u.FovZLaw_AllowLiveFovWithoutSoftRefresh())
+		H.assert_true(u.FovZLaw_PreferBorderGuideOverZSpam())
+		H.assert_eq(u.FovZLaw_RefreshKind("vrmod_horizontaloffset"), "submit_bounds")
+		H.assert_eq(u.FovZLaw_RefreshKind("vrmod_fovscale_x"), "soft_display")
+		H.assert_eq(u.FovZLaw_RefreshKind("vrmod_znear"), "session")
+		H.assert_eq(u.FovZLaw_RefreshKind("unknown_cvar"), "none")
+		H.assert_true(u.FovZLaw_IsBorderCvar("vrmod_scalefactor"))
+		H.assert_true(u.FovZLaw_IsFovProfileCvar("vrmod_viewscale"))
+		H.assert_true(u.FovZLaw_IsSessionCvar("vrmod_postprocess"))
+		local ok = u.FovZLaw_Decide({
+			cvar = "vrmod_fovscale_x",
+			vr_active = true,
+			soft_refreshed = true,
+			fov_x = 1.0,
+			fov_y = 1.0,
+		})
+		H.assert_true(ok.path_ok)
+		H.assert_eq(ok.refresh_kind, "soft_display")
+		H.assert_eq(u.FovZLaw_StatusLabel(ok), "FOVZ · SOFT")
+		local he = u.FovZLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G36", 1, true))
+		local fight = u.FovZLaw_Decide({ mid_frame_uv_and_fov = true, vr_active = true })
+		H.assert_true(not fight.path_ok)
+		H.assert_eq(fight.risk, "mid_frame_fight")
+		H.assert_true(u.FovZLaw_IsJitterRisk(fight))
+		local noSoft = u.FovZLaw_Decide({
+			cvar = "vrmod_fovscale_y",
+			vr_active = true,
+			soft_refreshed = false,
+		})
+		H.assert_eq(noSoft.risk, "no_soft")
+		local extreme = u.FovZLaw_Decide({
+			cvar = "vrmod_fovscale_x",
+			vr_active = true,
+			soft_refreshed = true,
+			fov_x = 0.2,
+			fov_y = 1.0,
+		})
+		H.assert_eq(extreme.risk, "extreme_fov")
+		local bounds = u.FovZLaw_Decide({ cvar = "vrmod_verticaloffset", vr_active = true })
+		H.assert_eq(bounds.refresh_kind, "submit_bounds")
+		H.assert_eq(u.FovZLaw_StatusLabel(bounds), "FOVZ · BOUNDS")
+	end)
+
 	-- G35 pure viewscale fisheye law (W8)
 	H.TEST("util.viewscale_law.fisheye_g35", function()
 		local u = env.vrmod.utils

@@ -532,3 +532,13 @@ Append one block per cycle. Newest at bottom.
 - G35 partial — HMD fisheye walk open.
 - Tests: full test_all PASS 6/6 (launcher 32; 47 Lua).
 - Next: HMD walk backlog (G05/G12) or W5 FOV/Z jitter notes.
+
+## 2026-08-05 cycle 54 — G36 FOV/Z soft-refresh law (W5)
+
+- Theme: no mid-frame UV+FOV fight; FOV→soft_display; borders→submit_bounds; znear→session.
+- Pure: FovZLaw_RefreshKind/ClampFov/Decide/HmdExpect.
+- cl_vrmod Bind*Callbacks + ComputeDisplayParams FOV clamp wire.
+- TESTING_FRAMEWORK §0.23; PURE_TESTED map.
+- G36 partial — HMD one-eye jitter walk open.
+- Tests: --fast PASS 4/4 (pure pending=0; 48 Lua).
+- Next: HMD walk backlog (G05/G12) or W9 hand bullet filter notes.

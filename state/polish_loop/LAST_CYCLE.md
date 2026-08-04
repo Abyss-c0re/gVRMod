@@ -1,29 +1,28 @@
 # Last cycle
 
-**Cycle:** 53  
-**Time:** 2026-08-05T00:05:00+03:00  
-**Focus:** G35 viewscale fisheye law (W8)  
-**Commit (gVRMod):** `81e19df`  
-**Commit (vrmod-x64):** `c126533`  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass (launcher 32; 47 Lua)  
+**Cycle:** 54  
+**Time:** 2026-08-05T00:16:00+03:00  
+**Focus:** G36 FOV/Z soft-refresh law (W5)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 48 Lua)  
 
 ## What changed
 
-1. **Pure Lua** ViewScaleLaw_Clamp/IsFisheyeRisk/Decide/HmdExpect  
-2. **Pure launcher** CubeViewScale_* + gmod_spawn/launch_fill clamp  
-3. **cl_vrmod** ComputeDisplayParams uses clamp + snapshot  
-4. Unit tests Lua + launcher; PURE_TESTED; §0.22  
-5. Gap G35 partial  
-6. Pushed stereo tilt settings `423a178` (user; tests green)  
+1. **Pure** FovZLaw_RefreshKind/ClampFov/ClampZnear/Decide/HmdExpect  
+2. **cl_vrmod** BindBorder/BindRenderProfile + FOV clamp in ComputeDisplayParams  
+3. Unit test util.fovz_law.soft_refresh_g36 + PURE_TESTED  
+4. TESTING_FRAMEWORK §0.23 FOV/Z walk  
+5. Gap G36 partial  
 
 ## Pain points
 
-- Soft care: fisheye via extreme viewscale; prefer Vision defaults / 1.0.
+- Soft care: no mid-frame UV+FOV fight; prefer Border guide over Z spam.
 
 ## Gaps
 
-- G35 partial — HMD fisheye walk open  
-- Next: HMD walk backlog (G05/G12) or W5 FOV/Z jitter notes  
+- G36 partial — HMD one-eye jitter walk open  
+- Next: HMD walk backlog (G05/G12) or W9 hand bullet filter notes  
 
 ## Notes
 

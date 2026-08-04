@@ -334,6 +334,94 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.FovZLaw_AllowLiveFovWithoutSoftRefresh
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_AllowMidFrameUvFight
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_ClampFovScale
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_ClampZnear
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_FovComfortMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_FovComfortMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_FovMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_FovMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_IsBorderCvar
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_IsFovExtreme
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_IsFovProfileCvar
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_IsJitterRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_IsSessionCvar
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_NormalizeCvar
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_PreferBorderGuideOverZSpam
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_RefreshKind
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_ZnearDefault
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_ZnearMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FovZLaw_ZnearMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
+    tier: pure
+    tests: [util.fovz_law.soft_refresh_g36]
   - id: vrmod.utils.FrameOrigin
     file: addon/vrmod-x64/lua/vrmod/utils/sh_frames.lua
     tier: seam
