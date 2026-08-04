@@ -409,7 +409,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.handoffDetail = CubeHandoffDetailForPhase(phase, gmodUp);
       // G02: panel-side fade amount (phase pre-dim + ramp during orderly exit)
       ui.handoffFade = CubeHandoffFadeAmount(phase, handoffExitRequested, handoffExitWait);
-      // G12: ambient gain + presence + player decide; backend only if GVRMOD_AMBIENT_PLAY=1
+      // G12: ambient gain + presence + player decide; default ON (opt-out GVRMOD_AMBIENT_PLAY=0)
       ui.handoffAudioGain = CubeHandoffAudioGain(phase, handoffExitRequested, handoffExitWait);
       {
         static float lastAmbGain = -1.f;

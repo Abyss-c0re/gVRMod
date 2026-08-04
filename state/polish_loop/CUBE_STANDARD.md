@@ -24,7 +24,7 @@ Never submit eng texture. Never dual pose truth.
 - G04 partial: default cold-spawns; skip-spawn plan + `WriteWarmAttachMarkers` when `GVRMOD_WARM_REUSE=1`; GMod changelevel still off
 - G13 partial: VR exit writes `cube_return.txt`; Cube polls + RETURN panel line; **does not** auto-reclaim XR (`CubeReclaimEnabled` hard-off)
 - G03 partial: pack + ApplyDecision + ComputeApplyPlan seated preview; allow_apply=false / empty mutations; **must not** auto-jump without HMD-proven apply
-- G12 partial: gain law + `cube_hold.ogg` + ffplay/paplay backend; audible only with `GVRMOD_AMBIENT_PLAY=1` (default silent)
+- G12 partial: gain law + `cube_hold.ogg` + ffplay backend; **default ON** during handoff (comfort master 0.55); silence with `GVRMOD_AMBIENT_PLAY=0`
 
 ## UI / interaction
 

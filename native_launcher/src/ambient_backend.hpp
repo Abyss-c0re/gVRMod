@@ -1,6 +1,6 @@
 #pragma once
 // G12: careful external ambient backend (ffplay/paplay). No OpenAL.
-// Spawn only when CubeAmbientPlayerEnabled(); pure argv in ambient_clip.hpp.
+// Spawn when CubeAmbientPlayerEnabled() (default ON; opt-out GVRMOD_AMBIENT_PLAY=0).
 #include "ambient_clip.hpp"
 #include <string>
 #include <sys/types.h>

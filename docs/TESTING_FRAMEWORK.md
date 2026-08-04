@@ -45,7 +45,7 @@ Two layers. Do not conflate them in commits, PR claims, or polish-loop status.
 6. **Desktop** — `vrmod_desktopview` 1/2/3/4 (follow-cam) as intended; mirror is secondary.  
 7. **Cal** — Experience once (or skip forever); border profile reload on later boots.  
 8. **Pain points** — no force `-noborder`; `mat_queue_mode` stays 1; climb/wall not thrashing.  
-9. **Ambient (optional)** — with `GVRMOD_AMBIENT_PLAY=1`, soft hold tone during Cube handoff; default remains silent.
+9. **Ambient** — soft hold tone during Cube handoff when `cube_hold.ogg` is present (default ON; silence with `GVRMOD_AMBIENT_PLAY=0`).
 
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 

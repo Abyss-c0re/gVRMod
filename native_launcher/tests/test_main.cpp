@@ -297,27 +297,39 @@ TEST(launcher_ambient_clip_contract) {
     ASSERT_TRUE(CubeAmbient_StatusLabel(1.f, true, false).find("MISSING") != std::string::npos);
 }
 
-// G12: ambient asset candidates + player decide (playback default off)
+// G12: ambient asset candidates + player decide (playback default ON, opt-out)
 TEST(launcher_ambient_player_decide) {
-    // Env opt-in pure; default product off when unset
     ASSERT_TRUE(!CubeAmbientPlayerWantEnv(nullptr));
     ASSERT_TRUE(!CubeAmbientPlayerWantEnv(""));
     ASSERT_TRUE(!CubeAmbientPlayerWantEnv("0"));
     ASSERT_TRUE(CubeAmbientPlayerWantEnv("1"));
     ASSERT_TRUE(CubeAmbientPlayerWantEnv("true"));
+    ASSERT_TRUE(CubeAmbientPlayerEnvIsOff("0"));
+    ASSERT_TRUE(CubeAmbientPlayerEnvIsOff("false"));
+    ASSERT_TRUE(CubeAmbientPlayerEnvIsOff("off"));
+    ASSERT_TRUE(!CubeAmbientPlayerEnvIsOff("1"));
+    // Default ON when env unset; explicit 0 silences
+    ASSERT_TRUE(CubeAmbientPlayerEnabledFromEnv(nullptr, true));
+    ASSERT_TRUE(!CubeAmbientPlayerEnabledFromEnv("0", true));
+    ASSERT_TRUE(CubeAmbientPlayerEnabledFromEnv("1", true));
     unsetenv("GVRMOD_AMBIENT_PLAY");
+    ASSERT_TRUE(CubeAmbientPlayerEnabled());
+    setenv("GVRMOD_AMBIENT_PLAY", "0", 1);
     ASSERT_TRUE(!CubeAmbientPlayerEnabled());
+    unsetenv("GVRMOD_AMBIENT_PLAY");
+
+    ASSERT_NEAR(CubeAmbient_ComfortMaster(), 0.55f, 1e-4f);
 
     auto cands = CubeAmbient_AssetsDirCandidates("/env/assets", "/opt/bin", "/src/assets");
     ASSERT_TRUE(cands.size() >= 3);
     ASSERT_EQ(cands[0], std::string("/env/assets"));
     ASSERT_TRUE(cands[1].find("/opt/bin/assets") != std::string::npos);
 
-    auto miss = CubeAmbient_PlayerDecide(true, 1.f, false, false);
+    auto miss = CubeAmbient_PlayerDecide(true, 1.f, false, false, true);
     ASSERT_EQ(miss.reason, std::string("clip_missing"));
     ASSERT_EQ(miss.action, std::string("idle"));
 
-    auto defer = CubeAmbient_PlayerDecide(true, 0.9f, true, false);
+    auto defer = CubeAmbient_PlayerDecide(true, 0.9f, true, false, /*featureEnabled=*/false);
     ASSERT_EQ(defer.action, std::string("deferred"));
     ASSERT_EQ(defer.reason, std::string("eligible_deferred"));
     ASSERT_TRUE(defer.want_audible);
@@ -325,6 +337,8 @@ TEST(launcher_ambient_player_decide) {
 
     auto start = CubeAmbient_PlayerDecide(true, 0.9f, true, false, /*featureEnabled=*/true);
     ASSERT_EQ(start.action, std::string("start"));
+    // Comfort master softens volume
+    ASSERT_NEAR(start.volume, 0.9f * CubeAmbient_ComfortMaster(), 1e-4f);
     auto gain = CubeAmbient_PlayerDecide(true, 0.5f, true, true, true);
     ASSERT_EQ(gain.action, std::string("set_gain"));
     auto stop = CubeAmbient_PlayerDecide(true, 0.f, true, true, true);

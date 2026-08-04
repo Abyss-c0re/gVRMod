@@ -1,29 +1,28 @@
 # Last cycle
 
-**Cycle:** 27  
-**Time:** 2026-08-04T19:18:23+03:00  
-**Focus:** G04 skip-spawn plan (env opt-in)  
-**Commit (gVRMod):** `118120f`  
+**Cycle:** 28  
+**Time:** 2026-08-04T19:28:24+03:00  
+**Focus:** G12 ambient default-on (careful)  
+**Commit (gVRMod):** (pending)  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **CubeWarmSkipSpawnPlanDecide** pure skip + markers/stage flags  
-2. **GVRMOD_WARM_REUSE** env opt-in (default off)  
-3. **WriteWarmAttachMarkers** openxr_launch + handoff phase=warm_attach  
-4. **xr_app** skip branch files markers + stage pack (no Steam)  
-5. Handoff labels for warm_attach / warm_wait_map / warm_ready  
-6. Unit: launcher_warm_skip_spawn_plan  
+1. **CubeAmbientPlayerEnabledFromEnv** default ON; opt-out 0/false/off  
+2. **CubeAmbient_ComfortMaster** 0.55 soft volume  
+3. PlayerDecide applies comfort master to volume  
+4. TESTING_FRAMEWORK ambient checklist default-on  
+5. Unit: env policy + comfort volume  
 
 ## Pain points
 
-- Untouched; no force skip without env.
+- Untouched.
 
 ## Gaps
 
-- G04 still **partial** — GMod changelevel on map mismatch open  
-- Next: ambient default-on or G03 executor careful  
+- G12 nearly done offline; HMD volume taste open  
+- Next: G03 plan executor careful or G13 reclaim  
 
 ## Notes
 

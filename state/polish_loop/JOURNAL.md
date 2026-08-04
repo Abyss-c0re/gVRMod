@@ -268,3 +268,14 @@ Append one block per cycle. Newest at bottom.
 - G04 partial — changelevel on warm map-mismatch still open.
 - Tests: full test_all PASS 6/6 (+skip spawn plan unit).
 - Next: ambient default-on careful or G03 plan executor careful.
+
+## 2026-08-04 cycle 28 — G12 ambient default-on careful
+
+- Theme: handoff hold tone default ON; soft comfort master; opt-out env.
+- Pure: EnabledFromEnv(defaultOn) / EnvIsOff / ComfortMaster 0.55.
+- Product: GVRMOD_AMBIENT_PLAY unset → play when clip present; =0 silences.
+- PlayerDecide volume uses comfort master; still handoff-gated.
+- TESTING_FRAMEWORK ambient checklist updated.
+- G12 partial → near done offline; HMD soft-volume taste open.
+- Tests: full test_all PASS 6/6.
+- Next: G03 plan executor careful or G13 reclaim careful.

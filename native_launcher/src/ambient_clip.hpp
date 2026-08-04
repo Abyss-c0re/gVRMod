@@ -29,18 +29,40 @@ struct AmbientPlayerDecision {
   bool valid = false;
 };
 
-// Env opt-in pure (unit-tested). Product default remains off when env unset.
+// Env token helpers (unit-tested).
 inline bool CubeAmbientPlayerWantEnv(const char* envVal) {
   if (!envVal || !envVal[0]) return false;
   char c = envVal[0];
   return c == '1' || c == 'y' || c == 'Y' || c == 't' || c == 'T';
 }
 
-// Default off. Careful HMD smoke: GVRMOD_AMBIENT_PLAY=1 (no rebuild).
-// Presence + decide always run; spawn only when this is true.
-inline bool CubeAmbientPlayerEnabled() {
-  return CubeAmbientPlayerWantEnv(std::getenv("GVRMOD_AMBIENT_PLAY"));
+// Explicit disable: 0 / n / f / off / false / no
+inline bool CubeAmbientPlayerEnvIsOff(const char* envVal) {
+  if (!envVal || !envVal[0]) return false;
+  char c = envVal[0];
+  if (c == '0' || c == 'n' || c == 'N' || c == 'f' || c == 'F') return true;
+  // "off"
+  if ((c == 'o' || c == 'O') && envVal[1] && (envVal[1] == 'f' || envVal[1] == 'F')) return true;
+  return false;
 }
+
+// Pure enable policy from env string. defaultOn=true → experience hold tone during handoff.
+// Opt-out: GVRMOD_AMBIENT_PLAY=0 (or false/off/no).
+inline bool CubeAmbientPlayerEnabledFromEnv(const char* envVal, bool defaultOn = true) {
+  if (!envVal || !envVal[0]) return defaultOn;
+  if (CubeAmbientPlayerEnvIsOff(envVal)) return false;
+  if (CubeAmbientPlayerWantEnv(envVal)) return true;
+  return defaultOn;
+}
+
+// Product: default ON (careful — only plays during handoff when clip present).
+// Silence: GVRMOD_AMBIENT_PLAY=0
+inline bool CubeAmbientPlayerEnabled() {
+  return CubeAmbientPlayerEnabledFromEnv(std::getenv("GVRMOD_AMBIENT_PLAY"), /*defaultOn=*/true);
+}
+
+// Soft master so hold tone is present but not harsh (applied to PlayerDecide volume).
+inline float CubeAmbient_ComfortMaster() { return 0.55f; }
 
 // 0..100 for ffplay -volume / UI.
 inline int CubeAmbient_VolumePercent(float volume01) {
@@ -154,14 +176,16 @@ inline std::vector<std::string> CubeAmbient_AssetsDirCandidates(const std::strin
   return out;
 }
 
-// Pure player FSM. featureEnabled defaults to CubeAmbientPlayerEnabled hard-off.
-// currentlyPlaying = backend already has a clip active (process/OpenAL).
+// Pure player FSM. featureEnabled defaults to CubeAmbientPlayerEnabled (default ON).
+// currentlyPlaying = backend already has a clip active (ffplay/paplay).
+// master defaults to comfort soft-cap for hold tone.
 inline AmbientPlayerDecision CubeAmbient_PlayerDecide(bool handoff, float gain, bool clipPresent,
                                                       bool currentlyPlaying,
-                                                      bool featureEnabled = CubeAmbientPlayerEnabled()) {
+                                                      bool featureEnabled = CubeAmbientPlayerEnabled(),
+                                                      float master = CubeAmbient_ComfortMaster()) {
   AmbientPlayerDecision d;
   d.valid = true;
-  d.volume = CubeAmbient_EffectiveVolume(gain, 1.f);
+  d.volume = CubeAmbient_EffectiveVolume(gain, master);
   const bool want = CubeAmbient_ShouldPlay(gain, handoff);
   d.want_audible = want && clipPresent;
   if (!clipPresent) {
