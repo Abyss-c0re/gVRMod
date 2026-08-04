@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 58
+Last updated: 2026-08-05 cycle 59
 
 ## P0 — seamless / feel broken
 
@@ -44,6 +44,16 @@ Last updated: 2026-08-05 cycle 58
 | G25 | Dual-truth pose/angvel SoT forks | PoseSoT_* cycle43; HMD walk open | **partial** cycle43 |
 | G26 | QM menu thrash / VRClimb dupes | MenuLaw_* cycle44; HMD walk open | **partial** cycle44 |
 | G27 | Engine blacklist never-call (W2) | EngineBlacklist_* cycle45; console walk open | **partial** cycle45 |
+| G41 | HMD walk inventory + dump | product in addon; parent offline pure cycle59 | **partial** cycle59 |
+| G42 | Hands stuck unstick (ship bar) | HandStuckLaw_* in addon; pure tests cycle59 | **partial** cycle59 |
+| G43 | Menu-open nested RT crash | NestedRtLaw_* in addon; pure tests cycle59 | **partial** cycle59 |
+| G44 | grab_end drop cooldown storms | GrabEndLaw_* in addon; pure tests cycle59 | **partial** cycle59 |
+
+## HMD walk backlog inventory (G41 — offline ≠ HMD OK)
+
+Prefer next: **G05 → G12 → G40 → G28 → G04**. Dump: `vrmod_hmd_expect_dump` (when loaded).
+
+Parent offline gate now loads pure HmdWalk/HandStuck/NestedRt/GrabEnd (cycle59). HMD walks still open.
 
 ## P2 — code quality / glogic hygiene
 
@@ -63,6 +73,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G41–G44 | Parent pure offline gate for ship-bar laws | tests + PURE_TESTED cycle59 |
 | G40 | Vision border fill law (W1) | BorderLaw_* + cl_border_calibrate |
 | G39 | VR_Init human error surface (W11) | InitLaw_* + PerformStartup |
 | G38 | Worldmodel single path (W10) | WorldModelLaw_* + cl_vrmod draw path |

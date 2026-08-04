@@ -582,3 +582,13 @@ Append one block per cycle. Newest at bottom.
 - G40 partial — HMD fill walk open.
 - Tests: --fast PASS 4/4 (pure pending=0; 52 Lua).
 - Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects inventory.
+
+## 2026-08-05 cycle 59 — G41–G44 parent pure offline gate + HmdWalk inventory
+
+- Theme: recover pure-pending=0; wire product HmdWalk/HandStuck/NestedRt/GrabEnd into parent tests.
+- PURE_TESTED + unit tests for G41 inventory, G42 hands, G43 nested RT, G44 grab_end.
+- SubmitBounds_MirrorLeftToBoth pure-tested; G05 HmdExpect expects mq2_mono_both.
+- TESTING_FRAMEWORK §0.28–0.31 notes; GLOGIC_GAPS inventory.
+- Did not thrash quest module WIP (8939da7) or cubalc_mirror.
+- Tests: --fast PASS 4/4 (pure pending=0; 56 Lua).
+- Next: Walk G05/G12 on HMD; or primary-hand left smoke.

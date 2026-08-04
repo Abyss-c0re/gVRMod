@@ -967,6 +967,11 @@ symbols:
     tier: seam
     tests: [api.smoke.IsPrimaryHand]
     notes: "thin getter / smoke"
+  - id: vrmod.IsQuest
+    file: addon/vrmod-x64/lua/vrmod/core/cl_runtime.lua
+    tier: seam
+    tests: [api.smoke.IsQuest]
+    notes: "thin getter / smoke"
   - id: vrmod.IsQuickMenuFreeFloat
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
     tier: seam

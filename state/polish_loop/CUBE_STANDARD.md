@@ -31,6 +31,8 @@ Never submit eng texture. Never dual pose truth.
 - G38 partial: worldmodel **single path** (W10); floating hands OR worldmodel, no dual ghost; `WorldModelLaw_*`; §0.25 open
 - G39 partial: VR_Init **human codes** (W11 108/215); toast + module zip; never silent; `InitLaw_*`; §0.26 open
 - G40 partial: Vision **border fill** (W1); guided scale→V→H→save; defaults scale=1 offsets=0; no slider maze; `BorderLaw_*`; §0.27 open
+- G41 partial: **HMD walk inventory** catalog + dump; never claim smoke from offline alone; `HmdWalk_*`; §0.28 open
+- G42–G44 partial (product in addon): hands stuck / nested RT / grab_end; offline pure gated cycle59; HMD walks open
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
 - G02 done (Cube shell): panel dim + both-eye black overlay (`GlFadeEyeBufferTowardBlack`) on take_xr
 - G05 partial: `StereoLoad_IsLoading` + dual-hold toast + `StereoLoad_HmdExpect` checklist; paint through load when mat_queue&lt;2; never dual under mq≥2; HMD walk still open (TESTING_FRAMEWORK §0.1)

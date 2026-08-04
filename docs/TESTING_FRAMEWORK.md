@@ -586,6 +586,29 @@ Offline gate proves guided path defaults (scale=1, offsets=0), clamps, bleed ris
 
 Pure helpers: `BorderLaw_GuideBaseline` / `BorderLaw_Decide` / `BorderLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.28 G41 HMD walk inventory + dump (manual aid)
+
+Offline gate proves the **catalog** of open walks (G05…G44) + forbidden offline-smoke claim. Does **not** close any HMD walk.
+
+| Tool | Role |
+|------|------|
+| `vrmod_hmd_expect_dump` | Print inventory + live `g_VR._*HmdExpect` snapshots |
+| Pure `HmdWalk_Catalog` / `HmdWalk_CollectLive` | Operator/offline tokens |
+
+**Prefer next (product feel):** G05 load-flash → G12 ambient → G40 border → G28 handoff timeouts → G04 warm.
+
+Pure helpers: `HmdWalk_FormatReport` / `HmdWalk_Decide` / `HmdWalk_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
+### 0.29–0.31 Ship-bar offline laws (G42–G44)
+
+| Gap | Theme | Pure | Walk |
+|-----|-------|------|------|
+| G42 | Hands stuck identity/raw unstick | `HandStuckLaw_*` | free hands + foregrip |
+| G43 | Menu-open nested RT crash | `NestedRtLaw_*` | open menus 5s |
+| G44 | grab_end drop cooldown | `GrabEndLaw_*` | pick/drop storms |
+
+Offline green ≠ HMD OK for any of these.
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

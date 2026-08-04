@@ -619,6 +619,58 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure
     tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.GrabEndLaw_AllowClimbRewrite
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_AllowPickup
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_CooldownSeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_IsStorm
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_IsStormRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_MenuClickIsNotPickup
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_NormalizeHand
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_PrimaryLeftPreservesPickup
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_RequirePerHandCooldown
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_ShouldStartCooldown
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
+  - id: vrmod.utils.GrabEndLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua
+    tier: pure
+    tests: [util.grab_end_law.storm_g44]
   - id: vrmod.utils.HandBulletLaw_AbsorbNonBulletOnProxy
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
@@ -683,6 +735,54 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
     tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandStuckLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_DistSqr
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_HealIdentityAlways
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_IsStuckRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_PreferRawWhenCollapsed
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_RawSeparatedThresholdSqr
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_ShouldSplitIdentity
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_ShouldUnstickFromRaw
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_SkipUnstickWhenForegrip
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
+  - id: vrmod.utils.HandStuckLaw_TrackCollapseThresholdSqr
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
+    tier: pure
+    tests: [util.hand_stuck_law.unstick_g42]
   - id: vrmod.utils.HandleNPCRagdoll
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam
@@ -698,6 +798,62 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.HmdWalk_Catalog
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_CollectLive
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_Count
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_CountP0
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_FindById
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_FormatLine
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_FormatLive
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_FormatReport
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_NeverClaimFromOfflineAlone
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_PreferredNextIds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_PriorityIsP0
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
+  - id: vrmod.utils.HmdWalk_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua
+    tier: pure
+    tests: [util.hmd_walk_law.inventory_g41]
   - id: vrmod.utils.HudLaw_ClampClearAlpha
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
     tier: pure
@@ -973,6 +1129,58 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.math.sub_add_mul]
+  - id: vrmod.utils.NestedRtLaw_AllowDrawMonitorsInVrRt
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_AllowHudCapture
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_AllowMenuRtPaint
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_AllowNestUnderStereo
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_AllowNestedWorldCapture
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_AllowPortalRenderViewInStereo
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_DeferMenuWhenStereoActive
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_HudCaptureBeforeStereoPush
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_IsCrashRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_RequirePopAfterMenuPaint
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
+  - id: vrmod.utils.NestedRtLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua
+    tier: pure
+    tests: [util.nested_rt_law.menu_open_g43]
   - id: vrmod.utils.ParseColor
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
@@ -1269,6 +1477,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.math.sub_add_mul]
+  - id: vrmod.utils.SubmitBounds_MirrorLeftToBoth
+    file: addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua
+    tier: pure
+    tests: [util.rendering.submit_bounds]
   - id: vrmod.utils.SubmitLaw_AllowCollect
     file: addon/vrmod-x64/lua/vrmod/utils/sh_submit_law.lua
     tier: pure

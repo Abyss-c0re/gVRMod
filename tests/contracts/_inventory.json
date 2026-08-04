@@ -585,6 +585,58 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
     ],
     [
+      "vrmod.utils.GrabEndLaw_AllowClimbRewrite",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_AllowPickup",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_CooldownSeconds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_IsStorm",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_IsStormRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_MenuClickIsNotPickup",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_NormalizeHand",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_PrimaryLeftPreservesPickup",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_RequirePerHandCooldown",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_ShouldStartCooldown",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
+      "vrmod.utils.GrabEndLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua"
+    ],
+    [
       "vrmod.utils.HandBulletLaw_AbsorbNonBulletOnProxy",
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
@@ -649,6 +701,54 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
     [
+      "vrmod.utils.HandStuckLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_DistSqr",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_HealIdentityAlways",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_IsStuckRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_PreferRawWhenCollapsed",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_RawSeparatedThresholdSqr",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_ShouldSplitIdentity",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_ShouldUnstickFromRaw",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_SkipUnstickWhenForegrip",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
+      "vrmod.utils.HandStuckLaw_TrackCollapseThresholdSqr",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
+    ],
+    [
       "vrmod.utils.HandleNPCRagdoll",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
@@ -659,6 +759,62 @@
     [
       "vrmod.utils.HitFilter",
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_Catalog",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_CollectLive",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_Count",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_CountP0",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_FindById",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_FormatLine",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_FormatLive",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_FormatReport",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_NeverClaimFromOfflineAlone",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_PreferredNextIds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_PriorityIsP0",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
+    ],
+    [
+      "vrmod.utils.HmdWalk_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua"
     ],
     [
       "vrmod.utils.HudLaw_ClampClearAlpha",
@@ -923,6 +1079,58 @@
     [
       "vrmod.utils.MulVec",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_AllowDrawMonitorsInVrRt",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_AllowHudCapture",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_AllowMenuRtPaint",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_AllowNestUnderStereo",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_AllowNestedWorldCapture",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_AllowPortalRenderViewInStereo",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_DeferMenuWhenStereoActive",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_HudCaptureBeforeStereoPush",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_IsCrashRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_RequirePopAfterMenuPaint",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
+    ],
+    [
+      "vrmod.utils.NestedRtLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua"
     ],
     [
       "vrmod.utils.ParseColor",
@@ -1207,6 +1415,10 @@
     [
       "vrmod.utils.SubVec",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
+    ],
+    [
+      "vrmod.utils.SubmitBounds_MirrorLeftToBoth",
+      "addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua"
     ],
     [
       "vrmod.utils.SubmitLaw_AllowCollect",
@@ -2269,6 +2481,10 @@
     [
       "vrmod.IsPrimaryHand",
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
+      "vrmod.IsQuest",
+      "addon/vrmod-x64/lua/vrmod/core/cl_runtime.lua"
     ],
     [
       "vrmod.IsQuickMenuFreeFloat",
