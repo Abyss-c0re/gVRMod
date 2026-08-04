@@ -3,12 +3,12 @@
   "interval": "11m",
   "created": "2026-08-04T14:27:53+03:00",
   "cycle": 0,
-  "status": "bootstrapped",
-  "last_cycle_at": null,
-  "last_commit": null,
-  "last_commit_repo": null,
+  "status": "scheduled",
+  "last_cycle_at": "2026-08-04T14:27:53+03:00",
+  "last_commit": "9a00ec2",
+  "last_commit_repo": "gVRMod",
   "last_test": null,
-  "last_focus": null,
+  "last_focus": "bootstrap durable polish loop + scheduler",
   "next_focus": "G01 handoff progress phases on Cube panel (safe: status file + UI string only)",
   "consecutive_no_commit": 0,
   "consecutive_failures": 0,
@@ -19,5 +19,5 @@
   },
   "test_cmd": "./scripts/test_all.sh --fast",
   "test_cmd_full": "./scripts/test_all.sh",
-  "scheduler_id": null
+  "scheduler_id": "019fcc898dd9"
 }
