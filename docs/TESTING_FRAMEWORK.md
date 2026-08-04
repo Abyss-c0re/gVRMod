@@ -45,7 +45,7 @@ Two layers. Do not conflate them in commits, PR claims, or polish-loop status.
 6. **Desktop** — `vrmod_desktopview` 1/2/3/4 (follow-cam) as intended; mirror is secondary.  
 7. **Cal** — Experience once (or skip forever); border profile reload on later boots.  
 8. **Pain points** — no force `-noborder`; `mat_queue_mode` stays 1; climb/wall not thrashing.  
-9. **Ambient** — soft hold tone during Cube handoff when `cube_hold.ogg` is present (default ON; silence with `GVRMOD_AMBIENT_PLAY=0`).
+9. **Ambient** — soft hold tone during Cube handoff when `cube_hold.ogg` is present (default ON; silence with `GVRMOD_AMBIENT_PLAY=0`). Optional taste: `GVRMOD_AMBIENT_MASTER=0.35…0.75` (default **0.55**). See **§0.2**.
 
 ### 0.1 G05 HMD load-flash walk (manual)
 
@@ -67,6 +67,32 @@ Offline gate proves pure `StereoLoad_*` helpers only. **Headset** still required
 5. Optional: in-game `lua_run print(g_VR._stereoLoadLabel)` / `g_VR._stereoLoadHmdExpect` during load.
 
 Pure helper: `vrmod.utils.StereoLoad_HmdExpect(policy)` → `checklist` / `pass_line` / `fail_line` / `flash_risk` (unit-tested; does **not** prove headset).
+
+### 0.2 G12 HMD ambient volume taste (manual)
+
+Offline gate proves gain law + PlayerDecide + master env. **Headset** (or desktop speakers during handoff) still required to claim taste OK.
+
+| Control | Meaning |
+|---------|---------|
+| (unset) | Comfort master **0.55** — soft present, not harsh |
+| `GVRMOD_AMBIENT_MASTER=0.35` | Softer hold tone |
+| `GVRMOD_AMBIENT_MASTER=0.75` | More present (still clamped ≤1) |
+| `GVRMOD_AMBIENT_PLAY=0` | Full silence (opt-out) |
+
+| When | Expect | FAIL if |
+|------|--------|---------|
+| Cube holding XR / STARTING GMOD | Soft looped hold tone if `cube_hold.ogg` present | Silent with asset present; ear-splitting; desktop speakers blast |
+| `take_xr` | Gain ducks / tone recedes | Tone stays full loud into VR |
+| After release / panel live | Silent | Bleed after handoff ends |
+
+**Procedure (claim “G12 volume OK” only if walked):**
+
+1. Default master: Start Game once — tone present and soft.  
+2. Optional: restart with `GVRMOD_AMBIENT_MASTER=0.35` then `0.75` — relative taste changes.  
+3. `GVRMOD_AMBIENT_PLAY=0` — confirmed silence.  
+4. Note band labels: soft / gentle / comfort / present (`CubeAmbient_TasteBand`).
+
+Pure helper: `CubeAmbient_HmdVolumeExpect(master, gain, playing, enabled, clipPresent)` → `checklist` (unit-tested; offline ≠ HMD OK).
 
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 

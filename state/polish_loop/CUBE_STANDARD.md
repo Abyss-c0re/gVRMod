@@ -24,7 +24,7 @@ Never submit eng texture. Never dual pose truth.
 - G04 partial: default cold-spawns; skip-spawn plan + `WriteWarmAttachMarkers` when `GVRMOD_WARM_REUSE=1`; careful changelevel plan executor opt-in (`vrmod_warm_changelevel` / `warm_changelevel_enable.txt` / `GVRMOD_WARM_CHANGELEVEL`) — **default off**
 - G13 partial: VR exit writes `cube_return.txt`; Cube soft-acks to `panel_live` after RETURN banner; XR rebind still env `GVRMOD_CUBE_RECLAIM` (off)
 - G03 partial: pack + plan + opt-in executor (`vrmod_stage_apply` 1 or `stage_apply_enable.txt`); **default off** — no auto height jump
-- G12 partial: gain law + `cube_hold.ogg` + ffplay backend; **default ON** during handoff (comfort master 0.55); silence with `GVRMOD_AMBIENT_PLAY=0`
+- G12 partial: gain law + `cube_hold.ogg` + ffplay; **default ON**; comfort master 0.55 or `GVRMOD_AMBIENT_MASTER`; silence `GVRMOD_AMBIENT_PLAY=0`; HMD taste walk §0.2 open
 
 ## UI / interaction
 

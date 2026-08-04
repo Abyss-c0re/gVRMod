@@ -61,8 +61,41 @@ inline bool CubeAmbientPlayerEnabled() {
   return CubeAmbientPlayerEnabledFromEnv(std::getenv("GVRMOD_AMBIENT_PLAY"), /*defaultOn=*/true);
 }
 
-// Soft master so hold tone is present but not harsh (applied to PlayerDecide volume).
-inline float CubeAmbient_ComfortMaster() { return 0.55f; }
+// Default soft master so hold tone is present but not harsh (PlayerDecide volume).
+inline float CubeAmbient_DefaultComfortMaster() { return 0.55f; }
+
+// Clamp master into taste-safe range (never silent-zero via master; use PLAY=0 to mute).
+inline float CubeAmbient_ClampMaster(float m) {
+  if (m < 0.05f) m = 0.05f;
+  if (m > 1.f) m = 1.f;
+  return m;
+}
+
+// Pure: parse GVRMOD_AMBIENT_MASTER ("0.4", "70%" not supported — 0..1 float only).
+// empty/invalid → fallback (default comfort). Always clamp.
+inline float CubeAmbient_MasterFromEnv(const char* envVal,
+                                       float fallback = CubeAmbient_DefaultComfortMaster()) {
+  if (!envVal || !envVal[0]) return CubeAmbient_ClampMaster(fallback);
+  char* end = nullptr;
+  float v = std::strtof(envVal, &end);
+  if (end == envVal) return CubeAmbient_ClampMaster(fallback);
+  return CubeAmbient_ClampMaster(v);
+}
+
+// Product master: env override when set, else default comfort 0.55.
+// HMD taste: GVRMOD_AMBIENT_MASTER=0.35 (softer) … 0.75 (more present). Mute: PLAY=0.
+inline float CubeAmbient_ComfortMaster() {
+  return CubeAmbient_MasterFromEnv(std::getenv("GVRMOD_AMBIENT_MASTER"));
+}
+
+// Taste band label for HMD smoke notes (pure).
+inline const char* CubeAmbient_TasteBand(float master) {
+  master = CubeAmbient_ClampMaster(master);
+  if (master < 0.30f) return "soft";
+  if (master < 0.50f) return "gentle";
+  if (master < 0.70f) return "comfort";
+  return "present";
+}
 
 // 0..100 for ffplay -volume / UI.
 inline int CubeAmbient_VolumePercent(float volume01) {
@@ -136,6 +169,55 @@ inline float CubeAmbient_EffectiveVolume(float gain, float master = 1.f) {
   if (master < 0.f) master = 0.f;
   if (master > 1.f) master = 1.f;
   return gain * master;
+}
+
+// G12 HMD volume observer contract (offline tokens — does not prove headset).
+struct AmbientHmdVolumeExpect {
+  float master = 0.55f;
+  float sample_volume = 0.f; // gain * master (clamped)
+  std::string taste = "comfort";
+  bool expect_audible = false;
+  std::string checklist;
+  std::string pass_line;
+  std::string fail_line;
+};
+
+// Pure HMD volume expect from master/gain/play flags.
+inline AmbientHmdVolumeExpect CubeAmbient_HmdVolumeExpect(float master, float gain, bool playing,
+                                                         bool featureEnabled, bool clipPresent) {
+  AmbientHmdVolumeExpect e;
+  e.master = CubeAmbient_ClampMaster(master);
+  e.taste = CubeAmbient_TasteBand(e.master);
+  e.sample_volume = CubeAmbient_EffectiveVolume(gain, e.master);
+  e.expect_audible = featureEnabled && clipPresent && playing && e.sample_volume >= 0.02f;
+  if (!featureEnabled) {
+    e.checklist = "G12 · SILENT · PLAY=0 or deferred";
+    e.pass_line = "No hold tone (opt-out)";
+    e.fail_line = "Unexpected loud clip while PLAY disabled";
+    e.expect_audible = false;
+    return e;
+  }
+  if (!clipPresent) {
+    e.checklist = "G12 · NO ASSET · cube_hold.ogg missing";
+    e.pass_line = "Silent without asset (honest)";
+    e.fail_line = "Crash or spam on missing clip";
+    e.expect_audible = false;
+    return e;
+  }
+  if (!playing || e.sample_volume < 0.02f) {
+    e.checklist = "G12 · CLIP READY · silent (not handoff / gain floor)";
+    e.pass_line = "Quiet outside handoff";
+    e.fail_line = "Hold tone bleeds after release";
+    e.expect_audible = false;
+    return e;
+  }
+  char buf[128];
+  snprintf(buf, sizeof(buf), "G12 · HOLD · taste %s · master %.0f%% · vol %.0f%%", e.taste.c_str(),
+           e.master * 100.f, e.sample_volume * 100.f);
+  e.checklist = buf;
+  e.pass_line = "Soft hold tone present, not harsh; ducks at take_xr; stops on exit";
+  e.fail_line = "Silent during hold with asset, or ear-splitting / no duck";
+  return e;
 }
 
 // Join assets dir + relative clip (or keep absolute path). Pure string only.

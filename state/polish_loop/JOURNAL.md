@@ -320,3 +320,13 @@ Append one block per cycle. Newest at bottom.
 - G05 partial — headset walk still required for 'OK'.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: G12 HMD volume taste or G13 XR reclaim careful.
+
+## 2026-08-04 cycle 33 — G12 ambient master taste
+
+- Theme: env master override + pure HMD volume expect; default comfort 0.55.
+- Pure: MasterFromEnv/ClampMaster/TasteBand/HmdVolumeExpect.
+- ComfortMaster uses GVRMOD_AMBIENT_MASTER when set (0.05..1).
+- TESTING_FRAMEWORK §0.2 volume taste procedure.
+- G12 partial → offline complete-ish; headset taste still open.
+- Tests: full test_all PASS 6/6.
+- Next: G13 XR reclaim careful or G03 HMD stage-apply notes.

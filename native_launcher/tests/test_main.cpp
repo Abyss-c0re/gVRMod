@@ -358,7 +358,29 @@ TEST(launcher_ambient_player_decide) {
     ASSERT_TRUE(!CubeAmbientPlayerEnabled());
     unsetenv("GVRMOD_AMBIENT_PLAY");
 
+    // G12 master taste: default 0.55; env override; clamp
+    unsetenv("GVRMOD_AMBIENT_MASTER");
+    ASSERT_NEAR(CubeAmbient_DefaultComfortMaster(), 0.55f, 1e-4f);
+    ASSERT_NEAR(CubeAmbient_MasterFromEnv(nullptr), 0.55f, 1e-4f);
+    ASSERT_NEAR(CubeAmbient_MasterFromEnv(""), 0.55f, 1e-4f);
+    ASSERT_NEAR(CubeAmbient_MasterFromEnv("0.35"), 0.35f, 1e-4f);
+    ASSERT_NEAR(CubeAmbient_MasterFromEnv("2"), 1.f, 1e-4f);
+    ASSERT_NEAR(CubeAmbient_MasterFromEnv("0"), 0.05f, 1e-4f);
+    ASSERT_NEAR(CubeAmbient_MasterFromEnv("nope"), 0.55f, 1e-4f);
     ASSERT_NEAR(CubeAmbient_ComfortMaster(), 0.55f, 1e-4f);
+    setenv("GVRMOD_AMBIENT_MASTER", "0.4", 1);
+    ASSERT_NEAR(CubeAmbient_ComfortMaster(), 0.4f, 1e-4f);
+    unsetenv("GVRMOD_AMBIENT_MASTER");
+    ASSERT_EQ(std::string(CubeAmbient_TasteBand(0.2f)), std::string("soft"));
+    ASSERT_EQ(std::string(CubeAmbient_TasteBand(0.55f)), std::string("comfort"));
+    ASSERT_EQ(std::string(CubeAmbient_TasteBand(0.9f)), std::string("present"));
+    auto he = CubeAmbient_HmdVolumeExpect(0.55f, 0.9f, true, true, true);
+    ASSERT_TRUE(he.expect_audible);
+    ASSERT_TRUE(he.checklist.find("HOLD") != std::string::npos);
+    ASSERT_NEAR(he.sample_volume, 0.9f * 0.55f, 1e-4f);
+    auto heOff = CubeAmbient_HmdVolumeExpect(0.55f, 1.f, true, false, true);
+    ASSERT_TRUE(!heOff.expect_audible);
+    ASSERT_TRUE(heOff.checklist.find("SILENT") != std::string::npos);
 
     auto cands = CubeAmbient_AssetsDirCandidates("/env/assets", "/opt/bin", "/src/assets");
     ASSERT_TRUE(cands.size() >= 3);
