@@ -330,6 +330,16 @@ TEST(launcher_warm_attach_decide) {
     ASSERT_TRUE(CubeWarmShouldExecuteChangelevel(planOn, true));
     auto et = CubeWarmChangelevelExecuteToast(true, true, "gm_flatgrass", "");
     ASSERT_TRUE(et.find("changelevel") != std::string::npos);
+    // G04 HMD warm expect
+    auto heDef = CubeWarm_HmdExpect(defer, &planDef, false, false);
+    ASSERT_EQ(heDef.verdict, std::string("expect_deferred"));
+    ASSERT_TRUE(heDef.expect_no_changelevel);
+    ASSERT_TRUE(heDef.checklist.find("DEFERRED") != std::string::npos);
+    auto heSame = CubeWarm_HmdExpect(same, nullptr, false, false);
+    ASSERT_EQ(heSame.verdict, std::string("expect_same_map"));
+    auto heChg = CubeWarm_HmdExpect(chg, &planOn, true, false);
+    ASSERT_EQ(heChg.verdict, std::string("expect_changelevel"));
+    ASSERT_TRUE(heChg.checklist.find("CHANGELEVEL") != std::string::npos);
 }
 
 // G12: ambient clip contract — pure should-play + format/parse + status label

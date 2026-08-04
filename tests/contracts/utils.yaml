@@ -616,6 +616,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
     tier: pure
     tests: [util.warm_attach.decide_g04]
+  - id: vrmod.utils.WarmAttach_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
+    tier: pure
+    tests: [util.warm_attach.decide_g04]
   - id: vrmod.utils.WarmAttach_MapTokenOk
     file: addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua
     tier: pure

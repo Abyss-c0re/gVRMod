@@ -87,6 +87,7 @@ PURE_TESTED = {
     "vrmod.utils.WarmAttach_ShouldExecuteChangelevel": "util.warm_attach.decide_g04",
     "vrmod.utils.WarmAttach_ExecuteChangelevel": "util.warm_attach.decide_g04",
     "vrmod.utils.WarmAttach_ExecuteToast": "util.warm_attach.decide_g04",
+    "vrmod.utils.WarmAttach_HmdExpect": "util.warm_attach.decide_g04",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.DedupInGameMenuItems": "api.menu.dedup_function",
     "vrmod.RemoveInGameMenuItem": "api.menu.dedupe_name",

@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 36
+Last updated: 2026-08-04 cycle 37
 
 ## P0 — seamless / feel broken
 
@@ -11,7 +11,7 @@ Last updated: 2026-08-04 cycle 36
 | G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |
 | G02 | No coordinated fade on take_xr | Panel + eye-buffer fade cycle14; Cube shell done | **done** cycle14 |
 | G03 | Cal / STAGE not packed into handoff | HmdExpect+§0.4 cycle35; default still off | **partial** cycle35 |
-| G04 | Cold Steam/hl2 every Start | changelevel plan executor cycle31; default still cold | **partial** cycle31 |
+| G04 | Cold Steam/hl2 every Start | HmdExpect+§0.6 cycle37; default still cold | **partial** cycle37 |
 | G05 | Loading after take_xr may not be stereo | HmdExpect+§0.1 checklist cycle32; HMD walk open | **partial** cycle32 |
 
 ## P1 — Cube experience polish
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G04 | Warm HmdExpect + §0.6 smoke walk | WarmAttach_HmdExpect + CubeWarm |
 | G14 | Glide HmdExpect + §0.5 smoke walk | Glide_HmdExpect + cl_input |
 | G03 | HMD stage-apply expect + §0.4 walk | StagePack_HmdExpect |
 | G13 | XR reclaim panel_refresh plan (env) | XrPlanDecide + §0.3 walk |

@@ -408,3 +408,74 @@ inline std::string CubeWarmChangelevelExecuteToast(bool applied, bool ok, const 
   if (!err.empty()) return "Warm attach · changelevel failed · " + err;
   return {};
 }
+
+// G04 HMD warm attach observer contract (offline tokens — does not prove headset).
+struct WarmHmdExpect {
+  std::string verdict = "idle"; // idle|expect_same_map|expect_deferred|expect_changelevel|expect_reject
+  bool expect_no_changelevel = true;
+  std::string checklist;
+  std::string pass_line;
+  std::string fail_line;
+};
+
+inline WarmHmdExpect CubeWarm_HmdExpect(const WarmAttachDecision& d, const WarmChangelevelPlan* plan,
+                                        bool execApplied = false, bool reuseSkipSpawn = false) {
+  WarmHmdExpect e;
+  e.expect_no_changelevel = true;
+  if (!d.valid) {
+    e.checklist = "G04 · IDLE · no warm request";
+    e.pass_line = "N/A";
+    e.fail_line = "N/A";
+    return e;
+  }
+  if (execApplied) {
+    e.verdict = "expect_changelevel";
+    e.expect_no_changelevel = false;
+    e.checklist = "G04 · CHANGELEVEL · opt-in applied · " + d.request_map;
+    e.pass_line = "Map switches once; stereo returns; XR kept";
+    e.fail_line = "Map thrash / XR death / unsolicited changelevel";
+    return e;
+  }
+  if (d.action == "idle") {
+    e.verdict = "idle";
+    e.checklist = reuseSkipSpawn ? "G04 · WARM SKIP · no attach marker"
+                                 : "G04 · COLD · no warm request";
+    e.pass_line = reuseSkipSpawn ? "Process reused; no accidental map flip"
+                                 : "Cold Steam spawn still valid default";
+    e.fail_line = "Silent map flip without cube_warm";
+    return e;
+  }
+  if (d.action == "same_map") {
+    e.verdict = "expect_same_map";
+    e.checklist = "G04 · SAME MAP · " + d.request_map + " · no changelevel";
+    e.pass_line = "Already on target; handoff without map load";
+    e.fail_line = "Forced changelevel on same map";
+    return e;
+  }
+  if (d.action == "reject") {
+    e.verdict = "expect_reject";
+    e.checklist = "G04 · REJECT · " + d.reason;
+    e.pass_line = "Bad token ignored";
+    e.fail_line = "Injected changelevel from bad map";
+    return e;
+  }
+  if (d.action == "changelevel" || (plan && plan->do_changelevel)) {
+    e.verdict = "expect_changelevel";
+    e.expect_no_changelevel = false;
+    e.checklist = "G04 · ARMED · changelevel → " + d.request_map;
+    e.pass_line = "Opt-in changelevel once; dual-hold through load";
+    e.fail_line = "Map thrash / mono load flash";
+    return e;
+  }
+  if (d.action == "deferred") {
+    e.verdict = "expect_deferred";
+    e.checklist = "G04 · DEFERRED · want " + d.request_map + " · default no RCC";
+    e.pass_line = "Toast deferred only; no auto changelevel";
+    e.fail_line = "Silent changelevel without opt-in";
+    return e;
+  }
+  e.checklist = "G04 · HOLD · action=" + d.action;
+  e.pass_line = "Observe only";
+  e.fail_line = "Unexpected map thrash";
+  return e;
+}

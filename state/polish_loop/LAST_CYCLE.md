@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 36  
-**Time:** 2026-08-04T20:57:00+03:00  
-**Focus:** G14 Glide HmdExpect + §0.5 smoke  
-**Commit (gVRMod):** `60e0d95`  
+**Cycle:** 37  
+**Time:** 2026-08-04T21:08:28+03:00  
+**Focus:** G04 warm HmdExpect + §0.6 smoke  
+**Commit (gVRMod):** (set after push)  
 **Commit (vrmod-x64):** (set after push)  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **Pure** Glide_HmdExpect / StatusLabel / EnterToast / ShouldToastEnter  
-2. **cl_input** enter path uses pure expect + logs checklist; tracks _glideSteerSource  
-3. TESTING_FRAMEWORK §0.5 Glide walk  
-4. Unit + PURE_TESTED  
+1. **Pure Lua** WarmAttach_HmdExpect  
+2. **Pure C++** CubeWarm_HmdExpect  
+3. **openxr_launch** logs G04 HMD checklist  
+4. TESTING_FRAMEWORK §0.6 warm walk  
 
 ## Pain points
 
-- Untouched; stick remains SoT.
+- Untouched; default still cold + no auto changelevel.
 
 ## Gaps
 
-- G14 partial — HMD+Glide walk still open  
-- Next: G04 warm HMD notes or G12/G05 HMD walks  
+- G04 partial — HMD warm walk still open  
+- Next: HMD walk backlog (G05/G12/G03) or HUD additive law notes  
 
 ## Notes
 

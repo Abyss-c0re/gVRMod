@@ -156,6 +156,28 @@ Offline gate proves stick-prefer SoT + HmdExpect tokens. **Headset + Glide addon
 
 Pure helpers: `Glide_HmdExpect` / `GlidePreferStickSteer` (unit-tested; offline ≠ HMD OK).
 
+### 0.6 G04 warm process / changelevel (manual)
+
+Offline gate proves skip-spawn plan + attach decide + opt-in changelevel. **Headset** required to claim warm Start OK.
+
+| Mode | How | Expect | FAIL if |
+|------|-----|--------|---------|
+| Default cold | env unset | Full Steam/hl2 spawn; handoff phases normal | Accidental skip-spawn without env |
+| Warm skip | `GVRMOD_WARM_REUSE=1`, process up | Skip Steam; phase warm_attach; markers | Second Steam spawn thrash |
+| Same map | cube_warm wants current map | SAME MAP toast; no changelevel | Forced reload |
+| Map mismatch default | warm want other map | DEFERRED toast only | Silent RCC changelevel |
+| Opt-in changelevel | `vrmod_warm_changelevel 1` or enable file / `GVRMOD_WARM_CHANGELEVEL=1` | One changelevel; stereo through load (G05) | Map thrash loop / XR death |
+
+**Procedure (claim “G04 warm OK” only if walked):**
+
+1. Cold Start once (baseline).  
+2. Leave GMod up; Cube Start with `GVRMOD_WARM_REUSE=1` — no second Steam.  
+3. Default mismatch: deferred toast; stay on map.  
+4. Optional opt-in changelevel once — dual-hold load; XR stays.  
+5. Log may show `G04 HMD · DEFERRED|SAME MAP|CHANGELEVEL …` (`g_VR._cubeWarmHmdExpect`).
+
+Pure helpers: `WarmAttach_HmdExpect` / `CubeWarm_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

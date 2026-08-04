@@ -545,6 +545,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
     ],
     [
+      "vrmod.utils.WarmAttach_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
+    ],
+    [
       "vrmod.utils.WarmAttach_MapTokenOk",
       "addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua"
     ],

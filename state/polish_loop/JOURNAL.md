@@ -360,3 +360,13 @@ Append one block per cycle. Newest at bottom.
 - G14 partial — headset+Glide walk still open.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: G04 warm HMD notes or backlog HMD walks.
+
+## 2026-08-04 cycle 37 — G04 warm HmdExpect
+
+- Theme: pure warm attach/changelevel HMD expect + smoke checklist; defaults unchanged.
+- Pure Lua WarmAttach_HmdExpect; pure C++ CubeWarm_HmdExpect.
+- openxr_launch logs G04 HMD checklist once with warm note.
+- TESTING_FRAMEWORK §0.6 warm walk.
+- G04 partial — headset warm proof still open.
+- Tests: full test_all PASS 6/6.
+- Next: HMD walk backlog or HUD additive notes.
