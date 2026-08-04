@@ -1,6 +1,7 @@
 #pragma once
 #include "ambient_clip.hpp"
 #include "stage_pack.hpp"
+#include "warm_reuse.hpp"
 #include <string>
 
 // GMod/Source graphics + OpenXR (vrmod_*) applied via +exec cfg
@@ -72,9 +73,11 @@ bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pa
 // G12: write cube_ambient.txt (gain/playing/clip_rel). No audio engine — status SoT only.
 bool WriteCubeAmbientStatus(const std::string& gmodRoot, const AmbientClipSnapshot& snap);
 
-// G04: cold Steam/hl2 Start inventory — pure strategy labels (warm process reuse not shipped).
-// Current product always cold_spawns via steam -applaunch / hl2.sh. Warm reuse needs a
-// map-change/attach protocol before skip-spawn is safe.
+// G04: write cube_warm.txt when process already up (intent only; still cold-spawns).
+bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot& snap);
+
+// G04: cold Steam/hl2 Start inventory — pure strategy labels.
+// Warm reuse: see warm_reuse.hpp (CubeWarmReuseEnabled hard-off until attach proven).
 inline std::string CubeLaunchBootKind(bool gmodAlreadyRunning, bool forceCold = false) {
   if (forceCold) return "COLD_SPAWN";
   if (gmodAlreadyRunning) return "WARM_DETECTED";
@@ -82,18 +85,21 @@ inline std::string CubeLaunchBootKind(bool gmodAlreadyRunning, bool forceCold = 
 }
 
 inline std::string CubeLaunchBootLabel(const std::string& kind) {
-  if (kind == "WARM_DETECTED") return "WARM DETECTED · REUSE FUTURE";
-  if (kind == "WARM_REUSE") return "WARM REUSE"; // reserved — not active
+  if (kind == "WARM_DETECTED") return "WARM DETECTED · REQUEST FILED";
+  if (kind == "WARM_REUSE") return "WARM REUSE"; // only if feature enabled
   return "COLD SPAWN · STEAM/HL2";
 }
 
 // Honest cold Facepunch gap for time-based progress fallback (seconds).
 inline float CubeColdStartProgressSeconds() { return 55.f; }
 
-// Skip steam relaunch only when true warm-reuse protocol exists (always false for now).
+// Skip steam only when decision.skip_spawn (requires CubeWarmReuseEnabled).
+inline bool CubeLaunchShouldSkipSpawn(const WarmReuseDecision& d) {
+  return d.skip_spawn && d.action == "warm_reuse";
+}
+// Legacy kind string — never skips without feature (kept for tests/call sites).
 inline bool CubeLaunchShouldSkipSpawn(const std::string& kind) {
-  (void)kind;
-  return false;
+  return kind == "WARM_REUSE" && CubeWarmReuseEnabled();
 }
 
 // G13: reverse handoff (GMod exit VR → Cube reclaim) — pure labels only.

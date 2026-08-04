@@ -188,3 +188,12 @@ Append one block per cycle. Newest at bottom.
 - G12 partial — real player + asset still open.
 - Tests: full test_all PASS 6/6 (+ambient unit).
 - Next: G04 warm reuse design or ambient asset+player careful.
+
+## 2026-08-04 cycle 20 — G04 warm reuse design
+
+- Theme: pure warm-process eligibility + request marker; spawn still cold.
+- Pure: warm_reuse.hpp Decide/Format/Parse; feature hard-off.
+- Start writes cube_warm.txt when process up; never skip steam yet.
+- G04 partial — real map attach/warm_reuse open.
+- Tests: full test_all PASS 6/6 (+warm reuse unit).
+- Next: G13 Cube reclaim poll or ambient player careful.

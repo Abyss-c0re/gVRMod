@@ -2,6 +2,7 @@
 #include "panel_config.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
+#include "warm_reuse.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -231,6 +232,8 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot) {
   unlink((d + "cube_return.txt").c_str());
   // G12: clear ambient status (rewritten while handoff runs)
   unlink((d + "cube_ambient.txt").c_str());
+  // G04: clear warm request (rewritten on Start when process already up)
+  unlink((d + "cube_warm.txt").c_str());
   // G03: keep cube_stage_pack.txt so GMod can read after claim (overwritten on next Start)
 }
 
@@ -262,5 +265,21 @@ bool WriteCubeAmbientStatus(const std::string& gmodRoot, const AmbientClipSnapsh
   s.valid = true;
   const std::string path = dataDir + "/cube_ambient.txt";
   if (!WriteFile(path, CubeAmbient_Format(s))) return false;
+  return true;
+}
+
+bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot& snap) {
+  if (gmodRoot.empty()) return false;
+  const std::string dataDir = gmodRoot + "/garrysmod/data/vrmod";
+  mkdir((gmodRoot + "/garrysmod/data").c_str(), 0755);
+  mkdir(dataDir.c_str(), 0755);
+  WarmRequestSnapshot s = snap;
+  if (s.ts <= 0) s.ts = (long)time(nullptr);
+  if (s.action.empty()) s.action = "warm_request";
+  s.valid = true;
+  const std::string path = dataDir + "/cube_warm.txt";
+  if (!WriteFile(path, CubeWarmReuse_Format(s))) return false;
+  fprintf(stderr, "[cube_webui] warm request → %s action=%s map=%s reason=%s\n",
+          path.c_str(), s.action.c_str(), s.map.c_str(), s.reason.c_str());
   return true;
 }

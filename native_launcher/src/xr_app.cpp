@@ -12,6 +12,7 @@
 #include "gmod_spawn.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
+#include "warm_reuse.hpp"
 #include "ui_panel.hpp"
 #include "smx_player.hpp"
 #include "math3d.hpp"
@@ -310,18 +311,32 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       WebUI_SaveBindingsIfDirty(ui);
       LaunchRequest lr = LaunchRequestFromUI(ui, gmodRoot);
       ClearCubeHandoffMarkers(gmodRoot);
-      // G04: classify cold vs warm-detected (still cold-spawn; reuse protocol not shipped)
+      // G04: pure warm-reuse decision (feature hard-off → warm_request + still cold-spawn)
       const bool alreadyUp = GModProcessRunning();
-      ui.handoffBootKind = CubeLaunchBootKind(alreadyUp, /*forceCold=*/false);
-      if (CubeLaunchShouldSkipSpawn(ui.handoffBootKind)) {
-        // Reserved: warm attach/map-change path (always false today)
+      WarmReuseDecision warm = CubeWarmReuseDecide(alreadyUp, /*forceCold=*/false, lr.map);
+      ui.handoffBootKind = CubeWarmReuseBootKind(warm);
+      if (warm.action == "warm_request" || warm.action == "warm_reuse") {
+        WarmRequestSnapshot wr;
+        wr.action = warm.action;
+        wr.reason = warm.reason;
+        wr.map = lr.map;
+        wr.source = "cube_webui";
+        WriteCubeWarmRequest(gmodRoot, wr);
+      }
+      if (CubeLaunchShouldSkipSpawn(warm)) {
+        // Only when CubeWarmReuseEnabled() — not active; keep branch for future attach
         ui.wantStart = false;
-        ui.status = "WARM REUSE NOT SHIPPED";
+        ui.status = "WARM REUSE · MAP ATTACH (EXPERIMENTAL)";
+        ui.handoff = true;
+        ui.handoffMap = lr.map;
+        ui.handoffPhase = "gmod_process";
+        ui.handoffDetail = CubeWarmReuseDetail(warm);
+        ui.handoffElapsed = 0.f;
       } else {
       std::string err;
       int rc = SpawnGModFromWebUI(lr, err);
-      fprintf(stderr, "[cube_webui] StartGame map=%s rc=%d boot=%s %s\n",
-              lr.map.c_str(), rc, ui.handoffBootKind.c_str(), err.c_str());
+      fprintf(stderr, "[cube_webui] StartGame map=%s rc=%d boot=%s warm=%s %s\n",
+              lr.map.c_str(), rc, ui.handoffBootKind.c_str(), warm.reason.c_str(), err.c_str());
       ui.wantStart = false;
       if (rc == 0) {
         // G11: remember map + gfx for next Cube session Quick Play
@@ -329,9 +344,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         ui.handoff = true;
         ui.handoffMap = lr.map;
         ui.handoffPhase = "SPAWNED";
-        ui.handoffDetail = (ui.handoffBootKind == "WARM_DETECTED")
-                               ? "process was up · still cold-spawn path · holding XR"
-                               : "cold Steam/hl2 · holding OpenXR · GMod booting";
+        ui.handoffDetail = CubeWarmReuseDetail(warm);
         ui.handoffElapsed = 0.f;
         ui.status = "HANDOFF — STAY IN VR";
         // G03: pack STAGE/LOCAL + head sample for GMod (no apply yet — continuity data only)

@@ -4,6 +4,7 @@
 #include "last_play.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
+#include "warm_reuse.hpp"
 
 TEST(launcher_math3d_normalize) {
     Vec3 n = Normalize(V3(3.f, 0.f, 0.f));
@@ -145,6 +146,37 @@ TEST(launcher_cold_start_boot_kind) {
     ASSERT_TRUE(CubeColdStartProgressSeconds() >= 40.f);
     auto d = CubeHandoffDetailForPhase("waiting_process", false);
     ASSERT_TRUE(d.find("cold") != std::string::npos || d.find("Steam") != std::string::npos);
+}
+
+// G04: warm reuse pure decision — feature off → warm_request, never skip spawn
+TEST(launcher_warm_reuse_decide) {
+    ASSERT_TRUE(!CubeWarmReuseEnabled());
+    auto cold = CubeWarmReuseDecide(false, false, "gm_construct");
+    ASSERT_EQ(cold.action, std::string("cold_spawn"));
+    ASSERT_TRUE(!cold.skip_spawn);
+    auto defer = CubeWarmReuseDecide(true, false, "gm_construct");
+    ASSERT_EQ(defer.action, std::string("warm_request"));
+    ASSERT_EQ(defer.reason, std::string("eligible_deferred"));
+    ASSERT_TRUE(!defer.skip_spawn);
+    ASSERT_EQ(CubeWarmReuseBootKind(defer), std::string("WARM_DETECTED"));
+    auto forced = CubeWarmReuseDecide(true, true, "gm_construct");
+    ASSERT_EQ(forced.action, std::string("cold_spawn"));
+    auto nomap = CubeWarmReuseDecide(true, false, "  ");
+    ASSERT_EQ(nomap.reason, std::string("no_map"));
+    // Feature-on path (unit only — product keeps CubeWarmReuseEnabled false)
+    auto reuse = CubeWarmReuseDecide(true, false, "gm_flatgrass", /*featureEnabled=*/true);
+    ASSERT_EQ(reuse.action, std::string("warm_reuse"));
+    ASSERT_TRUE(reuse.skip_spawn);
+    ASSERT_TRUE(CubeLaunchShouldSkipSpawn(reuse));
+    WarmRequestSnapshot a;
+    a.action = "warm_request";
+    a.reason = "eligible_deferred";
+    a.map = "gm_construct";
+    a.ts = 7;
+    WarmRequestSnapshot b;
+    ASSERT_TRUE(CubeWarmReuse_Parse(CubeWarmReuse_Format(a), b));
+    ASSERT_EQ(b.map, std::string("gm_construct"));
+    ASSERT_TRUE(CubeWarmReuseDetail(defer).find("warm_request") != std::string::npos);
 }
 
 // G12: ambient clip contract — pure should-play + format/parse + status label
