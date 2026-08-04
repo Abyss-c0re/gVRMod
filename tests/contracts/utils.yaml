@@ -35,6 +35,66 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.calib.seated_offset]
+  - id: vrmod.utils.BindingsLaw_AbortVrOnFail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_DataDir
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_ErrorOverlayText
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_ForceRewriteOnStart
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_IsSilentFailRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_ManifestRelPath
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_MaxSetAttempts
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_OverlayClearSeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_RequireToastOnFail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_ShouldRetryAfterFail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_ToastMessage
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_ToastSeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.self_heal_g31]
   - id: vrmod.utils.BlockInputActions
     file: addon/vrmod-x64/lua/vrmod/utils/sh_system.lua
     tier: seam

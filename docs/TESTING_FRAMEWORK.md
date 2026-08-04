@@ -393,6 +393,25 @@ Offline gate proves cold cfg **omits** `vrmod_fovscale_x/y` unless user touched 
 
 Pure helpers: `CubeFov_ShouldWrite` / `CubeFov_Decide` / `CubeFov_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.18 G31 action-manifest self-heal + honest toast (manual)
+
+Offline gate proves force-rewrite on start, one retry, **never abort VR**, toast required on fail. **Headset / SteamVR** for real SetActionManifest.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Cold VR start | DATA `vrmod_action_manifest.txt` rewritten; SetActionManifest ok | Stale/corrupt DATA left; silent fail |
+| First set fails | Rewrite again + one retry | Infinite rewrite loop or no retry |
+| Still fails | Crimson toast + overlay; VR session continues | Abort VR start or silent death |
+| Controllers | Actions live when set ok | Inputs dead with no toast |
+
+**Procedure (claim “G31 bindings OK” only if walked):**
+
+1. Delete/corrupt `garrysmod/data/vrmod/vrmod_action_manifest.txt` → Start VR — self-heal or honest toast.  
+2. Normal start — no bindings toast; controllers work.  
+3. Fail path (missing module path) — toast visible; HMD still renders.
+
+Pure helpers: `BindingsLaw_Decide` / `BindingsLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

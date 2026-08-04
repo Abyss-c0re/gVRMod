@@ -481,3 +481,13 @@ Append one block per cycle. Newest at bottom.
 - G30 partial — product already omit-when-untouched; law offline-tested.
 - Tests: full test_all PASS 6/6 (launcher 31 tests).
 - Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.
+
+## 2026-08-04 cycle 49 — G31 action-manifest self-heal + honest toast
+
+- Theme: W6 force-rewrite DATA bindings; retry once; toast on fail; never abort VR.
+- Pure: BindingsLaw_ForceRewrite/Retry/Abort/Toast/Decide/HmdExpect.
+- cl_vrmod SetupActions wires pure law + snapshot.
+- TESTING_FRAMEWORK §0.18 bindings walk; PURE_TESTED map.
+- G31 partial — product already self-healed; law offline-tested.
+- Tests: --fast PASS 4/4 (pure pending=0; 43 Lua).
+- Next: HMD walk backlog (G05/G12) or W7 submit fail toast law notes.

@@ -454,6 +454,72 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G31 pure bindings self-heal law (W6 force-rewrite + honest toast)
+	H.TEST("util.bindings_law.self_heal_g31", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.BindingsLaw_ManifestRelPath(), "vrmod/vrmod_action_manifest.txt")
+		H.assert_true(u.BindingsLaw_ForceRewriteOnStart())
+		H.assert_eq(u.BindingsLaw_MaxSetAttempts(), 2)
+		H.assert_true(u.BindingsLaw_ShouldRetryAfterFail(1))
+		H.assert_true(not u.BindingsLaw_ShouldRetryAfterFail(2))
+		H.assert_true(not u.BindingsLaw_AbortVrOnFail())
+		H.assert_true(u.BindingsLaw_RequireToastOnFail())
+		H.assert_true(string.find(u.BindingsLaw_ToastMessage(), "manifest", 1, true)
+			or string.find(u.BindingsLaw_ToastMessage(), "bindings", 1, true)
+			or string.find(u.BindingsLaw_ToastMessage(), "Bindings", 1, true)
+			or string.find(u.BindingsLaw_ToastMessage(), "module", 1, true))
+		local ok = u.BindingsLaw_Decide({
+			force_rewrite = true,
+			first_ok = true,
+			has_file = true,
+		})
+		H.assert_true(ok.ok)
+		H.assert_true(ok.path_ok)
+		H.assert_eq(u.BindingsLaw_StatusLabel(ok), "BIND · OK")
+		local he = u.BindingsLaw_HmdExpect(ok)
+		H.assert_eq(he.verdict, "expect_ok")
+		H.assert_true(string.find(he.checklist, "G31", 1, true))
+		local retry = u.BindingsLaw_Decide({
+			force_rewrite = true,
+			first_ok = false,
+			retry_ok = true,
+			has_file = true,
+		})
+		H.assert_true(retry.ok)
+		H.assert_eq(u.BindingsLaw_StatusLabel(retry), "BIND · RETRY OK")
+		local failToast = u.BindingsLaw_Decide({
+			force_rewrite = true,
+			first_ok = false,
+			retry_ok = false,
+			has_file = true,
+			toast_shown = true,
+		})
+		H.assert_true(not failToast.ok)
+		H.assert_true(failToast.should_toast)
+		H.assert_true(not failToast.abort_vr)
+		H.assert_eq(failToast.risk, "set_fail")
+		H.assert_eq(u.BindingsLaw_StatusLabel(failToast), "BIND · SET FAIL")
+		local heF = u.BindingsLaw_HmdExpect(failToast)
+		H.assert_eq(heF.verdict, "expect_fail_honest")
+		local silent = u.BindingsLaw_Decide({
+			force_rewrite = true,
+			first_ok = false,
+			retry_ok = false,
+			has_file = true,
+			toast_shown = false,
+		})
+		H.assert_eq(silent.risk, "silent_fail")
+		H.assert_true(u.BindingsLaw_IsSilentFailRisk(silent))
+		H.assert_eq(u.BindingsLaw_StatusLabel(silent), "BIND · SILENT FAIL")
+		local noRw = u.BindingsLaw_Decide({
+			force_rewrite = false,
+			first_ok = true,
+			has_file = true,
+		})
+		H.assert_eq(noRw.risk, "no_rewrite")
+		H.assert_true(not noRw.path_ok)
+	end)
+
 	-- G27 pure engine blacklist law (never call blocked convars / W2)
 	H.TEST("util.engine_blacklist_law.never_call_g27", function()
 		local u = env.vrmod.utils

@@ -33,6 +33,66 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.BindingsLaw_AbortVrOnFail",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_DataDir",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ErrorOverlayText",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ForceRewriteOnStart",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_IsSilentFailRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ManifestRelPath",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_MaxSetAttempts",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_OverlayClearSeconds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_RequireToastOnFail",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ShouldRetryAfterFail",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ToastMessage",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ToastSeconds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
       "vrmod.utils.BlockInputActions",
       "addon/vrmod-x64/lua/vrmod/utils/sh_system.lua"
     ],
