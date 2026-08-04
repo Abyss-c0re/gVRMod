@@ -278,6 +278,30 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.HudLaw_ClampClearAlpha
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
+    tier: pure
+    tests: [util.hud_law.composite_g15]
+  - id: vrmod.utils.HudLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
+    tier: pure
+    tests: [util.hud_law.composite_g15]
+  - id: vrmod.utils.HudLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
+    tier: pure
+    tests: [util.hud_law.composite_g15]
+  - id: vrmod.utils.HudLaw_IsBlackSlabRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
+    tier: pure
+    tests: [util.hud_law.composite_g15]
+  - id: vrmod.utils.HudLaw_MaterialFlags
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
+    tier: pure
+    tests: [util.hud_law.composite_g15]
+  - id: vrmod.utils.HudLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua
+    tier: pure
+    tests: [util.hud_law.composite_g15]
   - id: vrmod.utils.InitPickupController
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

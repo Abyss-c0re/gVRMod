@@ -241,6 +241,30 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
     [
+      "vrmod.utils.HudLaw_ClampClearAlpha",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua"
+    ],
+    [
+      "vrmod.utils.HudLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua"
+    ],
+    [
+      "vrmod.utils.HudLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua"
+    ],
+    [
+      "vrmod.utils.HudLaw_IsBlackSlabRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua"
+    ],
+    [
+      "vrmod.utils.HudLaw_MaterialFlags",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua"
+    ],
+    [
+      "vrmod.utils.HudLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua"
+    ],
+    [
       "vrmod.utils.InitPickupController",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],

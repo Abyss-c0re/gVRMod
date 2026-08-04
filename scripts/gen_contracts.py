@@ -59,6 +59,13 @@ PURE_TESTED = {
     "vrmod.utils.StagePack_ExecuteToast": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_HmdExpect": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_HeightJumpRiskIsBad": "util.stage_pack.parse_and_hint",
+    # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
+    "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
+    "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",
+    "vrmod.utils.HudLaw_MaterialFlags": "util.hud_law.composite_g15",
+    "vrmod.utils.HudLaw_StatusLabel": "util.hud_law.composite_g15",
+    "vrmod.utils.HudLaw_HmdExpect": "util.hud_law.composite_g15",
+    "vrmod.utils.HudLaw_IsBlackSlabRisk": "util.hud_law.composite_g15",
     # G05 pure stereo-load policy (never dual under mat_queue≥2)
     "vrmod.utils.StereoLoadPolicy": "util.stereo_load.policy_g05",
     "vrmod.utils.ShouldPaintStereoThisFrame": "util.stereo_load.policy_g05",

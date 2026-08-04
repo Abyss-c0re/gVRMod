@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 37
+Last updated: 2026-08-04 cycle 38
 
 ## P0 — seamless / feel broken
 
@@ -23,6 +23,7 @@ Last updated: 2026-08-04 cycle 37
 | G12 | Audio dead during handoff | master env+HmdExpect cycle33; HMD walk open | **partial** cycle33 |
 | G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
 | G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
+| G15 | Opaque black HUD / wall of Real | HudLaw composite cycle38; HMD walk open | **partial** cycle38 |
 
 ## P2 — code quality / glogic hygiene
 
@@ -42,6 +43,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G15 | HUD additive law (PROPHECY) | HudLaw_Decide + cl_hud wire |
 | G04 | Warm HmdExpect + §0.6 smoke walk | WarmAttach_HmdExpect + CubeWarm |
 | G14 | Glide HmdExpect + §0.5 smoke walk | Glide_HmdExpect + cl_input |
 | G03 | HMD stage-apply expect + §0.4 walk | StagePack_HmdExpect |

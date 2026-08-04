@@ -370,3 +370,13 @@ Append one block per cycle. Newest at bottom.
 - G04 partial — headset warm proof still open.
 - Tests: full test_all PASS 6/6.
 - Next: HMD walk backlog or HUD additive notes.
+
+## 2026-08-04 cycle 38 — G15 HUD additive law
+
+- Theme: PROPHECY HUD composite — clear translucent, dim additive; never black wall.
+- Pure: HudLaw_Decide/MaterialFlags/HmdExpect/IsBlackSlabRisk.
+- cl_hud: draw path applies pure flags from vrmod_hudtestalpha.
+- TESTING_FRAMEWORK §0.7 HUD walk.
+- G15 partial — HMD proof open.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: HMD walk backlog (G05/G12) or laser sacred notes.

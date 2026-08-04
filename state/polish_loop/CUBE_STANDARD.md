@@ -33,6 +33,7 @@ Never submit eng texture. Never dual pose truth.
 - No menu thrash (register once; dedupe by id)
 - No grab_end storms / left-trigger silence regressions
 - World panel: world-locked by default; grip repositions
+- G15 partial: HUD composite law — clear plate translucent; dim plate **additive** (PROPHECY); never opaque black slab; HMD walk §0.7 open
 
 ## Compatibility
 

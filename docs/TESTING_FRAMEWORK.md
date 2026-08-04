@@ -178,6 +178,25 @@ Offline gate proves skip-spawn plan + attach decide + opt-in changelevel. **Head
 
 Pure helpers: `WarmAttach_HmdExpect` / `CubeWarm_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.7 G15 HUD additive / PROPHECY (manual)
+
+Offline gate proves composite law (`HudLaw_Decide`). **Headset** required to claim no black wall.
+
+| Mode | Setting | Expect | FAIL if |
+|------|---------|--------|---------|
+| Default clear plate | `vrmod_hudtestalpha 0` | Translucent; vitals float; world fully visible | Solid black HUD rectangle |
+| Dim plate | `vrmod_hudtestalpha` 80–160 | **Additive** composite; black adds no light | Opaque black slab occludes world |
+| Forbidden | opaque UnlitGeneric | Must not ship | Black wall of the Real |
+
+**Procedure (claim “G15 HUD OK” only if walked):**
+
+1. VR start; look past HUD vitals — Real (world) still visible.  
+2. Optional dim: set `vrmod_hudtestalpha 120` — plate soft, not a wall; log `HUD · ADDITIVE`.  
+3. Reset alpha 0.  
+4. Optional: `print(g_VR._hudLawLabel)` / `g_VR._hudLaw`.
+
+Pure helpers: `vrmod.utils.HudLaw_Decide` / `HudLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law
