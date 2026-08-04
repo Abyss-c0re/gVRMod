@@ -3,7 +3,7 @@
 **Cycle:** 38  
 **Time:** 2026-08-04T21:20:45+03:00  
 **Focus:** G15 HUD additive law (PROPHECY)  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `f7c28d9`  
 **Commit (vrmod-x64):** (set after push)  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
