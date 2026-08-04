@@ -1,26 +1,27 @@
 # Last cycle
 
-**Cycle:** 8  
-**Time:** 2026-08-04T15:49:35+03:00  
-**Focus:** G24 document offline vs HMD smoke bar  
-**Commit (gVRMod):** `d76ca7b`  
-**Commit (vrmod-x64):** none  
-**Tests:** n/a (docs only — no product code)  
+**Cycle:** 9  
+**Time:** 2026-08-04T16:01:50+03:00  
+**Focus:** G14 Glide stick-primary SoT + seat toast  
+**Commit (gVRMod):** `d22a769`  
+**Commit (vrmod-x64):** `e8318a9`  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **docs/TESTING_FRAMEWORK.md §0** — offline proves/does-not-prove table; HMD checklist; agent law  
-2. **CUBE_STANDARD.md** — two-layer ship bar  
-3. **README.md** Testing — offline required; HMD manual  
+1. **sh_glide_sot.lua** — pure GlideSeatIsDriver + GlidePreferStickSteer  
+2. **cl_input** — use helpers; toast “Glide seat — use thumbstick; wheel is optional”  
+3. **CUBE_WATCHLIST W3** — HMD smoke steps documented  
+4. Unit test + PURE_TESTED map  
 
 ## Pain points
 
-- Untouched.
+- Untouched (no climb/noborder/mat_queue/pose thrash).
 
 ## Gaps
 
-- G24 → **done** (documentation of gap + checklist; HMD automation still future)  
-- Next: G14 Glide docs/toast note or careful P0  
+- G14 → **partial** (offline SoT/toast; HMD walkthrough still required)  
+- Next: G02 fade carefully  
 
 ## Notes
 

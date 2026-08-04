@@ -59,6 +59,7 @@ end
 -- Production pure modules
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_math.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_experience.lua")
+dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/cl_desktop_cam.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/api/sh_api.lua")

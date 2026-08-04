@@ -82,3 +82,14 @@ Append one block per cycle. Newest at bottom.
 - CUBE_STANDARD + README: two-layer bar; never claim HMD from offline green.
 - G24 → done (automation still open as future work).
 - Next: P0 G02 fade only with tiny safe step, or G14 Glide watchlist smoke note.
+
+## 2026-08-04 cycle 9 — G14 Glide stick SoT + toast
+
+- Theme: Glide W3/G14 pure SoT helpers + toast copy + smoke note.
+- Pure: GlideSeatIsDriver / GlidePreferStickSteer (sh_glide_sot.lua) + unit test.
+- cl_input: wire seat resolve + steer blend; shorter enter/unbound toasts.
+- WATCHLIST W3: HMD smoke checklist (manual).
+- Tests: --fast PASS 4/4 (31 Lua, pure pending=0).
+- Commits: vrmod-x64 e8318a9; gVRMod submodule + tests + state.
+- G14 remains partial (full HMD smoke still open); offline SoT/toast landed.
+- Next: careful P0 G02 fade design note, or G12 audio docs-only.

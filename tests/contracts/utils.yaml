@@ -211,6 +211,14 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.GlidePreferStickSteer
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.GlideSeatIsDriver
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.seat_and_steer_sot]
   - id: vrmod.utils.HandleNPCRagdoll
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

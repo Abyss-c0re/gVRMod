@@ -34,6 +34,8 @@ PURE_TESTED = {
     "vrmod.utils.ComputeDesktopCrop": "util.rendering.desktop_crop",
     "vrmod.utils.ComputeSubmitBounds": "util.rendering.submit_bounds",
     "vrmod.utils.AdjustFOV": "util.rendering.adjust_fov",
+    "vrmod.utils.GlideSeatIsDriver": "util.glide.seat_and_steer_sot",
+    "vrmod.utils.GlidePreferStickSteer": "util.glide.seat_and_steer_sot",
     "vrmod.utils.AngAlmostEqual": "util.math.vec_almost_equal",
     "vrmod.utils.LerpAngleWrap": "util.fingers.curl_lerp_unit",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",

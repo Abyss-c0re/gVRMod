@@ -175,4 +175,21 @@ return function(H, env)
 		-- original not mutated
 		H.assert_near(proj[1][1], 1.0, 1e-6)
 	end)
+
+	-- G14 / W3 pure Glide SoT helpers
+	H.TEST("util.glide.seat_and_steer_sot", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.GlideSeatIsDriver(1))
+		H.assert_true(u.GlideSeatIsDriver(0)) -- not ready → driver until recheck
+		H.assert_true(not u.GlideSeatIsDriver(2))
+		local s1, src1 = u.GlidePreferStickSteer(0.4, 0.9)
+		H.assert_near(s1, 0.4, 1e-6)
+		H.assert_eq(src1, "stick")
+		local s2, src2 = u.GlidePreferStickSteer(0.01, 0.5)
+		H.assert_near(s2, 0.5, 1e-6)
+		H.assert_eq(src2, "wheel")
+		local s3, src3 = u.GlidePreferStickSteer(0, 0)
+		H.assert_eq(src3, "stick")
+		H.assert_near(s3, 0, 1e-6)
+	end)
 end
