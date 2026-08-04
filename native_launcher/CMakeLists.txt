@@ -66,7 +66,12 @@ add_custom_command(TARGET cube_webui_launcher POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${CMAKE_CURRENT_SOURCE_DIR}/cube_webui.conf"
     "${CMAKE_SOURCE_DIR}/../install/native/cube_webui.conf"
-  COMMENT "Install cube_webui.conf next to binary"
+  COMMAND ${CMAKE_COMMAND} -E make_directory
+    "${CMAKE_SOURCE_DIR}/../install/native/assets/ambient"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/ambient/cube_hold.ogg"
+    "${CMAKE_SOURCE_DIR}/../install/native/assets/ambient/cube_hold.ogg"
+  COMMENT "Install cube_webui.conf + ambient assets next to binary"
 )
 
 install(TARGETS cube_webui_launcher RUNTIME DESTINATION bin)

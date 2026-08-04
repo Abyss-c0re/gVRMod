@@ -269,6 +269,48 @@ bool WriteCubeAmbientStatus(const std::string& gmodRoot, const AmbientClipSnapsh
   return true;
 }
 
+static std::string ExeDir() {
+  char buf[4096];
+  ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  if (n <= 0) return {};
+  buf[n] = 0;
+  std::string p(buf);
+  auto slash = p.find_last_of('/');
+  if (slash == std::string::npos) return {};
+  return p.substr(0, slash);
+}
+
+std::string ResolveCubeAmbientAssetsDir() {
+  const char* env = getenv("GVRMOD_ASSETS");
+  std::string envDir = env ? env : "";
+  std::string exe = ExeDir();
+  // Dev monorepo: GVRMOD_ROOT/native_launcher/assets
+  std::string source;
+  if (const char* root = getenv("GVRMOD_ROOT")) {
+    source = std::string(root) + "/native_launcher/assets";
+  }
+  auto cands = CubeAmbient_AssetsDirCandidates(envDir, exe, source);
+  for (const auto& c : cands) {
+    if (DirExists(c)) return c;
+  }
+  // Prefer first candidate even if missing (stable path for logs)
+  if (!cands.empty()) return cands.front();
+  return {};
+}
+
+bool CubeAmbientClipPresent(const std::string& absClipPath) {
+  if (absClipPath.empty()) return false;
+  return access(absClipPath.c_str(), R_OK) == 0;
+}
+
+std::string FillCubeAmbientClipPaths(AmbientClipSnapshot& snap) {
+  if (snap.clip_rel.empty()) snap.clip_rel = CubeAmbient_DefaultClipRel();
+  const std::string assets = ResolveCubeAmbientAssetsDir();
+  const std::string abs = CubeAmbient_ResolveClipPath(assets, snap.clip_rel);
+  snap.clip_present = CubeAmbientClipPresent(abs);
+  return abs;
+}
+
 bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot& snap) {
   if (gmodRoot.empty()) return false;
   const std::string dataDir = gmodRoot + "/garrysmod/data/vrmod";

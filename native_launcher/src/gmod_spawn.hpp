@@ -71,8 +71,15 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot);
 // Applying pack in GMod is intentionally separate — this only persists continuity data.
 bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pack);
 
-// G12: write cube_ambient.txt (gain/playing/clip_rel). No audio engine — status SoT only.
+// G12: write cube_ambient.txt (gain/playing/clip_present/clip_rel). Status SoT only.
 bool WriteCubeAmbientStatus(const std::string& gmodRoot, const AmbientClipSnapshot& snap);
+
+// G12: resolve assets/ root + absolute clip path; clipPresent when file readable.
+// Player spawn stays behind CubeAmbientPlayerEnabled hard-off.
+std::string ResolveCubeAmbientAssetsDir();
+bool CubeAmbientClipPresent(const std::string& absClipPath);
+// Fill snap.clip_rel default, resolve path, set clip_present. Returns abs path (may be empty).
+std::string FillCubeAmbientClipPaths(AmbientClipSnapshot& snap);
 
 // G04: write cube_warm.txt when process already up (intent only; still cold-spawns).
 bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot& snap);

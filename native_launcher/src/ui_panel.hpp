@@ -108,8 +108,10 @@ struct WebUIState {
   float handoffElapsed = 0.f;
   // G02: 0..1 intentional dim during take_xr / xrRequestExitSession (panel-side, not layer fade)
   float handoffFade = 0.f;
-  // G12: 0..1 ambient gain law during handoff (contract only until clip is wired)
+  // G12: 0..1 ambient gain law + clip presence (player hard-off until proven)
   float handoffAudioGain = 1.f;
+  bool handoffClipPresent = false;
+  std::string handoffAudioLabel; // panel AUDIO line (pure StatusLabelEx)
   // G03: STAGE/LOCAL continuity (from Cube shell content space + last head sample)
   std::string handoffRefSpace;
   float handoffHeadY = 0.f;

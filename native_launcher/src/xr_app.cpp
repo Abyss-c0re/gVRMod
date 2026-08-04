@@ -385,24 +385,45 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.handoffDetail = CubeHandoffDetailForPhase(phase, gmodUp);
       // G02: panel-side fade amount (phase pre-dim + ramp during orderly exit)
       ui.handoffFade = CubeHandoffFadeAmount(phase, handoffExitRequested, handoffExitWait);
-      // G12: ambient gain law + status file (clip contract; no OpenAL yet)
+      // G12: ambient gain law + asset presence + player decide (playback hard-off)
       ui.handoffAudioGain = CubeHandoffAudioGain(phase, handoffExitRequested, handoffExitWait);
       {
         static float lastAmbGain = -1.f;
         static bool lastAmbPlay = false;
+        static bool lastClipPresent = false;
+        static bool playerBackendOn = false; // would track paplay/OpenAL when feature on
         AmbientClipSnapshot amb;
         amb.gain = ui.handoffAudioGain;
         amb.handoff = true;
         amb.playing = CubeAmbient_ShouldPlay(amb.gain, true);
         amb.clip_rel = CubeAmbient_DefaultClipRel();
         amb.source = "cube_webui_handoff";
-        // Throttle disk writes: on play edge or gain step ≥5%
-        const bool edge = (amb.playing != lastAmbPlay);
+        FillCubeAmbientClipPaths(amb);
+        AmbientPlayerDecision pdec =
+            CubeAmbient_PlayerDecide(true, amb.gain, amb.clip_present, playerBackendOn);
+        // Feature branch: start/stop backend only when CubeAmbientPlayerEnabled()
+        if (CubeAmbientPlayerEnabled()) {
+          if (pdec.action == "start") {
+            // Future: spawn paplay/OpenAL on FillCubeAmbientClipPaths abs path
+            playerBackendOn = true;
+          } else if (pdec.action == "stop") {
+            playerBackendOn = false;
+          }
+        } else {
+          playerBackendOn = false;
+        }
+        ui.handoffClipPresent = amb.clip_present;
+        ui.handoffAudioLabel = CubeAmbient_StatusLabelEx(amb.gain, amb.playing, amb.clip_present, pdec);
+        // Throttle disk writes: on play edge, presence edge, or gain step ≥5%
+        const bool edge = (amb.playing != lastAmbPlay) || (amb.clip_present != lastClipPresent);
         const bool step = (lastAmbGain < 0.f) || (std::fabs(amb.gain - lastAmbGain) >= 0.05f);
         if (edge || step) {
           WriteCubeAmbientStatus(gmodRoot, amb);
           lastAmbGain = amb.gain;
           lastAmbPlay = amb.playing;
+          lastClipPresent = amb.clip_present;
+          fprintf(stderr, "[cube_webui] ambient clip_present=%d action=%s gain=%.2f path_rel=%s\n",
+                  amb.clip_present ? 1 : 0, pdec.action.c_str(), amb.gain, amb.clip_rel.c_str());
         }
       }
       WebUI_MarkDirty(ui);

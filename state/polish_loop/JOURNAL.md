@@ -207,3 +207,14 @@ Append one block per cycle. Newest at bottom.
 - G13 partial — true reverse reclaim still open.
 - Tests: full test_all PASS 6/6 (+reclaim poll unit); cube_webui_launcher builds.
 - Next: G12 ambient asset+player careful or G04 map attach.
+
+## 2026-08-04 cycle 22 — G12 ambient asset+player
+
+- Theme: ship hold clip asset + pure player decide; playback hard-off.
+- Asset: native_launcher/assets/ambient/cube_hold.ogg; POST_BUILD install.
+- Pure: PlayerDecide/AssetsDirCandidates/clip_present/StatusLabelEx.
+- Resolve assets dir (env/exe/source); panel AUDIO uses real clip presence.
+- CubeAmbientPlayerEnabled hard-off — start/stop backend branch empty.
+- G12 partial — audible paplay/OpenAL still open.
+- Tests: full test_all PASS 6/6 (+player decide unit); launcher builds.
+- Next: G04 map attach or ambient backend careful.

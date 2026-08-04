@@ -232,6 +232,7 @@ TEST(launcher_ambient_clip_contract) {
     a.gain = 0.88f;
     a.handoff = true;
     a.playing = CubeAmbient_ShouldPlay(a.gain, true);
+    a.clip_present = true;
     a.clip_rel = CubeAmbient_DefaultClipRel();
     a.ts = 42;
     std::string body = CubeAmbient_Format(a);
@@ -240,11 +241,40 @@ TEST(launcher_ambient_clip_contract) {
     ASSERT_NEAR(b.gain, 0.88f, 1e-4f);
     ASSERT_TRUE(b.playing);
     ASSERT_TRUE(b.handoff);
+    ASSERT_TRUE(b.clip_present);
     ASSERT_EQ(b.clip_rel, std::string(CubeAmbient_DefaultClipRel()));
     auto path = CubeAmbient_ResolveClipPath("/opt/cube/assets", "ambient/x.ogg");
     ASSERT_EQ(path, std::string("/opt/cube/assets/ambient/x.ogg"));
     ASSERT_TRUE(CubeAmbient_StatusLabel(0.f, false, true).find("SILENT") != std::string::npos);
     ASSERT_TRUE(CubeAmbient_StatusLabel(1.f, true, false).find("MISSING") != std::string::npos);
+}
+
+// G12: ambient asset candidates + player decide (playback hard-off)
+TEST(launcher_ambient_player_decide) {
+    ASSERT_TRUE(!CubeAmbientPlayerEnabled());
+    auto cands = CubeAmbient_AssetsDirCandidates("/env/assets", "/opt/bin", "/src/assets");
+    ASSERT_TRUE(cands.size() >= 3);
+    ASSERT_EQ(cands[0], std::string("/env/assets"));
+    ASSERT_TRUE(cands[1].find("/opt/bin/assets") != std::string::npos);
+
+    auto miss = CubeAmbient_PlayerDecide(true, 1.f, false, false);
+    ASSERT_EQ(miss.reason, std::string("clip_missing"));
+    ASSERT_EQ(miss.action, std::string("idle"));
+
+    auto defer = CubeAmbient_PlayerDecide(true, 0.9f, true, false);
+    ASSERT_EQ(defer.action, std::string("deferred"));
+    ASSERT_EQ(defer.reason, std::string("eligible_deferred"));
+    ASSERT_TRUE(defer.want_audible);
+    ASSERT_TRUE(CubeAmbient_StatusLabelEx(0.9f, true, true, defer).find("DEFERRED") != std::string::npos);
+
+    auto start = CubeAmbient_PlayerDecide(true, 0.9f, true, false, /*featureEnabled=*/true);
+    ASSERT_EQ(start.action, std::string("start"));
+    auto gain = CubeAmbient_PlayerDecide(true, 0.5f, true, true, true);
+    ASSERT_EQ(gain.action, std::string("set_gain"));
+    auto stop = CubeAmbient_PlayerDecide(true, 0.f, true, true, true);
+    ASSERT_EQ(stop.action, std::string("stop"));
+    auto idle = CubeAmbient_PlayerDecide(false, 1.f, true, false, true);
+    ASSERT_EQ(idle.action, std::string("idle"));
 }
 
 // G12: ambient gain law — full during hold, duck at take_xr, 0 on exit complete

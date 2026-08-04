@@ -1,21 +1,36 @@
 #pragma once
-// G12: Cube handoff ambient clip contract — pure format/parse (offline-tested).
+// G12: Cube handoff ambient clip contract — pure format/parse + player decide.
 // Gain curve lives in CubeHandoffAudioGain; this names the clip + play/stop policy.
-// No OpenAL required: status file cube_ambient.txt is the SoT for a future player.
+// Status file cube_ambient.txt is the SoT. OpenAL/paplay playback is feature-gated.
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <vector>
 
 struct AmbientClipSnapshot {
   int version = 1;
   float gain = 1.f;           // 0..1 from handoff gain law
   bool playing = false;       // should a clip be audible
   bool handoff = false;
+  bool clip_present = false;  // asset resolved on disk (I/O fills this)
   std::string clip_rel = "ambient/cube_hold.ogg"; // under launcher assets/
   std::string source = "cube_webui";
   long ts = 0;
   bool valid = false;
 };
+
+// Pure player decision (no process spawn here).
+struct AmbientPlayerDecision {
+  // idle | deferred | start | set_gain | stop
+  std::string action = "idle";
+  std::string reason = "none";
+  float volume = 0.f; // effective 0..1 for a future backend
+  bool want_audible = false;
+  bool valid = false;
+};
+
+// Hard off until paplay/OpenAL path is HMD-proven. Presence + decide still run.
+inline bool CubeAmbientPlayerEnabled() { return false; }
 
 inline void AmbientClip_Trim(std::string& s) {
   while (!s.empty() && (s.back() == '\r' || s.back() == ' ' || s.back() == '\t')) s.pop_back();
@@ -52,12 +67,81 @@ inline std::string CubeAmbient_ResolveClipPath(const std::string& assetsDir, con
   return assetsDir + "/" + rel;
 }
 
+// Ordered search roots for assets/ (pure list; first existing wins at I/O site).
+// envAssets: GVRMOD_ASSETS; exeDir: directory containing cube_webui_launcher;
+// sourceAssets: monorepo native_launcher/assets absolute if known.
+inline std::vector<std::string> CubeAmbient_AssetsDirCandidates(const std::string& envAssets,
+                                                                const std::string& exeDir,
+                                                                const std::string& sourceAssets) {
+  std::vector<std::string> out;
+  auto push = [&](std::string p) {
+    AmbientClip_Trim(p);
+    if (p.empty()) return;
+    while (!p.empty() && p.back() == '/') p.pop_back();
+    for (const auto& e : out)
+      if (e == p) return;
+    out.push_back(p);
+  };
+  push(envAssets);
+  if (!exeDir.empty()) {
+    std::string d = exeDir;
+    while (!d.empty() && d.back() == '/') d.pop_back();
+    push(d + "/assets");
+    // install/native → ../../native_launcher/assets (dev layout)
+    push(d + "/../native_launcher/assets");
+    push(d + "/../../native_launcher/assets");
+  }
+  push(sourceAssets);
+  return out;
+}
+
+// Pure player FSM. featureEnabled defaults to CubeAmbientPlayerEnabled hard-off.
+// currentlyPlaying = backend already has a clip active (process/OpenAL).
+inline AmbientPlayerDecision CubeAmbient_PlayerDecide(bool handoff, float gain, bool clipPresent,
+                                                      bool currentlyPlaying,
+                                                      bool featureEnabled = CubeAmbientPlayerEnabled()) {
+  AmbientPlayerDecision d;
+  d.valid = true;
+  d.volume = CubeAmbient_EffectiveVolume(gain, 1.f);
+  const bool want = CubeAmbient_ShouldPlay(gain, handoff);
+  d.want_audible = want && clipPresent;
+  if (!clipPresent) {
+    d.action = currentlyPlaying ? "stop" : "idle";
+    d.reason = "clip_missing";
+    d.want_audible = false;
+    d.volume = 0.f;
+    return d;
+  }
+  if (!want) {
+    d.action = currentlyPlaying ? "stop" : "idle";
+    d.reason = handoff ? "gain_floor" : "not_handoff";
+    d.volume = 0.f;
+    return d;
+  }
+  // Want audible + asset present
+  if (!featureEnabled) {
+    d.action = "deferred";
+    d.reason = "eligible_deferred";
+    // keep volume for status; no start
+    return d;
+  }
+  if (!currentlyPlaying) {
+    d.action = "start";
+    d.reason = "eligible";
+    return d;
+  }
+  d.action = "set_gain";
+  d.reason = "audible";
+  return d;
+}
+
 inline std::string CubeAmbient_Format(const AmbientClipSnapshot& s) {
   std::ostringstream o;
   o << "v=" << (s.version > 0 ? s.version : 1) << "\n"
     << "gain=" << s.gain << "\n"
     << "playing=" << (s.playing ? 1 : 0) << "\n"
     << "handoff=" << (s.handoff ? 1 : 0) << "\n"
+    << "clip_present=" << (s.clip_present ? 1 : 0) << "\n"
     << "clip_rel=" << (s.clip_rel.empty() ? CubeAmbient_DefaultClipRel() : s.clip_rel) << "\n"
     << "source=" << (s.source.empty() ? "cube_webui" : s.source) << "\n"
     << "ts=" << s.ts << "\n";
@@ -87,6 +171,8 @@ inline bool CubeAmbient_Parse(const std::string& body, AmbientClipSnapshot& out)
       out.playing = (v == "1" || v == "true");
     else if (k == "handoff")
       out.handoff = (v == "1" || v == "true");
+    else if (k == "clip_present" || k == "clip_ok")
+      out.clip_present = (v == "1" || v == "true");
     else if (k == "clip_rel" || k == "clip")
       out.clip_rel = v.empty() ? CubeAmbient_DefaultClipRel() : v;
     else if (k == "source")
@@ -100,7 +186,7 @@ inline bool CubeAmbient_Parse(const std::string& body, AmbientClipSnapshot& out)
   if (out.clip_rel.empty()) out.clip_rel = CubeAmbient_DefaultClipRel();
   // Consistency: playing implies handoff policy wants audio
   if (out.playing && !out.handoff) out.handoff = true;
-  out.valid = got || out.playing || out.handoff;
+  out.valid = got || out.playing || out.handoff || out.clip_present;
   return out.valid;
 }
 
@@ -116,4 +202,20 @@ inline std::string CubeAmbient_StatusLabel(float gain, bool playing, bool clipPr
   else
     snprintf(buf, sizeof(buf), "CLIP MISSING · GAIN %.0f%%", gain * 100.f);
   return std::string(buf);
+}
+
+// Extra honesty when player is deferred but asset is ready.
+inline std::string CubeAmbient_StatusLabelEx(float gain, bool playing, bool clipPresent,
+                                            const AmbientPlayerDecision& dec) {
+  if (dec.action == "deferred" && clipPresent && playing) {
+    char buf[96];
+    snprintf(buf, sizeof(buf), "CLIP READY · DEFERRED · GAIN %.0f%%", gain * 100.f);
+    return std::string(buf);
+  }
+  if (dec.action == "start" || dec.action == "set_gain") {
+    char buf[96];
+    snprintf(buf, sizeof(buf), "CLIP PLAY · GAIN %.0f%%", gain * 100.f);
+    return std::string(buf);
+  }
+  return CubeAmbient_StatusLabel(gain, playing, clipPresent);
 }

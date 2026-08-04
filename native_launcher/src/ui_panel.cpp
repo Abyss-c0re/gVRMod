@@ -491,6 +491,8 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.handoffElapsed = 0.f;
   s.handoffFade = 0.f;
   s.handoffAudioGain = 1.f;
+  s.handoffClipPresent = false;
+  s.handoffAudioLabel.clear();
   s.handoffRefSpace.clear();
   s.handoffHeadY = 0.f;
   s.handoffHeadOk = false;
@@ -1285,14 +1287,15 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     else
       snprintf(line, sizeof(line), "%.0fs  ·  HOLDING OPENXR FOR GMOD", t);
     DrawText(rgba, 24, 360, line, CT_RGB(CubeTheme::MUTED), 1);
-    // G12: ambient gain + clip contract (status file; OpenAL player still optional)
+    // G12: ambient gain + clip presence (player decide hard-off; label from handoff loop)
     {
       float g = s.handoffAudioGain;
       if (g < 0.f) g = 0.f;
       if (g > 1.f) g = 1.f;
       bool playing = CubeAmbient_ShouldPlay(g, true);
-      // Asset presence unknown here without I/O — label is contract-honest
-      std::string al = CubeAmbient_StatusLabel(g, playing, /*clipPresent=*/false);
+      std::string al = s.handoffAudioLabel;
+      if (al.empty())
+        al = CubeAmbient_StatusLabel(g, playing, s.handoffClipPresent);
       snprintf(line, sizeof(line), "AUDIO   %s", al.c_str());
       DrawText(rgba, 24, 380, line, CT_RGB(CubeTheme::MUTED), 1);
     }

@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 21  
-**Time:** 2026-08-04T18:12:00+03:00  
-**Focus:** G13 Cube reclaim poll (partial — feature hard-off)  
-**Commit (gVRMod):** `ed05fff`  
+**Cycle:** 22  
+**Time:** 2026-08-04T18:23:39+03:00  
+**Focus:** G12 ambient asset+player (partial — player hard-off)  
+**Commit (gVRMod):** (pending)  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **cube_return.hpp** pure Format/Parse + CubeReclaimDecide / PanelLabel / Detail  
-2. **CubeReclaimEnabled()** hard-off — never auto reverse reclaim XR  
-3. **ReadCubeReturnMarker** I/O; labels moved from gmod_spawn into pure header  
-4. **xr_app** ~1 Hz poll when not in Start handoff; panel RETURN banner on New Game  
-5. Unit: `launcher_cube_return_reclaim_poll`  
+1. **cube_hold.ogg** soft hold tone under `native_launcher/assets/ambient/` (install copy next to binary)  
+2. **ambient_clip.hpp** PlayerDecide / AssetsDirCandidates / clip_present format + StatusLabelEx  
+3. **CubeAmbientPlayerEnabled()** hard-off — no paplay/OpenAL spawn yet  
+4. **ResolveCubeAmbientAssetsDir** + FillCubeAmbientClipPaths; handoff panel AUDIO uses real presence  
+5. Unit: `launcher_ambient_player_decide`  
 
 ## Pain points
 
-- Untouched; no auto reclaim, no climb/border/mq thrash.
+- Untouched.
 
 ## Gaps
 
-- G13 still **partial** — auto reclaim path empty even if feature flipped  
-- Next: G12 ambient asset+player careful, or G04 map attach  
+- G12 still **partial** — real backend play path open (feature gate)  
+- Next: G04 map attach, or G03 apply design, or ambient paplay careful  
 
 ## Notes
 
