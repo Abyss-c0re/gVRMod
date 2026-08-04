@@ -350,3 +350,13 @@ Append one block per cycle. Newest at bottom.
 - G03 partial — headset height proof still open.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: G14 Glide smoke notes or G04 warm HMD notes.
+
+## 2026-08-04 cycle 36 — G14 Glide HmdExpect
+
+- Theme: pure Glide enter/drive HMD expect + smoke checklist; stick SoT unchanged.
+- Pure: Glide_HmdExpect/StatusLabel/EnterToast/ShouldToastEnter/SteerSourceLabel.
+- cl_input: enter toast from pure helpers; log G14 HMD checklist; track steer source.
+- TESTING_FRAMEWORK §0.5 Glide walk.
+- G14 partial — headset+Glide walk still open.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: G04 warm HMD notes or backlog HMD walks.

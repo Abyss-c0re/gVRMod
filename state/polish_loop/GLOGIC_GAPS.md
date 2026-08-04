@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 35
+Last updated: 2026-08-04 cycle 36
 
 ## P0 — seamless / feel broken
 
@@ -22,7 +22,7 @@ Last updated: 2026-08-04 cycle 35
 | G11 | Quick Play (last map + gfx) missing | Reduces menu friction | **done** cycle4 |
 | G12 | Audio dead during handoff | master env+HmdExpect cycle33; HMD walk open | **partial** cycle33 |
 | G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
-| G14 | Glide vehicle input SoT | Watchlist W3; partial | **partial** cycle9 (pure SoT+toast; HMD smoke open) |
+| G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
 
 ## P2 — code quality / glogic hygiene
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G14 | Glide HmdExpect + §0.5 smoke walk | Glide_HmdExpect + cl_input |
 | G03 | HMD stage-apply expect + §0.4 walk | StagePack_HmdExpect |
 | G13 | XR reclaim panel_refresh plan (env) | XrPlanDecide + §0.3 walk |
 | G12 | Ambient master env + HMD volume expect | MasterFromEnv + §0.2 walk |

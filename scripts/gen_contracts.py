@@ -36,6 +36,11 @@ PURE_TESTED = {
     "vrmod.utils.AdjustFOV": "util.rendering.adjust_fov",
     "vrmod.utils.GlideSeatIsDriver": "util.glide.seat_and_steer_sot",
     "vrmod.utils.GlidePreferStickSteer": "util.glide.seat_and_steer_sot",
+    "vrmod.utils.GlideSteerSourceLabel": "util.glide.seat_and_steer_sot",
+    "vrmod.utils.Glide_StatusLabel": "util.glide.seat_and_steer_sot",
+    "vrmod.utils.Glide_HmdExpect": "util.glide.seat_and_steer_sot",
+    "vrmod.utils.Glide_ShouldToastEnter": "util.glide.seat_and_steer_sot",
+    "vrmod.utils.Glide_EnterToast": "util.glide.seat_and_steer_sot",
     "vrmod.utils.AngAlmostEqual": "util.math.vec_almost_equal",
     "vrmod.utils.LerpAngleWrap": "util.fingers.curl_lerp_unit",
     # G03 pure STAGE pack parse + toast (no origin apply)

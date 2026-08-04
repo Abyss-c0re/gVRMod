@@ -25,6 +25,7 @@ Never submit eng texture. Never dual pose truth.
 - G13 partial: soft ack `panel_live` default; env `GVRMOD_CUBE_RECLAIM` → pure XR plan **panel refresh only** (never restart session); action rebind deferred; HMD walk §0.3 open
 - G03 partial: pack + plan + opt-in executor (`vrmod_stage_apply` / `stage_apply_enable.txt`); **default off**; `StagePack_HmdExpect` + §0.4 walk; HMD height proof open
 - G12 partial: gain law + `cube_hold.ogg` + ffplay; **default ON**; comfort master 0.55 or `GVRMOD_AMBIENT_MASTER`; silence `GVRMOD_AMBIENT_PLAY=0`; HMD taste walk §0.2 open
+- G14 partial: stick SoT + wheel assist; `Glide_HmdExpect` enter checklist; HMD drive walk §0.5 open
 
 ## UI / interaction
 

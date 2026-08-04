@@ -243,6 +243,26 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure
     tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.GlideSteerSourceLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.Glide_EnterToast
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.Glide_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.Glide_ShouldToastEnter
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.Glide_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.seat_and_steer_sot]
   - id: vrmod.utils.HandleNPCRagdoll
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

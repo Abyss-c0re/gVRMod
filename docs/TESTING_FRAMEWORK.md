@@ -133,6 +133,29 @@ Offline gate proves parse + deferred plan + opt-in executor. **Headset** require
 
 Pure helper: `vrmod.utils.StagePack_HmdExpect(decision, plan, execRes)` (unit-tested; offline ≠ HMD OK).
 
+### 0.5 G14 Glide vehicle input (manual)
+
+Offline gate proves stick-prefer SoT + HmdExpect tokens. **Headset + Glide addon** required to claim drive OK.
+
+| When | Expect | FAIL if |
+|------|--------|---------|
+| Enter Glide as driver | Toast: thumbstick drives, wheel optional; log `G14 HMD · DRIVER · stick SoT` | Silent enter; no toast |
+| Stick steer | Vehicle turns with thumbstick (SoT) | Stick ignored; only wheel works |
+| Wheel assist | Only when stick near deadzone | Wheel fights stick (dual SoT) |
+| Passenger seat | No drive nets | Passenger steers |
+| Unbound `/actions/driving` | Error toast about rebind | Silent dead car |
+| Lights / audio | Stereo lights; engine sound tracks HMD | Mono light only one eye; silent engine |
+
+**Procedure (claim “G14 Glide OK” only if walked):**
+
+1. VR enter Glide car as driver — toast + checklist log.  
+2. Stick left/right + throttle — responsive steer.  
+3. Grip wheel with stick idle — assist only; move stick — stick wins.  
+4. Exit; passenger seat if available — no drive.  
+5. Optional: `print(g_VR._glideHmdExpect)` / `g_VR._glideSteerSource`.
+
+Pure helpers: `Glide_HmdExpect` / `GlidePreferStickSteer` (unit-tested; offline ≠ HMD OK).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

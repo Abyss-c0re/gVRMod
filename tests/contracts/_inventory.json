@@ -209,6 +209,26 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
     ],
     [
+      "vrmod.utils.GlideSteerSourceLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
+      "vrmod.utils.Glide_EnterToast",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
+      "vrmod.utils.Glide_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
+      "vrmod.utils.Glide_ShouldToastEnter",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
+      "vrmod.utils.Glide_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
       "vrmod.utils.HandleNPCRagdoll",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],

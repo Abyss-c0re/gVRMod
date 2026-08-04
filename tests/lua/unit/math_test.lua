@@ -191,6 +191,47 @@ return function(H, env)
 		local s3, src3 = u.GlidePreferStickSteer(0, 0)
 		H.assert_eq(src3, "stick")
 		H.assert_near(s3, 0, 1e-6)
+		-- G14 HMD smoke expect
+		H.assert_eq(u.GlideSteerSourceLabel("wheel"), "WHEEL ASSIST")
+		local idle = u.Glide_HmdExpect({})
+		H.assert_eq(idle.verdict, "idle")
+		local drv = u.Glide_HmdExpect({
+			in_vehicle = true,
+			is_glide = true,
+			is_driver = true,
+			steer_source = "stick",
+			has_steer_action = true,
+		})
+		H.assert_eq(drv.verdict, "expect_driver_stick")
+		H.assert_true(drv.expect_stick_sot)
+		H.assert_true(string.find(drv.checklist, "stick", 1, true))
+		H.assert_eq(u.Glide_StatusLabel(drv), "GLIDE · DRIVER · STICK")
+		H.assert_true(u.Glide_ShouldToastEnter(drv, false))
+		H.assert_true(not u.Glide_ShouldToastEnter(drv, true))
+		local t = u.Glide_EnterToast(drv)
+		H.assert_true(type(t) == "string" and string.find(t, "thumbstick", 1, true))
+		local wh = u.Glide_HmdExpect({
+			in_vehicle = true,
+			is_glide = true,
+			is_driver = true,
+			steer_source = "wheel",
+			has_steer_action = true,
+		})
+		H.assert_eq(wh.verdict, "expect_driver_wheel")
+		local pass = u.Glide_HmdExpect({
+			in_vehicle = true,
+			is_glide = true,
+			is_driver = false,
+		})
+		H.assert_eq(pass.verdict, "expect_passenger")
+		local unbound = u.Glide_HmdExpect({
+			in_vehicle = true,
+			is_glide = true,
+			is_driver = true,
+			has_steer_action = false,
+		})
+		H.assert_eq(unbound.verdict, "expect_unbound")
+		H.assert_true(string.find(u.Glide_EnterToast(unbound) or "", "unbound", 1, true))
 	end)
 
 	-- G03 pure STAGE pack parse + toast (no origin apply)
