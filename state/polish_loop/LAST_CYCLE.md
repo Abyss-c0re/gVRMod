@@ -3,8 +3,8 @@
 **Cycle:** 52  
 **Time:** 2026-08-04T23:52:00+03:00  
 **Focus:** G34 fly-away origin snap + action set law (W12)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `d2341f1`  
+**Commit (vrmod-x64):** `ca1bea2`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 46 Lua tests)  
 
 ## What changed
