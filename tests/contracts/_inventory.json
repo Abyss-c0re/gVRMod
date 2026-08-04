@@ -365,7 +365,15 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
     [
+      "vrmod.utils.StagePack_ComputeApplyPlan",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
       "vrmod.utils.StagePack_IsUsable",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_MutationsFromPlan",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
     [
@@ -374,6 +382,10 @@
     ],
     [
       "vrmod.utils.StagePack_Parse",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_PlanToast",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
     [

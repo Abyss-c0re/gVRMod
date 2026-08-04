@@ -425,7 +425,15 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
     tier: pure
     tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_ComputeApplyPlan
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
   - id: vrmod.utils.StagePack_IsUsable
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_MutationsFromPlan
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
     tier: pure
     tests: [util.stage_pack.parse_and_hint]
@@ -434,6 +442,10 @@ symbols:
     tier: pure
     tests: [util.stage_pack.parse_and_hint]
   - id: vrmod.utils.StagePack_Parse
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
+    tier: pure
+    tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StagePack_PlanToast
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
     tier: pure
     tests: [util.stage_pack.parse_and_hint]

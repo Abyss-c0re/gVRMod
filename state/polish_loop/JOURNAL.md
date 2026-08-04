@@ -248,3 +248,12 @@ Append one block per cycle. Newest at bottom.
 - G05 partial — HMD load-flash proof still open.
 - Tests: --fast PASS 4/4 (35 Lua, pure pending=0).
 - Next: G03 apply careful or G04 skip-spawn design or ambient default-on.
+
+## 2026-08-04 cycle 26 — G03 StagePack apply plan
+
+- Theme: pure seated-offset apply plan preview; never auto-apply.
+- Pure: StagePack_ComputeApplyPlan / PlanToast / MutationsFromPlan.
+- openxr_launch stores plan + empty mutations; allow_apply=false.
+- G03 partial — real seatedoffset SetFloat still HMD-gated.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: G04 skip-spawn design or ambient default-on careful.

@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 25
+Last updated: 2026-08-04 cycle 26
 
 ## P0 — seamless / feel broken
 
@@ -10,7 +10,7 @@ Last updated: 2026-08-04 cycle 25
 |----|-----|-------|--------|
 | G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |
 | G02 | No coordinated fade on take_xr | Panel + eye-buffer fade cycle14; Cube shell done | **done** cycle14 |
-| G03 | Cal / STAGE not packed into handoff | Write+parse+toast+apply-gate; auto apply still off | **partial** cycle17 |
+| G03 | Cal / STAGE not packed into handoff | Apply plan preview cycle26; auto apply still off | **partial** cycle26 |
 | G04 | Cold Steam/hl2 every Start | map-attach decide cycle23; changelevel hard-off | **partial** cycle23 |
 | G05 | Loading after take_xr may not be stereo | IsLoading+toast cycle25; HMD proof open | **partial** cycle25 |
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G03 | StagePack apply plan (preview only) | ComputeApplyPlan + MutationsFromPlan |
 | G05 | Stereo-load IsLoading + toast gate | sh_stereo_load + cl_vrmod |
 | G12 | Ambient ffplay backend (env opt-in) | ambient_backend + PlayArgv |
 | G04 | Map attach decide (hard-off) | WarmAttach_* + noteWarmAttachOnce |

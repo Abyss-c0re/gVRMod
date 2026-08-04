@@ -259,6 +259,33 @@ return function(H, env)
 		H.assert_eq(decApply.reason, "eligible")
 		local at = u.StagePack_ApplyToast(decElig)
 		H.assert_true(type(at) == "string" and string.find(at, "deferred", 1, true))
+		-- G03 apply plan preview (no mutation when allow_apply false)
+		local planDef = u.StagePack_ComputeApplyPlan(p, decElig, {
+			world_scale = 40,
+			current_seatedoffset = 0,
+			allow_apply = false,
+		})
+		H.assert_true(planDef.valid)
+		H.assert_eq(planDef.method, "seated_offset")
+		H.assert_true(not planDef.do_apply)
+		H.assert_true(#u.StagePack_MutationsFromPlan(planDef) == 0)
+		local pt = u.StagePack_PlanToast(planDef)
+		H.assert_true(type(pt) == "string" and string.find(pt, "deferred", 1, true))
+		local planOn = u.StagePack_ComputeApplyPlan(p, decApply, {
+			world_scale = 40,
+			current_seatedoffset = 0,
+			allow_apply = true,
+		})
+		H.assert_true(planOn.do_apply)
+		local muts = u.StagePack_MutationsFromPlan(planOn)
+		H.assert_true(#muts == 1)
+		H.assert_eq(muts[1].convar, "vrmod_seatedoffset")
+		-- Close → no seated plan
+		local planClose = u.StagePack_ComputeApplyPlan(p, decClose, {
+			world_scale = 40,
+			allow_apply = true,
+		})
+		H.assert_eq(planClose.method, "none")
 	end)
 
 	-- G13 pure return-to-Cube reverse protocol

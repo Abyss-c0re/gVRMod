@@ -45,6 +45,9 @@ PURE_TESTED = {
     "vrmod.utils.StagePack_ToastHint": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_ApplyDecision": "util.stage_pack.parse_and_hint",
     "vrmod.utils.StagePack_ApplyToast": "util.stage_pack.parse_and_hint",
+    "vrmod.utils.StagePack_ComputeApplyPlan": "util.stage_pack.parse_and_hint",
+    "vrmod.utils.StagePack_PlanToast": "util.stage_pack.parse_and_hint",
+    "vrmod.utils.StagePack_MutationsFromPlan": "util.stage_pack.parse_and_hint",
     # G05 pure stereo-load policy (never dual under mat_queue≥2)
     "vrmod.utils.StereoLoadPolicy": "util.stereo_load.policy_g05",
     "vrmod.utils.ShouldPaintStereoThisFrame": "util.stereo_load.policy_g05",
