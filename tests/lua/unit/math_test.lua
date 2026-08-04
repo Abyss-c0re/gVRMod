@@ -286,6 +286,25 @@ return function(H, env)
 			allow_apply = true,
 		})
 		H.assert_eq(planClose.method, "none")
+		-- G03 careful executor (injectable applier)
+		H.assert_true(not u.StagePack_AllowApplyFromFlags({}))
+		H.assert_true(u.StagePack_AllowApplyFromFlags({ convar_on = true }))
+		H.assert_true(u.StagePack_AllowApplyFromFlags({ file_enable = true }))
+		H.assert_true(not u.StagePack_ShouldExecutePlan(planOn, false))
+		H.assert_true(u.StagePack_ShouldExecutePlan(planOn, true))
+		H.assert_true(not u.StagePack_ShouldExecutePlan(planDef, true))
+		local wrote = {}
+		local er = u.StagePack_ExecuteMutations(muts, function(name, val)
+			wrote[name] = val
+			return true
+		end)
+		H.assert_true(er.ok)
+		H.assert_eq(er.applied, 1)
+		H.assert_eq(wrote["vrmod_seatedoffset"], muts[1].value)
+		local erEmpty = u.StagePack_ExecuteMutations({}, function() return true end)
+		H.assert_eq(erEmpty.applied, 0)
+		local et = u.StagePack_ExecuteToast(er, planOn)
+		H.assert_true(type(et) == "string" and string.find(et, "applied", 1, true))
 	end)
 
 	-- G13 pure return-to-Cube reverse protocol

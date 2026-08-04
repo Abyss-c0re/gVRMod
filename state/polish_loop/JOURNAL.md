@@ -279,3 +279,13 @@ Append one block per cycle. Newest at bottom.
 - G12 partial → near done offline; HMD soft-volume taste open.
 - Tests: full test_all PASS 6/6.
 - Next: G03 plan executor careful or G13 reclaim careful.
+
+## 2026-08-04 cycle 29 — G03 StagePack plan executor careful
+
+- Theme: opt-in seated apply executor; product default still off.
+- Pure: AllowApplyFromFlags / ShouldExecutePlan / ExecuteMutations / ExecuteToast.
+- openxr_launch: vrmod_stage_apply or stage_apply_enable.txt unlocks; SetFloat seated.
+- Default path unchanged (preview toast only).
+- G03 partial — HMD-proven default-on still open.
+- Tests: --fast PASS 4/4 (pure pending=0).
+- Next: G13 reclaim careful or G04 changelevel careful.

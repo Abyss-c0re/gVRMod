@@ -357,6 +357,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua"
     ],
     [
+      "vrmod.utils.StagePack_AllowApplyFromFlags",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
       "vrmod.utils.StagePack_ApplyDecision",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
@@ -366,6 +370,14 @@
     ],
     [
       "vrmod.utils.StagePack_ComputeApplyPlan",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_ExecuteMutations",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_ExecuteToast",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
     [
@@ -386,6 +398,10 @@
     ],
     [
       "vrmod.utils.StagePack_PlanToast",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StagePack_ShouldExecutePlan",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
     [

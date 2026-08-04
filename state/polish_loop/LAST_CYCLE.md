@@ -1,28 +1,27 @@
 # Last cycle
 
-**Cycle:** 28  
-**Time:** 2026-08-04T19:28:24+03:00  
-**Focus:** G12 ambient default-on (careful)  
-**Commit (gVRMod):** `027a008`  
-**Commit (vrmod-x64):** none  
-**Tests:** `./scripts/test_all.sh` — 6/6 pass  
+**Cycle:** 29  
+**Time:** 2026-08-04T19:39:39+03:00  
+**Focus:** G03 StagePack plan executor (opt-in)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** (pending)  
+**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
 ## What changed
 
-1. **CubeAmbientPlayerEnabledFromEnv** default ON; opt-out 0/false/off  
-2. **CubeAmbient_ComfortMaster** 0.55 soft volume  
-3. PlayerDecide applies comfort master to volume  
-4. TESTING_FRAMEWORK ambient checklist default-on  
-5. Unit: env policy + comfort volume  
+1. **StagePack_AllowApplyFromFlags / ShouldExecutePlan / ExecuteMutations / ExecuteToast** pure  
+2. **openxr_launch** opt-in via `vrmod_stage_apply` or DATA file; SetFloat seated only then  
+3. Default path still preview-only  
+4. Unit expanded util.stage_pack.parse_and_hint  
 
 ## Pain points
 
-- Untouched.
+- Untouched; no auto height jump by default.
 
 ## Gaps
 
-- G12 nearly done offline; HMD volume taste open  
-- Next: G03 plan executor careful or G13 reclaim  
+- G03 still **partial** — default-on after HMD proof open  
+- Next: G13 reclaim or G04 changelevel careful  
 
 ## Notes
 
