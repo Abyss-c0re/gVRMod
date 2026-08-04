@@ -357,7 +357,6 @@ bool XR_CollectEyesFromEngine(const float textureBounds[8]) {
         : (g_rightEyeTexture ? g_rightEyeTexture : 0);
     GLuint sbs = g_vrRtColorTex ? g_vrRtColorTex
         : (g_sharedTexture ? g_sharedTexture : g_captureTexture);
-    // Same rule as Submit: both FBOs required (no color+depth false dual).
     bool havePerEye = leftSrc && rightSrc && leftSrc != rightSrc
         && g_leftEyeFBO != 0 && g_rightEyeFBO != 0;
     if (!havePerEye && !sbs) return false;
@@ -574,22 +573,56 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
       g_xrEyePosesValid = true;
     }
 
-    // Always one SBS engine RT, crop L/R halves. Never gen-steal dual (rightFBO=0).
-    // Prefer stolenTexture (ShareTextureFinish id from Lua) first — g_vrRtColorTex can lag.
+    // Per-eye path. Prefer module staging (collected after previous stereo + MatQueue drain).
+    // Backend times this submit (WaitFrame already done); staging isolates live engine RTs.
     GLuint perEyeSrc[2] = {0, 0};
     bool havePerEye = false;
-    GLuint srcTex = 0;
-    if (stolenTexture) srcTex = stolenTexture;
-    if (!srcTex && g_vrRtColorTex) srcTex = g_vrRtColorTex;
-    if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
-    if (!srcTex && g_captureTexture) srcTex = g_captureTexture;
-    if (srcTex) {
-        perEyeSrc[0] = perEyeSrc[1] = srcTex;
+    GLuint srcTex = stolenTexture;
+
+    if (g_preferCollectedEyes && g_eyeStageReady
+        && g_eyeStage[0][g_eyeStageRead] && g_eyeStage[1][g_eyeStageRead]) {
+        perEyeSrc[0] = g_eyeStage[0][g_eyeStageRead];
+        perEyeSrc[1] = g_eyeStage[1][g_eyeStageRead];
+        havePerEye = true;
+        srcTex = perEyeSrc[0];
+        // Staging is already one eye each at swapchain size — full rect.
+        // Override known size for this submit path.
+        if (g_eyeStageW > 0 && g_eyeStageH > 0) {
+            VRMOD_SetKnownSubmitSize(g_eyeStageW, g_eyeStageH);
+        }
+    } else {
+        // mat_queue_mode 2: do NOT rebind engine FBOs every frame to re-query
+        // attachments — that races material workers. Trust IDs captured at share time.
+        GLuint leftSrc = g_leftEyeColorTex ? g_leftEyeColorTex
+            : (g_leftEyeTexture ? g_leftEyeTexture : 0);
+        GLuint rightSrc = g_rightEyeColorTex ? g_rightEyeColorTex
+            : (g_rightEyeTexture ? g_rightEyeTexture : 0);
+        perEyeSrc[0] = leftSrc ? leftSrc : stolenTexture;
+        perEyeSrc[1] = rightSrc ? rightSrc : stolenTexture;
+
+        if (!srcTex && g_vrRtColorTex) srcTex = g_vrRtColorTex;
+        if (!srcTex && g_sharedTexture) srcTex = g_sharedTexture;
+        if (!srcTex && g_captureTexture) srcTex = g_captureTexture;
+
+        bool leftOk = (perEyeSrc[0] != 0);
+        bool rightOk = (perEyeSrc[1] != 0);
+        // Require both FBOs — gen-steal color+depth as L/R was false dual (black eye).
+        havePerEye = leftOk && rightOk && (perEyeSrc[0] != perEyeSrc[1])
+            && g_leftEyeFBO != 0 && g_rightEyeFBO != 0;
+        if (!havePerEye) {
+            if (g_vrRtColorTex) srcTex = g_vrRtColorTex;
+            if (!srcTex && stolenTexture) srcTex = stolenTexture;
+            if (srcTex) {
+                perEyeSrc[0] = perEyeSrc[1] = srcTex;
+            }
+        }
     }
-    g_preferCollectedEyes = false;
     if ((s_submitCallCount % 30) == 0) {
-        VRMOD_LOG_INFO("Submit SBS-only srcTex=%u rtFBO=%u known=%dx%d (no per-eye/collector)",
-            srcTex, g_vrRtFBO, g_knownSubmitSrcW, g_knownSubmitSrcH);
+        if (havePerEye) {
+            VRMOD_LOG_INFO("Submit using PER-EYE textures L=%u R=%u (leftFBO=%u rightFBO=%u)", perEyeSrc[0], perEyeSrc[1], g_leftEyeFBO, g_rightEyeFBO);
+        } else {
+            VRMOD_LOG_INFO("Submit using legacy SBS srcTex=%u (rtFBO=%u) bounds-crop L/R halves", srcTex, g_vrRtFBO);
+        }
     }
 
     // Dimensions: Lua/ShareTexture known size FIRST — never glGetTexLevel on live
@@ -712,21 +745,67 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 glReadBuffer(GL_COLOR_ATTACHMENT0);
                 glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
-                // Full SBS halves (no Lua crop). Ordered V + dest-Y flip on Linux
-                // (inverted-src path was leaving near-black HMD in Quest screenshots).
-                const float ins = 0.003f;
-                float u0 = (eye == 0) ? ins : 0.5f;
-                float u1 = (eye == 0) ? 0.5f : (1.0f - ins);
-                float v0 = ins;
-                float v1 = 1.0f - ins;
-                (void)textureBounds;
-                (void)havePerEye;
-                (void)g_submitCropMode;
+                // Rect selection — policy g_submitCropMode (Lua vrmod_submit_crop):
+                //   SAFE(0): collector/per-eye = full eye; SBS = Lua bounds halves
+                //   FULL(1): force full-eye UV (debug borders)
+                //   FOV_CROP(2): experimental asymmetric FOV crop on per-eye only
+                // IMPORTANT: Linux SBS bounds often invert V (v0>v1). Do not treat that
+                // as invalid — would reset U and double the image.
+                float u0 = (eye == 0) ? textureBounds[0] : textureBounds[4];
+                float u1 = (eye == 0) ? textureBounds[2] : textureBounds[6];
+                float v0 = (eye == 0) ? textureBounds[1] : textureBounds[5];
+                float v1 = (eye == 0) ? textureBounds[3] : textureBounds[7];
 
+                const float ins = 0.003f;
+                const bool fromCollector = g_preferCollectedEyes && g_eyeStageReady
+                    && perEyeSrc[eye] == g_eyeStage[eye][g_eyeStageRead];
+                const bool singleEyeTex = fromCollector || havePerEye;
+                const int cropMode = g_submitCropMode;
+
+                if (singleEyeTex && cropMode == 2) {
+                    // Experimental: crop symmetric overrender to OpenXR FOV
+                    AsymmetricFovToUvCrop(g_views[eye].fov, &u0, &u1, &v0, &v1);
+                } else if (singleEyeTex || cropMode == 1) {
+                    // SAFE/FULL: full single-eye texture (no SBS U halves)
+                    u0 = ins;
+                    u1 = 1.0f - ins;
+                    v0 = ins;
+                    v1 = 1.0f - ins;
+                } else if (!(u1 > u0 + 0.001f)) {
+                    // SBS path: repair broken U only
+                    if (eye == 0) {
+                        u0 = ins;
+                        u1 = 0.5f;
+                    } else {
+                        u0 = 0.5f;
+                        u1 = 1.0f - ins;
+                    }
+                }
+                // V: empty only → full. Inverted V intentional on SBS (flip via blit).
+                if (!singleEyeTex && cropMode != 1 && std::fabs(v1 - v0) < 0.001f) {
+                    v0 = ins;
+                    v1 = 1.0f - ins;
+                }
+
+                // g_rtTextureNeedsVFlip: mirror V into GL bottom-left space when bounds
+                // were authored in D3D-style (low V = top). If bounds already inverted
+                // (Linux Lua convention), they already encode the flip — do not mirror again.
+                // Staging uses ordered V → always apply one flip on Linux via dest when needed.
+                const bool boundsVInverted = (v0 > v1);
+                if (g_rtTextureNeedsVFlip && !boundsVInverted) {
+                    float tmp0 = 1.0f - v1;
+                    float tmp1 = 1.0f - v0;
+                    v0 = tmp0;
+                    v1 = tmp1;
+                }
+
+                // Source rect in texels (OpenGL origin = bottom-left).
+                // srcY0 > srcY1 is allowed: glBlitFramebuffer flips when src Y is inverted.
                 GLint srcX0 = (GLint)(u0 * eyeSrcW);
                 GLint srcX1 = (GLint)(u1 * eyeSrcW);
                 GLint srcY0 = (GLint)(v0 * eyeSrcH);
                 GLint srcY1 = (GLint)(v1 * eyeSrcH);
+                // Clamp X into texture
                 if (srcX0 < 0) srcX0 = 0;
                 if (srcX1 < 0) srcX1 = 0;
                 if (srcX0 > eyeSrcW) srcX0 = eyeSrcW;
@@ -735,6 +814,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     if (srcX1 < eyeSrcW) srcX1 = srcX0 + 1;
                     else srcX0 = srcX1 - 1;
                 }
+                // Clamp Y independently (order may be flipped)
                 if (srcY0 < 0) srcY0 = 0;
                 if (srcY1 < 0) srcY1 = 0;
                 if (srcY0 > eyeSrcH) srcY0 = eyeSrcH;
@@ -744,10 +824,20 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     else srcY0 = srcY1 - 1;
                 }
 
-                // Linux: invert dest Y (OpenXR top-left vs GL bottom-left). One flip only.
+                // Primary path: glBlitFramebuffer.
+                // No glReadPixels here — that forces a full GPU sync and races
+                // mat_queue_mode 2 workers ("Illegal termination of worker thread").
+                // OpenXR OpenGL swapchain: first row = top of view. Source Engine GL RTs
+                // store top-of-scene at high Y. When bounds already invert src Y (Linux),
+                // the blit itself flips. When bounds are ordered low→high, invert dest Y
+                // on Linux so the image is not upside-down in the HMD.
                 GLint dstY0 = 0;
                 GLint dstY1 = (GLint)g_xrSwapchainHeight;
-                if (g_rtTextureNeedsVFlip) {
+                const bool srcYFlips = (srcY0 > srcY1);
+                // Need one vertical flip total for Linux GL→OpenXR.
+                // - If src Y already inverted (blit flips): dest identity.
+                // - Else if g_rtTextureNeedsVFlip (or default Linux): invert dest Y.
+                if (!srcYFlips && g_rtTextureNeedsVFlip) {
                     dstY0 = (GLint)g_xrSwapchainHeight;
                     dstY1 = 0;
                 }
