@@ -461,3 +461,13 @@ Append one block per cycle. Newest at bottom.
 - G28 partial — product already used 90/180; law offline-tested.
 - Tests: full test_all PASS 6/6 (launcher 29 tests).
 - Next: HMD walk backlog (G05/G12) or supersample cold-start cap notes.
+
+## 2026-08-04 cycle 47 — G29 supersample cold-start cap law
+
+- Theme: cold cfg SS ≤1.4; never crank 1.75/2.0 at Start (soft care).
+- Pure: CubeSs_ColdStartCap/ClampCold/Live/Ladder/Decide/HmdExpect.
+- gmod_spawn cfg + launch_fill ladder wire pure helpers.
+- TESTING_FRAMEWORK §0.16 SS walk.
+- G29 partial — product already capped 1.4; law offline-tested.
+- Tests: full test_all PASS 6/6 (launcher 30 tests).
+- Next: HMD walk backlog (G05/G12) or FOV archive write-only-when-touched notes.
