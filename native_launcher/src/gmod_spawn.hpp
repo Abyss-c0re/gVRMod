@@ -67,9 +67,9 @@ void ClearCubeHandoffMarkers(const std::string& gmodRoot);
 // Map status-file phase tokens → human detail / progress / display label.
 inline std::string CubeHandoffDetailForPhase(const std::string& phase, bool gmodUp) {
   if (phase == "take_xr" || phase == "ready")
-    return "GMod claims OpenXR · releasing session…";
+    return "GMod claims OpenXR · coordinated fade · releasing…";
   if (phase == "starting_xr")
-    return "starting OpenXR in GMod…";
+    return "starting OpenXR in GMod · stay in headset…";
   if (phase == "vr_active")
     return "VR live in GMod · handoff complete";
   if (phase == "wait_module")
@@ -111,9 +111,25 @@ inline std::string CubeHandoffPhaseLabel(const std::string& phase) {
   if (phase == "boot") return "LUA BOOT";
   if (phase == "map_ready") return "MAP READY";
   if (phase == "wait_module") return "WAIT MODULE";
-  if (phase == "take_xr") return "TAKE XR";
+  if (phase == "take_xr") return "TAKE XR · FADE";
   if (phase == "starting_xr") return "STARTING XR";
   if (phase == "vr_active") return "VR ACTIVE";
-  if (phase == "ready") return "READY";
+  if (phase == "ready") return "READY · FADE";
   return phase;
+}
+
+// G02: intentional panel dim toward black during take_xr / session release (not OpenXR layer fade).
+// Returns 0..1. Full compositor crossfade still future; this makes the cut feel deliberate.
+inline float CubeHandoffFadeAmount(const std::string& phase, bool exitRequested, float exitWaitSec) {
+  if (exitRequested) {
+    // Ramp over ~2.5s of orderly release (matches Lua wait budget)
+    float f = exitWaitSec / 2.5f;
+    if (f < 0.f) f = 0.f;
+    if (f > 1.f) f = 1.f;
+    return f;
+  }
+  if (phase == "take_xr" || phase == "ready") return 0.28f;
+  if (phase == "starting_xr") return 0.45f;
+  if (phase == "vr_active") return 0.65f;
+  return 0.f;
 }

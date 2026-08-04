@@ -93,3 +93,12 @@ Append one block per cycle. Newest at bottom.
 - Commits: vrmod-x64 e8318a9; gVRMod submodule + tests + state.
 - G14 remains partial (full HMD smoke still open); offline SoT/toast landed.
 - Next: careful P0 G02 fade design note, or G12 audio docs-only.
+
+## 2026-08-04 cycle 10 — G02 panel fade on take_xr
+
+- Theme: coordinated *feel* without full compositor layer fade (safe).
+- Pure: CubeHandoffFadeAmount; PHASE TAKE XR · FADE; detail copy.
+- xr_app sets handoffFade; ui_panel BlendTowardBlack + FADE % status.
+- Full XR layer fade still open (G02 partial).
+- Tests: full test_all PASS 6/6 (+fade unit test).
+- Next: G03 cal/STAGE pack (careful) or G12 audio design-only.

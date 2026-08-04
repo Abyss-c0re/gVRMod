@@ -1,27 +1,27 @@
 # Last cycle
 
-**Cycle:** 9  
-**Time:** 2026-08-04T16:01:50+03:00  
-**Focus:** G14 Glide stick-primary SoT + seat toast  
-**Commit (gVRMod):** `ca30d8c`  
-**Commit (vrmod-x64):** `e8318a9`  
-**Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
+**Cycle:** 10  
+**Time:** 2026-08-04T16:11:22+03:00  
+**Focus:** G02 panel-side fade on take_xr (partial)  
+**Commit (gVRMod):** `afb0378`  
+**Commit (vrmod-x64):** none  
+**Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **sh_glide_sot.lua** — pure GlideSeatIsDriver + GlidePreferStickSteer  
-2. **cl_input** — use helpers; toast “Glide seat — use thumbstick; wheel is optional”  
-3. **CUBE_WATCHLIST W3** — HMD smoke steps documented  
-4. Unit test + PURE_TESTED map  
+1. **CubeHandoffFadeAmount** pure helper (phase pre-dim + exit ramp)  
+2. **handoffFade** on WebUIState; xr_app drives it  
+3. **ui_panel** BlendTowardBlack + FADE status line  
+4. Intentionally **not** OpenXR composition layer fade (still open)  
 
 ## Pain points
 
-- Untouched (no climb/noborder/mat_queue/pose thrash).
+- Untouched; soft 90s/180s handoff timeouts unchanged.
 
 ## Gaps
 
-- G14 → **partial** (offline SoT/toast; HMD walkthrough still required)  
-- Next: G02 fade carefully  
+- G02 → **partial** (panel intentional dim; compositor layer fade future)  
+- Next: G03 cal/STAGE  
 
 ## Notes
 

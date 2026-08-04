@@ -489,6 +489,7 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
   s.handoffPhase.clear();
   s.handoffDetail.clear();
   s.handoffElapsed = 0.f;
+  s.handoffFade = 0.f;
   s.cursorVisible = false;
   s.cursorX = 0;
   s.cursorY = 0;
@@ -1197,6 +1198,19 @@ static void DrawNav(unsigned char* rgba, WebUIPage page) {
   }
 }
 
+// G02: blend panel toward black (opaque RT — no real alpha; darken in place).
+static void BlendTowardBlack(unsigned char* rgba, float fade) {
+  fade = std::clamp(fade, 0.f, 1.f);
+  if (fade <= 0.001f) return;
+  const float keep = 1.f - fade;
+  const int n = UI_W * UI_H * 4;
+  for (int i = 0; i < n; i += 4) {
+    rgba[i + 0] = (unsigned char)(rgba[i + 0] * keep);
+    rgba[i + 1] = (unsigned char)(rgba[i + 1] * keep);
+    rgba[i + 2] = (unsigned char)(rgba[i + 2] * keep);
+  }
+}
+
 void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
   // Seamless handoff: keep Cube panel painted (same theme) until GMod takes XR.
   if (s.handoff) {
@@ -1225,6 +1239,9 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     // G01: prefer phase progress when known; else time fallback (pre-Lua cold boot)
     float phaseP = CubeHandoffProgressForPhase(s.handoffPhase);
     float frac = (phaseP >= 0.f) ? phaseP : std::min(0.95f, 0.08f + t / 40.f);
+    // G02: progress bar fills through release dim
+    if (s.handoffFade > 0.f)
+      frac = std::min(0.99f, std::max(frac, 0.78f + 0.2f * s.handoffFade));
     int fill = (int)(barW * frac);
     FillRect(rgba, 24, 300, barW, 32, CT_RGB(CubeTheme::ROW), 255);
     FillRect(rgba, 24, 300, std::max(8, fill), 32,
@@ -1232,13 +1249,18 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     // Accent tick on bar (Cube DrawPanel style)
     FillRect(rgba, 24, 300, 6, 32, CT_RGB(CubeTheme::CRIMSON_HOT), 255);
 
-    snprintf(line, sizeof(line), "%.0fs  ·  HOLDING OPENXR FOR GMOD", t);
+    if (s.handoffFade > 0.05f)
+      snprintf(line, sizeof(line), "%.0fs  ·  FADE %.0f%%  ·  RELEASING TO GMOD", t, s.handoffFade * 100.f);
+    else
+      snprintf(line, sizeof(line), "%.0fs  ·  HOLDING OPENXR FOR GMOD", t);
     DrawText(rgba, 24, 360, line, CT_RGB(CubeTheme::MUTED), 1);
     DrawText(rgba, 24, 400, "THEME = LUA CUBE  ·  BINDINGS CARRY OVER  ·  NO BLACK GAP",
              CT_RGB(CubeTheme::MUTED), 1);
-    DrawText(rgba, 24, 440, "When GMod signals take_xr, this panel releases the runtime.",
+    DrawText(rgba, 24, 440, "When GMod signals take_xr, panel dims then releases the runtime.",
              160, 120, 130, 1);
     DrawText(rgba, 24, UI_H - 36, s.status.c_str(), 255, 200, 210, 1);
+    // Intentional dim before compositor cut (panel-side; full XR layer fade is future)
+    BlendTowardBlack(rgba, s.handoffFade);
     return;
   }
 

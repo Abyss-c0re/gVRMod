@@ -334,6 +334,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.handoffPhase = phase;
       // G01: phase-aware detail (status file tokens → intentional copy, not opaque hold)
       ui.handoffDetail = CubeHandoffDetailForPhase(phase, gmodUp);
+      // G02: panel-side fade amount (phase pre-dim + ramp during orderly exit)
+      ui.handoffFade = CubeHandoffFadeAmount(phase, handoffExitRequested, handoffExitWait);
       WebUI_MarkDirty(ui);
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
       // Soft only after long wait if process is up but never signaled (was 40s — race window)
@@ -349,7 +351,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       }
       if (handoffExitRequested) {
         handoffExitWait += 1.f / 72.f;
-        ui.handoffDetail = "releasing OpenXR for GMod…";
+        ui.handoffDetail = "coordinated fade · releasing OpenXR for GMod…";
+        ui.handoffFade = CubeHandoffFadeAmount(phase, true, handoffExitWait);
         // Session STOPPING handler ends session; leave when ended or hard cap
         if (!sessionRunning || handoffExitWait > 3.f) {
           fprintf(stderr, "[cube_webui] handoff complete sessionRunning=%d wait=%.2f\n",

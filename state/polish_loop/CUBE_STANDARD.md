@@ -19,6 +19,7 @@ Never submit eng texture. Never dual pose truth.
 - After first-run: panel2vr + Glorious Crimson Cube; desktop stays Derma
 - Seamless launcher: hold XR → STARTING GMOD → take_xr → release (no early void)
 - Handoff should feel intentional: progress, cal continuity, fade — not “stuck?”
+- G02 partial: Cube panel dims on take_xr / release (`CubeHandoffFadeAmount`); full OpenXR layer crossfade still open
 
 ## UI / interaction
 

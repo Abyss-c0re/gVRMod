@@ -53,7 +53,7 @@ TEST(launcher_handoff_progress_monotone) {
 TEST(launcher_handoff_phase_label) {
     ASSERT_EQ(CubeHandoffPhaseLabel(""), std::string("SPAWNING"));
     ASSERT_EQ(CubeHandoffPhaseLabel("map_ready"), std::string("MAP READY"));
-    ASSERT_EQ(CubeHandoffPhaseLabel("take_xr"), std::string("TAKE XR"));
+    ASSERT_EQ(CubeHandoffPhaseLabel("take_xr"), std::string("TAKE XR · FADE"));
 }
 
 // G11: Quick Play last map + gfx snapshot round-trip
@@ -94,6 +94,18 @@ TEST(launcher_last_play_clamps_desktopview) {
     ASSERT_EQ(b.xrDesktopView, 4);
     ASSERT_TRUE(LastPlay_Parse("v=1\nmap=gm_flatgrass\nxr_desktopview=0\n", b));
     ASSERT_EQ(b.xrDesktopView, 1);
+}
+
+// G02: panel fade amount — pre-dim at take_xr, ramp on exit
+TEST(launcher_handoff_fade_amount) {
+    ASSERT_NEAR(CubeHandoffFadeAmount("boot", false, 0.f), 0.f, 1e-5f);
+    float take = CubeHandoffFadeAmount("take_xr", false, 0.f);
+    ASSERT_TRUE(take > 0.1f && take < 0.5f);
+    float mid = CubeHandoffFadeAmount("take_xr", true, 1.25f);
+    float end = CubeHandoffFadeAmount("take_xr", true, 2.5f);
+    ASSERT_TRUE(mid > take);
+    ASSERT_NEAR(end, 1.f, 1e-5f);
+    ASSERT_TRUE(CubeHandoffPhaseLabel("take_xr").find("FADE") != std::string::npos);
 }
 
 int main() {
