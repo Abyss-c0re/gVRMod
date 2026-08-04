@@ -3,7 +3,7 @@
 **Cycle:** 35  
 **Time:** 2026-08-04T20:45:23+03:00  
 **Focus:** G03 HMD stage-apply expect + §0.4  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `bba00bc`  
 **Commit (vrmod-x64):** (set after push)  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
