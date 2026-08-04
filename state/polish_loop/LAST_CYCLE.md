@@ -3,7 +3,7 @@
 **Cycle:** 2  
 **Time:** 2026-08-04T14:43:54+03:00  
 **Focus:** G10 first-run gates re-spam when cal + native_wrapper  
-**Commit (gVRMod):** `e2a0847`  
+**Commit (gVRMod):** `7748fb6`  
 **Commit (vrmod-x64):** `70ff998`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (+6 experience unit tests)  
 
