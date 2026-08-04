@@ -3,7 +3,7 @@
 **Cycle:** 4  
 **Time:** 2026-08-04T15:05:48+03:00  
 **Focus:** G11 Quick Play last map + gfx  
-**Commit (gVRMod):** `d5a90a1`  
+**Commit (gVRMod):** `5408886`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass (+2 last_play unit tests); launcher builds  
 
