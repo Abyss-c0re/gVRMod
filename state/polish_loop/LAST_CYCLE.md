@@ -3,7 +3,7 @@
 **Cycle:** 21  
 **Time:** 2026-08-04T18:12:00+03:00  
 **Focus:** G13 Cube reclaim poll (partial — feature hard-off)  
-**Commit (gVRMod):** (pending)  
+**Commit (gVRMod):** `ed05fff`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
