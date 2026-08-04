@@ -3,7 +3,7 @@
 **Cycle:** 48  
 **Time:** 2026-08-04T23:15:00+03:00  
 **Focus:** G30 FOV archive write-only-when-touched law  
-**Commit (gVRMod):** (pending)  
+**Commit (gVRMod):** `1a1729f`  
 **Commit (vrmod-x64):** (unchanged)  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass (launcher 31 tests)  
 
