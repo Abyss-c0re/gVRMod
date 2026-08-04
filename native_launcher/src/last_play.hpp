@@ -142,8 +142,8 @@ inline bool LastPlay_Parse(const std::string& body, LastPlaySnapshot& out) {
   // G23: desktop view enum 1..4 only
   if (out.xrDesktopView < 1) out.xrDesktopView = 1;
   if (out.xrDesktopView > 4) out.xrDesktopView = 4;
-  // Never invent borderless via corrupt snapshot
-  if (out.noborder && out.windowed == false) { /* ok */ }
+  // G18: missing noborder key leaves default false (never invent borderless).
+  // Explicit noborder=1 in snapshot is user/opt-in; product never forces it.
   out.valid = gotMap;
   return out.valid;
 }

@@ -631,7 +631,8 @@ bool WebUI_LoadLastPlay(WebUIState& s) {
   s.gfx.winW = lp.winW;
   s.gfx.winH = lp.winH;
   s.gfx.windowed = lp.windowed;
-  // Pain point: never force borderless from corrupt snapshot alone
+  // G18 / pain point #2: honor snapshot noborder only when parsed true;
+  // defaults and missing keys stay framed (LastPlaySnapshot.noborder=false).
   s.gfx.noborder = lp.noborder;
   s.gfx.xr.ssIdx = std::clamp(lp.xrSsIdx, 0, 5);
   s.gfx.xr.viewScale = lp.xrViewScale;

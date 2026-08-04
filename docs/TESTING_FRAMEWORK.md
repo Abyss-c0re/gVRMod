@@ -239,6 +239,26 @@ Offline gate proves pin prefer **1**, dual only when mq&lt;2, **never write** fr
 
 Pure helpers: `MatQueueLaw_Decide` / `MatQueueLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.10 G18 framed window chrome (manual)
+
+Offline gate proves Cube pin **windowed + framed** (`noborder=false`), never invent `-noborder` from missing keys, BuildArgs omit `-noborder` by default. **Desktop** observation is enough for chrome law; HMD still product surface.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Cold Start / shell launch | GMod desktop mirror has **title bar** (framed) | Forced `-noborder` / borderless slab |
+| Args | `-windowed -w … -h …` without `-noborder` | Product injects `-noborder` by default |
+| last_play missing `noborder=` | Stays framed (`false`) | Borderless invented from corrupt snapshot |
+| User opt-in | Settings/last_play `noborder=1` may borderless | Forced true when key absent |
+
+**Procedure (claim “G18 chrome OK” only if walked):**
+
+1. Cube Start Game (defaults) — desktop GMod window shows title chrome; movable.  
+2. Confirm launch log / cmdline has no forced `-noborder`.  
+3. Optional: set borderless in SETTINGS once, restart — opt-in only.  
+4. Optional: delete `noborder=` from last_play — reloads framed.
+
+Pure helpers: `WindowChrome_Decide` / `WindowChrome_BuildArgs` / `WindowChrome_HmdExpect` (unit-tested; offline ≠ desktop walk).
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

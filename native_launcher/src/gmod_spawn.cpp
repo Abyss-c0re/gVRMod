@@ -4,6 +4,7 @@
 #include "ambient_clip.hpp"
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
+#include "window_chrome.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -150,11 +151,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
 
   WriteFile(req.gmodRoot + "/steam_appid.txt", "4000\n");
 
-  std::ostringstream win;
-  if (req.windowed) win << " -windowed";
-  else win << " -fullscreen";
-  win << " -w " << req.winW << " -h " << req.winH;
-  if (req.noborder) win << " -noborder";
+  // G18: pure framed-window args (never invent -noborder).
+  const std::string win = WindowChrome_BuildArgs(req.windowed, req.noborder, req.winW, req.winH);
 
   std::ostringstream cmd;
   if (req.useSteam && system("command -v steam >/dev/null 2>&1") == 0) {
@@ -162,7 +160,7 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
     if (!req.xrRuntimeJson.empty())
       cmd << " XR_RUNTIME_JSON='" << req.xrRuntimeJson << "'";
     cmd << " steam -applaunch 4000 -novid"
-        << win.str()
+        << win
         << " +maxplayers " << req.maxPlayers
         << " +sv_lan " << (req.svLan ? 1 : 0)
         << " +hostname \"" << req.hostname << "\""
@@ -177,7 +175,7 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
     if (!req.xrRuntimeJson.empty())
       cmd << " XR_RUNTIME_JSON='" << req.xrRuntimeJson << "'";
     cmd << " \"" << req.gmodRoot << "/hl2.sh\" -game garrysmod -novid"
-        << win.str()
+        << win
         << " +maxplayers " << req.maxPlayers
         << " +sv_lan " << (req.svLan ? 1 : 0)
         << " +hostname \"" << req.hostname << "\""

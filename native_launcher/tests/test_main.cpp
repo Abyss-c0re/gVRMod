@@ -6,6 +6,7 @@
 #include "ambient_clip.hpp"
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
+#include "window_chrome.hpp"
 #include <algorithm>
 #include <cstdlib>
 
@@ -514,6 +515,57 @@ TEST(launcher_stage_pack_head_y_sanity) {
     ASSERT_TRUE(StagePack_IsUsable(b));
     ASSERT_TRUE(!b.headOk);
     ASSERT_EQ(StagePack_NormalizeSpace("local"), std::string("LOCAL"));
+}
+
+// G18: framed window chrome law (never force -noborder)
+TEST(launcher_window_chrome_cube_default) {
+    ASSERT_TRUE(WindowChrome_CubeWindowed());
+    ASSERT_TRUE(!WindowChrome_CubeNoborder());
+    ASSERT_TRUE(!WindowChrome_ShouldForceNoborder("product"));
+    ASSERT_TRUE(!WindowChrome_ShouldForceNoborder(nullptr));
+    ASSERT_TRUE(WindowChrome_ShouldForceNoborder("force_test")); // unit only
+    auto d = WindowChrome_CubeDefault();
+    ASSERT_TRUE(d.valid);
+    ASSERT_TRUE(d.windowed);
+    ASSERT_TRUE(!d.noborder);
+    ASSERT_TRUE(d.force_noborder_forbidden);
+    ASSERT_EQ(d.risk, std::string("none"));
+    ASSERT_EQ(WindowChrome_StatusLabel(d), std::string("WIN · FRAMED"));
+}
+
+TEST(launcher_window_chrome_sanitize_and_args) {
+    ASSERT_TRUE(!WindowChrome_SanitizeNoborder(true, false)); // missing key → framed
+    ASSERT_TRUE(WindowChrome_SanitizeNoborder(true, true));
+    ASSERT_TRUE(!WindowChrome_SanitizeNoborder(false, true));
+    std::string framed = WindowChrome_BuildArgs(true, false, 720, 480);
+    ASSERT_TRUE(framed.find("-windowed") != std::string::npos);
+    ASSERT_TRUE(framed.find("-w 720") != std::string::npos);
+    ASSERT_TRUE(framed.find("-h 480") != std::string::npos);
+    ASSERT_TRUE(framed.find("-noborder") == std::string::npos);
+    std::string borderless = WindowChrome_BuildArgs(true, true, 1280, 720);
+    ASSERT_TRUE(borderless.find("-noborder") != std::string::npos);
+    std::string full = WindowChrome_BuildArgs(false, false, 1920, 1080);
+    ASSERT_TRUE(full.find("-fullscreen") != std::string::npos);
+    ASSERT_TRUE(full.find("-windowed") == std::string::npos);
+}
+
+TEST(launcher_window_chrome_hmd_expect) {
+    auto framed = WindowChrome_CubeDefault();
+    auto he = WindowChrome_HmdExpect(framed);
+    ASSERT_EQ(he.verdict, std::string("expect_framed"));
+    ASSERT_TRUE(he.expect_title_chrome);
+    ASSERT_TRUE(he.checklist.find("G18") != std::string::npos);
+    ASSERT_TRUE(he.checklist.find("FRAMED") != std::string::npos);
+
+    auto bl = WindowChrome_Decide(true, true, 720, 480, true);
+    auto heBl = WindowChrome_HmdExpect(bl);
+    ASSERT_EQ(heBl.verdict, std::string("expect_borderless_opt_in"));
+    ASSERT_TRUE(!heBl.expect_title_chrome);
+
+    auto missing = WindowChrome_Decide(true, true, 720, 480, false);
+    ASSERT_TRUE(!missing.noborder); // invent-forbidden
+    ASSERT_EQ(WindowChrome_StatusLabel(missing), std::string("WIN · FRAMED"));
+    ASSERT_TRUE(!WindowChrome_IsForceRisk(framed));
 }
 
 int main() {

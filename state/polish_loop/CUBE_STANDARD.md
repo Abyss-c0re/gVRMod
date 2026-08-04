@@ -35,6 +35,7 @@ Never submit eng texture. Never dual pose truth.
 - World panel: world-locked by default; grip repositions
 - G15 partial: HUD composite law — clear plate translucent; dim plate **additive** (PROPHECY); never opaque black slab; HMD walk §0.7 open
 - G17 partial: `mat_queue_mode` Cube pin prefer **1**; VR never SetInt mq; dual only if mq&lt;2; HmdExpect §0.9 open
+- G18 partial: desktop chrome **framed** (windowed, no force `-noborder`); `WindowChrome_*` pure; HmdExpect §0.10 open
 
 ## Compatibility
 
