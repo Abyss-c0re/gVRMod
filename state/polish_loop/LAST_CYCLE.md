@@ -3,7 +3,7 @@
 **Cycle:** 40  
 **Time:** 2026-08-04T21:41:08+03:00  
 **Focus:** G17 mat_queue pin law  
-**Commit (gVRMod):** (set after push)  
+**Commit (gVRMod):** `593f34e`  
 **Commit (vrmod-x64):** (set after push)  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
