@@ -3,7 +3,7 @@
 **Cycle:** 20  
 **Time:** 2026-08-04T18:00:30+03:00  
 **Focus:** G04 warm reuse design (partial — feature hard-off)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `ed814eb`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 

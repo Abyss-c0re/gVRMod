@@ -5,7 +5,7 @@
   "cycle": 20,
   "status": "ok",
   "last_cycle_at": "2026-08-04T18:00:30+03:00",
-  "last_commit": "pending",
+  "last_commit": "ed814eb",
   "last_commit_repo": "gVRMod",
   "last_test": "test_all PASS 6/6",
   "last_focus": "G04 warm reuse design (hard-off)",
