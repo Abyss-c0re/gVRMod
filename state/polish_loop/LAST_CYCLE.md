@@ -3,7 +3,7 @@
 **Cycle:** 12  
 **Time:** 2026-08-04T16:32:44+03:00  
 **Focus:** G03 STAGE pack Lua parse + toast (apply still deferred)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `0b545f9`  
 **Commit (vrmod-x64):** `d052c35`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 
