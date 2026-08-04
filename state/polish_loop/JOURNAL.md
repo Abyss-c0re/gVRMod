@@ -400,3 +400,13 @@ Append one block per cycle. Newest at bottom.
 - G17 partial — product already never writes; law now offline-tested.
 - Tests: --fast PASS 4/4 (pure pending=0).
 - Next: HMD walk backlog (G05/G12) or -noborder framed law notes.
+
+## 2026-08-04 cycle 41 — G18 framed window chrome law
+
+- Theme: never force -noborder; windowed framed desktop mirror pin.
+- Pure: WindowChrome_Cube*/Sanitize/BuildArgs/Decide/HmdExpect.
+- gmod_spawn uses pure BuildArgs for Steam/hl2 cmdline.
+- TESTING_FRAMEWORK §0.10 desktop chrome walk.
+- G18 partial — product already framed; law now offline-tested.
+- Tests: full test_all PASS 6/6 (launcher 28 tests).
+- Next: HMD walk backlog (G05/G12) or remaining partial HmdExpects.
