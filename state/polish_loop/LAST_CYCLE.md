@@ -3,7 +3,7 @@
 **Cycle:** 17  
 **Time:** 2026-08-04T17:26:58+03:00  
 **Focus:** G03 StagePack apply gate (design — still no auto height)  
-**Commit (gVRMod):** (pending close)  
+**Commit (gVRMod):** `9fc48a6`  
 **Commit (vrmod-x64):** `82a0a6d`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass  
 

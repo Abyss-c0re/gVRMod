@@ -5,7 +5,7 @@
   "cycle": 17,
   "status": "ok",
   "last_cycle_at": "2026-08-04T17:26:58+03:00",
-  "last_commit": "pending",
+  "last_commit": "9fc48a6",
   "last_commit_repo": "gVRMod+vrmod-x64",
   "last_test": "test_all --fast PASS 4/4",
   "last_focus": "G03 StagePack apply gate (no auto height)",
