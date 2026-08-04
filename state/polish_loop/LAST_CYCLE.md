@@ -3,7 +3,7 @@
 **Cycle:** 7  
 **Time:** 2026-08-04T15:38:51+03:00  
 **Focus:** G21 contract inventory — pure symbols tested  
-**Commit (gVRMod):** `08b500b`  
+**Commit (gVRMod):** `f6983d9`  
 **Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (30 Lua tests)  
 
