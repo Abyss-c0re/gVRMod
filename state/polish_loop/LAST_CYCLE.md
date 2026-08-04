@@ -3,8 +3,8 @@
 **Cycle:** 51  
 **Time:** 2026-08-04T23:42:00+03:00  
 **Focus:** G33 swap-eyes content-only law (W4)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `7cc2086`  
+**Commit (vrmod-x64):** `ae7e483`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 45 Lua tests)  
 
 ## What changed
