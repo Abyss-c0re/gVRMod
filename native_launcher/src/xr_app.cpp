@@ -12,6 +12,7 @@
 #include "gmod_spawn.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
+#include "ambient_backend.hpp"
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
 #include "ui_panel.hpp"
@@ -385,32 +386,28 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       ui.handoffDetail = CubeHandoffDetailForPhase(phase, gmodUp);
       // G02: panel-side fade amount (phase pre-dim + ramp during orderly exit)
       ui.handoffFade = CubeHandoffFadeAmount(phase, handoffExitRequested, handoffExitWait);
-      // G12: ambient gain law + asset presence + player decide (playback hard-off)
+      // G12: ambient gain + presence + player decide; backend only if GVRMOD_AMBIENT_PLAY=1
       ui.handoffAudioGain = CubeHandoffAudioGain(phase, handoffExitRequested, handoffExitWait);
       {
         static float lastAmbGain = -1.f;
         static bool lastAmbPlay = false;
         static bool lastClipPresent = false;
-        static bool playerBackendOn = false; // would track paplay/OpenAL when feature on
+        static AmbientBackendState ambBackend;
         AmbientClipSnapshot amb;
         amb.gain = ui.handoffAudioGain;
         amb.handoff = true;
         amb.playing = CubeAmbient_ShouldPlay(amb.gain, true);
         amb.clip_rel = CubeAmbient_DefaultClipRel();
         amb.source = "cube_webui_handoff";
-        FillCubeAmbientClipPaths(amb);
+        const std::string absClip = FillCubeAmbientClipPaths(amb);
+        AmbientBackend_Poll(ambBackend);
+        const bool backendOn = ambBackend.running;
         AmbientPlayerDecision pdec =
-            CubeAmbient_PlayerDecide(true, amb.gain, amb.clip_present, playerBackendOn);
-        // Feature branch: start/stop backend only when CubeAmbientPlayerEnabled()
+            CubeAmbient_PlayerDecide(true, amb.gain, amb.clip_present, backendOn);
         if (CubeAmbientPlayerEnabled()) {
-          if (pdec.action == "start") {
-            // Future: spawn paplay/OpenAL on FillCubeAmbientClipPaths abs path
-            playerBackendOn = true;
-          } else if (pdec.action == "stop") {
-            playerBackendOn = false;
-          }
-        } else {
-          playerBackendOn = false;
+          AmbientBackend_Apply(ambBackend, pdec, absClip);
+        } else if (ambBackend.running || ambBackend.pid > 0) {
+          AmbientBackend_Stop(ambBackend);
         }
         ui.handoffClipPresent = amb.clip_present;
         ui.handoffAudioLabel = CubeAmbient_StatusLabelEx(amb.gain, amb.playing, amb.clip_present, pdec);
@@ -422,8 +419,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           lastAmbGain = amb.gain;
           lastAmbPlay = amb.playing;
           lastClipPresent = amb.clip_present;
-          fprintf(stderr, "[cube_webui] ambient clip_present=%d action=%s gain=%.2f path_rel=%s\n",
-                  amb.clip_present ? 1 : 0, pdec.action.c_str(), amb.gain, amb.clip_rel.c_str());
+          fprintf(stderr,
+                  "[cube_webui] ambient clip_present=%d action=%s gain=%.2f play_env=%d path_rel=%s\n",
+                  amb.clip_present ? 1 : 0, pdec.action.c_str(), amb.gain,
+                  CubeAmbientPlayerEnabled() ? 1 : 0, amb.clip_rel.c_str());
         }
       }
       WebUI_MarkDirty(ui);

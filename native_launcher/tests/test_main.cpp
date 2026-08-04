@@ -6,6 +6,8 @@
 #include "ambient_clip.hpp"
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
+#include <algorithm>
+#include <cstdlib>
 
 TEST(launcher_math3d_normalize) {
     Vec3 n = Normalize(V3(3.f, 0.f, 0.f));
@@ -270,9 +272,17 @@ TEST(launcher_ambient_clip_contract) {
     ASSERT_TRUE(CubeAmbient_StatusLabel(1.f, true, false).find("MISSING") != std::string::npos);
 }
 
-// G12: ambient asset candidates + player decide (playback hard-off)
+// G12: ambient asset candidates + player decide (playback default off)
 TEST(launcher_ambient_player_decide) {
+    // Env opt-in pure; default product off when unset
+    ASSERT_TRUE(!CubeAmbientPlayerWantEnv(nullptr));
+    ASSERT_TRUE(!CubeAmbientPlayerWantEnv(""));
+    ASSERT_TRUE(!CubeAmbientPlayerWantEnv("0"));
+    ASSERT_TRUE(CubeAmbientPlayerWantEnv("1"));
+    ASSERT_TRUE(CubeAmbientPlayerWantEnv("true"));
+    unsetenv("GVRMOD_AMBIENT_PLAY");
     ASSERT_TRUE(!CubeAmbientPlayerEnabled());
+
     auto cands = CubeAmbient_AssetsDirCandidates("/env/assets", "/opt/bin", "/src/assets");
     ASSERT_TRUE(cands.size() >= 3);
     ASSERT_EQ(cands[0], std::string("/env/assets"));
@@ -296,6 +306,24 @@ TEST(launcher_ambient_player_decide) {
     ASSERT_EQ(stop.action, std::string("stop"));
     auto idle = CubeAmbient_PlayerDecide(false, 1.f, true, false, true);
     ASSERT_EQ(idle.action, std::string("idle"));
+}
+
+// G12: pure ffplay/paplay argv + gain restart threshold (no process spawn)
+TEST(launcher_ambient_backend_argv) {
+    ASSERT_EQ(CubeAmbient_VolumePercent(0.42f), 42);
+    ASSERT_EQ(CubeAmbient_VolumePercent(-1.f), 0);
+    ASSERT_EQ(CubeAmbient_VolumePercent(2.f), 100);
+    auto ff = CubeAmbient_PlayArgv("ffplay", "/tmp/a.ogg", 0.5f);
+    ASSERT_TRUE(ff.size() >= 8);
+    ASSERT_EQ(ff[0], std::string("ffplay"));
+    ASSERT_TRUE(std::find(ff.begin(), ff.end(), "-loop") != ff.end());
+    ASSERT_EQ(ff.back(), std::string("/tmp/a.ogg"));
+    auto pa = CubeAmbient_PlayArgv("paplay", "/tmp/a.ogg", 0.5f);
+    ASSERT_EQ(pa.size(), (size_t)2);
+    ASSERT_EQ(pa[0], std::string("paplay"));
+    ASSERT_TRUE(CubeAmbient_ShouldRestartForGain(0.9f, 0.5f));
+    ASSERT_TRUE(!CubeAmbient_ShouldRestartForGain(0.5f, 0.55f));
+    ASSERT_TRUE(CubeAmbient_PlayArgv("ffplay", "", 1.f).empty());
 }
 
 // G12: ambient gain law — full during hold, duck at take_xr, 0 on exit complete

@@ -29,14 +29,73 @@ struct AmbientPlayerDecision {
   bool valid = false;
 };
 
-// Hard off until paplay/OpenAL path is HMD-proven. Presence + decide still run.
-inline bool CubeAmbientPlayerEnabled() { return false; }
+// Env opt-in pure (unit-tested). Product default remains off when env unset.
+inline bool CubeAmbientPlayerWantEnv(const char* envVal) {
+  if (!envVal || !envVal[0]) return false;
+  char c = envVal[0];
+  return c == '1' || c == 'y' || c == 'Y' || c == 't' || c == 'T';
+}
+
+// Default off. Careful HMD smoke: GVRMOD_AMBIENT_PLAY=1 (no rebuild).
+// Presence + decide always run; spawn only when this is true.
+inline bool CubeAmbientPlayerEnabled() {
+  return CubeAmbientPlayerWantEnv(std::getenv("GVRMOD_AMBIENT_PLAY"));
+}
+
+// 0..100 for ffplay -volume / UI.
+inline int CubeAmbient_VolumePercent(float volume01) {
+  if (volume01 < 0.f) volume01 = 0.f;
+  if (volume01 > 1.f) volume01 = 1.f;
+  return (int)(volume01 * 100.f + 0.5f);
+}
+
+// Prefer ffplay (loop + volume). paplay is once-shot fallback.
+inline const char* CubeAmbient_DefaultBackend() { return "ffplay"; }
+
+// Restart external player when gain steps enough (ffplay cannot duck live).
+inline bool CubeAmbient_ShouldRestartForGain(float oldVol, float newVol, float threshold = 0.15f) {
+  float d = newVol - oldVol;
+  if (d < 0.f) d = -d;
+  return d >= threshold;
+}
 
 inline void AmbientClip_Trim(std::string& s) {
   while (!s.empty() && (s.back() == '\r' || s.back() == ' ' || s.back() == '\t')) s.pop_back();
   size_t i = 0;
   while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) ++i;
   if (i) s = s.substr(i);
+}
+
+// Pure argv for external player (no shell). backend: ffplay | paplay
+inline std::vector<std::string> CubeAmbient_PlayArgv(const std::string& backend,
+                                                     const std::string& absPath,
+                                                     float volume01) {
+  std::vector<std::string> argv;
+  if (absPath.empty()) return argv;
+  int vol = CubeAmbient_VolumePercent(volume01);
+  if (vol < 1) vol = 1; // avoid total silence while "playing"
+  std::string be = backend.empty() ? CubeAmbient_DefaultBackend() : backend;
+  AmbientClip_Trim(be);
+  for (char& c : be) {
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+  }
+  if (be == "paplay") {
+    // Pulse once-shot — no native volume/loop; gain law only gates start/stop
+    argv.push_back("paplay");
+    argv.push_back(absPath);
+    return argv;
+  }
+  // ffplay: loop hold tone, volume 0..100, no video window
+  argv.push_back("ffplay");
+  argv.push_back("-nodisp");
+  argv.push_back("-loglevel");
+  argv.push_back("quiet");
+  argv.push_back("-loop");
+  argv.push_back("0");
+  argv.push_back("-volume");
+  argv.push_back(std::to_string(vol));
+  argv.push_back(absPath);
+  return argv;
 }
 
 inline const char* CubeAmbient_DefaultClipRel() { return "ambient/cube_hold.ogg"; }

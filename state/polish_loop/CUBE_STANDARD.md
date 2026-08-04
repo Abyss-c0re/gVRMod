@@ -24,7 +24,7 @@ Never submit eng texture. Never dual pose truth.
 - G04 partial: every Start still cold-spawns; `cube_warm.txt` + GMod WarmAttach decide/toast; changelevel/`CubeWarmReuseEnabled` hard-off
 - G13 partial: VR exit writes `cube_return.txt`; Cube polls + RETURN panel line; **does not** auto-reclaim XR (`CubeReclaimEnabled` hard-off)
 - G03 partial: Cube writes `cube_stage_pack.txt`; GMod parses + `StagePack_ApplyDecision` (allow_apply=false); **must not** auto-jump origin/height without HMD-proven apply
-- G12 partial: gain law + `cube_hold.ogg` asset + presence resolve; `CubeAmbientPlayerEnabled` hard-off (no audible yet)
+- G12 partial: gain law + `cube_hold.ogg` + ffplay/paplay backend; audible only with `GVRMOD_AMBIENT_PLAY=1` (default silent)
 
 ## UI / interaction
 

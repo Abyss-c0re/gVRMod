@@ -228,3 +228,13 @@ Append one block per cycle. Newest at bottom.
 - G04 partial — skip-spawn + real changelevel still open.
 - Tests: full test_all PASS 6/6 (+attach unit Lua/C++).
 - Next: G12 paplay backend careful or G05 careful.
+
+## 2026-08-04 cycle 24 — G12 ambient ffplay/paplay backend
+
+- Theme: careful external player; default off, env opt-in.
+- ambient_backend: fork ffplay -loop -volume (paplay fallback).
+- Pure: PlayArgv/VolumePercent/RestartForGain/WantEnv.
+- Wire xr_app AmbientBackend_Apply when GVRMOD_AMBIENT_PLAY=1.
+- G12 partial — product default still silent until HMD-proven default-on.
+- Tests: full test_all PASS 6/6 (+backend argv unit); launcher builds.
+- Next: G05 stereo-load HMD notes or ambient default-on careful.

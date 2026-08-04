@@ -1,28 +1,28 @@
 # Last cycle
 
-**Cycle:** 23  
-**Time:** 2026-08-04T18:34:25+03:00  
-**Focus:** G04 map attach design (partial — changelevel hard-off)  
-**Commit (gVRMod):** `ac1775d`  
-**Commit (vrmod-x64):** `b299125`  
+**Cycle:** 24  
+**Time:** 2026-08-04T18:45:49+03:00  
+**Focus:** G12 paplay/ffplay ambient backend (env opt-in)  
+**Commit (gVRMod):** (pending)  
+**Commit (vrmod-x64):** none  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
 
-1. **warm_reuse.hpp** CubeWarmAttach_NormalizeMap / Decide / Toast (pure)  
-2. **sh_warm_attach.lua** Parse + Decide + Toast (allow_changelevel=false)  
-3. **cl_openxr_launch** noteWarmAttachOnce toast after VR live (no changelevel)  
-4. Units: launcher_warm_attach_decide + util.warm_attach.decide_g04  
-5. PURE_TESTED map for WarmAttach_*  
+1. **ambient_backend.cpp** fork/exec ffplay (loop+volume) / paplay fallback  
+2. Pure **PlayArgv / VolumePercent / ShouldRestartForGain / WantEnv**  
+3. **GVRMOD_AMBIENT_PLAY=1** opt-in (default still silent)  
+4. xr_app Apply on decide; stop when env off  
+5. Unit: `launcher_ambient_backend_argv`  
 
 ## Pain points
 
-- Untouched; no auto changelevel / skip-spawn.
+- Untouched.
 
 ## Gaps
 
-- G04 still **partial** — real skip-spawn + changelevel path open  
-- Next: G12 paplay backend careful, or G05 HMD notes  
+- G12 still **partial** — default silent; HMD smoke with env; OpenAL future  
+- Next: G05 stereo-load notes, or default-on ambient after HMD proof  
 
 ## Notes
 

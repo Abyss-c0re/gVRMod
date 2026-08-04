@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-04 cycle 23
+Last updated: 2026-08-04 cycle 24
 
 ## P0 — seamless / feel broken
 
@@ -20,7 +20,7 @@ Last updated: 2026-08-04 cycle 23
 |----|-----|-------|--------|
 | G10 | First-run gates re-spam on wrapper autostart | Should skip if cal exists + native_wrapper | **done** cycle2 |
 | G11 | Quick Play (last map + gfx) missing | Reduces menu friction | **done** cycle4 |
-| G12 | Audio dead during handoff | Asset+decide+presence cycle22; play hard-off | **partial** cycle22 |
+| G12 | Audio dead during handoff | ffplay backend cycle24; env GVRMOD_AMBIENT_PLAY | **partial** cycle24 |
 | G13 | Return-to-Cube reverse handoff | Poll+panel cycle21; auto reclaim hard-off | **partial** cycle21 |
 | G14 | Glide vehicle input SoT | Watchlist W3; partial | **partial** cycle9 (pure SoT+toast; HMD smoke open) |
 
@@ -42,6 +42,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G12 | Ambient ffplay backend (env opt-in) | ambient_backend + PlayArgv |
 | G04 | Map attach decide (hard-off) | WarmAttach_* + noteWarmAttachOnce |
 | G12 | Ambient asset + player decide (hard-off) | cube_hold.ogg + PlayerDecide |
 | G13 | Reclaim poll design (hard-off) | cube_return.hpp + panel poll |
