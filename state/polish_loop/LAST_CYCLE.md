@@ -3,8 +3,8 @@
 **Cycle:** 49  
 **Time:** 2026-08-04T23:20:00+03:00  
 **Focus:** G31 action-manifest self-heal + honest toast law (W6)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `b0a70a5`  
+**Commit (vrmod-x64):** `8ad16c5`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 43 Lua tests)  
 
 ## What changed
