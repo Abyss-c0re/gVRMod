@@ -592,3 +592,14 @@ Append one block per cycle. Newest at bottom.
 - Did not thrash quest module WIP (8939da7) or cubalc_mirror.
 - Tests: --fast PASS 4/4 (pure pending=0; 56 Lua).
 - Next: Walk G05/G12 on HMD; or primary-hand left smoke.
+
+## 2026-08-05 cycle 60 — G45 primary-hand left SoT (LaserLaw_Decide)
+
+- Theme: primary-left laser+click; wrong-hand steal risk; dual laser forbidden.
+- Pure: LaserLaw_Decide/AllowLaserFromHand/IsWrongHandPrimaryClick/IsStealRisk.
+- cl_ui menu laser path snapshots _laserLaw + HmdExpect.
+- Align submit_bounds test with clampHalf (V offset still differs under auto).
+- HmdWalk catalog G45 §0.32; TESTING_FRAMEWORK.
+- vrmod-x64 pushed branch cube-stereo-g45 (main non-ff: remote has mq2 mono revert).
+- Tests: --fast PASS 4/4 (pure pending=0; 56 Lua).
+- Next: Walk G05/G12 or primary-left on HMD; resolve vrmod-x64 main vs cube-stereo-g45.

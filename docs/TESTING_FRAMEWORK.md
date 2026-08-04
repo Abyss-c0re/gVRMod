@@ -208,6 +208,7 @@ Offline gate proves primary-hand SoT + click action map + first-eye focus solve.
 | Trigger | Primary fire = LMB click once | Miss / double / wrong hand |
 | Secondary | Secondary fire closes / RMB | Grab_end storms |
 | Left primary | `vrmod_primary_hand 1` → left laser+click | Right still steals click |
+| G45 decide | `g_VR._laserLawLabel` FOCUS/AIM; risk=steal if wrong hand | Dual laser / steal risk |
 
 **Procedure (claim “G16 laser OK” only if walked):**
 
@@ -217,7 +218,21 @@ Offline gate proves primary-hand SoT + click action map + first-eye focus solve.
 4. Optional left-hand primary — laser+click follow.  
 5. Secondary closes menus cleanly.
 
-Pure helpers: `LaserLaw_IsMenuPrimaryClick` / `LaserLaw_ShouldSolveFocus` / `LaserLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+Pure helpers: `LaserLaw_IsMenuPrimaryClick` / `LaserLaw_ShouldSolveFocus` / `LaserLaw_Decide` / `LaserLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
+
+### 0.32 G45 primary-hand left SoT walk (manual)
+
+Offline gate proves **Decide** + wrong-hand steal + primary-only laser ray. **Headset** still required to claim left-primary OK.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| `vrmod_primary_hand 1` | Laser from left; left trigger = LMB | Right trigger steals LMB |
+| Laser hand | `menuPointerHand` = left only | Dual free-for-all lasers |
+| Snapshot | `_laserLaw` / `_laserLawHmdExpect` | Silent dual/steal |
+
+**Procedure:** set primary left → open Cube menu → left click works; right fire does not activate LMB.
+
+Pure helpers: `LaserLaw_AllowLaserFromHand` / `LaserLaw_IsWrongHandPrimaryClick` / `LaserLaw_Decide` (unit-tested; offline ≠ HMD OK).
 
 ### 0.9 G17 mat_queue pin (manual)
 

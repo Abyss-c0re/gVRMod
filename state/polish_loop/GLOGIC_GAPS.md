@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 59
+Last updated: 2026-08-05 cycle 60
 
 ## P0 — seamless / feel broken
 
@@ -48,6 +48,7 @@ Last updated: 2026-08-05 cycle 59
 | G42 | Hands stuck unstick (ship bar) | HandStuckLaw_* in addon; pure tests cycle59 | **partial** cycle59 |
 | G43 | Menu-open nested RT crash | NestedRtLaw_* in addon; pure tests cycle59 | **partial** cycle59 |
 | G44 | grab_end drop cooldown storms | GrabEndLaw_* in addon; pure tests cycle59 | **partial** cycle59 |
+| G45 | Primary-hand left SoT (ship bar) | LaserLaw_Decide + steal/dual cycle60 | **partial** cycle60 |
 
 ## HMD walk backlog inventory (G41 — offline ≠ HMD OK)
 
@@ -73,6 +74,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G45 | Primary-hand left Decide + steal law | LaserLaw_* + cl_ui snapshot |
 | G41–G44 | Parent pure offline gate for ship-bar laws | tests + PURE_TESTED cycle59 |
 | G40 | Vision border fill law (W1) | BorderLaw_* + cl_border_calibrate |
 | G39 | VR_Init human error surface (W11) | InitLaw_* + PerformStartup |

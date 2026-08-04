@@ -44,7 +44,7 @@ Never submit eng texture. Never dual pose truth.
 
 ## UI / interaction
 
-- Laser + trigger click is sacred and must stay responsive (G16: pure primary-hand SoT + first-eye focus; §0.8 walk open)
+- Laser + trigger click is sacred and must stay responsive (G16/G45: primary-hand SoT + left primary no steal + first-eye focus; §0.8/§0.32 walk open)
 - No menu thrash (register once; dedupe by id) — G26 partial: `MenuLaw_*` stable key + VRClimb collapse; HmdExpect §0.13 open
 - No grab_end storms / left-trigger silence regressions
 - World panel: world-locked by default; grip repositions

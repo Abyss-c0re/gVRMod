@@ -953,6 +953,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
     [
+      "vrmod.utils.LaserLaw_AllowLaserFromHand",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
       "vrmod.utils.LaserLaw_HmdExpect",
       "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
     ],
@@ -966,6 +974,14 @@
     ],
     [
       "vrmod.utils.LaserLaw_IsMenuSecondaryClick",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_IsStealRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
+      "vrmod.utils.LaserLaw_IsWrongHandPrimaryClick",
       "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
     ],
     [

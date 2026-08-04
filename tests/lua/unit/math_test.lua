@@ -152,12 +152,15 @@ return function(H, env)
 		H.assert_true(uMinR < uMaxR)
 		H.assert_true(uMaxL <= uMinR + 0.001, "left half ends at seam")
 		H.assert_true(uMinL >= 0 and uMaxR <= 1.01)
-		-- asymmetric auto offset should shift U when renderOffset=true
-		local La = { Width = 1.0, Height = 1.0, HorizontalOffset = 0.1, VerticalOffset = 0.0 }
-		local Ra = { Width = 1.0, Height = 1.0, HorizontalOffset = -0.1, VerticalOffset = 0.0 }
-		local aUMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
-		local bUMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, false)
-		H.assert_true(math.abs(aUMinL - bUMinL) > 1e-6, "auto FOV offset changes U mins")
+		-- clampHalf may absorb pure H offset at the SBS seam; V offset still applies
+		local La = { Width = 1.0, Height = 1.0, HorizontalOffset = 0.1, VerticalOffset = 0.2 }
+		local Ra = { Width = 1.0, Height = 1.0, HorizontalOffset = -0.1, VerticalOffset = -0.2 }
+		local _, aVMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
+		local _, bVMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, false)
+		H.assert_true(math.abs(aVMinL - bVMinL) > 1e-6, "auto FOV vertical offset changes V mins")
+		-- halves stay valid after seam clamp
+		local c0, _, c2 = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
+		H.assert_true(c0 < c2 and c2 <= 0.5 + 1e-6)
 		-- mq2 mono-both: right UV mirrors left half (no one-eye black)
 		local b = { uMinL, vMinL, uMaxL, vMaxL, uMinR, vMinR, uMaxR, vMaxR }
 		local m0, m1, m2, m3, m4, m5, m6, m7 = env.vrmod.utils.SubmitBounds_MirrorLeftToBoth(b)
@@ -1368,6 +1371,45 @@ return function(H, env)
 		H.assert_eq(he.verdict, "expect_focus")
 		H.assert_true(string.find(he.checklist, "FOCUS", 1, true))
 		H.assert_eq(u.LaserLaw_StatusLabel(he), "LASER · FOCUS")
+		-- G45: primary-left SoT — left laser+click; right must not steal
+		H.assert_true(u.LaserLaw_AllowLaserFromHand("left", "left"))
+		H.assert_true(not u.LaserLaw_AllowLaserFromHand("right", "left"))
+		H.assert_true(u.LaserLaw_IsWrongHandPrimaryClick("boolean_primaryfire", "left"))
+		H.assert_true(not u.LaserLaw_IsWrongHandPrimaryClick("boolean_left_primaryfire", "left"))
+		local leftOk = u.LaserLaw_Decide({
+			vr_active = true,
+			laser_on = true,
+			has_primary_pose = true,
+			menu_focus = true,
+			primary_hand = "left",
+			laser_hand = "left",
+			click_action = "boolean_left_primaryfire",
+		})
+		H.assert_true(leftOk.path_ok)
+		H.assert_eq(leftOk.primary_hand, "left")
+		H.assert_true(leftOk.menu_primary_click)
+		H.assert_eq(u.LaserLaw_StatusLabel(leftOk), "LASER · FOCUS")
+		local steal = u.LaserLaw_Decide({
+			vr_active = true,
+			laser_on = true,
+			has_primary_pose = true,
+			primary_hand = "left",
+			laser_hand = "left",
+			click_action = "boolean_primaryfire",
+		})
+		H.assert_eq(steal.risk, "steal")
+		H.assert_true(not steal.path_ok)
+		H.assert_true(u.LaserLaw_IsStealRisk(steal))
+		H.assert_eq(u.LaserLaw_HmdExpect(steal).verdict, "expect_steal")
+		local dual = u.LaserLaw_Decide({
+			vr_active = true,
+			laser_on = true,
+			has_primary_pose = true,
+			primary_hand = "left",
+			laser_hand = "right",
+		})
+		H.assert_eq(dual.risk, "dual")
+		H.assert_eq(u.LaserLaw_StatusLabel(dual), "LASER · DUAL FAIL")
 	end)
 
 	-- G15 pure HUD composite law (never black wall of the Real)

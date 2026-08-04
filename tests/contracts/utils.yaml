@@ -1000,6 +1000,14 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.LaserLaw_AllowLaserFromHand
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
   - id: vrmod.utils.LaserLaw_HmdExpect
     file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
     tier: pure
@@ -1013,6 +1021,14 @@ symbols:
     tier: pure
     tests: [util.laser_law.sacred_g16]
   - id: vrmod.utils.LaserLaw_IsMenuSecondaryClick
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_IsStealRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: pure
+    tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_IsWrongHandPrimaryClick
     file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
     tier: pure
     tests: [util.laser_law.sacred_g16]

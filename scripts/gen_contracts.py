@@ -354,6 +354,10 @@ PURE_TESTED = {
     "vrmod.utils.LaserLaw_ShouldSolveFocus": "util.laser_law.sacred_g16",
     "vrmod.utils.LaserLaw_HmdExpect": "util.laser_law.sacred_g16",
     "vrmod.utils.LaserLaw_StatusLabel": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_AllowLaserFromHand": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_IsWrongHandPrimaryClick": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_Decide": "util.laser_law.sacred_g16",
+    "vrmod.utils.LaserLaw_IsStealRisk": "util.laser_law.sacred_g16",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",
