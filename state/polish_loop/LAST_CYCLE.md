@@ -3,8 +3,8 @@
 **Cycle:** 57  
 **Time:** 2026-08-05T00:49:00+03:00  
 **Focus:** G39 VR_Init human error surface (W11)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `6349ac4`  
+**Commit (vrmod-x64):** `237a742`  
 **Tests:** `./scripts/test_all.sh --fast` — 4/4 pass (pure pending=0; 51 Lua)  
 
 ## What changed
