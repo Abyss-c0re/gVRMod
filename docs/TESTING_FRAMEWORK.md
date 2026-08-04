@@ -508,6 +508,27 @@ Offline gate proves FOV cvars → **soft_display**, borders → **submit_bounds*
 
 Pure helpers: `FovZLaw_RefreshKind` / `FovZLaw_Decide` / `FovZLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).
 
+### 0.24 G37 hand vs bullet filter (manual)
+
+Offline gate proves hand damage scale **0.45**, head **10×**, non-bullet absorb, **no world solid**, grab allowed. **Headset/MP** for real bullet pass.
+
+| Check | Expect | FAIL if |
+|-------|--------|---------|
+| Grab prop with hand | Physical grab contact | Hands ghost / non-physical |
+| Bullet hits hand proxy | ~45% player dmg + drop | Silent block; no feedback |
+| Bullet hits head proxy | High damage redirect | No head hit registration |
+| Self melee on hand | Absorbed | Self-punch thrash |
+| Proxy vs world | No solid wall fight | Sparks / climb thrash |
+
+**Procedure (claim “G37 hand-bullet OK” only if walked):**
+
+1. Grab prop — hands feel Real.  
+2. Get shot in hand (or shoot near) — damage + drop path.  
+3. Hands do not solid-block world walls (climb/wall path separate).
+
+Pure helpers: `HandBulletLaw_Decide` / `HandBulletLaw_HmdExpect` (unit-tested; offline ≠ HMD OK).  
+**Do not** rewrite climb/wall coll while verifying.
+
 **Automation gap (open):** no CI job runs OpenXR runtime + HMD. Do not invent “HMD smoke passed offline.” When automation lands, keep it optional/nightly — never block pure-util PRs.
 
 ### Agent / polish-loop law

@@ -515,6 +515,70 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure
     tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.HandBulletLaw_AbsorbNonBulletOnProxy
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_AllowGrabContact
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_HandDamageScale
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_HeadDamageScale
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_IsBlockRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_IsBulletDamageType
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_IsHandPart
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_NormalizePart
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_PreventSelfMeleeOnHand
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_ProxySolidToWorld
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_RedirectScale
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_ShouldAbsorbOnProxy
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_ShouldDropOnHandBullet
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.filter_g37]
   - id: vrmod.utils.HandleNPCRagdoll
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

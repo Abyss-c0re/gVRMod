@@ -481,6 +481,70 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
     ],
     [
+      "vrmod.utils.HandBulletLaw_AbsorbNonBulletOnProxy",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_AllowGrabContact",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_HandDamageScale",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_HeadDamageScale",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_IsBlockRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_IsBulletDamageType",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_IsHandPart",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_NormalizePart",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_PreventSelfMeleeOnHand",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_ProxySolidToWorld",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_RedirectScale",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_ShouldAbsorbOnProxy",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_ShouldDropOnHandBullet",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
       "vrmod.utils.HandleNPCRagdoll",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],

@@ -454,6 +454,65 @@ return function(H, env)
 		H.assert_true(string.find(heChg.checklist, "CHANGELEVEL", 1, true))
 	end)
 
+	-- G37 pure hand vs bullet filter law (W9)
+	H.TEST("util.hand_bullet_law.filter_g37", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.HandBulletLaw_HandDamageScale(), 0.45)
+		H.assert_eq(u.HandBulletLaw_HeadDamageScale(), 10.0)
+		H.assert_true(not u.HandBulletLaw_ProxySolidToWorld())
+		H.assert_true(u.HandBulletLaw_AllowGrabContact())
+		H.assert_true(u.HandBulletLaw_PreventSelfMeleeOnHand())
+		H.assert_true(u.HandBulletLaw_AbsorbNonBulletOnProxy())
+		H.assert_true(u.HandBulletLaw_IsBulletDamageType(2)) -- DMG_BULLET
+		H.assert_true(not u.HandBulletLaw_IsBulletDamageType(0))
+		H.assert_true(u.HandBulletLaw_IsHandPart("left"))
+		H.assert_true(not u.HandBulletLaw_IsHandPart("head"))
+		H.assert_eq(u.HandBulletLaw_RedirectScale("head"), 10.0)
+		H.assert_eq(u.HandBulletLaw_RedirectScale("right"), 0.45)
+		H.assert_true(u.HandBulletLaw_ShouldDropOnHandBullet("left", true))
+		H.assert_true(not u.HandBulletLaw_ShouldDropOnHandBullet("head", true))
+		H.assert_true(u.HandBulletLaw_ShouldAbsorbOnProxy({
+			is_bullet = false,
+			is_self = true,
+			part = "left",
+		}))
+		H.assert_true(not u.HandBulletLaw_ShouldAbsorbOnProxy({
+			is_bullet = true,
+			is_self = false,
+			part = "left",
+		}))
+		local handHit = u.HandBulletLaw_Decide({
+			part = "right",
+			is_bullet = true,
+			damage = 100,
+		})
+		H.assert_true(handHit.path_ok)
+		H.assert_eq(handHit.player_damage, 45)
+		H.assert_true(handHit.drop_weapon)
+		H.assert_eq(u.HandBulletLaw_StatusLabel(handHit), "HAND · BULLET REDIRECT")
+		local he = u.HandBulletLaw_HmdExpect(handHit)
+		H.assert_eq(he.verdict, "expect_bullet_redirect")
+		H.assert_true(string.find(he.checklist, "G37", 1, true))
+		local block = u.HandBulletLaw_Decide({
+			part = "left",
+			is_bullet = true,
+			blocks_bullets_as_world = true,
+		})
+		H.assert_true(not block.path_ok)
+		H.assert_eq(block.risk, "blocks_bullets")
+		H.assert_true(u.HandBulletLaw_IsBlockRisk(block))
+		local solid = u.HandBulletLaw_Decide({ solid_to_world = true, part = "left" })
+		H.assert_eq(solid.risk, "solid_world")
+		local absorb = u.HandBulletLaw_Decide({
+			part = "left",
+			is_bullet = false,
+			is_self = true,
+			damage = 10,
+		})
+		H.assert_true(absorb.absorb)
+		H.assert_eq(u.HandBulletLaw_StatusLabel(absorb), "HAND · ABSORB")
+	end)
+
 	-- G36 pure FOV/Z soft-refresh law (W5; no mid-frame UV fight)
 	H.TEST("util.fovz_law.soft_refresh_g36", function()
 		local u = env.vrmod.utils

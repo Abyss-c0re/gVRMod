@@ -542,3 +542,13 @@ Append one block per cycle. Newest at bottom.
 - G36 partial — HMD one-eye jitter walk open.
 - Tests: --fast PASS 4/4 (pure pending=0; 48 Lua).
 - Next: HMD walk backlog (G05/G12) or W9 hand bullet filter notes.
+
+## 2026-08-05 cycle 55 — G37 hand vs bullet filter law (W9)
+
+- Theme: hands Real for grabs; bullet redirect (hand 0.45 / head 10×); non-bullet absorb; never world solid.
+- Pure: HandBulletLaw_IsBullet/RedirectScale/ShouldAbsorb/Decide/HmdExpect.
+- sv_collision_proxies damage redirect wires pure law (no climb/wall thrash).
+- TESTING_FRAMEWORK §0.24; PURE_TESTED map.
+- G37 partial — HMD/MP bullet walk open.
+- Tests: --fast PASS 4/4 (pure pending=0; 49 Lua).
+- Next: HMD walk backlog (G05/G12) or W10 worldmodel single path notes.

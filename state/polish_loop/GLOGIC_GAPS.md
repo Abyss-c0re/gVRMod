@@ -2,7 +2,7 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 54
+Last updated: 2026-08-05 cycle 55
 
 ## P0 — seamless / feel broken
 
@@ -30,6 +30,7 @@ Last updated: 2026-08-05 cycle 54
 | G34 | Fly-away origin snap + action set (W12) | FlyAwayLaw_* cycle52; HMD walk open | **partial** cycle52 |
 | G35 | Viewscale fisheye clamp / comfort (W8) | ViewScaleLaw_* + CubeViewScale_* cycle53; HMD walk open | **partial** cycle53 |
 | G36 | FOV/Z soft-refresh no mid-frame UV fight (W5) | FovZLaw_* cycle54; HMD walk open | **partial** cycle54 |
+| G37 | Hand vs bullet filter (W9) | HandBulletLaw_* cycle55; HMD walk open | **partial** cycle55 |
 | G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
 | G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
 | G15 | Opaque black HUD / wall of Real | HudLaw composite cycle38; HMD walk open | **partial** cycle38 |
@@ -59,6 +60,7 @@ See `addon/vrmod-x64/docs/CUBE_WATCHLIST.md` (W1–W12). Prefer smoke docs and t
 
 | ID | What | Commit / note |
 |----|------|----------------|
+| G37 | Hand vs bullet filter (W9) | HandBulletLaw_* + sv_collision_proxies |
 | G36 | FOV/Z soft-refresh no mid-frame UV fight (W5) | FovZLaw_* + cl_vrmod Bind* |
 | G35 | Viewscale fisheye clamp / comfort (W8) | ViewScaleLaw_* + CubeViewScale_* |
 | G34 | Fly-away origin snap + action set (W12) | FlyAwayLaw_* + cl_vrmod wire |
