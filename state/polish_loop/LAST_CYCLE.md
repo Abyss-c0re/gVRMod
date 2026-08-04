@@ -3,8 +3,8 @@
 **Cycle:** 23  
 **Time:** 2026-08-04T18:34:25+03:00  
 **Focus:** G04 map attach design (partial — changelevel hard-off)  
-**Commit (gVRMod):** (pending)  
-**Commit (vrmod-x64):** (pending)  
+**Commit (gVRMod):** `ac1775d`  
+**Commit (vrmod-x64):** `b299125`  
 **Tests:** `./scripts/test_all.sh` — 6/6 pass  
 
 ## What changed
