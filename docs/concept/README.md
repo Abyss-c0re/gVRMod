@@ -8,5 +8,6 @@ Material here is **deferred research**. It is not required to build, install, or
 | `cubalc/` | Mirrored protocol headers + SMX notes (snapshot) |
 | `scripts/cubalc_pull_loop.sh` | Optional lab pull (do not ship) |
 | `addon/vrmod-x64/concept/algocube/` | Algocube Lua prototypes (**not** autorun) |
+| `experimental/smx_proto/` | **SMX** standalone lab binary (not in CubeUI) |
 
 **Product path:** OpenXR module + CubeUI launcher + `addon/vrmod-x64/lua` (standard VRMod).

@@ -9,10 +9,11 @@ Not required for gVRMod OpenXR, WiVRn, CubeUI, or GMod addon ship.
 - Protocol notes / headers snapshot: `docs/concept/cubalc/`
 - Lab pull script: `docs/concept/scripts/cubalc_pull_loop.sh`
 - Algocube Lua (not loaded by VRMod): `addon/vrmod-x64/concept/algocube/`
-- Optional SMX sockets in the launcher: **off by default** (`GVRMOD_SMX_*`)
+- **SMX lab module** (standalone): `experimental/smx_proto/` — not linked into CubeUI
 
 ## Product rules until re-enabled
 
 - No CubalC mirror under `state/`
 - No pull loop in `scripts/` product entry points
 - No autorun of algocube from `lua/vrmod/utils/`
+- No SMX sockets in the product launcher binary

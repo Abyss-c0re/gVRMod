@@ -27,7 +27,6 @@ set(CUBEUI_SOURCES
   src/bindings_mgr.cpp
   src/gmod_spawn.cpp
   src/ui_panel.cpp
-  src/smx_player.cpp
   src/ambient_backend.cpp
   ${CUBE_SHARED_OPENXR}
 )

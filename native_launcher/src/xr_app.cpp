@@ -16,7 +16,6 @@
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
 #include "ui_panel.hpp"
-#include "smx_player.hpp"
 #include "math3d.hpp"
 
 #include <X11/Xlib.h>
@@ -256,8 +255,6 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
   bool worldInitPending = true;
   bool emergencySeedOnly = false; // true after fake seed — re-anchor on first real HMD
 
-  SmxPeerState smx{};
-  SmxInit(smx, "gvrmod-cube-shell");
   Vec3 grabOff{0, 0, 0};
   float stickCooldown = 0.f;
   // Primary laser (best tracking / active hand) + optional second laser
@@ -926,8 +923,9 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
       xrLocateViews(session, &vli0, &vs0, 2, &vc0, views0);
     }
 
-    bool trigL = trigLEarly;
-    bool trigR = trigREarly;
+    // trigger level used via edgeL/edgeR / axis latch; no SMX matrix export in product
+    (void)trigLEarly;
+    (void)trigREarly;
     bool menuBtn = XrInputReadMenu(session, input);
     // MENU re-place: edge + cooldown so chatter cannot re-seed every frame (HMD flight)
     static float menuReseedCd = 0.f;
@@ -983,36 +981,7 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
     }
     if (stickCooldown > 0.f) stickCooldown -= 1.f / 72.f;
 
-    // SMX matrix bus — only if configured; rate-limited inside SmxPump (default 20Hz)
-    if (SmxEnabled(smx)) {
-      SmxPlayerMatrix mat{};
-      std::strncpy(mat.player_id, smx.self_id, sizeof mat.player_id - 1);
-      if (headOk) {
-        SmxFillPose(mat.head, headWorld.position.x, headWorld.position.y, headWorld.position.z,
-                    headWorld.orientation.x, headWorld.orientation.y, headWorld.orientation.z,
-                    headWorld.orientation.w);
-        mat.valid_mask |= 1;
-      }
-      if (aimValidL) {
-        SmxFillPose(mat.aim_l, aimOL.x, aimOL.y, aimOL.z, aimDL.x, aimDL.y, aimDL.z, 0.f);
-        mat.valid_mask |= 2;
-      }
-      if (aimValidR) {
-        SmxFillPose(mat.aim_r, aimOR.x, aimOR.y, aimOR.z, aimDR.x, aimDR.y, aimDR.z, 0.f);
-        mat.valid_mask |= 4;
-      }
-      mat.trigger_l = trigL ? 1.f : 0.f;
-      mat.trigger_r = trigR ? 1.f : 0.f;
-      mat.grab_l = grabL;
-      mat.grab_r = grabR;
-      mat.menu = menuBtn ? 1 : 0;
-      mat.ui_tex_w = (uint32_t)UI_W;
-      mat.ui_tex_h = (uint32_t)UI_H;
-      // Cheap hash: seq + paint frame — do NOT scan full RGBA every XR tick
-      mat.ui_tex_hash = (uint32_t)ui.paintFrame * 2654435761u ^ (uint32_t)smx.tx_seq;
-      SmxPlayerMatrix peer{};
-      SmxPump(smx, mat, &peer);
-    }
+    // SMX matrix bus is NOT in product launcher — see experimental/smx_proto
 
     std::vector<XrCompositionLayerProjectionView> projViews;
     XrCompositionLayerProjection layer{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
@@ -1155,7 +1124,6 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
       if (pfnPausePt) pfnPausePt(passthrough);
       if (pfnDestroyPt) pfnDestroyPt(passthrough);
     }
-    SmxShutdown(smx);
     XrInputDestroy(input);
     if (viewSpace) xrDestroySpace(viewSpace);
     if (space) xrDestroySpace(space);

@@ -1,26 +1,25 @@
-# gVRMod · State Matrix Exchange (optional / future)
+# State Matrix Exchange (SMX) — prototype module
 
-**Status:** off by default. Not part of the core OpenXR / WiVRn / CubeUI ship path.
+**Status:** separate lab binary. **Not** linked into CubeUI or `gmcl_vrmod_*`.
 
-Optional raw TCP exchange of a packed **player matrix** (poses, sticks, triggers, UI frame hash) for later multiplayer / debug tooling. Framing:
+Code: `experimental/smx_proto/`  
+How-to: `experimental/smx_proto/README.md`
+
+Wire framing:
 
 ```
 TCP stream:  [u32le N][payload N bytes]
 ```
 
-Payload layout: `SmxPlayerMatrix` in `native_launcher/src/smx_player.hpp`.
-
-## Enable (lab only)
+Payload: `SmxPlayerMatrix` in `experimental/smx_proto/smx_player.hpp`.
 
 | Variable | Role |
 |----------|------|
-| `GVRMOD_SMX_BIND` | Serve `host:port` (e.g. `0.0.0.0:17740`) |
+| `GVRMOD_SMX_BIND` | Serve `host:port` |
 | `GVRMOD_SMX_PEER` | Dial `host:port` |
 | `GVRMOD_SMX_KEY` | Optional shared secret |
-| `GVRMOD_SMX_HZ` | Max pump rate |
+| `GVRMOD_SMX_HZ` | TX rate (default 20) |
 
-Without bind/peer, SMX is idle (no sockets, no cost).
+Prove SERVE/DIAL + matrix round-trip here first. Only then consider product integration.
 
-## Related
-
-Longer-term matrix / neural bus ideas: see `docs/concept/CUBALC_FUTURE.md` (deferred).
+Related deferred ideas: `docs/concept/CUBALC_FUTURE.md`.

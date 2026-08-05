@@ -1,8 +1,7 @@
 #pragma once
-// gVRMod State Matrix Exchange (SMX) — optional player matrix P2P (off by default).
-// Wire: TCP [u32le N][payload N]. Future real-time data plane; not required for ship.
-// Enable only via GVRMOD_SMX_BIND / GVRMOD_SMX_PEER. HMAC via GVRMOD_SMX_KEY.
-#include "math3d.hpp"
+// SMX prototype — State Matrix Exchange (standalone lab module).
+// NOT linked into CubeUI / product launcher. Build: experimental/smx_proto
+// Wire: TCP [u32le N][payload N]. Env: GVRMOD_SMX_BIND / PEER / KEY / HZ.
 #include <cstdint>
 #include <string>
 
