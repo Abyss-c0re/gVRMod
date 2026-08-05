@@ -57,6 +57,8 @@ void Addons_ClampPage(AddonManager& m);
 
 bool Addons_ToggleSelected(AddonManager& m, std::string& err);
 bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err);
+// Bulk enable/disable for current filter list (workshop nomount + local rename).
+bool Addons_SetAllFiltered(AddonManager& m, bool enable, std::string& err);
 bool Addons_WriteNomount(const AddonManager& m, std::string& err);
 
 int Addons_EnabledCount(const AddonManager& m);

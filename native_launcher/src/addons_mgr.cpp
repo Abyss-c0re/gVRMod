@@ -477,6 +477,11 @@ int Addons_PageCount(const AddonManager& m) {
 
 void Addons_ClampPage(AddonManager& m) {
   int pc = Addons_PageCount(m);
+  // Empty filter → page 0 only (pc-1 when pc==0 was -1 and crashed paint/index)
+  if (pc <= 0) {
+    m.page = 0;
+    return;
+  }
   if (m.page < 0) m.page = 0;
   if (m.page >= pc) m.page = pc - 1;
 }
@@ -545,6 +550,29 @@ bool Addons_ToggleIndex(AddonManager& m, int absIndex, std::string& err) {
 
 bool Addons_ToggleSelected(AddonManager& m, std::string& err) {
   return Addons_ToggleIndex(m, m.selected, err);
+}
+
+bool Addons_SetAllFiltered(AddonManager& m, bool enable, std::string& err) {
+  std::vector<int> idx;
+  Addons_FilteredIndices(m, idx);
+  if (idx.empty()) {
+    err = "no addons in filter";
+    return false;
+  }
+  int n = 0;
+  for (int abs : idx) {
+    if (abs < 0 || abs >= (int)m.addons.size()) continue;
+    if (m.addons[abs].enabled == enable) continue;
+    std::string e;
+    if (!Addons_ToggleIndex(m, abs, e)) {
+      err = e;
+      // continue other rows; surface last error
+    } else {
+      ++n;
+    }
+  }
+  m.status = (enable ? "ENABLED ALL " : "DISABLED ALL ") + std::to_string(n);
+  return true;
 }
 
 bool Addons_PumpAsync(AddonManager& m) {

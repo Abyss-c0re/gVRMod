@@ -938,10 +938,30 @@ bool CubeUI_PointerClick(CubeUIState& s, int px, int py) {
         return true;
       }
     }
+    // Bulk enable / disable (current filter)
+    if (py >= 50 && py <= 74) {
+      if (px >= 480 && px <= 580) {
+        std::string err;
+        if (!Addons_SetAllFiltered(s.addons, true, err))
+          s.status = err.empty() ? "ENABLE ALL FAIL" : err;
+        else
+          s.status = s.addons.status;
+        return true;
+      }
+      if (px >= 590 && px <= 710) {
+        std::string err;
+        if (!Addons_SetAllFiltered(s.addons, false, err))
+          s.status = err.empty() ? "DISABLE ALL FAIL" : err;
+        else
+          s.status = s.addons.status;
+        return true;
+      }
+    }
     // Page prev / next
     if (py >= UI_H - 48 && py <= UI_H - 12) {
       if (px >= 16 && px <= 120) {
         s.addons.page = std::max(0, s.addons.page - 1);
+        Addons_ClampPage(s.addons);
         s.status = "PAGE " + std::to_string(s.addons.page + 1);
         return true;
       }
@@ -955,14 +975,16 @@ bool CubeUI_PointerClick(CubeUIState& s, int px, int py) {
     // Rows on current page
     std::vector<int> idx;
     Addons_FilteredIndices(s.addons, idx);
-    int start = s.addons.page * s.addons.pageSize;
+    Addons_ClampPage(s.addons);
+    int start = std::max(0, s.addons.page) * s.addons.pageSize;
     const int rowH = 48;
     for (int n = 0; n < s.addons.pageSize; ++n) {
       int k = start + n;
-      if (k >= (int)idx.size()) break;
+      if (k < 0 || k >= (int)idx.size()) break;
       int y = 84 + n * rowH;
       if (px >= 12 && px <= UI_W - 12 && py >= y && py <= y + rowH - 4) {
         int abs = idx[k];
+        if (abs < 0 || abs >= (int)s.addons.addons.size()) return true;
         s.addons.selected = abs;
         std::string err;
         if (!Addons_ToggleIndex(s.addons, abs, err))
@@ -1411,24 +1433,33 @@ void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICurs
       FillRect(rgba, x0, 52, 84, 22, on ? CubeTheme::CRIMSON[0] : CubeTheme::BTN[0], on ? CubeTheme::CRIMSON[1] : CubeTheme::BTN[1], on ? CubeTheme::CRIMSON[2] : CubeTheme::BTN[2], 255);
       DrawText(rgba, x0 + 12, 56, filters[f], 255, 240, 244, 1);
     }
+    // Bulk actions (current filter)
+    FillRect(rgba, 480, 52, 100, 22, CT_RGB(CubeTheme::OK), 255);
+    DrawText(rgba, 492, 56, "ALL ON", 255, 255, 255, 1);
+    FillRect(rgba, 590, 52, 120, 22, CT_RGB(CubeTheme::CRIMSON_DIM), 255);
+    DrawText(rgba, 600, 56, "ALL OFF", 255, 255, 255, 1);
+
     char cnt[96];
     std::vector<int> idx;
     Addons_FilteredIndices(s.addons, idx);
+    Addons_ClampPage(s.addons);
     int pc = Addons_PageCount(s.addons);
-    snprintf(cnt, sizeof(cnt), "%zu SHOWN / %zu TOTAL  ON %d  OFF %d  P%d/%d",
+    snprintf(cnt, sizeof(cnt), "%zu/%zu  ON %d OFF %d  P%d/%d",
              idx.size(), s.addons.addons.size(),
              Addons_EnabledCount(s.addons), Addons_DisabledCount(s.addons),
              s.addons.page + 1, std::max(1, pc));
-    DrawText(rgba, 480, 56, cnt, CT_RGB(CubeTheme::MUTED), 1);
+    DrawText(rgba, 720, 56, cnt, CT_RGB(CubeTheme::MUTED), 1);
 
-    int start = s.addons.page * s.addons.pageSize;
+    int start = std::max(0, s.addons.page) * s.addons.pageSize;
     const int rowH = 48;
     for (int n = 0; n < s.addons.pageSize; ++n) {
       int k = start + n;
-      if (k >= (int)idx.size()) break;
+      if (k < 0 || k >= (int)idx.size()) break;
       int ai = idx[k];
+      if (ai < 0 || ai >= (int)s.addons.addons.size()) break;
       const auto& a = s.addons.addons[ai];
       int y = 84 + n * rowH;
+      if (y + rowH > UI_H - 52) break;
       bool sel = (ai == s.addons.selected);
       FillRect(rgba, 12, y, UI_W - 24, rowH - 4, sel ? CubeTheme::ROW_HOT[0] : CubeTheme::ROW[0], sel ? CubeTheme::ROW_HOT[1] : CubeTheme::ROW[1], sel ? CubeTheme::ROW_HOT[2] : CubeTheme::ROW[2], 255);
       // Thumb 40x40
@@ -1469,7 +1500,7 @@ void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICurs
     FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, CT_RGB(CubeTheme::BTN), 255);
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
     DrawText(rgba, 140, UI_H - 36, s.addons.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
-    DrawText(rgba, 140, UI_H - 20, "TRIGGER = TOGGLE MOUNT  ·  CLOSE = EXIT", 160, 120, 130, 1);
+    DrawText(rgba, 140, UI_H - 20, "TRIGGER=TOGGLE  ALL ON/OFF=FILTER  PREV/NEXT=PAGE", 160, 120, 130, 1);
 
     if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
       int cx = cursor ? cursor->x : s.cursorX;
