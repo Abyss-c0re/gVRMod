@@ -1,5 +1,5 @@
 // SMX player matrix P2P — raw TCP bidirectional binary exchange.
-// Compatible framing with CubalC: [u32le len][bytes].
+// Framing: [u32le len][bytes].
 #define _POSIX_C_SOURCE 200809L
 #include "smx_player.hpp"
 

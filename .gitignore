@@ -17,3 +17,8 @@ native_launcher/build/
 
 # Runtime binary next to cwd only; project conf in native_launcher/ is tracked
 /CubeUI
+
+# Deferred CubalC / lab noise (not product)
+state/cubalc_mirror/
+.scratch/
+**/cubalc_pull.log

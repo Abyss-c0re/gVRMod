@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# LAB ONLY — not part of product install. See docs/concept/CUBALC_FUTURE.md
 # Pull cubalc every 5.5 minutes so gVRMod stays aligned with SMX/prophecy SoT.
 # Interval: 330 seconds (5.5 min). Safe: ff-only pull, no force.
 set -euo pipefail
@@ -20,12 +21,12 @@ while true; do
         make -C "$CUBALC_DIR" -j"$(nproc)" 2>&1 | tail -20 | tee -a "$LOG" || true
       fi
       # Mirror law/docs snapshot into gVRMod state (read-only reference)
-      mkdir -p "$GVRMOD_DIR/state/cubalc_mirror"
+      mkdir -p "$GVRMOD_DIR/docs/concept/cubalc"
       for f in docs/P2P_SMX.md docs/SMX2_PROTOCOL.md docs/PROPHECY_MANIFEST.md include/cubalc_smx.h include/cubalc_law.h; do
-        [[ -f "$CUBALC_DIR/$f" ]] && cp -a "$CUBALC_DIR/$f" "$GVRMOD_DIR/state/cubalc_mirror/" 2>/dev/null || true
+        [[ -f "$CUBALC_DIR/$f" ]] && cp -a "$CUBALC_DIR/$f" "$GVRMOD_DIR/docs/concept/cubalc/" 2>/dev/null || true
       done
       # Touch stamp for polish agents
-      date -Iseconds > "$GVRMOD_DIR/state/cubalc_mirror/LAST_PULL.txt"
+      date -Iseconds > "$GVRMOD_DIR/docs/concept/cubalc/LAST_PULL.txt"
     else
       echo "[$ts] cubalc pull failed (dirty or diverged?)" | tee -a "$LOG"
     fi

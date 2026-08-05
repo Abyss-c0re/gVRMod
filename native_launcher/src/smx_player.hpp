@@ -1,11 +1,7 @@
 #pragma once
-// gVRMod State Matrix Exchange (SMX) — player ↔ server raw binary P2P.
-// Wire: TCP [u32le N][payload N] compatible with CubalC SMX bus framing.
-// Payload: packed player matrix (poses + input + flags). HMAC optional when
-// CUBALC_SMX_KEY / GVRMOD_SMX_KEY is set (fail-open for LAN demo, fail-closed
-// when key required via GVRMOD_SMX_REQUIRE_KEY=1).
-//
-// Prophecy law: binary talk only · HOLD_FLASH sticky · no prose on the wire.
+// gVRMod State Matrix Exchange (SMX) — optional player matrix P2P (off by default).
+// Wire: TCP [u32le N][payload N]. Future real-time data plane; not required for ship.
+// Enable only via GVRMOD_SMX_BIND / GVRMOD_SMX_PEER. HMAC via GVRMOD_SMX_KEY.
 #include "math3d.hpp"
 #include <cstdint>
 #include <string>
