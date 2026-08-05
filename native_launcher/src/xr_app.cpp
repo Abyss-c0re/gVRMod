@@ -117,11 +117,30 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
   sci.next = &binding;
   sci.systemId = systemId;
   XrSession session = XR_NULL_HANDLE;
-  if (XR_FAILED(xrCreateSession(instance, &sci, &session))) {
-    Die("xrCreateSession failed");
-    xrDestroyInstance(instance);
-    GlxDestroy(glx);
-    return 4;
+  // G13 return-from-GMod: runtime may still be draining the previous session for
+  // 1–3s after VRMOD_Shutdown. Hard-fail left users on bare passthrough.
+  {
+    XrResult sr = XR_ERROR_RUNTIME_FAILURE;
+    const int kAttempts = 24; // ~6s @ 250ms
+    for (int attempt = 1; attempt <= kAttempts; ++attempt) {
+      sr = xrCreateSession(instance, &sci, &session);
+      if (XR_SUCCEEDED(sr) && session != XR_NULL_HANDLE) {
+        if (attempt > 1)
+          fprintf(stderr, "[CubeUI] xrCreateSession ok on attempt %d\n", attempt);
+        break;
+      }
+      fprintf(stderr,
+              "[CubeUI] xrCreateSession attempt %d/%d failed (0x%08x) — waiting for XR free\n",
+              attempt, kAttempts, (unsigned)sr);
+      session = XR_NULL_HANDLE;
+      usleep(250000);
+    }
+    if (session == XR_NULL_HANDLE || XR_FAILED(sr)) {
+      Die("xrCreateSession failed after retries (is GMod still holding OpenXR?)");
+      xrDestroyInstance(instance);
+      GlxDestroy(glx);
+      return 4;
+    }
   }
 
   XrInputState input{};
