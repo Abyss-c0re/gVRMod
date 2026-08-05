@@ -909,9 +909,11 @@ return function(H, env)
 		H.assert_eq(u.FovZLaw_RefreshKind("vrmod_horizontaloffset"), "submit_bounds")
 		H.assert_eq(u.FovZLaw_RefreshKind("vrmod_fovscale_x"), "soft_display")
 		H.assert_eq(u.FovZLaw_RefreshKind("vrmod_znear"), "session")
+		H.assert_eq(u.FovZLaw_RefreshKind("vrmod_desktopview"), "desktop_view")
 		H.assert_eq(u.FovZLaw_RefreshKind("unknown_cvar"), "none")
 		H.assert_true(u.FovZLaw_IsBorderCvar("vrmod_scalefactor"))
 		H.assert_true(u.FovZLaw_IsFovProfileCvar("vrmod_viewscale"))
+		H.assert_true(not u.FovZLaw_IsFovProfileCvar("vrmod_desktopview"))
 		H.assert_true(u.FovZLaw_IsSessionCvar("vrmod_postprocess"))
 		local ok = u.FovZLaw_Decide({
 			cvar = "vrmod_fovscale_x",
