@@ -1442,15 +1442,18 @@ void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICurs
     char cnt[96];
     std::vector<int> idx;
     Addons_FilteredIndices(s.addons, idx);
-    Addons_ClampPage(s.addons);
     int pc = Addons_PageCount(s.addons);
+    int page = s.addons.page;
+    if (pc <= 0) page = 0;
+    else if (page < 0) page = 0;
+    else if (page >= pc) page = pc - 1;
     snprintf(cnt, sizeof(cnt), "%zu/%zu  ON %d OFF %d  P%d/%d",
              idx.size(), s.addons.addons.size(),
              Addons_EnabledCount(s.addons), Addons_DisabledCount(s.addons),
-             s.addons.page + 1, std::max(1, pc));
+             page + 1, std::max(1, pc));
     DrawText(rgba, 720, 56, cnt, CT_RGB(CubeTheme::MUTED), 1);
 
-    int start = std::max(0, s.addons.page) * s.addons.pageSize;
+    int start = page * s.addons.pageSize;
     const int rowH = 48;
     for (int n = 0; n < s.addons.pageSize; ++n) {
       int k = start + n;
