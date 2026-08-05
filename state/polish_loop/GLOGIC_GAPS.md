@@ -36,7 +36,7 @@ Last updated: 2026-08-05 cycle 63
 | G37 | Hand vs bullet filter (W9) | HandBulletLaw_* cycle55; HMD walk open | **partial** cycle55 |
 | G38 | Worldmodel single path (W10; no dual ghost) | WorldModelLaw_* cycle56; HMD walk open | **partial** cycle56 |
 | G39 | VR_Init human error surface (W11 108/215) | InitLaw_* cycle57; runtime walk open | **partial** cycle57 |
-| G13 | Return-to-Cube reverse handoff | panel_refresh XR plan cycle34; rebind deferred | **partial** cycle34 |
+| G13 | Return-to-Cube reverse handoff | soft resume + Cube Launcher QM + spawn bridge 2026-08-05 | **partial** — see docs/CUBE_LAUNCHER_BRIDGE.md |
 | G14 | Glide vehicle input SoT | HmdExpect+§0.5 cycle36; HMD walk open | **partial** cycle36 |
 | G15 | Opaque black HUD / wall of Real | HudLaw composite cycle38; HMD walk open | **partial** cycle38 |
 | G16 | Laser + trigger UI sacred | LaserLaw pure cycle39; HMD walk open | **partial** cycle39 |

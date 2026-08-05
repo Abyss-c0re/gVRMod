@@ -310,27 +310,40 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
       CubeUI_SaveBindingsIfDirty(ui);
       LaunchRequest lr = LaunchRequestFromUI(ui, gmodRoot);
       ClearCubeHandoffMarkers(gmodRoot);
-      // G04: pure warm-reuse decision (feature hard-off → warm_request + still cold-spawn)
+      // G04 / G13 soft resume: if GMod is still running (temp return to launcher),
+      // skip Steam spawn and write warm_attach markers so GMod restarts VR only.
       const bool alreadyUp = GModProcessRunning();
       WarmReuseDecision warm = CubeWarmReuseDecide(alreadyUp, /*forceCold=*/false, lr.map);
-      ui.handoffBootKind = CubeWarmReuseBootKind(warm);
+      const bool softResume = alreadyUp && !lr.map.empty();
+      if (softResume) {
+        warm.action = "warm_reuse";
+        warm.reason = "soft_resume_gmod_up";
+        warm.skip_spawn = true;
+        warm.process_up = true;
+        warm.valid = true;
+        warm.map = lr.map;
+      }
+      ui.handoffBootKind = softResume ? "SOFT_RESUME" : CubeWarmReuseBootKind(warm);
       if (warm.action == "warm_request" || warm.action == "warm_reuse") {
         WarmRequestSnapshot wr;
         wr.action = warm.action;
         wr.reason = warm.reason;
         wr.map = lr.map;
-        wr.source = "CubeUI";
+        wr.source = softResume ? "CubeUI_soft_resume" : "CubeUI";
         WriteCubeWarmRequest(gmodRoot, wr);
       }
-      // G04: pure skip-spawn plan (markers + stage pack; no Steam when feature on)
-      WarmSkipSpawnPlan skipPlan = CubeWarmSkipSpawnPlanDecide(warm);
-      if (CubeLaunchShouldSkipSpawn(warm) && skipPlan.skip_spawn) {
+      // Soft resume forces skip-spawn plan even when GVRMOD_WARM_REUSE env is off
+      WarmSkipSpawnPlan skipPlan =
+          CubeWarmSkipSpawnPlanDecide(warm, softResume || CubeWarmReuseEnabled());
+      if ((softResume || CubeLaunchShouldSkipSpawn(warm)) && skipPlan.skip_spawn) {
         ui.wantStart = false;
-        ui.status = "WARM REUSE · SKIP STEAM · ATTACH";
+        ui.status = softResume ? "RESUME VR · GMOD STILL UP" : "WARM REUSE · SKIP STEAM · ATTACH";
         ui.handoff = true;
         ui.handoffMap = lr.map;
         ui.handoffPhase = skipPlan.initial_phase.empty() ? "warm_attach" : skipPlan.initial_phase;
-        ui.handoffDetail = skipPlan.detail.empty() ? CubeWarmReuseDetail(warm) : skipPlan.detail;
+        ui.handoffDetail = softResume
+            ? "soft resume · markers only · GMod restarts VR"
+            : (skipPlan.detail.empty() ? CubeWarmReuseDetail(warm) : skipPlan.detail);
         ui.handoffElapsed = 0.f;
         if (skipPlan.write_markers)
           WriteWarmAttachMarkers(gmodRoot, lr.map, ui.handoffPhase);
@@ -556,6 +569,14 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
         if (ack.should_write && !ack.detail.empty())
           detail = ack.detail;
         std::string key = active ? (dec.phase + "|" + dec.map + "|" + dec.action) : std::string("idle");
+        // Keep RESUME button state fresh (process may exit while panel is open)
+        {
+          const bool up = GModProcessRunning();
+          if (up != ui.gmodProcessUp) {
+            ui.gmodProcessUp = up;
+            CubeUI_MarkDirty(ui);
+          }
+        }
         if (key != lastReturnKey) {
           lastReturnKey = key;
           const bool wasActive = ui.returnActive;
@@ -564,6 +585,7 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
           ui.returnMap = active ? dec.map : std::string();
           ui.returnLabel = active ? label : std::string();
           ui.returnDetail = detail;
+          ui.returnIntent = (active && have) ? ret.intent : std::string();
           if (active) {
             fprintf(stderr, "[CubeUI] G13 return poll phase=%s action=%s map=%s reclaim=%d vis=%.1f\n",
                     dec.phase.c_str(), dec.action.c_str(), dec.map.c_str(),

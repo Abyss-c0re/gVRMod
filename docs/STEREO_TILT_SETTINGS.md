@@ -25,8 +25,9 @@ Experimental FOV crop is **never** the default (it previously destroyed stereo).
 | `vrmod_submit_crop` | **0** | Pushes to C++: **0** safe · **1** full · **2** FOV crop **experimental** |
 | `vrmod_renderoffset` | 1 | SBS auto UV from projection (legacy auto-offset) |
 | `vrmod_scalefactor` | 1 | UV border scale; nudge ±0.05 for edge warp |
-| `vrmod_horizontaloffset` / `vrmod_verticaloffset` | 0 | Manual UV bias (with auto off or as extra) |
-| `vrmod_swap_eyes` | **0** | Content half swap only — **leave off** unless stereo is truly inverted |
+| `vrmod_horizontaloffset` / `vrmod_verticaloffset` | 0 | Manual UV pan — **fixed UV gain** (±1 always visible; not diluted by projection Height) |
+| `vrmod_lens_bend` | **0** | Pull each eye UV toward half-center (lens map); dial in Video calibration |
+| `vrmod_swap_eyes` | **0** | **Deprecated / hidden** — content L↔R only; launcher always writes 0 |
 
 Live: crop + UV apply without VR restart. Eye mode applies next stereo frame.
 

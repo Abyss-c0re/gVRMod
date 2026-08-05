@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include <dirent.h>
 #include <fstream>
 #include <sstream>
@@ -11,12 +12,15 @@
 #include <cctype>
 #include <chrono>
 #include <unordered_map>
+#include <unordered_set>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_JPEG
 #define STBI_ONLY_PNG
 #define STBI_NO_HDR
 #define STBI_NO_LINEAR
+// Workshop previews can be multi-megapixel; cap decode to avoid OOM crashes on page flip.
+#define STBI_MAX_DIMENSIONS 1024
 #include "stb_image.h"
 
 static bool IsDir(const std::string& p) {
@@ -140,6 +144,15 @@ bool Addons_WriteNomount(const AddonManager& m, std::string& err) {
 
 static bool LoadThumbFile(const std::string& path, AddonEntry& a) {
   if (!IsFile(path)) return false;
+  // Skip huge / corrupt files before full decode (page-switch OOM with many WS addons).
+  struct stat st{};
+  if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) return false;
+  if (st.st_size <= 32 || st.st_size > 2 * 1024 * 1024) return false;
+  int iw = 0, ih = 0, ich = 0;
+  if (!stbi_info(path.c_str(), &iw, &ih, &ich) || iw <= 0 || ih <= 0) return false;
+  if (iw > 2048 || ih > 2048) return false;
+  if ((int64_t)iw * (int64_t)ih > (int64_t)1024 * 1024) return false;
+
   int w = 0, h = 0, ch = 0;
   unsigned char* data = stbi_load(path.c_str(), &w, &h, &ch, 4);
   if (!data || w <= 0 || h <= 0) {
@@ -152,8 +165,10 @@ static bool LoadThumbFile(const std::string& path, AddonEntry& a) {
   a.thumbRgba.assign(tw * th * 4, 0);
   for (int y = 0; y < th; ++y) {
     for (int x = 0; x < tw; ++x) {
-      int sx = x * w / tw;
-      int sy = y * h / th;
+      int sx = (w > 0) ? (x * w / tw) : 0;
+      int sy = (h > 0) ? (y * h / th) : 0;
+      if (sx >= w) sx = w - 1;
+      if (sy >= h) sy = h - 1;
       int si = (sy * w + sx) * 4;
       int di = (y * tw + x) * 4;
       a.thumbRgba[di + 0] = data[si + 0];
@@ -164,6 +179,43 @@ static bool LoadThumbFile(const std::string& path, AddonEntry& a) {
   }
   stbi_image_free(data);
   return true;
+}
+
+// Free RGBA for addons far from the current page so page-flipping thousands of
+// workshop entries cannot accumulate tens of MB of thumb pixels.
+static void Addons_EvictFarThumbs(AddonManager& m) {
+  if (m.addons.empty()) return;
+  int pageSize = m.pageSize > 0 ? m.pageSize : 8;
+  int page = m.page;
+  if (page < 0) page = 0;
+  std::vector<int> idx;
+  Addons_FilteredIndices(m, idx);
+  if (idx.empty()) return;
+  int keepLo = std::max(0, (page - 1) * pageSize);
+  int keepHi = std::min((int)idx.size(), (page + 2) * pageSize);
+  std::unordered_set<int> keep;
+  keep.reserve((size_t)std::max(0, keepHi - keepLo));
+  for (int n = keepLo; n < keepHi; ++n) keep.insert(idx[n]);
+  for (int i = 0; i < (int)m.addons.size(); ++i) {
+    if (keep.count(i)) continue;
+    auto& a = m.addons[i];
+    if (a.thumbRgba.empty()) continue;
+    // Drop pixels only — cache file remains; re-load from disk when page returns.
+    a.thumbRgba.clear();
+    a.thumbRgba.shrink_to_fit();
+    a.thumbW = 0;
+    a.thumbH = 0;
+    // Allow re-queue from cache (not Steam thrash): clear failed only if we still lack title.
+    if (a.kind == "workshop" && a.thumbW == 0) {
+      bool titleOk = !a.title.empty() && a.title.rfind("Workshop ", 0) != 0;
+      if (titleOk) {
+        // Title ok, thumb evicted — re-fetch preview path from disk on next pump.
+        a.metaFailed = false;
+        a.metaPending = true;
+        a.metaQueued = false;
+      }
+    }
+  }
 }
 
 static bool FindLocalPreview(const std::string& dir, AddonEntry& a) {
@@ -472,10 +524,12 @@ int Addons_PageCount(const AddonManager& m) {
   std::vector<int> idx;
   Addons_FilteredIndices(m, idx);
   if (idx.empty()) return 1;
-  return (int)((idx.size() + m.pageSize - 1) / m.pageSize);
+  int ps = m.pageSize > 0 ? m.pageSize : 8;
+  return (int)((idx.size() + (size_t)ps - 1) / (size_t)ps);
 }
 
 void Addons_ClampPage(AddonManager& m) {
+  if (m.pageSize <= 0) m.pageSize = 8;
   int pc = Addons_PageCount(m);
   // Empty filter → page 0 only (pc-1 when pc==0 was -1 and crashed paint/index)
   if (pc <= 0) {
@@ -581,15 +635,22 @@ bool Addons_PumpAsync(AddonManager& m) {
   Addons_ClampPage(m);
   bool contentChanged = false;
 
-  // Apply finished jobs (UI thread only — never block on curl)
+  // Apply finished jobs (UI thread only — never block on curl).
+  // Cap thumb decodes per frame so rapid page flips with many unloaded WS
+  // addons cannot spike memory / hitch into a crash.
   std::vector<SteamMeta> done;
   {
     std::lock_guard<std::mutex> lk(g_doneMu);
     done.swap(g_doneJobs);
   }
+  int thumbsThisFrame = 0;
+  constexpr int kMaxThumbsPerFrame = 2;
+  std::vector<SteamMeta> deferred;
   for (auto& meta : done) {
+    bool matched = false;
     for (auto& a : m.addons) {
       if (a.kind != "workshop" || a.id != meta.id) continue;
+      matched = true;
       a.metaQueued = false;
       if (!meta.title.empty() &&
           (a.title.empty() || a.title.rfind("Workshop ", 0) == 0)) {
@@ -597,7 +658,16 @@ bool Addons_PumpAsync(AddonManager& m) {
         contentChanged = true;
       }
       if (!meta.previewPath.empty() && a.thumbW == 0) {
-        if (LoadThumbFile(meta.previewPath, a)) contentChanged = true;
+        if (thumbsThisFrame >= kMaxThumbsPerFrame) {
+          // Re-queue for next frame; keep pending so UI shows "..."
+          a.metaPending = true;
+          deferred.push_back(std::move(meta));
+          break;
+        }
+        if (LoadThumbFile(meta.previewPath, a)) {
+          ++thumbsThisFrame;
+          contentChanged = true;
+        }
       }
       bool titleOk = !a.title.empty() && a.title.rfind("Workshop ", 0) != 0;
       bool thumbOk = a.thumbW > 0;
@@ -607,6 +677,9 @@ bool Addons_PumpAsync(AddonManager& m) {
       } else if (!meta.ok) {
         a.metaPending = false;
         a.metaFailed = true; // don't thrash
+      } else if (a.thumbW == 0 && !meta.previewPath.empty() && thumbsThisFrame >= kMaxThumbsPerFrame) {
+        // still waiting on deferred thumb load
+        a.metaPending = true;
       } else {
         // partial — mark done enough for UI
         a.metaPending = false;
@@ -616,18 +689,38 @@ bool Addons_PumpAsync(AddonManager& m) {
       contentChanged = true;
       break;
     }
+    if (!matched) {
+      // Addon list reloaded while job was in flight — drop.
+    }
+  }
+  if (!deferred.empty()) {
+    std::lock_guard<std::mutex> lk(g_doneMu);
+    for (auto& d : deferred) g_doneJobs.push_back(std::move(d));
   }
 
-  // Queue missing meta for current page + next page (prefetch)
+  // Evict far-page thumb pixels before queuing more (page-switch crash path)
+  static int lastEvictPage = -999;
+  if (lastEvictPage != m.page) {
+    lastEvictPage = m.page;
+    Addons_EvictFarThumbs(m);
+  }
+
+  // Queue missing meta for current page + next page only (prefetch)
   std::vector<int> idx;
   Addons_FilteredIndices(m, idx);
-  int start = m.page * m.pageSize;
-  int end = std::min((int)idx.size(), start + m.pageSize * 2);
+  int pageSize = m.pageSize > 0 ? m.pageSize : 8;
+  int start = m.page * pageSize;
+  int end = std::min((int)idx.size(), start + pageSize * 2);
   int queued = 0;
   {
     std::lock_guard<std::mutex> lk(m.jobMu);
+    // Bound queue growth when user flips pages quickly through huge lists
+    constexpr size_t kMaxPending = 24;
     for (int n = start; n < end; ++n) {
-      auto& a = m.addons[idx[n]];
+      if (n < 0 || n >= (int)idx.size()) break;
+      int abs = idx[n];
+      if (abs < 0 || abs >= (int)m.addons.size()) continue;
+      auto& a = m.addons[abs];
       if (a.kind != "workshop") continue;
       if (a.metaFailed) continue;
       bool titleOk = !a.title.empty() && a.title.rfind("Workshop ", 0) != 0;
@@ -635,6 +728,19 @@ bool Addons_PumpAsync(AddonManager& m) {
       if (titleOk && thumbOk) {
         a.metaPending = false;
         continue;
+      }
+      // Prefer local cache reload for evicted thumbs (title already known)
+      if (titleOk && !thumbOk && !m.thumbCache.empty()) {
+        std::string img = m.thumbCache + "/" + a.id + ".jpg";
+        if (!IsFile(img)) img = m.thumbCache + "/" + a.id + ".png";
+        if (IsFile(img) && thumbsThisFrame < kMaxThumbsPerFrame) {
+          if (LoadThumbFile(img, a)) {
+            ++thumbsThisFrame;
+            a.metaPending = false;
+            contentChanged = true;
+            continue;
+          }
+        }
       }
       if (a.metaQueued || m.inFlight.count(a.id)) {
         a.metaPending = true;
@@ -644,6 +750,7 @@ bool Addons_PumpAsync(AddonManager& m) {
       bool q = false;
       for (auto& p : m.pendingIds) if (p == a.id) { q = true; break; }
       if (!q) {
+        if (m.pendingIds.size() >= kMaxPending) break;
         m.pendingIds.push_back(a.id);
         a.metaQueued = true;
         a.metaPending = true;

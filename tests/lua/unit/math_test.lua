@@ -152,13 +152,33 @@ return function(H, env)
 		H.assert_true(uMinR < uMaxR)
 		H.assert_true(uMaxL <= uMinR + 0.001, "left half ends at seam")
 		H.assert_true(uMinL >= 0 and uMaxR <= 1.01)
-		-- clampHalf may absorb pure H offset at the SBS seam; V offset still applies
 		local La = { Width = 1.0, Height = 1.0, HorizontalOffset = 0.1, VerticalOffset = 0.2 }
 		local Ra = { Width = 1.0, Height = 1.0, HorizontalOffset = -0.1, VerticalOffset = -0.2 }
-		local _, aVMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
-		local _, bVMinL = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, false)
-		H.assert_true(math.abs(aVMinL - bVMinL) > 1e-6, "auto FOV vertical offset changes V mins")
-		-- b1a5e9e path: left U span stays ordered (may cross 0.5 slightly under H offset)
+		-- Auto FOV V changes at least one edge (not only vMin — clamp can hold top edge)
+		local _, av0, _, av1 = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
+		local _, bv0, _, bv1 = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, false)
+		H.assert_true(
+			math.abs(av0 - bv0) > 1e-6 or math.abs(av1 - bv1) > 1e-6,
+			"auto FOV vertical offset changes V"
+		)
+		-- Manual V offset: span and/or edge moves (independent clamp, not re-expand)
+		local huge = { Width = 20.0, Height = 20.0, HorizontalOffset = 0, VerticalOffset = 0 }
+		local _, a0, _, a1 = env.vrmod.utils.ComputeSubmitBounds(huge, huge, 0, 0, 1.0, false)
+		local _, b0, _, b1 = env.vrmod.utils.ComputeSubmitBounds(huge, huge, 0, 0.2, 1.0, false)
+		local spanA, spanB = math.abs(a1 - a0), math.abs(b1 - b0)
+		H.assert_true(
+			math.abs(b0 - a0) > 0.02 or math.abs(b1 - a1) > 0.02 or math.abs(spanB - spanA) > 0.02,
+			"manual vertical offset changes UV crop"
+		)
+		-- Scale zoom actually changes crop span (was a no-op when only multiplying offset factors)
+		local s1u0, _, s1u1 = env.vrmod.utils.ComputeSubmitBounds(L, R, 0, 0, 1.0, false)
+		local s2u0, _, s2u1 = env.vrmod.utils.ComputeSubmitBounds(L, R, 0, 0, 2.0, false)
+		H.assert_true(math.abs((s2u1 - s2u0) - (s1u1 - s1u0)) > 0.05, "scaleFactor zooms UV crop")
+		-- Lens bend pulls bounds toward eye center
+		local u0a, _, u0b = env.vrmod.utils.ComputeSubmitBounds(L, R, 0, 0, 1.0, false, 0)
+		local u1a, _, u1b = env.vrmod.utils.ComputeSubmitBounds(L, R, 0, 0, 1.0, false, 0.2)
+		H.assert_true(math.abs((u1b - u1a) - (u0b - u0a)) > 1e-6 or math.abs(u1a - u0a) > 1e-6, "lens bend changes UV")
+		-- left U span stays ordered
 		local c0, _, c2 = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
 		H.assert_true(c0 < c2, "left U span ordered")
 		-- mq2 mono-both: right UV mirrors left half (no one-eye black)
@@ -713,12 +733,20 @@ return function(H, env)
 		H.assert_eq(steps[2], "scale")
 		H.assert_eq(steps[3], "vertical")
 		H.assert_eq(steps[4], "horizontal")
-		H.assert_eq(steps[5], "done")
+		H.assert_eq(steps[5], "eye")
+		H.assert_eq(steps[6], "fov_x")
+		H.assert_eq(steps[7], "fov_y")
+		H.assert_eq(steps[8], "lens")
+		H.assert_eq(steps[9], "done")
+		H.assert_true(not u.BorderLaw_ResetOnStart())
+		H.assert_eq(u.BorderLaw_ClampLens(9), u.BorderLaw_LensMax())
+		H.assert_eq(u.BorderLaw_ClampLens(-9), u.BorderLaw_LensMin())
 		local base = u.BorderLaw_GuideBaseline()
 		H.assert_eq(base.scalefactor, 1.0)
 		H.assert_eq(base.verticaloffset, 0.0)
 		H.assert_eq(base.horizontaloffset, 0.0)
 		H.assert_eq(base.renderoffset, 1)
+		H.assert_eq(base.lens_bend, 0.0)
 		H.assert_true(not u.BorderLaw_IsBleedRisk({ scalefactor = 1, verticaloffset = 0, horizontaloffset = 0 }))
 		H.assert_true(u.BorderLaw_IsBleedRisk({ scalefactor = 0.5, verticaloffset = 0, horizontaloffset = 0 }))
 		H.assert_true(u.BorderLaw_IsBleedRisk({ scalefactor = 1, verticaloffset = 0.5, horizontaloffset = 0 }))

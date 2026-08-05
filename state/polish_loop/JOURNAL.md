@@ -11,6 +11,14 @@ Append one block per cycle. Newest at bottom.
 - Seeded GLOGIC_GAPS from seamless-handoff analysis + Cube synthesis/watchlist.
 - Next focus: G01 handoff progress (or safer docs/test if blocked).
 
+## 2026-08-05 — G13 Cube launcher bridge (user request)
+
+- VR exit after Cube session → write `cube_return` + spawn CubeUI (`cl_cube_bridge.lua`).
+- Quick menu **Cube Launcher** = temporary return (`intent=temp_return`); GMod map kept.
+- Soft resume: if GMod process still up, Start skips Steam and writes `warm_attach`; GMod polls → `vrmod_start force`.
+- Sticky `cube_bin` / `cube_launcher_path.txt` from Cube spawn; docs: `docs/CUBE_LAUNCHER_BRIDGE.md`.
+- Gaps still open: sandbox spawn, changelevel opt-in, Cube-never-dies dual session.
+
 ## 2026-08-04 cycle 1 — G01 handoff phases
 
 - Theme: seamless handoff progress (status file + UI strings only).

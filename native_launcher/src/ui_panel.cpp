@@ -140,7 +140,7 @@ enum SetRow : int {
   SR_XR_ZNEAR,
   SR_XR_DESKTOP,
   SR_XR_POST,
-  SR_XR_SWAP,
+  SR_XR_LENS,
   SR_XR_SKYBOX,
   SR_XR_MQ2,
   SR_XR_RENDEROFFSET,
@@ -182,7 +182,7 @@ static const float kFovSc[] = {0.9f, 0.95f, 1.0f, 1.05f, 1.1f};
 static constexpr int kFovScN = 5;
 static const float kScaleF[] = {0.9f, 0.95f, 1.0f, 1.05f, 1.1f};
 static constexpr int kScaleFN = 5;
-static const float kEyeSc[] = {0.35f, 0.45f, 0.5f, 0.55f, 0.65f};
+static const float kEyeSc[] = {0.35f, 0.5f, 0.65f, 0.8f, 1.0f};
 static constexpr int kEyeScN = 5;
 static const float kZNear[] = {0.5f, 1.0f, 1.5f, 2.0f, 3.0f};
 static constexpr int kZNearN = 5;
@@ -359,7 +359,15 @@ void CubeUI_CycleSetting(CubeUIState& s, int row, int dir) {
       g.preset = -1;
       break;
     case SR_XR_POST: g.xr.postProcess = !g.xr.postProcess; g.preset = -1; break;
-    case SR_XR_SWAP: g.xr.swapEyes = !g.xr.swapEyes; g.preset = -1; break;
+    case SR_XR_LENS: {
+      static const float kLens[] = { -0.3f, -0.2f, -0.1f, 0.0f, 0.1f, 0.2f, 0.3f };
+      static const int kLensN = 7;
+      int i = IndexOfF(kLens, kLensN, g.xr.lensBend);
+      i = (i + dir + kLensN) % kLensN;
+      g.xr.lensBend = kLens[i];
+      g.preset = -1;
+      break;
+    }
     case SR_XR_SKYBOX: g.xr.skybox = !g.xr.skybox; g.preset = -1; break;
     case SR_XR_MQ2: g.xr.mq2SinglePass = !g.xr.mq2SinglePass; g.preset = -1; break;
     case SR_XR_RENDEROFFSET: g.xr.renderOffset = !g.xr.renderOffset; g.preset = -1; break;
@@ -464,8 +472,8 @@ static void FormatSettingRow(const CubeUIState& s, int row, char* out, int outN)
     case SR_XR_POST:
       snprintf(out, outN, "XR POSTPROCESS  %s", g.xr.postProcess ? "ON" : "OFF");
       break;
-    case SR_XR_SWAP:
-      snprintf(out, outN, "XR SWAP EYES    %s", g.xr.swapEyes ? "ON" : "OFF");
+    case SR_XR_LENS:
+      snprintf(out, outN, "XR LENS BEND    %+.2f", g.xr.lensBend);
       break;
     case SR_XR_SKYBOX:
       snprintf(out, outN, "XR 3D SKYBOX    %s", g.xr.skybox ? "ON" : "OFF");
@@ -1077,7 +1085,7 @@ bool CubeUI_PointerClick(CubeUIState& s, int px, int py) {
   if (px >= setX + 12 && px <= setX + setW - 12 && py >= by && py <= by + 44) {
     s.focusCol = 3;
     s.wantStart = true;
-    s.status = "START GAME";
+    s.status = (s.gmodProcessUp || s.returnIntent == "temp_return") ? "RESUME VR" : "START GAME";
     return true;
   }
   return false;
@@ -1200,7 +1208,8 @@ void CubeUI_Input(CubeUIState& s, int stickX, int stickY, bool triggerEdge, bool
   if (stickY < 0) pos = std::max(0, pos - 1);
   if (stickY > 0) pos = std::min((int)idx.size() - 1, pos + 1);
   s.addons.selected = idx[pos];
-  s.addons.page = pos / s.addons.pageSize;
+  int ps = s.addons.pageSize > 0 ? s.addons.pageSize : 8;
+  s.addons.page = pos / ps;
   Addons_ClampPage(s.addons);
   if (triggerEdge) {
     std::string err;
@@ -1623,8 +1632,10 @@ void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICurs
 
   int by = UI_H - 70;
   bool startFoc = (s.focusCol == 3);
+  const bool resumeMode = s.gmodProcessUp || s.returnIntent == "temp_return"
+      || s.returnIntent == "resume";
   FillRect(rgba, setX + 12, by, setW - 24, 44, startFoc ? CubeTheme::CRIMSON_HOT[0] : CubeTheme::CRIMSON[0], startFoc ? CubeTheme::CRIMSON_HOT[1] : CubeTheme::CRIMSON[1], startFoc ? CubeTheme::CRIMSON_HOT[2] : CubeTheme::CRIMSON[2], 255);
-  DrawText(rgba, setX + 36, by + 14, "START GAME", 255, 255, 255, 2);
+  DrawText(rgba, setX + 36, by + 14, resumeMode ? "RESUME VR" : "START GAME", 255, 255, 255, 2);
 
   // G13: reverse handoff RETURN banner when cube_return.txt polled (auto reclaim off)
   if (s.returnActive && !s.returnLabel.empty()) {

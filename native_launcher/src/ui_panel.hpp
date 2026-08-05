@@ -23,11 +23,11 @@ struct OpenXrRenderSettings {
   float fovScaleY = 1.0f;   // vrmod_fovscale_y
   bool fovTouched = false;  // only rewrite FOV on Start when user edited SETTINGS
   float scaleFactor = 1.0f; // vrmod_scalefactor (submit UV crop)
-  float eyeScale = 0.5f;    // vrmod_eyescale (IPD-ish submit)
+  float eyeScale = 1.0f;    // vrmod_eyescale (IPD; 1.0 = full)
   float zNear = 1.0f;       // vrmod_znear
   int desktopView = 1;      // 1=none (Cube seamless) 2=left 3=right 4=follow-cam
   bool postProcess = false;
-  bool swapEyes = false;
+  float lensBend = 0.0f;    // vrmod_lens_bend (−0.5..0.5)
   bool skybox = false;
   bool mq2SinglePass = true;
   bool renderOffset = true;
@@ -125,6 +125,9 @@ struct CubeUIState {
   std::string returnLabel;  // one-liner for panel RETURN row
   std::string returnDetail;
   std::string returnMap;
+  std::string returnIntent; // vr_exit | temp_return | resume
+  // GMod hl2 still running (temp return) — paint RESUME not START
+  bool gmodProcessUp = false;
 
   // Laser cursor (software reticle — optional; laser usually enough)
   bool cursorVisible = false;

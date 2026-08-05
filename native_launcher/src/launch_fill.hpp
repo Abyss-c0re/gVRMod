@@ -44,7 +44,7 @@ inline LaunchRequest LaunchRequestFromUI(const CubeUIState& ui, const std::strin
   lr.gfx.xrZNear = ui.gfx.xr.zNear;
   lr.gfx.xrDesktopView = ui.gfx.xr.desktopView;
   lr.gfx.xrPostProcess = ui.gfx.xr.postProcess;
-  lr.gfx.xrSwapEyes = ui.gfx.xr.swapEyes;
+  lr.gfx.xrLensBend = ui.gfx.xr.lensBend;
   lr.gfx.xrSkybox = ui.gfx.xr.skybox;
   lr.gfx.xrMq2SinglePass = ui.gfx.xr.mq2SinglePass;
   lr.gfx.xrRenderOffset = ui.gfx.xr.renderOffset;

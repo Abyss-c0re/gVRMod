@@ -28,12 +28,12 @@ struct GfxLaunch {
   float xrFovScaleY = 1.0f;
   bool xrWriteFov = false; // only write fovscale when user touched SETTINGS
   float xrScaleFactor = 1.0f;
-  float xrEyeScale = 0.5f;
+  float xrEyeScale = 1.0f;
   float xrZNear = 1.0f;
   // 1=none (Cube seamless / shell policy), 2=left, 3=right
   int xrDesktopView = 1;
   bool xrPostProcess = false;
-  bool xrSwapEyes = false;
+  float xrLensBend = 0.0f;
   bool xrSkybox = false;
   bool xrMq2SinglePass = true;
   bool xrRenderOffset = true;

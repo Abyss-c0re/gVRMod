@@ -1505,6 +1505,26 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua
     tier: pure
     tests: [util.stereo_load.policy_g05]
+  - id: vrmod.utils.StereoRigid_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.StereoRigid_DefaultEnabled
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.StereoRigid_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.StereoRigid_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.StereoSelfTest_AbortVrOnFail
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua
     tier: pure

@@ -1445,6 +1445,22 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua"
     ],
     [
+      "vrmod.utils.StereoRigid_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoRigid_DefaultEnabled",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoRigid_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoRigid_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_rigid_law.lua"
+    ],
+    [
       "vrmod.utils.StereoSelfTest_AbortVrOnFail",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_selftest_law.lua"
     ],

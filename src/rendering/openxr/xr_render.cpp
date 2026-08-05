@@ -388,30 +388,91 @@ bool XR_CollectEyesFromEngine(const float textureBounds[8]) {
         GLuint srcTex = havePerEye ? (eye == 0 ? leftSrc : rightSrc) : sbs;
         if (!srcTex || !g_eyeStage[eye][wslot]) continue;
 
-        // Crop U for SBS halves only. V always full ordered 0→1 — no flip here.
-        // Staging keeps engine GL orientation; submit applies the single Linux V flip.
-        // (Collect flip + submit flip = upside-down.)
-        float u0, u1;
-        if (havePerEye) {
-            u0 = 0.f; u1 = 1.f;
+        // Lua textureBounds for U crop + V crop/pan — but NEVER flip orientation here.
+        // Linux Lua often passes inverted V (v0>v1) as a *submit* flip signal. Using that
+        // as glBlit srcY order flips the collector; submit then flips again → HMD upside-down
+        // while desktop (different path) stays fine. Crop with ordered V only.
+        float u0, u1, v0, v1;
+        if (textureBounds) {
+            u0 = textureBounds[eye * 4 + 0];
+            v0 = textureBounds[eye * 4 + 1];
+            u1 = textureBounds[eye * 4 + 2];
+            v1 = textureBounds[eye * 4 + 3];
+        } else if (havePerEye) {
+            u0 = 0.f; u1 = 1.f; v0 = 0.f; v1 = 1.f;
         } else {
-            u0 = textureBounds ? textureBounds[eye * 4 + 0] : (eye == 0 ? 0.f : 0.5f);
-            u1 = textureBounds ? textureBounds[eye * 4 + 2] : (eye == 0 ? 0.5f : 1.f);
-            if (!(u1 > u0 + 0.001f)) {
+            u0 = (eye == 0) ? 0.f : 0.5f;
+            u1 = (eye == 0) ? 0.5f : 1.f;
+            v0 = 0.f; v1 = 1.f;
+        }
+        if (havePerEye) {
+            // Map SBS-space bounds (0–0.5 / 0.5–1) → per-eye 0–1 UV
+            if (eye == 0) {
+                u0 = u0 * 2.f;
+                u1 = u1 * 2.f;
+            } else {
+                u0 = (u0 - 0.5f) * 2.f;
+                u1 = (u1 - 0.5f) * 2.f;
+            }
+            if (u0 < 0.f) u0 = 0.f;
+            if (u1 > 1.f) u1 = 1.f;
+            if (u0 > 1.f) u0 = 1.f;
+            if (u1 < 0.f) u1 = 0.f;
+        } else {
+            if (!(std::fabs(u1 - u0) > 0.001f)) {
                 u0 = (eye == 0) ? 0.f : 0.5f;
                 u1 = (eye == 0) ? 0.5f : 1.f;
             }
         }
+        // Ordered U (left→right)
+        if (u0 > u1) {
+            float t = u0; u0 = u1; u1 = t;
+        }
+        // Ordered V for crop only — strip submit-style inversion so we do not flip
+        {
+            float va = (v0 < v1) ? v0 : v1;
+            float vb = (v0 < v1) ? v1 : v0;
+            if (vb - va < 0.001f) {
+                va = 0.f;
+                vb = 1.f;
+            }
+            v0 = va;
+            v1 = vb;
+        }
 
-        GLint sx0 = (GLint)(u0 * srcW);
-        GLint sx1 = (GLint)(u1 * srcW);
-        GLint sy0 = 0;
-        GLint sy1 = srcH;
-        if (sx0 < 0) sx0 = 0;
-        if (sx1 < 0) sx1 = 0;
-        if (sx0 > srcW) sx0 = srcW;
-        if (sx1 > srcW) sx1 = srcW;
+        // SBS: full stereo RT. Per-eye: each RT is already one eye (0–1 UV after map).
+        GLint texW = srcW;
+        GLint texH = srcH;
+        if (havePerEye) {
+            texW = (GLint)(g_xrSwapchainWidth > 0 ? g_xrSwapchainWidth : (srcW > 1 ? srcW / 2 : srcW));
+            texH = (GLint)(g_xrSwapchainHeight > 0 ? g_xrSwapchainHeight : srcH);
+            if (texW < 32) texW = (srcW > 1) ? srcW / 2 : srcW;
+            if (texH < 32) texH = srcH;
+        }
+
+        GLint sx0 = (GLint)(u0 * (float)texW);
+        GLint sx1 = (GLint)(u1 * (float)texW);
+        GLint sy0 = (GLint)(v0 * (float)texH);
+        GLint sy1 = (GLint)(v1 * (float)texH);
+        auto clampX = [&](GLint& x) {
+            if (x < 0) x = 0;
+            if (x > texW) x = texW;
+        };
+        auto clampY = [&](GLint& y) {
+            if (y < 0) y = 0;
+            if (y > texH) y = texH;
+        };
+        clampX(sx0); clampX(sx1);
+        clampY(sy0); clampY(sy1);
         if (sx0 == sx1) continue;
+        if (sy0 == sy1) {
+            if (sy1 < texH) sy1 = sy0 + 1;
+            else sy0 = sy1 - 1;
+        }
+        // Enforce sy0 < sy1 (ordered) — never flip into staging
+        if (sy0 > sy1) {
+            GLint t = sy0; sy0 = sy1; sy1 = t;
+        }
 
         glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitSrcFBO);
         glFramebufferTexture2DPtr(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcTex, 0);
@@ -423,7 +484,7 @@ bool XR_CollectEyesFromEngine(const float textureBounds[8]) {
         }
         glReadBuffer(GL_COLOR_ATTACHMENT0);
         glDrawBuffer(GL_COLOR_ATTACHMENT0);
-        // Identity dest — orientation fixed once at OpenXR submit.
+        // Ordered src → ordered dest. Orientation flip is submit-only (one flip on Linux).
         glBlitFramebufferPtr(sx0, sy0, sx1, sy1, 0, 0, (GLint)g_eyeStageW, (GLint)g_eyeStageH,
             GL_COLOR_BUFFER_BIT, GL_LINEAR);
         okEyes++;
@@ -765,13 +826,39 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 if (singleEyeTex && cropMode == 2) {
                     // Experimental: crop symmetric overrender to OpenXR FOV
                     AsymmetricFovToUvCrop(g_views[eye].fov, &u0, &u1, &v0, &v1);
-                } else if (singleEyeTex || cropMode == 1) {
-                    // SAFE/FULL: full single-eye texture (no SBS U halves)
+                } else if (fromCollector) {
+                    // Collector already baked Lua scale/offset/lens into full eye stage → sample full
                     u0 = ins;
                     u1 = 1.0f - ins;
                     v0 = ins;
                     v1 = 1.0f - ins;
-                } else if (!(u1 > u0 + 0.001f)) {
+                } else if (singleEyeTex && cropMode == 1) {
+                    // FULL debug: force full eye
+                    u0 = ins;
+                    u1 = 1.0f - ins;
+                    v0 = ins;
+                    v1 = 1.0f - ins;
+                } else if (singleEyeTex && cropMode == 0) {
+                    // Per-eye RT without collector: map SBS Lua bounds → eye 0–1 (U+V)
+                    if (eye == 0) {
+                        u0 = u0 * 2.f;
+                        u1 = u1 * 2.f;
+                    } else {
+                        u0 = (u0 - 0.5f) * 2.f;
+                        u1 = (u1 - 0.5f) * 2.f;
+                    }
+                    if (u0 < ins) u0 = ins;
+                    if (u1 > 1.f - ins) u1 = 1.f - ins;
+                    if (u1 <= u0 + 0.001f) {
+                        u0 = ins;
+                        u1 = 1.f - ins;
+                    }
+                    // V kept from Lua (may be inverted on Linux)
+                    if (std::fabs(v1 - v0) < 0.001f) {
+                        v0 = ins;
+                        v1 = 1.0f - ins;
+                    }
+                } else if (!(u1 > u0 + 0.001f) && !(u0 > u1 + 0.001f)) {
                     // SBS path: repair broken U only
                     if (eye == 0) {
                         u0 = ins;
@@ -781,7 +868,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                         u1 = 1.0f - ins;
                     }
                 }
-                // V: empty only → full. Inverted V intentional on SBS (flip via blit).
+                // SBS direct: empty V only → full. Inverted V intentional (flip via blit).
                 if (!singleEyeTex && cropMode != 1 && std::fabs(v1 - v0) < 0.001f) {
                     v0 = ins;
                     v1 = 1.0f - ins;

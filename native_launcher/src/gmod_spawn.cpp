@@ -126,7 +126,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "vrmod_znear " << g.xrZNear << "\n"
       << "vrmod_desktopview " << g.xrDesktopView << "\n"
       << "vrmod_postprocess " << (g.xrPostProcess ? 1 : 0) << "\n"
-      << "vrmod_swap_eyes " << (g.xrSwapEyes ? 1 : 0) << "\n"
+      << "vrmod_swap_eyes 0\n" // deprecated — always off from launcher
+      << "vrmod_lens_bend " << g.xrLensBend << "\n"
       << "vrmod_skybox " << (g.xrSkybox ? 1 : 0) << "\n"
       << "vrmod_mq2_single_pass " << (g.xrMq2SinglePass ? 1 : 0) << "\n"
       << "vrmod_renderoffset " << (g.xrRenderOffset ? 1 : 0) << "\n"
@@ -154,12 +155,22 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
           "[gVRMod] gfx cfg mat_picmip=%d r_rootlod=%d aa=%d aniso=%d hdr=%d\n",
           g.matPicmip, g.rRootLod, g.matAntialias, g.matForceAniso, g.matHdrLevel);
 
-  // Marker for openxr_launch.lua
+  // Marker for openxr_launch.lua (+ cube_bin so GMod can relaunch CubeUI on VR exit)
   std::ostringstream mark;
   mark << "mode=hub\nprefer_backend=openxr\nautostart=1\nmenu_vr=0\nhub=1\n"
        << "bg_map=" << req.map << "\nmap_mode=full\nnative_wrapper=1\n"
        << "supersample=" << g.xrSupersample << "\n"
        << "ts=" << (long)time(nullptr) << "\n";
+  {
+    char self[4096];
+    ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);
+    if (n > 0) {
+      self[n] = '\0';
+      mark << "cube_bin=" << self << "\n";
+      // Also sticky path for bridge without re-reading launch marker
+      WriteFile(dataDir + "/cube_launcher_path.txt", std::string(self) + "\n");
+    }
+  }
   if (!WriteFile(dataDir + "/openxr_launch.txt", mark.str())) {
     errOut = "failed to write openxr_launch.txt";
     return 3;
@@ -358,6 +369,15 @@ bool WriteWarmAttachMarkers(const std::string& gmodRoot, const std::string& map,
        << "bg_map=" << map << "\nmap_mode=full\nnative_wrapper=1\n"
        << "warm_attach=1\n"
        << "ts=" << ts << "\n";
+  {
+    char self[4096];
+    ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);
+    if (n > 0) {
+      self[n] = '\0';
+      mark << "cube_bin=" << self << "\n";
+      WriteFile(dataDir + "/cube_launcher_path.txt", std::string(self) + "\n");
+    }
+  }
   if (!WriteFile(dataDir + "/openxr_launch.txt", mark.str())) return false;
   if (!WriteFile(dataDir + "/cube_handoff.txt",
                  "phase=" + ph + "\nts=" + std::to_string(ts) + "\n"))

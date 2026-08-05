@@ -12,6 +12,8 @@ struct CubeReturnSnapshot {
   std::string phase = "vr_exit"; // vr_exit | xr_released | cube_claim | panel_live
   std::string map;
   std::string source = "vrmod";
+  // vr_exit | temp_return (GMod kept — RESUME) | resume
+  std::string intent = "vr_exit";
   long ts = 0;
   bool valid = false;
 };
@@ -99,12 +101,25 @@ inline float CubeReverseProgressForPhase(const std::string& phase) {
   return -1.f;
 }
 
+inline std::string CubeReturn_NormalizeIntent(const std::string& raw) {
+  std::string s = raw;
+  CubeReturn_Trim(s);
+  for (char& c : s) {
+    if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+  }
+  if (s == "temp_return" || s == "temporary" || s == "launcher") return "temp_return";
+  if (s == "resume") return "resume";
+  if (s.empty() || s == "exit" || s == "vr_exit") return "vr_exit";
+  return s;
+}
+
 inline std::string CubeReturn_Format(const CubeReturnSnapshot& s) {
   std::ostringstream o;
   o << "v=" << (s.version > 0 ? s.version : 1) << "\n"
     << "phase=" << CubeReturn_NormalizePhase(s.phase.empty() ? "vr_exit" : s.phase) << "\n"
     << "map=" << s.map << "\n"
     << "source=" << (s.source.empty() ? "vrmod" : s.source) << "\n"
+    << "intent=" << CubeReturn_NormalizeIntent(s.intent.empty() ? "vr_exit" : s.intent) << "\n"
     << "ts=" << s.ts << "\n";
   return o.str();
 }
@@ -132,11 +147,14 @@ inline bool CubeReturn_Parse(const std::string& body, CubeReturnSnapshot& out) {
       out.map = v;
     else if (k == "source")
       out.source = v.empty() ? "vrmod" : v;
+    else if (k == "intent")
+      out.intent = CubeReturn_NormalizeIntent(v);
     else if (k == "ts")
       out.ts = std::atol(v.c_str());
   }
   if (out.version <= 0) out.version = 1;
   if (out.phase.empty()) out.phase = "vr_exit";
+  if (out.intent.empty()) out.intent = "vr_exit";
   out.valid = gotPhase;
   return out.valid;
 }
