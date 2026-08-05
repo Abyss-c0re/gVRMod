@@ -552,6 +552,27 @@ return function(H, env)
 		})
 		H.assert_true(follow.allow_present)
 		H.assert_eq(u.DesktopMirror_StatusLabel(follow), "DESK · FOLLOW")
+	end)
+
+	-- Rigid stereo under head roll (shared FOV + synth IPD)
+	H.TEST("util.stereo_rigid_law.roll", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.StereoRigid_DefaultEnabled())
+		local r = u.StereoRigid_Decide({
+			rigid = true, ipd_m = 0.064, scale = 40, eye_scale = 1,
+			fov_l = 100, fov_r = 110, asp_l = 1.0, asp_r = 1.1,
+		})
+		H.assert_true(r.rigid)
+		H.assert_true(r.use_synth_ipd)
+		H.assert_true(r.shared_orientation)
+		H.assert_eq(r.fov_l, r.fov_r)
+		H.assert_eq(r.asp_l, r.asp_r)
+		H.assert_true(r.fov >= 110 - 0.01)
+		H.assert_eq(u.StereoRigid_StatusLabel(r), "STEREO · RIGID ROLL")
+		H.assert_eq(u.StereoRigid_HmdExpect(r).verdict, "expect_rigid")
+		local leg = u.StereoRigid_Decide({ rigid = false, fov_l = 90, fov_r = 100 })
+		H.assert_true(not leg.rigid)
+		H.assert_eq(leg.risk, "roll_shear")
 		local he = u.DesktopMirror_HmdExpect(follow)
 		H.assert_eq(he.verdict, "expect_ok")
 		H.assert_true(string.find(he.checklist, "G46", 1, true))

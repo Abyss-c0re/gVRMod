@@ -377,6 +377,8 @@ void CubeUI_CycleSetting(CubeUIState& s, int row, int dir) {
   char buf[96];
   FormatSettingRow(s, row, buf, sizeof(buf));
   s.status = buf;
+  // Persist gfx so relaunch does not reset to Medium/High defaults
+  CubeUI_SaveLastPlay(s);
 }
 
 static const char* PresetLabel(int p) {
@@ -556,16 +558,27 @@ void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot) {
       break;
     }
   }
-  CubeUI_ApplyGfxPreset(s, 2); // High defaults
-  SyncResFromIdx(s.gfx);
   Addons_Load(s.addons, gmodRoot);
   Bindings_Load(s.bindings, gmodRoot);
-  // G11: restore last map + gfx so Quick Play / START reuse prior session
+  // G11: restore last map + gfx first — do NOT stomp with High after load
   s.hasLastPlay = false;
   s.lastPlayMap.clear();
-  if (CubeUI_LoadLastPlay(s) && CubeUI_ApplyLastPlayMap(s)) {
-    s.status = "QUICK PLAY · " + s.lastPlayMap;
+  if (CubeUI_LoadLastPlay(s)) {
+    // Match resIdx ladder to restored window size
+    for (int i = 0; i < kResN; ++i) {
+      if (kRes[i].w == s.gfx.winW && kRes[i].h == s.gfx.winH) {
+        s.gfx.resIdx = i;
+        break;
+      }
+    }
+    SyncResFromIdx(s.gfx);
+    if (CubeUI_ApplyLastPlayMap(s))
+      s.status = "RESTORED · " + s.lastPlayMap;
+    else
+      s.status = "GFX RESTORED · pick map";
   } else {
+    CubeUI_ApplyGfxPreset(s, 2); // High defaults only when no snapshot
+    SyncResFromIdx(s.gfx);
     s.status = "NEW GAME · ADDONS · SETTINGS · BINDINGS";
   }
   CubeUI_MarkDirty(s);
