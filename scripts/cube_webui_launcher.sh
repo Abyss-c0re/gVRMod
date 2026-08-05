@@ -114,7 +114,7 @@ fi
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║  Cube native WebUI launcher (OpenXR)                       ║"
-echo "║  TRIGGER click · GRIP move menu · MENU reset pose              ║"
+echo "║  TRIGGER click (no hover) · GRIP move · MENU reset pose        ║"
 echo "║  passthrough + flexible panel (cube_webui.conf)            ║"
 echo "║  Host: echo start|reset|click|addons >/tmp/cube_webui_cmd  ║"
 echo "╚════════════════════════════════════════════════════════════╝"

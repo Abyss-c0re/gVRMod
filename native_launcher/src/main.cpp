@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
     if (std::strcmp(argv[i], "--help") == 0) {
       std::printf(
           "cube_webui_launcher — Cube WebUI in OpenXR (seamless product)\n"
-          "  TRIGGER click · MENU re-place panel · CLOSE exit · START → GMod handoff\n"
+          "  TRIGGER click (point alone never presses) · MENU re-place · CLOSE exit · START → GMod\n"
           "  Same Cube crimson theme as Lua vrmod-x64 (cl_cube_theme).\n"
           "  grab_enable=0 by default (no grip thrash). Env: GMOD_DIR XR_RUNTIME_JSON\n"
           "  Cmds: echo start|close|addons|settings|reset|click >/tmp/cube_webui_cmd\n");

@@ -47,7 +47,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   fprintf(stderr, "[cube_webui] OpenXR WebUI (modular host)\n");
   fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
-  fprintf(stderr, "[cube_webui] TRIGGER=click · MENU=re-place · CLOSE=exit · grab=%s\n",
+  fprintf(stderr, "[cube_webui] TRIGGER=click (no hover/dwell) · MENU=re-place · CLOSE=exit · grab=%s\n",
           cfg.grabEnable ? "on" : "off");
   fprintf(stderr, "[cube_webui] seamless: eye-pose seed · dual-hand L+R · Cube theme · SMX\n");
 
@@ -942,14 +942,15 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     }
     prevMenu = menuBtn;
 
-    // Ray-plane click: EDGE only while on panel (+ dwell). No enter-while-held —
-    // stuck face-button level made that spam CLICK every hit flicker.
+    // Ray-plane click: TRIGGER EDGE only while laser hits panel.
+    // No dwell / hover-to-click — pointing alone must never activate UI.
+    // No enter-while-held: stuck face-button level spammed CLICK every hit flicker.
     static float clickCd = 0.f;
     if (clickCd > 0.f) clickCd -= dt;
     auto fireClick = [&](int px, int py, const char* which) {
       if (clickCd > 0.f || grabbing) return;
       clickCd = 0.28f;
-      fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d (ray on plane)\n", which, px, py);
+      fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d (trigger edge)\n", which, px, py);
       WebUI_PointerClick(ui, px, py);
       char st[96];
       snprintf(st, sizeof st, "CLICK %s @ %d,%d", which, px, py);
@@ -960,53 +961,6 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (edgeR && panelHitR) fireClick(hitPxR, hitPyR, "R");
     if (!panelHitL && !panelHitR && panelHitHead && (edgeL || edgeR))
       fireClick(hitPxH, hitPyH, "HEAD");
-
-    // Dwell click: stay on roughly same panel pixel → click (no button needed)
-    static float dwellT = 0.f;
-    static int dwellPx = -1, dwellPy = -1;
-    static bool dwellFired = false;
-    int dpx = -1, dpy = -1;
-    bool dhit = false;
-    if (panelHitR) {
-      dhit = true;
-      dpx = hitPxR;
-      dpy = hitPyR;
-    } else if (panelHitL) {
-      dhit = true;
-      dpx = hitPxL;
-      dpy = hitPyL;
-    } else if (panelHitHead) {
-      dhit = true;
-      dpx = hitPxH;
-      dpy = hitPyH;
-    }
-    // No dwell on CLOSE (bottom-left). Dwell 0.75s elsewhere when buttons are dead.
-    const bool onClose = (dpy >= UI_H - 40 && dpx <= 110);
-    if (dhit && !grabbing && !onClose) {
-      const int cell = 36;
-      if (dwellPx >= 0 && std::abs(dpx - dwellPx) < cell && std::abs(dpy - dwellPy) < cell) {
-        dwellT += dt;
-        if (dwellT >= 0.75f && !dwellFired) {
-          dwellFired = true;
-          fireClick(dpx, dpy, "DWELL");
-        } else if (!dwellFired && (static_cast<int>(dwellT * 10) % 3 == 0)) {
-          char st[80];
-          snprintf(st, sizeof st, "HOLD… %.0f%% @%d,%d",
-                   std::min(100.f, dwellT / 0.75f * 100.f), dpx, dpy);
-          ui.status = st;
-          WebUI_MarkDirty(ui);
-        }
-      } else {
-        dwellPx = dpx;
-        dwellPy = dpy;
-        dwellT = 0.f;
-        dwellFired = false;
-      }
-    } else {
-      dwellT = 0.f;
-      dwellPx = dwellPy = -1;
-      dwellFired = false;
-    }
 
     float sx = 0.f, sy = 0.f;
     if (XrInputReadStick(session, input, &sx, &sy)) {
