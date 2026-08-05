@@ -31,10 +31,12 @@ no_build=0
 [[ "${GVMOD_FORCE_BUILD:-0}" == "1" || "${CUBE_FORCE_BUILD:-0}" == "1" ]] && force_build=1
 [[ "${GVMOD_NO_BUILD:-0}" == "1" || "${CUBE_NO_BUILD:-0}" == "1" ]] && no_build=1
 
+SHARED_CUBE_UI="$ROOT/shared/cube_ui"
+
 # Newest mtime (integer seconds) among Cube native inputs that affect the binary.
+# Only these trees — never rebuild because monorepo pull touched unrelated files.
 newest_src_mtime() {
   local newest=0 t
-  # %T@ is float; take integer seconds only
   while IFS= read -r t; do
     [[ -z "$t" ]] && continue
     t=${t%%.*}
@@ -46,6 +48,9 @@ newest_src_mtime() {
     if [[ -d "$SHARED_OX" ]]; then
       find "$SHARED_OX" -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) -printf '%T@\n' 2>/dev/null
     fi
+    if [[ -d "$SHARED_CUBE_UI" ]]; then
+      find "$SHARED_CUBE_UI" -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) -printf '%T@\n' 2>/dev/null
+    fi
   )
   echo "$newest"
 }
@@ -53,7 +58,7 @@ newest_src_mtime() {
 need_build=0
 if [[ "$force_build" == "1" ]]; then
   need_build=1
-  echo "[cube_webui] force build requested"
+  echo "[cube_webui] force build requested (GVMOD_FORCE_BUILD/CUBE_FORCE_BUILD)"
 elif [[ "$no_build" == "1" ]]; then
   need_build=0
 elif [[ ! -x "$BIN" ]]; then
@@ -64,9 +69,9 @@ else
   src_mtime=$(newest_src_mtime)
   if (( src_mtime > bin_mtime )); then
     need_build=1
-    echo "[cube_webui] sources newer than binary — rebuilding"
+    echo "[cube_webui] sources newer than binary — rebuilding (src=$src_mtime bin=$bin_mtime)"
   else
-    echo "[cube_webui] binary up to date — skip compile"
+    echo "[cube_webui] binary up to date — skip compile (no source change)"
   fi
 fi
 
@@ -89,7 +94,8 @@ if [[ "$need_build" == "1" ]]; then
   if [[ "$need_cmake" == "1" ]]; then
     cmake -S "$SRC_DIR" -B "$BUILD_DIR"
   fi
-  cmake --build "$BUILD_DIR" -j"$(nproc)"
+  # Incremental: ninja/make no-ops object files that did not change
+  cmake --build "$BUILD_DIR" -j"$(nproc)" --target cube_webui_launcher
 fi
 
 if [[ ! -x "$BIN" ]]; then
@@ -108,7 +114,7 @@ fi
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║  Cube native WebUI launcher (OpenXR)                       ║"
-echo "║  TRIGGER click · GRIP move menu · MENU reset pose          ║"
+echo "║  TRIGGER click · GRIP move menu · MENU reset pose              ║"
 echo "║  passthrough + flexible panel (cube_webui.conf)            ║"
 echo "║  Host: echo start|reset|click|addons >/tmp/cube_webui_cmd  ║"
 echo "╚════════════════════════════════════════════════════════════╝"
