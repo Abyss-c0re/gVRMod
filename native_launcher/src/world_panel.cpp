@@ -99,7 +99,7 @@ void WorldPanelSyncAxes() {
     g_wp.up = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 1, 0)));
     g_wp.normal = Normalize(QuatRotate(g_wp.pose.orientation, V3(0, 0, -1)));
     if (g_wp.up.y < 0.f) g_wp.up = V3(0, 1, 0); // last resort
-    fprintf(stderr, "[cube_webui] panel axes re-uprighted up.y=%.2f\n", g_wp.up.y);
+    fprintf(stderr, "[CubeUI] panel axes re-uprighted up.y=%.2f\n", g_wp.up.y);
   }
 }
 
@@ -140,17 +140,17 @@ bool WorldPanelSeed(const XrPosef& headInWorld, bool force) {
         g_wp.pose = WorldPanelMakePose(center, Normalize(toward));
         WorldPanelSyncAxes();
       }
-      fprintf(stderr, "[cube_webui] panel face forced toward HMD (front=image)\n");
+      fprintf(stderr, "[CubeUI] panel face forced toward HMD (front=image)\n");
     }
     fprintf(stderr,
-            "[cube_webui] face check n·toHead=%.2f (want >0 = front to user)\n",
+            "[CubeUI] face check n·toHead=%.2f (want >0 = front to user)\n",
             Dot(g_wp.normal, Normalize(toward)));
   }
   g_wp.ready = true;
   g_wp.frozen = true;
   g_wp.seedCount++;
   fprintf(stderr,
-          "[cube_webui] panel seed #%d pos=(%.2f,%.2f,%.2f) up=(%.2f,%.2f,%.2f) n=(%.2f,%.2f,%.2f)\n",
+          "[CubeUI] panel seed #%d pos=(%.2f,%.2f,%.2f) up=(%.2f,%.2f,%.2f) n=(%.2f,%.2f,%.2f)\n",
           g_wp.seedCount, g_wp.c.x, g_wp.c.y, g_wp.c.z, g_wp.up.x, g_wp.up.y, g_wp.up.z,
           g_wp.normal.x, g_wp.normal.y, g_wp.normal.z);
   return true;
@@ -179,7 +179,7 @@ bool WorldPanelEnsureFaceToward(Vec3 headWorldPos) {
     WorldPanelSyncAxes();
   }
   fprintf(stderr,
-          "[cube_webui] flipped panel to face HMD n=(%.2f,%.2f,%.2f) n·toHead=%.2f\n",
+          "[CubeUI] flipped panel to face HMD n=(%.2f,%.2f,%.2f) n·toHead=%.2f\n",
           g_wp.normal.x, g_wp.normal.y, g_wp.normal.z,
           Dot(g_wp.normal, Normalize(toward)));
   return true;

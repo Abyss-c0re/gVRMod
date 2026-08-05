@@ -75,7 +75,7 @@ Never submit eng texture. Never dual pose truth.
 Proves contracts + pure utils + module/launcher unit. **Not** headset-proven.
 
 **HMD smoke (manual, no automation yet):** boot → handoff phases → stereo both eyes → laser UI → desktopview modes → cal/skip → pain-point checks.  
-Tools: `./quick_test.sh`, Cube webui / `gvrmod_launcher.sh`. Details: [`docs/TESTING_FRAMEWORK.md`](../../docs/TESTING_FRAMEWORK.md) §0.
+Tools: `./quick_test.sh`, CubeUI / `gvrmod_launcher.sh`. Details: [`docs/TESTING_FRAMEWORK.md`](../../docs/TESTING_FRAMEWORK.md) §0.
 
 Never claim “shipped Ideal VR” or “HMD smoke passed” from offline green alone.
 

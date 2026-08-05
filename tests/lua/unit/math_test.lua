@@ -262,7 +262,7 @@ return function(H, env)
 			"scalefactor=1.05",
 			"supersample=1.5",
 			"map=gm_construct",
-			"source=cube_webui",
+			"source=CubeUI",
 			"ts=123",
 		}, "\n")
 		local p = u.StagePack_Parse(body)
@@ -398,7 +398,7 @@ return function(H, env)
 			"action=warm_request",
 			"reason=eligible_deferred",
 			"map=gm_flatgrass",
-			"source=cube_webui",
+			"source=CubeUI",
 			"ts=7",
 		}, "\n")
 		local req = u.WarmAttach_Parse(body)

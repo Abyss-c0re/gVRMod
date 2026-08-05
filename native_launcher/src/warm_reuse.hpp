@@ -21,7 +21,7 @@ struct WarmRequestSnapshot {
   std::string action = "warm_request";
   std::string reason;
   std::string map;
-  std::string source = "cube_webui";
+  std::string source = "CubeUI";
   long ts = 0;
   bool valid = false;
 };
@@ -100,7 +100,7 @@ inline std::string CubeWarmReuse_Format(const WarmRequestSnapshot& s) {
     << "action=" << (s.action.empty() ? "warm_request" : s.action) << "\n"
     << "reason=" << s.reason << "\n"
     << "map=" << s.map << "\n"
-    << "source=" << (s.source.empty() ? "cube_webui" : s.source) << "\n"
+    << "source=" << (s.source.empty() ? "CubeUI" : s.source) << "\n"
     << "ts=" << s.ts << "\n";
   return o.str();
 }
@@ -130,7 +130,7 @@ inline bool CubeWarmReuse_Parse(const std::string& body, WarmRequestSnapshot& ou
       out.map = v;
       got = true;
     } else if (k == "source")
-      out.source = v.empty() ? "cube_webui" : v;
+      out.source = v.empty() ? "CubeUI" : v;
     else if (k == "ts")
       out.ts = std::atol(v.c_str());
   }

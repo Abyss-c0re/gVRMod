@@ -7,7 +7,7 @@
 
 // Cube native menu: New Game + Addons + Settings + Bindings
 
-enum class WebUIPage {
+enum class CubeUIPage {
   NewGame = 0,
   Addons = 1,
   Settings = 2,
@@ -63,8 +63,8 @@ struct GModGfxSettings {
   OpenXrRenderSettings xr;
 };
 
-struct WebUIState {
-  WebUIPage page = WebUIPage::NewGame;
+struct CubeUIState {
+  CubeUIPage page = CubeUIPage::NewGame;
   std::string gmodRoot;
 
   // --- New Game ---
@@ -141,34 +141,34 @@ struct WebUIState {
   bool paintSoftCursor = false;
 };
 
-void WebUI_Init(WebUIState& s, const std::string& gmodRoot);
-const std::string& WebUI_SelectedMap(const WebUIState& s);
-int WebUI_MaxPlayers(const WebUIState& s);
+void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot);
+const std::string& CubeUI_SelectedMap(const CubeUIState& s);
+int CubeUI_MaxPlayers(const CubeUIState& s);
 
 // Cycle a settings row (trigger / laser click). dir = +1 or -1.
-void WebUI_CycleSetting(WebUIState& s, int row, int dir = 1);
+void CubeUI_CycleSetting(CubeUIState& s, int row, int dir = 1);
 // Apply quality preset 0..3 into individual gfx fields.
-void WebUI_ApplyGfxPreset(WebUIState& s, int preset);
-int WebUI_SettingsRowCount();
+void CubeUI_ApplyGfxPreset(CubeUIState& s, int preset);
+int CubeUI_SettingsRowCount();
 
-void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge);
-void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible);
-bool WebUI_PointerClick(WebUIState& s, int px, int py);
+void CubeUI_Input(CubeUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge);
+void CubeUI_SetCursor(CubeUIState& s, int px, int py, bool visible);
+bool CubeUI_PointerClick(CubeUIState& s, int px, int py);
 // Persist dirty bindings to garrysmod/data/vrmod/vrmod_openxr_bindings.json
-bool WebUI_SaveBindingsIfDirty(WebUIState& s);
+bool CubeUI_SaveBindingsIfDirty(CubeUIState& s);
 
 // G11: persist / restore last map + gfx for Quick Play
-bool WebUI_SaveLastPlay(const WebUIState& s);
-bool WebUI_LoadLastPlay(WebUIState& s);
+bool CubeUI_SaveLastPlay(const CubeUIState& s);
+bool CubeUI_LoadLastPlay(CubeUIState& s);
 // Apply snapshot into UI (map selection + server + gfx). Returns false if map missing.
-bool WebUI_ApplyLastPlayMap(WebUIState& s);
+bool CubeUI_ApplyLastPlayMap(CubeUIState& s);
 
 // Mark content dirty (input, meta apply, page change, handoff anim).
-void WebUI_MarkDirty(WebUIState& s);
+void CubeUI_MarkDirty(CubeUIState& s);
 // True if full CPU raster + tex upload should run this frame.
-bool WebUI_ShouldRepaint(WebUIState& s);
+bool CubeUI_ShouldRepaint(CubeUIState& s);
 // After a successful repaint/upload, clear dirty + reset frame counter.
-void WebUI_DidRepaint(WebUIState& s);
+void CubeUI_DidRepaint(CubeUIState& s);
 
 constexpr int UI_W = 960;
 constexpr int UI_H = 540;
@@ -178,4 +178,4 @@ struct WebUICursor {
   int x = 0, y = 0;
 };
 // Full panel paint (content). Soft cursor only if s.paintSoftCursor && cursor.
-void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor = nullptr);
+void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICursor* cursor = nullptr);

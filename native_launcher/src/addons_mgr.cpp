@@ -354,7 +354,7 @@ void Addons_Load(AddonManager& m, const std::string& gmodRoot) {
     m.thumbCache = std::string(home) + "/.cache/gvrmod/thumbs";
     MkDirP(m.thumbCache);
   } else {
-    m.thumbCache = "/tmp/cube_webui_thumbs";
+    m.thumbCache = "/tmp/CubeUI_thumbs";
     MkDirP(m.thumbCache);
   }
   ParseNomount(gmodRoot + "/garrysmod/cfg/addonnomount.txt", m.nomount);
@@ -449,7 +449,7 @@ void Addons_Load(AddonManager& m, const std::string& gmodRoot) {
   snprintf(st, sizeof(st), "ADDONS %zu · ON %d · OFF %d · meta %d",
            m.addons.size(), Addons_EnabledCount(m), Addons_DisabledCount(m), needMeta);
   m.status = st;
-  fprintf(stderr, "[cube_webui] addons loaded: %zu (ws=%s cache=%s need_meta=%d)\n",
+  fprintf(stderr, "[CubeUI] addons loaded: %zu (ws=%s cache=%s need_meta=%d)\n",
           m.addons.size(), m.workshopRoot.empty() ? "none" : m.workshopRoot.c_str(),
           m.thumbCache.c_str(), needMeta);
   EnsureWorkers(m);

@@ -4,11 +4,11 @@
 #include <cstdlib>
 
 // Map WebUI state → LaunchRequest (graphics + map + server).
-inline LaunchRequest LaunchRequestFromUI(const WebUIState& ui, const std::string& gmodRoot) {
+inline LaunchRequest LaunchRequestFromUI(const CubeUIState& ui, const std::string& gmodRoot) {
   LaunchRequest lr;
   lr.gmodRoot = gmodRoot;
-  lr.map = WebUI_SelectedMap(ui);
-  lr.maxPlayers = WebUI_MaxPlayers(ui);
+  lr.map = CubeUI_SelectedMap(ui);
+  lr.maxPlayers = CubeUI_MaxPlayers(ui);
   lr.hostname = ui.hostname;
   lr.svLan = ui.svLan;
   lr.p2p = ui.p2p;

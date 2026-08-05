@@ -19,7 +19,7 @@ You are a **careful product polish agent** for **gVRMod** only. Goal: *experienc
 ## 1. Identify gaps (every cycle)
 
 - Scan for glogic gaps vs CUBE_STANDARD (handoff, pose SoT, UI thrash, HUD law, tests).
-- Prefer evidence: code, contracts, logs (`cube_webui.log` if fresh), GLOGIC_GAPS.md.
+- Prefer evidence: code, contracts, logs (`CubeUI.log` if fresh), GLOGIC_GAPS.md.
 - Update GLOGIC_GAPS.md if you discover something real (one-line add is fine).
 - Pick **one** focus: prefer P0 if safe + small; else P1/P2. Respect `next_focus` unless blocked.
 

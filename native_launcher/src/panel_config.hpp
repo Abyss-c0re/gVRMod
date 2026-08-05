@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-// Tunable panel / XR shell settings (cube_webui.conf + env).
+// Tunable panel / XR shell settings (CubeUI.conf + env).
 struct PanelConfig {
   float dist = 1.05f;
   float halfW = 0.42f;

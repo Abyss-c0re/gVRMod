@@ -153,7 +153,7 @@ enum SetRow : int {
   SR_COUNT
 };
 
-int WebUI_SettingsRowCount() { return SR_COUNT; }
+int CubeUI_SettingsRowCount() { return SR_COUNT; }
 
 struct WinRes { int w, h; const char* label; };
 static const WinRes kRes[] = {
@@ -196,7 +196,7 @@ static int IndexOfF(const float* a, int n, float v) {
   return best;
 }
 
-void WebUI_ApplyGfxPreset(WebUIState& s, int preset) {
+void CubeUI_ApplyGfxPreset(CubeUIState& s, int preset) {
   preset = std::clamp(preset, 0, 3);
   s.gfx.preset = preset;
   auto& x = s.gfx.xr;
@@ -243,13 +243,13 @@ static void SyncResFromIdx(GModGfxSettings& g) {
   g.winH = kRes[i].h;
 }
 
-void WebUI_CycleSetting(WebUIState& s, int row, int dir) {
+void CubeUI_CycleSetting(CubeUIState& s, int row, int dir) {
   if (dir == 0) dir = 1;
   auto& g = s.gfx;
   switch (row) {
     case SR_PRESET:
       g.preset = (g.preset + dir + 4) % 4;
-      WebUI_ApplyGfxPreset(s, g.preset);
+      CubeUI_ApplyGfxPreset(s, g.preset);
       break;
     case SR_RES:
       g.resIdx = (g.resIdx + dir + kResN) % kResN;
@@ -380,7 +380,7 @@ static const char* HdrLabel(int p) {
   return "FULL";
 }
 
-static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) {
+static void FormatSettingRow(const CubeUIState& s, int row, char* out, int outN) {
   const auto& g = s.gfx;
   switch (row) {
     case SR_PRESET: snprintf(out, outN, "PRESET          %s", PresetLabel(g.preset)); break;
@@ -456,7 +456,7 @@ static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) 
     case SR_XR_FOCUS:
       snprintf(out, outN, "XR NEED FOCUS   %s", g.xr.requireFocus ? "ON" : "OFF");
       break;
-    case SR_PLAYERS: snprintf(out, outN, "MAX PLAYERS     %d", WebUI_MaxPlayers(s)); break;
+    case SR_PLAYERS: snprintf(out, outN, "MAX PLAYERS     %d", CubeUI_MaxPlayers(s)); break;
     case SR_LAN: snprintf(out, outN, "LAN SERVER      %s", s.svLan ? "ON" : "OFF"); break;
     case SR_P2P: snprintf(out, outN, "P2P             %s", s.p2p ? "ON" : "OFF"); break;
     case SR_P2P_FRIENDS: snprintf(out, outN, "P2P FRIENDS     %s", s.p2pFriends ? "ON" : "OFF"); break;
@@ -464,10 +464,10 @@ static void FormatSettingRow(const WebUIState& s, int row, char* out, int outN) 
   }
 }
 
-void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
+void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot) {
   // In-place reset (AddonManager holds mutex — not assignable)
   s.gmodRoot = gmodRoot;
-  s.page = WebUIPage::NewGame;
+  s.page = CubeUIPage::NewGame;
   s.categories.clear();
   s.catIndex = 0;
   s.mapScroll = 0;
@@ -535,19 +535,19 @@ void WebUI_Init(WebUIState& s, const std::string& gmodRoot) {
       break;
     }
   }
-  WebUI_ApplyGfxPreset(s, 2); // High defaults
+  CubeUI_ApplyGfxPreset(s, 2); // High defaults
   SyncResFromIdx(s.gfx);
   Addons_Load(s.addons, gmodRoot);
   Bindings_Load(s.bindings, gmodRoot);
   // G11: restore last map + gfx so Quick Play / START reuse prior session
   s.hasLastPlay = false;
   s.lastPlayMap.clear();
-  if (WebUI_LoadLastPlay(s) && WebUI_ApplyLastPlayMap(s)) {
+  if (CubeUI_LoadLastPlay(s) && CubeUI_ApplyLastPlayMap(s)) {
     s.status = "QUICK PLAY · " + s.lastPlayMap;
   } else {
     s.status = "NEW GAME · ADDONS · SETTINGS · BINDINGS";
   }
-  WebUI_MarkDirty(s);
+  CubeUI_MarkDirty(s);
 }
 
 static std::string LastPlayPath(const std::string& gmodRoot) {
@@ -555,11 +555,11 @@ static std::string LastPlayPath(const std::string& gmodRoot) {
   return gmodRoot + "/garrysmod/data/vrmod/cube_last_play.txt";
 }
 
-static LastPlaySnapshot SnapshotFromUI(const WebUIState& s) {
+static LastPlaySnapshot SnapshotFromUI(const CubeUIState& s) {
   LastPlaySnapshot lp;
-  lp.map = WebUI_SelectedMap(s);
+  lp.map = CubeUI_SelectedMap(s);
   lp.gamemode = s.gamemode;
-  lp.maxPlayers = WebUI_MaxPlayers(s);
+  lp.maxPlayers = CubeUI_MaxPlayers(s);
   lp.svLan = s.svLan;
   lp.p2p = s.p2p;
   lp.p2pFriends = s.p2pFriends;
@@ -584,7 +584,7 @@ static LastPlaySnapshot SnapshotFromUI(const WebUIState& s) {
   return lp;
 }
 
-bool WebUI_SaveLastPlay(const WebUIState& s) {
+bool CubeUI_SaveLastPlay(const CubeUIState& s) {
   const std::string path = LastPlayPath(s.gmodRoot);
   if (path.empty()) return false;
   LastPlaySnapshot lp = SnapshotFromUI(s);
@@ -592,11 +592,11 @@ bool WebUI_SaveLastPlay(const WebUIState& s) {
   std::ofstream f(path);
   if (!f) return false;
   f << LastPlay_Format(lp);
-  fprintf(stderr, "[cube_webui] last play saved map=%s → %s\n", lp.map.c_str(), path.c_str());
+  fprintf(stderr, "[CubeUI] last play saved map=%s → %s\n", lp.map.c_str(), path.c_str());
   return true;
 }
 
-bool WebUI_LoadLastPlay(WebUIState& s) {
+bool CubeUI_LoadLastPlay(CubeUIState& s) {
   const std::string path = LastPlayPath(s.gmodRoot);
   if (path.empty()) return false;
   std::ifstream f(path);
@@ -608,7 +608,7 @@ bool WebUI_LoadLastPlay(WebUIState& s) {
   // Stash onto state via fields we apply next; temporary use of lastPlayMap
   s.lastPlayMap = lp.map;
   s.hasLastPlay = true;
-  // Apply gfx/server immediately; map selection in WebUI_ApplyLastPlayMap
+  // Apply gfx/server immediately; map selection in CubeUI_ApplyLastPlayMap
   s.gamemode = lp.gamemode.empty() ? "sandbox" : lp.gamemode;
   s.svLan = lp.svLan;
   s.p2p = lp.p2p;
@@ -648,7 +648,7 @@ bool WebUI_LoadLastPlay(WebUIState& s) {
   return true;
 }
 
-bool WebUI_ApplyLastPlayMap(WebUIState& s) {
+bool CubeUI_ApplyLastPlayMap(CubeUIState& s) {
   if (!s.hasLastPlay || s.lastPlayMap.empty()) return false;
   const std::string& want = s.lastPlayMap;
   for (size_t ci = 0; ci < s.categories.size(); ++ci) {
@@ -665,7 +665,7 @@ bool WebUI_ApplyLastPlayMap(WebUIState& s) {
   return false;
 }
 
-bool WebUI_SaveBindingsIfDirty(WebUIState& s) {
+bool CubeUI_SaveBindingsIfDirty(CubeUIState& s) {
   if (!s.bindings.dirty) return true;
   std::string err;
   if (!Bindings_Save(s.bindings, err)) {
@@ -676,7 +676,7 @@ bool WebUI_SaveBindingsIfDirty(WebUIState& s) {
   return true;
 }
 
-const std::string& WebUI_SelectedMap(const WebUIState& s) {
+const std::string& CubeUI_SelectedMap(const CubeUIState& s) {
   static std::string fallback = "gm_construct";
   if (s.categories.empty()) return fallback;
   const auto& maps = s.categories[s.catIndex].maps;
@@ -685,19 +685,19 @@ const std::string& WebUI_SelectedMap(const WebUIState& s) {
   return maps[i];
 }
 
-int WebUI_MaxPlayers(const WebUIState& s) {
+int CubeUI_MaxPlayers(const CubeUIState& s) {
   return s.maxPlayersOpts[std::clamp(s.maxPlayersIdx, 0, 7)];
 }
 
-void WebUI_MarkDirty(WebUIState& s) { s.paintDirty = true; }
+void CubeUI_MarkDirty(CubeUIState& s) { s.paintDirty = true; }
 
-bool WebUI_ShouldRepaint(WebUIState& s) {
+bool CubeUI_ShouldRepaint(CubeUIState& s) {
   // Handoff progress bar animates — full rate
   if (s.handoff) return true;
   if (s.paintDirty) return true;
   // Idle heartbeat: pick up async addon meta without every-frame paint
   int interval = 12;
-  if (s.page == WebUIPage::Addons) {
+  if (s.page == CubeUIPage::Addons) {
     // Faster when titles/thumbs still loading
     bool pending = false;
     for (const auto& a : s.addons.addons) {
@@ -707,19 +707,19 @@ bool WebUI_ShouldRepaint(WebUIState& s) {
       }
     }
     interval = pending ? 6 : 24;
-  } else if (s.page == WebUIPage::Bindings || s.page == WebUIPage::Settings) {
+  } else if (s.page == CubeUIPage::Bindings || s.page == CubeUIPage::Settings) {
     interval = 30; // mostly static until input dirties
   }
   if (interval > 0 && s.paintFrame >= interval) return true;
   return false;
 }
 
-void WebUI_DidRepaint(WebUIState& s) {
+void CubeUI_DidRepaint(CubeUIState& s) {
   s.paintDirty = false;
   s.paintFrame = 0;
 }
 
-void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
+void CubeUI_SetCursor(CubeUIState& s, int px, int py, bool visible) {
   // Quantize to 4px (VRMod focused dirty law) — sub-cell motion does not repaint
   const int qx = px >> 2;
   const int qy = py >> 2;
@@ -732,7 +732,7 @@ void WebUI_SetCursor(WebUIState& s, int px, int py, bool visible) {
     s.lastCursorQy = qy;
     s.lastCursorVis = visible;
     // Soft cursor only when requested; laser is the primary reticle (research-2)
-    if (s.paintSoftCursor) WebUI_MarkDirty(s);
+    if (s.paintSoftCursor) CubeUI_MarkDirty(s);
   }
 }
 
@@ -743,11 +743,11 @@ static constexpr int kTabX0[kTabN] = {0, 240, 480, 720};
 static constexpr int kTabW = 240;
 static constexpr const char* kTabLabel[kTabN] = {"NEW GAME", "ADDONS", "SETTINGS", "BINDINGS"};
 
-bool WebUI_PointerClick(WebUIState& s, int px, int py) {
-  WebUI_MarkDirty(s);
+bool CubeUI_PointerClick(CubeUIState& s, int px, int py) {
+  CubeUI_MarkDirty(s);
   // CLOSE bottom-left (away from rest-aim / START)
   if (py >= UI_H - 40 && py <= UI_H - 8 && px >= 8 && px <= 100) {
-    WebUI_SaveBindingsIfDirty(s);
+    CubeUI_SaveBindingsIfDirty(s);
     s.wantQuit = true;
     s.status = "CLOSING";
     return true;
@@ -755,21 +755,21 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
 
   // Full-width nav (same geometry as DrawNav)
   if (py >= kNavY0 && py <= kNavY1) {
-    auto leave = [&]() { WebUI_SaveBindingsIfDirty(s); };
+    auto leave = [&]() { CubeUI_SaveBindingsIfDirty(s); };
     for (int i = 0; i < kTabN; ++i) {
       if (px >= kTabX0[i] && px < kTabX0[i] + kTabW) {
         leave();
         if (i == 0) {
-          s.page = WebUIPage::NewGame;
+          s.page = CubeUIPage::NewGame;
           s.status = "NEW GAME";
         } else if (i == 1) {
-          s.page = WebUIPage::Addons;
+          s.page = CubeUIPage::Addons;
           s.status = "ADDONS";
         } else if (i == 2) {
-          s.page = WebUIPage::Settings;
+          s.page = CubeUIPage::Settings;
           s.status = "SETTINGS";
         } else {
-          s.page = WebUIPage::Bindings;
+          s.page = CubeUIPage::Bindings;
           // Re-read disk so launcher matches what Lua last saved
           if (!s.gmodRoot.empty())
             Bindings_Load(s.bindings, s.gmodRoot);
@@ -780,7 +780,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
     }
   }
 
-  if (s.page == WebUIPage::Bindings) {
+  if (s.page == CubeUIPage::Bindings) {
     // Filters ALL / FOOT / VEHICLE / CUSTOM
     const char* filters[] = {"ALL", "FOOT", "VEHICLE", "CUSTOM"};
     for (int f = 0; f < 4; ++f) {
@@ -885,7 +885,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
     return false;
   }
 
-  if (s.page == WebUIPage::Settings) {
+  if (s.page == CubeUIPage::Settings) {
     const int visible = 12;
     const int rowH = 32;
     int start = s.settingsScroll;
@@ -896,7 +896,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
       if (px >= 24 && px <= UI_W - 24 && py >= y && py <= y + rowH - 4) {
         s.settingsRow = i;
         int dir = (px < UI_W / 2) ? -1 : 1;
-        WebUI_CycleSetting(s, i, dir);
+        CubeUI_CycleSetting(s, i, dir);
         char buf[96];
         FormatSettingRow(s, i, buf, sizeof(buf));
         s.status = buf;
@@ -906,7 +906,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
     return false;
   }
 
-  if (s.page == WebUIPage::Addons) {
+  if (s.page == CubeUIPage::Addons) {
     // Filter chips
     const char* filters[] = {"ALL", "ON", "OFF", "WS", "LOCAL"};
     for (int f = 0; f < 5; ++f) {
@@ -1004,7 +1004,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
 
   // Link to full settings
   if (px >= setX + 8 && px <= setX + setW - 8 && py >= 240 && py <= 270) {
-    s.page = WebUIPage::Settings;
+    s.page = CubeUIPage::Settings;
     s.status = "GMOD GRAPHICS + ENGINE";
     return true;
   }
@@ -1013,7 +1013,7 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   int qy = UI_H - 120;
   if (s.hasLastPlay && px >= setX + 12 && px <= setX + setW - 12 && py >= qy && py <= qy + 36) {
     s.focusCol = 3;
-    WebUI_ApplyLastPlayMap(s);
+    CubeUI_ApplyLastPlayMap(s);
     s.wantStart = true;
     s.status = "QUICK PLAY · " + s.lastPlayMap;
     return true;
@@ -1029,27 +1029,27 @@ bool WebUI_PointerClick(WebUIState& s, int px, int py) {
   return false;
 }
 
-void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge) {
-  if (stickX || stickY || triggerEdge || backEdge) WebUI_MarkDirty(s);
+void CubeUI_Input(CubeUIState& s, int stickX, int stickY, bool triggerEdge, bool backEdge) {
+  if (stickX || stickY || triggerEdge || backEdge) CubeUI_MarkDirty(s);
   if (backEdge) {
-    WebUI_SaveBindingsIfDirty(s);
+    CubeUI_SaveBindingsIfDirty(s);
     s.wantQuit = true;
     return;
   }
 
-  if (s.page == WebUIPage::Bindings) {
+  if (s.page == CubeUIPage::Bindings) {
     if (stickX < 0) {
       if (s.bindings.page > 0) { s.bindings.page--; return; }
-      WebUI_SaveBindingsIfDirty(s);
-      s.page = WebUIPage::Settings;
+      CubeUI_SaveBindingsIfDirty(s);
+      s.page = CubeUIPage::Settings;
       s.status = "SETTINGS";
       return;
     }
     if (stickX > 0) {
       int pc = Bindings_PageCount(s.bindings);
       if (s.bindings.page + 1 < pc) { s.bindings.page++; return; }
-      WebUI_SaveBindingsIfDirty(s);
-      s.page = WebUIPage::NewGame;
+      CubeUI_SaveBindingsIfDirty(s);
+      s.page = CubeUIPage::NewGame;
       return;
     }
     std::vector<int> idx;
@@ -1066,14 +1066,14 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
     return;
   }
 
-  if (s.page == WebUIPage::Settings) {
+  if (s.page == CubeUIPage::Settings) {
     if (stickX < 0) {
-      s.page = WebUIPage::Addons;
+      s.page = CubeUIPage::Addons;
       s.status = "ADDONS";
       return;
     }
     if (stickX > 0) {
-      s.page = WebUIPage::Bindings;
+      s.page = CubeUIPage::Bindings;
       s.status = "BINDINGS";
       return;
     }
@@ -1082,17 +1082,17 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
     // keep row visible
     if (s.settingsRow < s.settingsScroll) s.settingsScroll = s.settingsRow;
     if (s.settingsRow >= s.settingsScroll + 12) s.settingsScroll = s.settingsRow - 11;
-    if (triggerEdge) WebUI_CycleSetting(s, s.settingsRow, 1);
+    if (triggerEdge) CubeUI_CycleSetting(s, s.settingsRow, 1);
     return;
   }
 
-  if (s.page == WebUIPage::NewGame) {
+  if (s.page == CubeUIPage::NewGame) {
     if (s.categories.empty()) return;
 
     if (stickX < 0) s.focusCol = std::max(0, s.focusCol - 1);
     if (stickX > 0) {
       if (s.focusCol >= 3) {
-        s.page = WebUIPage::Addons;
+        s.page = CubeUIPage::Addons;
         s.status = "ADDON MANAGER";
         return;
       }
@@ -1130,7 +1130,7 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
       s.addons.page--;
       return;
     }
-    s.page = WebUIPage::NewGame;
+    s.page = CubeUIPage::NewGame;
     s.status = "NEW GAME";
     return;
   }
@@ -1140,7 +1140,7 @@ void WebUI_Input(WebUIState& s, int stickX, int stickY, bool triggerEdge, bool b
       s.addons.page++;
       return;
     }
-    s.page = WebUIPage::Settings;
+    s.page = CubeUIPage::Settings;
     s.status = "SETTINGS";
     return;
   }
@@ -1194,10 +1194,10 @@ inline constexpr int CLOSE[]     = {180, 40, 50};     // cubeui close
 }
 #define CT_RGB(c) (c)[0], (c)[1], (c)[2]
 
-static void DrawNav(unsigned char* rgba, WebUIPage page) {
+static void DrawNav(unsigned char* rgba, CubeUIPage page) {
   FillRect(rgba, 0, kNavY0, UI_W, kNavY1, CT_RGB(CubeTheme::HEADER), 255);
-  const WebUIPage pages[kTabN] = {WebUIPage::NewGame, WebUIPage::Addons, WebUIPage::Settings,
-                                  WebUIPage::Bindings};
+  const CubeUIPage pages[kTabN] = {CubeUIPage::NewGame, CubeUIPage::Addons, CubeUIPage::Settings,
+                                  CubeUIPage::Bindings};
   for (int i = 0; i < kTabN; ++i) {
     bool on = (page == pages[i]);
     int x = kTabX0[i];
@@ -1224,7 +1224,7 @@ static void BlendTowardBlack(unsigned char* rgba, float fade) {
   }
 }
 
-void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
+void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICursor* cursor) {
   // Seamless handoff: keep Cube panel painted (same theme) until GMod takes XR.
   if (s.handoff) {
     FillRect(rgba, 0, 0, UI_W, UI_H, CT_RGB(CubeTheme::BG), 255);
@@ -1313,7 +1313,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   FillRect(rgba, 0, 0, UI_W, UI_H, CT_RGB(CubeTheme::BG), 255);
   DrawNav(rgba, s.page);
 
-  if (s.page == WebUIPage::Bindings) {
+  if (s.page == CubeUIPage::Bindings) {
     FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, CT_RGB(CubeTheme::PANEL_DIM), 255);
     const char* filters[] = {"ALL", "FOOT", "VEHICLE", "CUSTOM"};
     for (int f = 0; f < 4; ++f) {
@@ -1390,7 +1390,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     return;
   }
 
-  if (s.page == WebUIPage::Addons) {
+  if (s.page == CubeUIPage::Addons) {
     FillRect(rgba, 8, 48, UI_W - 16, UI_H - 56, CT_RGB(CubeTheme::PANEL_DIM), 255);
     // Filters
     const char* filters[] = {"ALL", "ON", "OFF", "WS", "LOCAL"};
@@ -1470,7 +1470,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   }
 
   // --- Settings page (GMod native graphics + engine) ---
-  if (s.page == WebUIPage::Settings) {
+  if (s.page == CubeUIPage::Settings) {
     FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, CT_RGB(CubeTheme::PANEL_DIM), 255);
     DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER CYCLES  ·  XR SS NEEDS VR RESTART", CT_RGB(CubeTheme::MUTED), 1);
     char line[96];
@@ -1538,7 +1538,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
     if (foc) FillRect(rgba, setX + 4, y - 4, setW - 8, 30, CT_RGB(CubeTheme::ROW_HOT), 255);
     DrawText(rgba, setX + 12, y, label, 255, 240, 244, 1);
   };
-  snprintf(line, sizeof(line), "PLAYERS %d", WebUI_MaxPlayers(s));
+  snprintf(line, sizeof(line), "PLAYERS %d", CubeUI_MaxPlayers(s));
   row(0, line);
   row(1, s.svLan ? "LAN SERVER ON" : "LAN SERVER OFF");
   row(2, s.p2p ? "P2P ON" : "P2P OFF");
@@ -1578,7 +1578,7 @@ void WebUI_Rasterize(const WebUIState& s, unsigned char* rgba, const WebUICursor
   DrawText(rgba, 22, UI_H - 28, "CLOSE", 255, 255, 255, 1);
   DrawText(rgba, 110, UI_H - 28, s.status.c_str(), CT_RGB(CubeTheme::MUTED), 1);
   char sel[128];
-  snprintf(sel, sizeof(sel), "SEL %s", WebUI_SelectedMap(s).c_str());
+  snprintf(sel, sizeof(sel), "SEL %s", CubeUI_SelectedMap(s).c_str());
   DrawText(rgba, mapX + 8, UI_H - 28, sel, CT_RGB(CubeTheme::CRIMSON_HOT), 1);
 
   if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {

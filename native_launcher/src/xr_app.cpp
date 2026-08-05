@@ -1,4 +1,4 @@
-// Cube WebUI OpenXR host — orchestration only (logic lives in modules).
+// CubeUI OpenXR host — orchestration only (logic lives in modules).
 #include "xr_app.hpp"
 
 #include "panel_config.hpp"
@@ -35,21 +35,21 @@
 #include <vector>
 #include <unistd.h>
 
-static void Die(const char* m) { fprintf(stderr, "[cube_webui] FATAL: %s\n", m); }
+static void Die(const char* m) { fprintf(stderr, "[CubeUI] FATAL: %s\n", m); }
 
-int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson) {
+int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
   if (!xrJson.empty())
     setenv("XR_RUNTIME_JSON", xrJson.c_str(), 1);
 
   LoadPanelConfig(gmodRoot);
   const auto& cfg = PanelCfgConst();
 
-  fprintf(stderr, "[cube_webui] OpenXR WebUI (modular host)\n");
-  fprintf(stderr, "[cube_webui] GMOD=%s XR=%s\n", gmodRoot.c_str(),
+  fprintf(stderr, "[CubeUI] OpenXR WebUI (modular host)\n");
+  fprintf(stderr, "[CubeUI] GMOD=%s XR=%s\n", gmodRoot.c_str(),
           getenv("XR_RUNTIME_JSON") ? getenv("XR_RUNTIME_JSON") : "(default)");
-  fprintf(stderr, "[cube_webui] TRIGGER=click (no hover/dwell) · MENU=re-place · CLOSE=exit · grab=%s\n",
+  fprintf(stderr, "[CubeUI] TRIGGER=click (no hover/dwell) · MENU=re-place · CLOSE=exit · grab=%s\n",
           cfg.grabEnable ? "on" : "off");
-  fprintf(stderr, "[cube_webui] seamless: eye-pose seed · dual-hand L+R · Cube theme · SMX\n");
+  fprintf(stderr, "[CubeUI] seamless: eye-pose seed · dual-hand L+R · Cube theme · SMX\n");
 
   GlxContext glx{};
   if (!GlxCreate(glx)) {
@@ -61,7 +61,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   bool wantFbPt = cfg.passthrough && XrExtensionAvailable(XR_FB_PASSTHROUGH_EXTENSION_NAME);
   if (wantFbPt) {
     extList.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
-    fprintf(stderr, "[cube_webui] enabling %s\n", XR_FB_PASSTHROUGH_EXTENSION_NAME);
+    fprintf(stderr, "[CubeUI] enabling %s\n", XR_FB_PASSTHROUGH_EXTENSION_NAME);
   }
 
   XrInstanceCreateInfo ici{XR_TYPE_INSTANCE_CREATE_INFO};
@@ -76,7 +76,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   XrInstance instance = XR_NULL_HANDLE;
   if (XR_FAILED(xrCreateInstance(&ici, &instance))) {
     if (wantFbPt) {
-      fprintf(stderr, "[cube_webui] retry without FB passthrough\n");
+      fprintf(stderr, "[CubeUI] retry without FB passthrough\n");
       extList.resize(1);
       wantFbPt = false;
       ici.enabledExtensionCount = 1;
@@ -158,7 +158,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         lci.purpose = XR_PASSTHROUGH_LAYER_PURPOSE_RECONSTRUCTION_FB;
         if (XR_SUCCEEDED(pfnCreatePtLayer(session, &lci, &ptLayerHandle))) {
           pfnStartPt(passthrough);
-          fprintf(stderr, "[cube_webui] FB passthrough layer active\n");
+          fprintf(stderr, "[CubeUI] FB passthrough layer active\n");
         } else if (pfnDestroyPt) {
           pfnDestroyPt(passthrough);
           passthrough = XR_NULL_HANDLE;
@@ -188,7 +188,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       spaceName = "STAGE";
     }
   }
-  fprintf(stderr, "[cube_webui] content space=%s (panel+laser+eyes same space)\n", spaceName);
+  fprintf(stderr, "[CubeUI] content space=%s (panel+laser+eyes same space)\n", spaceName);
   // G03: last valid head sample in content space (for stage pack continuity)
   float lastHeadX = 0.f, lastHeadY = 0.f, lastHeadZ = 0.f;
   bool lastHeadOk = false;
@@ -238,11 +238,11 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
   bool running = true;
   bool sessionRunning = false;
 
-  WebUIState ui{};
-  WebUI_Init(ui, gmodRoot);
+  CubeUIState ui{};
+  CubeUI_Init(ui, gmodRoot);
   ui.status = "STATIC panel · GRIP on panel = move · MENU = re-place";
   std::vector<unsigned char> panelBuf(UI_W * UI_H * 4);
-  WebUI_Rasterize(ui, panelBuf.data(), nullptr);
+  CubeUI_Rasterize(ui, panelBuf.data(), nullptr);
   GLuint panelTex = GlMakeRgbaTex(UI_W, UI_H, panelBuf.data());
   GLuint fbo = 0;
   int framesNoHead = 0;
@@ -277,7 +277,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         if (state == XR_SESSION_STATE_READY && !sessionRunning) {
           xrBeginSession(session, &sbi);
           sessionRunning = true;
-          fprintf(stderr, "[cube_webui] session RUNNING\n");
+          fprintf(stderr, "[CubeUI] session RUNNING\n");
         }
         if (state == XR_SESSION_STATE_STOPPING && sessionRunning) {
           xrEndSession(session);
@@ -299,7 +299,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     static bool quitRequested = false;
     if (ui.wantQuit && !quitRequested) {
       quitRequested = true;
-      fprintf(stderr, "[cube_webui] quit requested — orderly xrRequestExitSession\n");
+      fprintf(stderr, "[CubeUI] quit requested — orderly xrRequestExitSession\n");
       if (sessionRunning) xrRequestExitSession(session);
       else running = false;
     }
@@ -310,7 +310,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     // StartGame → keep XR until take_xr handoff
     if (ui.wantStart && !ui.handoff) {
-      WebUI_SaveBindingsIfDirty(ui);
+      CubeUI_SaveBindingsIfDirty(ui);
       LaunchRequest lr = LaunchRequestFromUI(ui, gmodRoot);
       ClearCubeHandoffMarkers(gmodRoot);
       // G04: pure warm-reuse decision (feature hard-off → warm_request + still cold-spawn)
@@ -322,7 +322,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         wr.action = warm.action;
         wr.reason = warm.reason;
         wr.map = lr.map;
-        wr.source = "cube_webui";
+        wr.source = "CubeUI";
         WriteCubeWarmRequest(gmodRoot, wr);
       }
       // G04: pure skip-spawn plan (markers + stage pack; no Steam when feature on)
@@ -348,24 +348,24 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           pack.scaleFactor = lr.gfx.xrScaleFactor;
           pack.supersample = lr.gfx.xrSupersample;
           pack.map = lr.map;
-          pack.source = "cube_webui_warm_attach";
+          pack.source = "CubeUI_warm_attach";
           WriteCubeStagePack(gmodRoot, pack);
           ui.handoffRefSpace = StagePack_NormalizeSpace(pack.refSpace);
           ui.handoffHeadY = pack.headY;
           ui.handoffHeadOk = pack.headOk;
         }
-        WebUI_SaveLastPlay(ui);
-        fprintf(stderr, "[cube_webui] skip-spawn warm attach map=%s phase=%s\n",
+        CubeUI_SaveLastPlay(ui);
+        fprintf(stderr, "[CubeUI] skip-spawn warm attach map=%s phase=%s\n",
                 lr.map.c_str(), ui.handoffPhase.c_str());
       } else {
       std::string err;
       int rc = SpawnGModFromWebUI(lr, err);
-      fprintf(stderr, "[cube_webui] StartGame map=%s rc=%d boot=%s warm=%s %s\n",
+      fprintf(stderr, "[CubeUI] StartGame map=%s rc=%d boot=%s warm=%s %s\n",
               lr.map.c_str(), rc, ui.handoffBootKind.c_str(), warm.reason.c_str(), err.c_str());
       ui.wantStart = false;
       if (rc == 0) {
         // G11: remember map + gfx for next Cube session Quick Play
-        WebUI_SaveLastPlay(ui);
+        CubeUI_SaveLastPlay(ui);
         ui.handoff = true;
         ui.handoffMap = lr.map;
         ui.handoffPhase = "SPAWNED";
@@ -384,7 +384,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           pack.scaleFactor = lr.gfx.xrScaleFactor;
           pack.supersample = lr.gfx.xrSupersample;
           pack.map = lr.map;
-          pack.source = "cube_webui";
+          pack.source = "CubeUI";
           WriteCubeStagePack(gmodRoot, pack);
           ui.handoffRefSpace = StagePack_NormalizeSpace(pack.refSpace);
           ui.handoffHeadY = pack.headY;
@@ -421,7 +421,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         amb.handoff = true;
         amb.playing = CubeAmbient_ShouldPlay(amb.gain, true);
         amb.clip_rel = CubeAmbient_DefaultClipRel();
-        amb.source = "cube_webui_handoff";
+        amb.source = "CubeUI_handoff";
         const std::string absClip = FillCubeAmbientClipPaths(amb);
         AmbientBackend_Poll(ambBackend);
         const bool backendOn = ambBackend.running;
@@ -443,12 +443,12 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           lastAmbPlay = amb.playing;
           lastClipPresent = amb.clip_present;
           fprintf(stderr,
-                  "[cube_webui] ambient clip_present=%d action=%s gain=%.2f play_env=%d path_rel=%s\n",
+                  "[CubeUI] ambient clip_present=%d action=%s gain=%.2f play_env=%d path_rel=%s\n",
                   amb.clip_present ? 1 : 0, pdec.action.c_str(), amb.gain,
                   CubeAmbientPlayerEnabled() ? 1 : 0, amb.clip_rel.c_str());
         }
       }
-      WebUI_MarkDirty(ui);
+      CubeUI_MarkDirty(ui);
       bool takeXr = (phase == "take_xr" || phase == "vr_active" || phase == "ready");
       // G28: soft 90s / hard 180s pure gate — never racey early release (was 40s void).
       HandoffTimeoutDecision ht =
@@ -457,7 +457,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         handoffExitRequested = true;
         handoffExitWait = 0.f;
         fprintf(stderr,
-                "[cube_webui] handoff release phase=%s t=%.1f reason=%s (orderly xrRequestExitSession)\n",
+                "[CubeUI] handoff release phase=%s t=%.1f reason=%s (orderly xrRequestExitSession)\n",
                 phase.c_str(), ui.handoffElapsed, ht.reason.c_str());
         // G03: refresh stage pack with final head sample before runtime release
         {
@@ -477,7 +477,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
             pack.supersample = kSs[i];
           }
           pack.map = ui.handoffMap;
-          pack.source = "cube_webui_take_xr";
+          pack.source = "CubeUI_take_xr";
           WriteCubeStagePack(gmodRoot, pack);
           ui.handoffRefSpace = StagePack_NormalizeSpace(pack.refSpace);
           ui.handoffHeadY = pack.headY;
@@ -493,7 +493,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         ui.handoffAudioGain = CubeHandoffAudioGain(phase, true, handoffExitWait);
         // Session STOPPING handler ends session; leave when ended or hard cap
         if (!sessionRunning || handoffExitWait > 3.f) {
-          fprintf(stderr, "[cube_webui] handoff complete sessionRunning=%d wait=%.2f\n",
+          fprintf(stderr, "[CubeUI] handoff complete sessionRunning=%d wait=%.2f\n",
                   sessionRunning ? 1 : 0, handoffExitWait);
           running = false;
           continue;
@@ -525,9 +525,9 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         if (ack.should_write && have) {
           CubeReturnSnapshot ackSnap = ret;
           ackSnap.phase = ack.next_phase.empty() ? "panel_live" : ack.next_phase;
-          ackSnap.source = "cube_webui_soft_ack";
+          ackSnap.source = "CubeUI_soft_ack";
           if (WriteCubeReturnMarker(gmodRoot, ackSnap)) {
-            fprintf(stderr, "[cube_webui] G13 soft ack → phase=%s map=%s\n",
+            fprintf(stderr, "[CubeUI] G13 soft ack → phase=%s map=%s\n",
                     ackSnap.phase.c_str(), ackSnap.map.c_str());
             returnVisibleSec = 0.f;
             lastReturnKey.clear();
@@ -543,14 +543,14 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
             && (ack.should_write || ack.clear_banner)) {
           std::string lab = CubeReclaimXrPlanLabel(xrPlan);
           if (!lab.empty()) ui.status = lab;
-          WebUI_MarkDirty(ui);
+          CubeUI_MarkDirty(ui);
           static bool loggedXrPlan = false;
           if (!loggedXrPlan) {
             loggedXrPlan = true;
-            fprintf(stderr, "[cube_webui] G13 XR plan method=%s detail=%s\n",
+            fprintf(stderr, "[CubeUI] G13 XR plan method=%s detail=%s\n",
                     xrPlan.method.c_str(), xrPlan.detail.c_str());
             auto he = CubeReclaim_HmdExpect(dec, xrPlan);
-            fprintf(stderr, "[cube_webui] G13 HMD %s\n", he.checklist.c_str());
+            fprintf(stderr, "[CubeUI] G13 HMD %s\n", he.checklist.c_str());
           }
         }
         const bool active = dec.show_panel;
@@ -568,7 +568,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           ui.returnLabel = active ? label : std::string();
           ui.returnDetail = detail;
           if (active) {
-            fprintf(stderr, "[cube_webui] G13 return poll phase=%s action=%s map=%s reclaim=%d vis=%.1f\n",
+            fprintf(stderr, "[CubeUI] G13 return poll phase=%s action=%s map=%s reclaim=%d vis=%.1f\n",
                     dec.phase.c_str(), dec.action.c_str(), dec.map.c_str(),
                     dec.auto_reclaim ? 1 : 0, returnVisibleSec);
             if (ui.status.find("RETURN") == std::string::npos)
@@ -577,7 +577,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
             if (ui.status.find("RETURN") != std::string::npos)
               ui.status = "CUBE · PANEL LIVE";
           }
-          WebUI_MarkDirty(ui);
+          CubeUI_MarkDirty(ui);
         }
       }
     }
@@ -659,8 +659,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           worldInitPending = false;
           emergencySeedOnly = false;
           ui.status = "PANEL LIVE · trigger=click · MENU=re-place";
-          WebUI_MarkDirty(ui);
-          fprintf(stderr, "[cube_webui] PANEL VISIBLE mesh space=%s seed#%d pos=(%.2f,%.2f,%.2f)\n",
+          CubeUI_MarkDirty(ui);
+          fprintf(stderr, "[CubeUI] PANEL VISIBLE mesh space=%s seed#%d pos=(%.2f,%.2f,%.2f)\n",
                   spaceName, WorldPanelState().seedCount,
                   WorldPanelState().c.x, WorldPanelState().c.y, WorldPanelState().c.z);
         }
@@ -671,8 +671,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
           worldInitPending = false;
           emergencySeedOnly = true;
           ui.status = "PANEL · waiting track (seamless re-anchor)";
-          WebUI_MarkDirty(ui);
-          fprintf(stderr, "[cube_webui] emergency panel seed — will re-anchor on first head/eye pose\n");
+          CubeUI_MarkDirty(ui);
+          fprintf(stderr, "[CubeUI] emergency panel seed — will re-anchor on first head/eye pose\n");
         }
       }
     }
@@ -687,8 +687,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         if (WorldPanelSeed(headWorld, /*force=*/true)) {
           farReseedDone = true;
           ui.status = "PANEL RE-ANCHORED (seamless catch-up)";
-          WebUI_MarkDirty(ui);
-          fprintf(stderr, "[cube_webui] seamless far re-anchor dist=%.2f\n", std::sqrt(dist2));
+          CubeUI_MarkDirty(ui);
+          fprintf(stderr, "[CubeUI] seamless far re-anchor dist=%.2f\n", std::sqrt(dist2));
         }
       }
       if (dist2 < 4.f) farReseedDone = false; // allow again if they walk away later
@@ -703,7 +703,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
                    {headWorld.position.x, headWorld.position.y, headWorld.position.z})) {
         faceCd = 1.0f;
         ui.status = "PANEL FACING YOU (front = image + clicks)";
-        WebUI_MarkDirty(ui);
+        CubeUI_MarkDirty(ui);
       }
     }
     // ── Dual-hand async: each hand has its own aim ray + trigger + grab ──
@@ -770,7 +770,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     static int aimLog = 0;
     if ((aimLog++ % 600) == 0)
       fprintf(stderr,
-              "[cube_webui] aim L hit=%d R hit=%d primary=%d head=%d trigL=%d trigR=%d\n",
+              "[CubeUI] aim L hit=%d R hit=%d primary=%d head=%d trigL=%d trigR=%d\n",
               panelHitL ? 1 : 0, panelHitR ? 1 : 0, panelHit ? 1 : 0, headOk ? 1 : 0,
               XrInputReadTriggerHand(session, input, XrHand::Left, cfg.triggerThresh) ? 1 : 0,
               XrInputReadTriggerHand(session, input, XrHand::Right, cfg.triggerThresh) ? 1 : 0);
@@ -858,7 +858,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         grabArmL = grabArmR = 0.f;
         grabCooldown = 0.35f;
         ui.status = "STATIC · click priority";
-        WebUI_MarkDirty(ui);
+        CubeUI_MarkDirty(ui);
       } else if (still) {
         Vec3 go = (grabHand == XrHand::Left) ? aimOL : aimOR;
         Vec3 gd = (grabHand == XrHand::Left) ? aimDL : aimDR;
@@ -875,8 +875,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         grabbing = false;
         grabCooldown = 0.25f;
         ui.status = "STATIC (room locked)";
-        WebUI_MarkDirty(ui);
-        fprintf(stderr, "[cube_webui] grab end hand=%s pos=(%.3f,%.3f,%.3f)\n",
+        CubeUI_MarkDirty(ui);
+        fprintf(stderr, "[CubeUI] grab end hand=%s pos=(%.3f,%.3f,%.3f)\n",
                 grabHand == XrHand::Left ? "L" : "R", wp.c.x, wp.c.y, wp.c.z);
       }
     } else if (wp.ready && wp.frozen && !anyTrigEdge && grabCooldown <= 0.f) {
@@ -886,26 +886,26 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         grabHand = XrHand::Left;
         grabOff = wp.c - aimOL;
         ui.status = "MOVING panel (left grip)";
-        WebUI_MarkDirty(ui);
-        fprintf(stderr, "[cube_webui] grab start hand=L\n");
+        CubeUI_MarkDirty(ui);
+        fprintf(stderr, "[CubeUI] grab start hand=L\n");
       } else if (grabArmR >= grabArmNeed && aimValidR && panelHitR) {
         grabbing = true;
         grabHand = XrHand::Right;
         grabOff = wp.c - aimOR;
         ui.status = "MOVING panel (right grip)";
-        WebUI_MarkDirty(ui);
-        fprintf(stderr, "[cube_webui] grab start hand=R\n");
+        CubeUI_MarkDirty(ui);
+        fprintf(stderr, "[CubeUI] grab start hand=R\n");
       }
     }
 
     // Cursor from primary panel hit (either hand)
     if (aimValid && panelHit && !grabbing)
-      WebUI_SetCursor(ui, hitPx, hitPy, true);
+      CubeUI_SetCursor(ui, hitPx, hitPy, true);
     else
-      WebUI_SetCursor(ui, 0, 0, false);
+      CubeUI_SetCursor(ui, 0, 0, false);
 
-    if (ui.page == WebUIPage::Addons) {
-      if (Addons_PumpAsync(ui.addons)) WebUI_MarkDirty(ui);
+    if (ui.page == CubeUIPage::Addons) {
+      if (Addons_PumpAsync(ui.addons)) CubeUI_MarkDirty(ui);
     }
     // Tick idle paint budget (research-2 dirty/heartbeat)
     ui.paintFrame++;
@@ -936,7 +936,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
       grabbing = false;
       if (WorldPanelSeed(headWorld, /*force=*/true)) {
         ui.status = "PANEL RE-ANCHORED (intentional)";
-        WebUI_MarkDirty(ui);
+        CubeUI_MarkDirty(ui);
         menuReseedCd = 1.5f;
       }
     }
@@ -950,12 +950,12 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     auto fireClick = [&](int px, int py, const char* which) {
       if (clickCd > 0.f || grabbing) return;
       clickCd = 0.28f;
-      fprintf(stderr, "[cube_webui] CLICK %s px=%d py=%d (trigger edge)\n", which, px, py);
-      WebUI_PointerClick(ui, px, py);
+      fprintf(stderr, "[CubeUI] CLICK %s px=%d py=%d (trigger edge)\n", which, px, py);
+      CubeUI_PointerClick(ui, px, py);
       char st[96];
       snprintf(st, sizeof st, "CLICK %s @ %d,%d", which, px, py);
       ui.status = st;
-      WebUI_MarkDirty(ui);
+      CubeUI_MarkDirty(ui);
     };
     if (edgeL && panelHitL) fireClick(hitPxL, hitPyL, "L");
     if (edgeR && panelHitR) fireClick(hitPxR, hitPyR, "R");
@@ -976,7 +976,7 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
         if (sy < -0.55f) isy = 1;
         if (sy > 0.55f) isy = -1;
         if (isx || isy) {
-          WebUI_Input(ui, isx, isy, false, false);
+          CubeUI_Input(ui, isx, isy, false, false);
           stickCooldown = 0.18f;
         }
       }
@@ -1030,10 +1030,10 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
 
     if (fs.shouldRender) {
       // Always keep content fresh enough; paint when dirty/heartbeat
-      if (WebUI_ShouldRepaint(ui) || !wp.ready) {
-        WebUI_Rasterize(ui, panelBuf.data(), nullptr);
+      if (CubeUI_ShouldRepaint(ui) || !wp.ready) {
+        CubeUI_Rasterize(ui, panelBuf.data(), nullptr);
         GlUpdateRgbaTex(panelTex, UI_W, UI_H, panelBuf.data());
-        WebUI_DidRepaint(ui);
+        CubeUI_DidRepaint(ui);
       }
 
       // Primary path: FROZEN world mesh in eye buffers (works on WiVRn).
@@ -1164,8 +1164,8 @@ int RunCubeWebUILauncher(const std::string& gmodRoot, const std::string& xrJson)
     if (panelTex) glDeleteTextures(1, &panelTex);
     GlxDestroy(glx);
   } catch (...) {
-    fprintf(stderr, "[cube_webui] teardown exception swallowed\n");
+    fprintf(stderr, "[CubeUI] teardown exception swallowed\n");
   }
-  fprintf(stderr, "[cube_webui] exit\n");
+  fprintf(stderr, "[CubeUI] exit\n");
   return 0;
 }

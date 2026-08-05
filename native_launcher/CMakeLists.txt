@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(cube_webui_launcher LANGUAGES CXX)
+project(CubeUI LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ set(CUBE_SHARED_OPENXR
   ${CMAKE_CURRENT_SOURCE_DIR}/../shared/openxr/openxr_shell_input.cpp
 )
 
-set(CUBE_WEBUI_SOURCES
+set(CUBEUI_SOURCES
   src/main.cpp
   src/paths.cpp
   src/panel_config.cpp
@@ -32,9 +32,9 @@ set(CUBE_WEBUI_SOURCES
   ${CUBE_SHARED_OPENXR}
 )
 
-add_executable(cube_webui_launcher ${CUBE_WEBUI_SOURCES})
+add_executable(CubeUI ${CUBEUI_SOURCES})
 
-target_include_directories(cube_webui_launcher PRIVATE
+target_include_directories(CubeUI PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party
   ${CMAKE_CURRENT_SOURCE_DIR}/../shared/openxr
@@ -47,7 +47,7 @@ find_library(OPENXR_LIB openxr_loader REQUIRED)
 find_library(GL_LIB GL REQUIRED)
 find_library(GLX_LIB GLX REQUIRED)
 
-target_link_libraries(cube_webui_launcher PRIVATE
+target_link_libraries(CubeUI PRIVATE
   ${OPENXR_LIB}
   ${GL_LIB}
   ${GLX_LIB}
@@ -57,26 +57,26 @@ target_link_libraries(cube_webui_launcher PRIVATE
   pthread
 )
 
-target_compile_options(cube_webui_launcher PRIVATE -O2 -Wall)
+target_compile_options(CubeUI PRIVATE -O2 -Wall)
 
-set_target_properties(cube_webui_launcher PROPERTIES
+set_target_properties(CubeUI PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../install/native"
 )
 
-add_custom_command(TARGET cube_webui_launcher POST_BUILD
+add_custom_command(TARGET CubeUI POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/cube_webui.conf"
-    "${CMAKE_SOURCE_DIR}/../install/native/cube_webui.conf"
+    "${CMAKE_CURRENT_SOURCE_DIR}/CubeUI.conf"
+    "${CMAKE_SOURCE_DIR}/../install/native/CubeUI.conf"
   COMMAND ${CMAKE_COMMAND} -E make_directory
     "${CMAKE_SOURCE_DIR}/../install/native/assets/ambient"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/ambient/cube_hold.ogg"
     "${CMAKE_SOURCE_DIR}/../install/native/assets/ambient/cube_hold.ogg"
-  COMMENT "Install cube_webui.conf + ambient assets next to binary"
+  COMMENT "Install CubeUI.conf + ambient assets next to binary"
 )
 
-install(TARGETS cube_webui_launcher RUNTIME DESTINATION bin)
-install(FILES cube_webui.conf cube_webui.conf.example DESTINATION share/gvrmod)
+install(TARGETS CubeUI RUNTIME DESTINATION bin)
+install(FILES CubeUI.conf CubeUI.conf.example DESTINATION share/gvrmod)
 
 # ── Offline unit tests (no OpenXR runtime / no display required for math3d) ──
 option(CUBE_BUILD_TESTS "Build cube launcher unit tests" ON)

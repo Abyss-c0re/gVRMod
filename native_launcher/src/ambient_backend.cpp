@@ -101,7 +101,7 @@ bool AmbientBackend_Start(AmbientBackendState& s, const std::string& absPath, fl
   s.backend = be;
   s.running = true;
   s.last_err.clear();
-  fprintf(stderr, "[cube_webui] ambient backend start pid=%d backend=%s vol=%.2f path=%s\n",
+  fprintf(stderr, "[CubeUI] ambient backend start pid=%d backend=%s vol=%.2f path=%s\n",
           (int)pid, be.c_str(), volume01, absPath.c_str());
   return true;
 }

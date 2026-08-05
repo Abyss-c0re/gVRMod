@@ -200,7 +200,7 @@ void Bindings_LoadCustomActions(BindingsManager& m) {
         ++i;
       }
     }
-    fprintf(stderr, "[cube_webui] custom actions (json): %zu total logical\n", m.logical.size());
+    fprintf(stderr, "[CubeUI] custom actions (json): %zu total logical\n", m.logical.size());
     return;
   }
 
@@ -382,7 +382,7 @@ bool Bindings_Load(BindingsManager& m, const std::string& gmodRoot) {
   if (!pr.empty()) m.preset = pr;
   m.dirty = false;
   m.status = "SYNCED " + m.filePath;
-  fprintf(stderr, "[cube_webui] bindings loaded %zu actions from %s (logical=%zu)\n",
+  fprintf(stderr, "[CubeUI] bindings loaded %zu actions from %s (logical=%zu)\n",
           m.actions.size(), m.filePath.c_str(), m.logical.size());
   return true;
 }
@@ -402,7 +402,7 @@ static void BackupBindingsFile(const std::string& path) {
   if (!out) return;
   out << in.rdbuf();
   out.close();
-  fprintf(stderr, "[cube_webui] bindings backup → %s\n", bak.c_str());
+  fprintf(stderr, "[CubeUI] bindings backup → %s\n", bak.c_str());
   // prune old backups in same dir
   std::string dir = path;
   auto slash = dir.find_last_of('/');
@@ -442,7 +442,7 @@ bool Bindings_Save(BindingsManager& m, std::string& err) {
   f << Serialize(m);
   m.dirty = false;
   m.status = "SAVED BINDINGS";
-  fprintf(stderr, "[cube_webui] bindings saved %s\n", m.filePath.c_str());
+  fprintf(stderr, "[CubeUI] bindings saved %s\n", m.filePath.c_str());
   return true;
 }
 

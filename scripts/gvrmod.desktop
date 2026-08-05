@@ -1,14 +1,14 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=gVRMod Cube
-GenericName=Cube VR Launcher for Garry's Mod
-Comment=Native OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
-Exec=/home/voldemar/Dev/GMod/gVRMod/scripts/cube_webui_launcher.sh
+Name=CubeUI
+GenericName=CubeUI VR Launcher for Garry's Mod
+Comment=Native OpenXR CubeUI menu — maps, addons, settings, bindings; GMod starts on START GAME
+Exec=/home/voldemar/Dev/GMod/gVRMod/scripts/CubeUI.sh
 Path=/home/voldemar/Dev/GMod/gVRMod
 Icon=gvrmod
 Terminal=true
 StartupNotify=true
 Categories=Game;ActionGame;
-Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;
-StartupWMClass=cube_webui_glx
+Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;CubeUI;Launcher;
+StartupWMClass=CubeUI_glx

@@ -16,4 +16,4 @@ native_launcher/build/
 .scratch/
 
 # Runtime binary next to cwd only; project conf in native_launcher/ is tracked
-/cube_webui_launcher
+/CubeUI

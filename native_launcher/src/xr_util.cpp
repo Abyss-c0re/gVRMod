@@ -26,14 +26,14 @@ XrEnvironmentBlendMode XrPickBlendMode(XrInstance instance, XrSystemId systemId,
     return false;
   };
   if (wantPassthrough && has(XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND)) {
-    fprintf(stderr, "[cube_webui] blend=ALPHA_BLEND (passthrough)\n");
+    fprintf(stderr, "[CubeUI] blend=ALPHA_BLEND (passthrough)\n");
     return XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND;
   }
   if (wantPassthrough && has(XR_ENVIRONMENT_BLEND_MODE_ADDITIVE)) {
-    fprintf(stderr, "[cube_webui] blend=ADDITIVE\n");
+    fprintf(stderr, "[CubeUI] blend=ADDITIVE\n");
     return XR_ENVIRONMENT_BLEND_MODE_ADDITIVE;
   }
-  fprintf(stderr, "[cube_webui] blend=OPAQUE%s\n",
+  fprintf(stderr, "[CubeUI] blend=OPAQUE%s\n",
           wantPassthrough ? " (no alpha/additive)" : "");
   return XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 }

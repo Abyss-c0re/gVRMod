@@ -42,9 +42,9 @@ Append one block per cycle. Newest at bottom.
 
 - Theme: last map + gfx snapshot for Cube Quick Play (safe UI/status file).
 - Pure: last_play.hpp Format/Parse (+ 2 launcher unit tests).
-- Save cube_last_play.txt on successful Start; restore on WebUI_Init; QUICK PLAY button.
+- Save cube_last_play.txt on successful Start; restore on CubeUI_Init; QUICK PLAY button.
 - No -noborder force; mat_queue untouched.
-- Tests: full test_all PASS 6/6; cube_webui_launcher builds.
+- Tests: full test_all PASS 6/6; CubeUI builds.
 - Next: G23 follow-cam paths verify or G02 fade (careful).
 
 ## 2026-08-04 cycle 5 — G23 follow-cam paths
@@ -205,7 +205,7 @@ Append one block per cycle. Newest at bottom.
 - ReadCubeReturnMarker; xr_app 1Hz poll when !handoff; New Game RETURN banner.
 - CubeReclaimEnabled hard-off — auto reclaim branch empty.
 - G13 partial — true reverse reclaim still open.
-- Tests: full test_all PASS 6/6 (+reclaim poll unit); cube_webui_launcher builds.
+- Tests: full test_all PASS 6/6 (+reclaim poll unit); CubeUI builds.
 - Next: G12 ambient asset+player careful or G04 map attach.
 
 ## 2026-08-04 cycle 22 — G12 ambient asset+player

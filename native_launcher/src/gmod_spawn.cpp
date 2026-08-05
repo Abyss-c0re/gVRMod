@@ -42,7 +42,7 @@ static void SyncMonorepoLua(const std::string& gmodRoot) {
   std::string src = monorepo + "/addon/vrmod-x64";
   std::string dest = gmodRoot + "/garrysmod/addons/vrmod-x64";
   if (!DirExists(src)) {
-    fprintf(stderr, "[cube_webui] monorepo lua missing at %s (skip rsync)\n", src.c_str());
+    fprintf(stderr, "[CubeUI] monorepo lua missing at %s (skip rsync)\n", src.c_str());
     return;
   }
   mkdir((gmodRoot + "/garrysmod/addons").c_str(), 0755);
@@ -50,7 +50,7 @@ static void SyncMonorepoLua(const std::string& gmodRoot) {
       "rsync -a --delete --exclude '.git' --exclude '.scratch' "
       "'" + src + "/' '" + dest + "/' 2>/dev/null";
   int rc = system(cmd.c_str());
-  fprintf(stderr, "[cube_webui] rsync monorepo → addons/vrmod-x64 rc=%d\n", rc);
+  fprintf(stderr, "[CubeUI] rsync monorepo → addons/vrmod-x64 rc=%d\n", rc);
 }
 
 int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
@@ -71,7 +71,7 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   // Law: do not clobber Vision FOV archives or force mat_queue_mode 2 (VRMod safe = 1).
   const auto& g = req.gfx;
   std::ostringstream cfg;
-  cfg << "// written by cube_webui_launcher — GMod native graphics + Cube OpenXR\n"
+  cfg << "// written by CubeUI — GMod native graphics + Cube OpenXR\n"
       << "// --- Source / GMod graphics (from Cube SETTINGS tab) ---\n"
       << "mat_picmip " << g.matPicmip << "\n"
       << "r_rootlod " << g.rRootLod << "\n"
@@ -173,7 +173,7 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " +gamemode " << req.gamemode
         << " +exec " << req.cubeCfg
         << " +map " << req.map
-        << " >/tmp/cube_webui_gmod.log 2>&1 &";
+        << " >/tmp/CubeUI_gmod.log 2>&1 &";
   } else {
     cmd << "env -u LD_LIBRARY_PATH";
     if (!req.xrRuntimeJson.empty())
@@ -186,14 +186,14 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " +gamemode " << req.gamemode
         << " +exec " << req.cubeCfg
         << " +map " << req.map
-        << " >/tmp/cube_webui_gmod.log 2>&1 &";
+        << " >/tmp/CubeUI_gmod.log 2>&1 &";
   }
 
   WriteFile(dataDir + "/cube_handoff.txt",
             "phase=spawned\nts=" + std::to_string((long)time(nullptr)) + "\n");
   unlink((dataDir + "/cube_ready.txt").c_str());
 
-  fprintf(stderr, "[cube_webui] StartGame → %s\n", cmd.str().c_str());
+  fprintf(stderr, "[CubeUI] StartGame → %s\n", cmd.str().c_str());
   int rc = system(cmd.str().c_str());
   if (rc != 0) {
     errOut = "spawn returned " + std::to_string(rc);
@@ -203,7 +203,7 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
 }
 
 bool GModProcessRunning() {
-  FILE* p = popen("pgrep -af 'hl2_linux|garrysmod' 2>/dev/null | grep -v cube_webui | head -1", "r");
+  FILE* p = popen("pgrep -af 'hl2_linux|garrysmod' 2>/dev/null | grep -v CubeUI | head -1", "r");
   if (!p) return false;
   char buf[256] = {};
   bool ok = (fgets(buf, sizeof(buf), p) != nullptr) && buf[0] != 0;
@@ -251,7 +251,7 @@ bool WriteCubeStagePack(const std::string& gmodRoot, const StagePackSnapshot& pa
   s.valid = true;
   const std::string path = dataDir + "/cube_stage_pack.txt";
   if (!WriteFile(path, StagePack_Format(s))) return false;
-  fprintf(stderr, "[cube_webui] stage pack → %s space=%s head_ok=%d y=%.3f\n",
+  fprintf(stderr, "[CubeUI] stage pack → %s space=%s head_ok=%d y=%.3f\n",
           path.c_str(), s.refSpace.c_str(), s.headOk ? 1 : 0, s.headY);
   return true;
 }
@@ -324,7 +324,7 @@ bool WriteCubeWarmRequest(const std::string& gmodRoot, const WarmRequestSnapshot
   s.valid = true;
   const std::string path = dataDir + "/cube_warm.txt";
   if (!WriteFile(path, CubeWarmReuse_Format(s))) return false;
-  fprintf(stderr, "[cube_webui] warm request → %s action=%s map=%s reason=%s\n",
+  fprintf(stderr, "[CubeUI] warm request → %s action=%s map=%s reason=%s\n",
           path.c_str(), s.action.c_str(), s.map.c_str(), s.reason.c_str());
   return true;
 }
@@ -348,7 +348,7 @@ bool WriteWarmAttachMarkers(const std::string& gmodRoot, const std::string& map,
                  "phase=" + ph + "\nts=" + std::to_string(ts) + "\n"))
     return false;
   unlink((dataDir + "/cube_ready.txt").c_str());
-  fprintf(stderr, "[cube_webui] warm attach markers → map=%s phase=%s (no steam)\n",
+  fprintf(stderr, "[CubeUI] warm attach markers → map=%s phase=%s (no steam)\n",
           map.c_str(), ph.c_str());
   return true;
 }
@@ -376,7 +376,7 @@ bool WriteCubeReturnMarker(const std::string& gmodRoot, const CubeReturnSnapshot
   s.valid = true;
   const std::string path = dataDir + "/cube_return.txt";
   if (!WriteFile(path, CubeReturn_Format(s))) return false;
-  fprintf(stderr, "[cube_webui] G13 cube_return write phase=%s map=%s\n",
+  fprintf(stderr, "[CubeUI] G13 cube_return write phase=%s map=%s\n",
           s.phase.c_str(), s.map.c_str());
   return true;
 }

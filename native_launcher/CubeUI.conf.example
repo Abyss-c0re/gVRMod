@@ -1,4 +1,4 @@
-# Copy to ~/.config/gvrmod/cube_webui.conf to override project defaults.
+# Copy to ~/.config/gvrmod/CubeUI.conf to override project defaults.
 #
 # view_lock=0  — world-locked panel (default). 1 = head-follow HUD.
 # passthrough=1 — alpha-blend / FB passthrough when available

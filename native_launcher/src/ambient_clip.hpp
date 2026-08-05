@@ -14,7 +14,7 @@ struct AmbientClipSnapshot {
   bool handoff = false;
   bool clip_present = false;  // asset resolved on disk (I/O fills this)
   std::string clip_rel = "ambient/cube_hold.ogg"; // under launcher assets/
-  std::string source = "cube_webui";
+  std::string source = "CubeUI";
   long ts = 0;
   bool valid = false;
 };
@@ -231,7 +231,7 @@ inline std::string CubeAmbient_ResolveClipPath(const std::string& assetsDir, con
 }
 
 // Ordered search roots for assets/ (pure list; first existing wins at I/O site).
-// envAssets: GVRMOD_ASSETS; exeDir: directory containing cube_webui_launcher;
+// envAssets: GVRMOD_ASSETS; exeDir: directory containing CubeUI;
 // sourceAssets: monorepo native_launcher/assets absolute if known.
 inline std::vector<std::string> CubeAmbient_AssetsDirCandidates(const std::string& envAssets,
                                                                 const std::string& exeDir,
@@ -308,7 +308,7 @@ inline std::string CubeAmbient_Format(const AmbientClipSnapshot& s) {
     << "handoff=" << (s.handoff ? 1 : 0) << "\n"
     << "clip_present=" << (s.clip_present ? 1 : 0) << "\n"
     << "clip_rel=" << (s.clip_rel.empty() ? CubeAmbient_DefaultClipRel() : s.clip_rel) << "\n"
-    << "source=" << (s.source.empty() ? "cube_webui" : s.source) << "\n"
+    << "source=" << (s.source.empty() ? "CubeUI" : s.source) << "\n"
     << "ts=" << s.ts << "\n";
   return o.str();
 }
@@ -341,7 +341,7 @@ inline bool CubeAmbient_Parse(const std::string& body, AmbientClipSnapshot& out)
     else if (k == "clip_rel" || k == "clip")
       out.clip_rel = v.empty() ? CubeAmbient_DefaultClipRel() : v;
     else if (k == "source")
-      out.source = v.empty() ? "cube_webui" : v;
+      out.source = v.empty() ? "CubeUI" : v;
     else if (k == "ts")
       out.ts = std::atol(v.c_str());
   }

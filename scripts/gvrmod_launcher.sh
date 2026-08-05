@@ -2,7 +2,7 @@
 # =============================================================================
 # gVRMod — GMod process helper (spawned AFTER native WebUI StartGame)
 #
-# Preferred product entry is scripts/cube_webui_launcher.sh (OpenXR first).
+# Preferred product entry is scripts/CubeUI.sh (OpenXR first).
 # This script only boots GMod with OpenXR autostart — not the menu itself.
 #
 # Product law:

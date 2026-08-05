@@ -75,7 +75,7 @@ static bool LoadConfigFile(const std::string& path) {
     ApplyConfigKey(key, val);
   }
   fclose(f);
-  fprintf(stderr, "[cube_webui] config %s\n", path.c_str());
+  fprintf(stderr, "[CubeUI] config %s\n", path.c_str());
   return true;
 }
 
@@ -83,14 +83,21 @@ void LoadPanelConfig(const std::string& gmodRoot) {
   g_cfg = PanelConfig{};
   std::string exe = PathExeDir();
   if (!exe.empty()) {
-    LoadConfigFile(exe + "/cube_webui.conf");
+    LoadConfigFile(exe + "/CubeUI.conf");
+    LoadConfigFile(exe + "/cube_webui.conf"); // legacy name
+    LoadConfigFile(PathDirname(PathDirname(exe)) + "/native_launcher/CubeUI.conf");
     LoadConfigFile(PathDirname(PathDirname(exe)) + "/native_launcher/cube_webui.conf");
   }
+  LoadConfigFile("CubeUI.conf");
   LoadConfigFile("cube_webui.conf");
-  if (const char* home = getenv("HOME"))
+  if (const char* home = getenv("HOME")) {
+    LoadConfigFile(std::string(home) + "/.config/gvrmod/CubeUI.conf");
     LoadConfigFile(std::string(home) + "/.config/gvrmod/cube_webui.conf");
-  if (!gmodRoot.empty())
+  }
+  if (!gmodRoot.empty()) {
+    LoadConfigFile(gmodRoot + "/garrysmod/data/vrmod/CubeUI.conf");
     LoadConfigFile(gmodRoot + "/garrysmod/data/vrmod/cube_webui.conf");
+  }
 
   auto tryEnvF = [](const char* k, float& out, float lo, float hi) {
     if (const char* v = getenv(k)) {
@@ -130,7 +137,7 @@ void LoadPanelConfig(const std::string& gmodRoot) {
   if (g_cfg.triggerThresh > 1.f) g_cfg.triggerThresh = 1.f;
   WorldPanelReset();
   fprintf(stderr,
-          "[cube_webui] panel size=%.2fx%.2fm dist=%.2f world_lock=%d passthrough=%d "
+          "[CubeUI] panel size=%.2fx%.2fm dist=%.2f world_lock=%d passthrough=%d "
           "grab=%s(>=%.2f) trig>=%.2f\n",
           g_cfg.halfW * 2.f, g_cfg.halfH * 2.f, g_cfg.dist,
           g_cfg.viewLock ? 0 : 1, g_cfg.passthrough ? 1 : 0,

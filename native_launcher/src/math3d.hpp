@@ -1,5 +1,5 @@
 #pragma once
-// Lightweight 3D math for Cube WebUI (OpenXR pose helpers).
+// Lightweight 3D math for CubeUI (OpenXR pose helpers).
 #include <cmath>
 #include <openxr/openxr.h>
 

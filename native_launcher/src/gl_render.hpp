@@ -4,7 +4,7 @@
 #include <GL/gl.h>
 #include <openxr/openxr.h>
 
-// GL helpers for Cube WebUI stereo render path.
+// GL helpers for CubeUI stereo render path.
 void GlLoadFboProcs();
 bool GlBindSwapchainFbo(GLuint colorTex, GLuint* fboOut);
 void GlUnbindFbo();

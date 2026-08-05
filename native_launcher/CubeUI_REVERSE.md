@@ -84,12 +84,12 @@ Rendered as a **stereo OpenGL panel** in OpenXR (not CEF, not GMod VGUI).
 ## Product flow
 
 ```
-Desktop icon → cube_webui_launcher (OpenXR native)
+Desktop icon → CubeUI (OpenXR native)
 
 ## Controls (headset)
 - **Trigger** — click UI under laser
 - **Grip / squeeze** — grab and move the **world-locked** menu
-- **Menu / A** — reset panel pose to `cube_webui.conf` defaults
+- **Menu / A** — reset panel pose to `CubeUI.conf` defaults
 - **Thumbstick** — navigate when not grabbing
 
 ## World-locked panel (default)
@@ -102,8 +102,8 @@ Lua writes `garrysmod/data/vrmod/cube_handoff.txt` (`phase=take_xr`) before clai
 native exits the session only then so GMod can take over without an early void.
 
 ## Config (no recompile)
-Project defaults: `native_launcher/cube_webui.conf` (copied to `install/native/`).
-User override: `~/.config/gvrmod/cube_webui.conf`.
+Project defaults: `native_launcher/CubeUI.conf` (copied to `install/native/`).
+User override: `~/.config/gvrmod/CubeUI.conf`.
 
 | key | meaning |
 |-----|---------|

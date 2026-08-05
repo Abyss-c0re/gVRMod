@@ -32,7 +32,7 @@ Two layers. Do not conflate them in commits, PR claims, or polish-loop status.
 | Tool | Role |
 |------|------|
 | `./quick_test.sh` | Build + launch GMod; inject `vrmod_start`; needs desktop focus tools |
-| Cube webui / `scripts/gvrmod_launcher.sh` | Product path: hold XR → GMod → `take_xr` |
+| CubeUI / `scripts/gvrmod_launcher.sh` | Product path: hold XR → GMod → `take_xr` |
 | `scripts/quest_media_auto_review.sh` | Post-hoc Quest media review (smoke evidence, not a unit gate) |
 
 **Minimum headset checklist** (claim “smoke OK” only if walked):
@@ -944,7 +944,7 @@ native_launcher/tests/
   test_panel_hit.cpp
   fixtures/
     bindings_quest3_gold.json
-    cube_webui_min.conf
+    CubeUI_min.conf
 ```
 
 Hit tests: feed NDC / laser ray → expect panel UV; lock cases that regressed (upside-down input, front face).

@@ -1,6 +1,6 @@
 #pragma once
 // G03: Cube STAGE / cal continuity pack — pure parse/format (offline-tested).
-// Written by cube_webui at Start + refreshed at take_xr release.
+// Written by CubeUI at Start + refreshed at take_xr release.
 // GMod may read later to avoid height/playspace jumps; applying is a separate careful step.
 // No OpenXR / filesystem deps in this header.
 #include <cctype>
@@ -19,7 +19,7 @@ struct StagePackSnapshot {
   float scaleFactor = 1.f;
   float supersample = 1.f;
   std::string map;
-  std::string source = "cube_webui";
+  std::string source = "CubeUI";
   long ts = 0;
   bool valid = false;
 };
@@ -53,7 +53,7 @@ inline std::string StagePack_Format(const StagePackSnapshot& s) {
     << "scalefactor=" << s.scaleFactor << "\n"
     << "supersample=" << s.supersample << "\n"
     << "map=" << s.map << "\n"
-    << "source=" << (s.source.empty() ? "cube_webui" : s.source) << "\n"
+    << "source=" << (s.source.empty() ? "CubeUI" : s.source) << "\n"
     << "ts=" << s.ts << "\n";
   return o.str();
 }
@@ -102,7 +102,7 @@ inline bool StagePack_Parse(const std::string& body, StagePackSnapshot& out) {
     else if (k == "map")
       out.map = v;
     else if (k == "source")
-      out.source = v.empty() ? "cube_webui" : v;
+      out.source = v.empty() ? "CubeUI" : v;
     else if (k == "ts")
       out.ts = std::atol(v.c_str());
   }

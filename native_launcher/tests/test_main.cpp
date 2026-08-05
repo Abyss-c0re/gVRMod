@@ -512,7 +512,7 @@ TEST(launcher_stage_pack_roundtrip) {
     a.scaleFactor = 1.05f;
     a.supersample = 1.5f;
     a.map = "gm_construct";
-    a.source = "cube_webui";
+    a.source = "CubeUI";
     a.ts = 12345;
     std::string body = StagePack_Format(a);
     StagePackSnapshot b;

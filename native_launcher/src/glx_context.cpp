@@ -20,7 +20,7 @@ bool GlxCreate(GlxContext& g) {
   g.win = XCreateWindow(g.dpy, RootWindow(g.dpy, scr), 0, 0, 64, 64, 0,
                         vi->depth, InputOutput, vi->visual,
                         CWColormap | CWEventMask, &swa);
-  XStoreName(g.dpy, g.win, "cube_webui_glx");
+  XStoreName(g.dpy, g.win, "CubeUI_glx");
   XMapWindow(g.dpy, g.win);
   XFlush(g.dpy);
   g.ctx = glXCreateContext(g.dpy, vi, nullptr, GL_TRUE);
@@ -58,7 +58,7 @@ bool GlxCreate(GlxContext& g) {
   }
   XFree(vi);
   if (!g.ctx) return false;
-  fprintf(stderr, "[cube_webui] GLX visualid=%u fbConfig=%p\n", g.visualid, (void*)g.fbConfig);
+  fprintf(stderr, "[CubeUI] GLX visualid=%u fbConfig=%p\n", g.visualid, (void*)g.fbConfig);
   return glXMakeCurrent(g.dpy, g.win, g.ctx);
 }
 

@@ -86,7 +86,7 @@ EOF
 # Install application menu entry — Cube native launcher (default product entry)
 install_desktop_entry() {
     # Product law: desktop opens Cube OpenXR menu first; GMod only after START GAME.
-    local launcher="$SCRIPT_DIR/scripts/cube_webui_launcher.sh"
+    local launcher="$SCRIPT_DIR/scripts/CubeUI.sh"
     local desktop_src="$SCRIPT_DIR/scripts/gvrmod.desktop"
     local app_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
     local icon_dir="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
@@ -132,7 +132,7 @@ Terminal=true
 StartupNotify=true
 Categories=Game;ActionGame;
 Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;
-StartupWMClass=cube_webui_glx
+StartupWMClass=CubeUI_glx
 EOF
     chmod +x "$desktop_dst" 2>/dev/null || true
 
@@ -152,7 +152,7 @@ Terminal=true
 StartupNotify=true
 Categories=Game;ActionGame;
 Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;
-StartupWMClass=cube_webui_glx
+StartupWMClass=CubeUI_glx
 EOF
     fi
 
@@ -531,7 +531,7 @@ echo
 echo "A manifest was written to:"
 echo "    $MANIFEST"
 echo
-echo "App menu: search for \"gVRMod Cube\" → scripts/cube_webui_launcher.sh"
+echo "App menu: search for \"gVRMod Cube\" → scripts/CubeUI.sh"
 echo "(GMod is started only after START GAME in the Cube headset menu.)"
 echo "Legacy GMod-only helper: scripts/gvrmod_launcher.sh"
 echo "If you ever want to remove everything this script installed, run:"
