@@ -71,8 +71,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   // Law: do not clobber Vision FOV archives or force mat_queue_mode 2 (VRMod safe = 1).
   const auto& g = req.gfx;
   std::ostringstream cfg;
-  cfg << "// written by CubeUI — GMod native graphics + Cube OpenXR\n"
-      << "// --- Source / GMod graphics (from Cube SETTINGS tab) ---\n"
+  cfg << "// written by gVRMod launcher (CubeUI settings panel)\n"
+      << "// --- Source / GMod graphics (from SETTINGS tab) ---\n"
       << "mat_picmip " << g.matPicmip << "\n"
       << "r_rootlod " << g.rRootLod << "\n"
       << "r_lod " << g.rRootLod << "\n"
@@ -131,7 +131,14 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
       << "vrmod_mq2_single_pass " << (g.xrMq2SinglePass ? 1 : 0) << "\n"
       << "vrmod_renderoffset " << (g.xrRenderOffset ? 1 : 0) << "\n"
       << "vrmod_require_window_focus " << (g.xrRequireFocus ? 1 : 0) << "\n"
-      << "vrmod_start force\n";
+      << "vrmod_start force\n"
+      // Re-assert Source gfx after map (map load can stomp video defaults)
+      << "mat_picmip " << g.matPicmip << "\n"
+      << "r_rootlod " << g.rRootLod << "\n"
+      << "r_lod " << g.rRootLod << "\n"
+      << "mat_antialias " << g.matAntialias << "\n"
+      << "mat_forceaniso " << g.matForceAniso << "\n"
+      << "mat_hdr_level " << g.matHdrLevel << "\n";
 
   const std::string cfgBody = cfg.str();
   if (!WriteFile(cfgDir + "/gvrmod_cube.cfg", cfgBody)) {
@@ -141,6 +148,11 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   WriteFile(cfgDir + "/gvrmod_hub.cfg", cfgBody);
   WriteFile(cfgDir + "/gvrmod_menu.cfg", cfgBody);
   WriteFile(cfgDir + "/gvrmod_graphics.cfg", cfgBody);
+  // Dedicated late-exec so textures/models still apply after +map
+  WriteFile(cfgDir + "/cube_gfx.cfg", cfgBody);
+  fprintf(stderr,
+          "[gVRMod] gfx cfg mat_picmip=%d r_rootlod=%d aa=%d aniso=%d hdr=%d\n",
+          g.matPicmip, g.rRootLod, g.matAntialias, g.matForceAniso, g.matHdrLevel);
 
   // Marker for openxr_launch.lua
   std::ostringstream mark;
@@ -171,9 +183,11 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " +p2p_enabled " << (req.p2p ? 1 : 0)
         << " +p2p_friendsonly " << (req.p2pFriends ? 1 : 0)
         << " +gamemode " << req.gamemode
-        << " +exec " << req.cubeCfg
         << " +map " << req.map
-        << " >/tmp/CubeUI_gmod.log 2>&1 &";
+        // Exec AFTER map so textures/models are not stomped by map/video defaults
+        << " +exec " << req.cubeCfg
+        << " +exec cube_gfx"
+        << " >/tmp/gVRMod_gmod.log 2>&1 &";
   } else {
     cmd << "env -u LD_LIBRARY_PATH";
     if (!req.xrRuntimeJson.empty())
@@ -184,16 +198,17 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " +sv_lan " << (req.svLan ? 1 : 0)
         << " +hostname \"" << req.hostname << "\""
         << " +gamemode " << req.gamemode
-        << " +exec " << req.cubeCfg
         << " +map " << req.map
-        << " >/tmp/CubeUI_gmod.log 2>&1 &";
+        << " +exec " << req.cubeCfg
+        << " +exec cube_gfx"
+        << " >/tmp/gVRMod_gmod.log 2>&1 &";
   }
 
   WriteFile(dataDir + "/cube_handoff.txt",
             "phase=spawned\nts=" + std::to_string((long)time(nullptr)) + "\n");
   unlink((dataDir + "/cube_ready.txt").c_str());
 
-  fprintf(stderr, "[CubeUI] StartGame → %s\n", cmd.str().c_str());
+  fprintf(stderr, "[gVRMod] StartGame → %s\n", cmd.str().c_str());
   int rc = system(cmd.str().c_str());
   if (rc != 0) {
     errOut = "spawn returned " + std::to_string(rc);

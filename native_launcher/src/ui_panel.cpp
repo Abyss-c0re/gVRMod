@@ -168,6 +168,11 @@ static constexpr int kResN = 6;
 static const int kAa[] = {0, 2, 4, 8};
 static const int kAf[] = {0, 2, 4, 8, 16};
 static const int kFps[] = {0, 60, 90, 120, 144, 240};
+// Texture quality = mat_picmip (lower = sharper). Models = r_rootlod (lower = higher detail).
+static const int kTexPicmip[] = {-1, 0, 1, 2}; // Very High .. Low
+static constexpr int kTexN = 4;
+static const int kModelLod[] = {0, 1, 2}; // High .. Low
+static constexpr int kModelN = 3;
 // OpenXR supersample ladder (vrmod_supersample)
 static const float kSs[] = {0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f};
 static constexpr int kSsN = 6;
@@ -243,12 +248,16 @@ static void SyncResFromIdx(GModGfxSettings& g) {
   g.winH = kRes[i].h;
 }
 
+static void FormatSettingRow(const CubeUIState& s, int row, char* out, int outN);
+
 void CubeUI_CycleSetting(CubeUIState& s, int row, int dir) {
   if (dir == 0) dir = 1;
   auto& g = s.gfx;
   switch (row) {
     case SR_PRESET:
-      g.preset = (g.preset + dir + 4) % 4;
+      // preset may be -1 (CUSTOM) — treat as HIGH next cycle
+      if (g.preset < 0) g.preset = (dir > 0) ? 0 : 3;
+      else g.preset = (g.preset + dir + 4) % 4;
       CubeUI_ApplyGfxPreset(s, g.preset);
       break;
     case SR_RES:
@@ -256,14 +265,21 @@ void CubeUI_CycleSetting(CubeUIState& s, int row, int dir) {
       SyncResFromIdx(g);
       g.preset = -1;
       break;
-    case SR_TEX:
-      g.matPicmip = std::clamp(g.matPicmip - dir, -1, 2); // higher quality = lower picmip
+    case SR_TEX: {
+      // Wrap ladder so every trigger click always changes label
+      int i = IndexOf(kTexPicmip, kTexN, g.matPicmip);
+      i = (i + dir + kTexN) % kTexN;
+      g.matPicmip = kTexPicmip[i];
       g.preset = -1;
       break;
-    case SR_MODELS:
-      g.rRootLod = std::clamp(g.rRootLod - dir, 0, 2);
+    }
+    case SR_MODELS: {
+      int i = IndexOf(kModelLod, kModelN, g.rRootLod);
+      i = (i + dir + kModelN) % kModelN;
+      g.rRootLod = kModelLod[i];
       g.preset = -1;
       break;
+    }
     case SR_AA: {
       int i = IndexOf(kAa, 4, g.matAntialias);
       i = (i + dir + 4) % 4;
@@ -356,6 +372,11 @@ void CubeUI_CycleSetting(CubeUIState& s, int row, int dir) {
     case SR_P2P_FRIENDS: s.p2pFriends = !s.p2pFriends; break;
     default: break;
   }
+  // Always repaint after a cycle so TEXTURES / MODELS labels update immediately
+  CubeUI_MarkDirty(s);
+  char buf[96];
+  FormatSettingRow(s, row, buf, sizeof(buf));
+  s.status = buf;
 }
 
 static const char* PresetLabel(int p) {
@@ -895,11 +916,9 @@ bool CubeUI_PointerClick(CubeUIState& s, int px, int py) {
       int y = 72 + n * rowH;
       if (px >= 24 && px <= UI_W - 24 && py >= y && py <= y + rowH - 4) {
         s.settingsRow = i;
-        int dir = (px < UI_W / 2) ? -1 : 1;
+        // Left third = decrease, rest = increase (clearer hit zones than half-panel)
+        int dir = (px < 24 + (UI_W - 48) / 3) ? -1 : 1;
         CubeUI_CycleSetting(s, i, dir);
-        char buf[96];
-        FormatSettingRow(s, i, buf, sizeof(buf));
-        s.status = buf;
         return true;
       }
     }
@@ -1067,21 +1086,13 @@ void CubeUI_Input(CubeUIState& s, int stickX, int stickY, bool triggerEdge, bool
   }
 
   if (s.page == CubeUIPage::Settings) {
-    if (stickX < 0) {
-      s.page = CubeUIPage::Addons;
-      s.status = "ADDONS";
-      return;
-    }
-    if (stickX > 0) {
-      s.page = CubeUIPage::Bindings;
-      s.status = "BINDINGS";
-      return;
-    }
+    // Stick Y = move row; stick X / trigger = cycle value (do NOT leave SETTINGS on stick X —
+    // that made TEXTURES/MODELS feel broken). Use top nav tabs to change page.
     if (stickY < 0) s.settingsRow = std::max(0, s.settingsRow - 1);
     if (stickY > 0) s.settingsRow = std::min(SR_COUNT - 1, s.settingsRow + 1);
-    // keep row visible
     if (s.settingsRow < s.settingsScroll) s.settingsScroll = s.settingsRow;
     if (s.settingsRow >= s.settingsScroll + 12) s.settingsScroll = s.settingsRow - 11;
+    if (stickX != 0) CubeUI_CycleSetting(s, s.settingsRow, stickX > 0 ? 1 : -1);
     if (triggerEdge) CubeUI_CycleSetting(s, s.settingsRow, 1);
     return;
   }
@@ -1472,7 +1483,7 @@ void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICurs
   // --- Settings page (GMod native graphics + engine) ---
   if (s.page == CubeUIPage::Settings) {
     FillRect(rgba, 8, 52, UI_W - 16, UI_H - 60, CT_RGB(CubeTheme::PANEL_DIM), 255);
-    DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER CYCLES  ·  XR SS NEEDS VR RESTART", CT_RGB(CubeTheme::MUTED), 1);
+    DrawText(rgba, 20, 58, "SOURCE + OPENXR  ·  TRIGGER/STICK X CYCLES  ·  LEFT=DEC RIGHT=INC", CT_RGB(CubeTheme::MUTED), 1);
     char line[96];
     const int visible = 12;
     const int rowH = 32;

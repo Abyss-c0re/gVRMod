@@ -20,7 +20,7 @@ bool GlxCreate(GlxContext& g) {
   g.win = XCreateWindow(g.dpy, RootWindow(g.dpy, scr), 0, 0, 64, 64, 0,
                         vi->depth, InputOutput, vi->visual,
                         CWColormap | CWEventMask, &swa);
-  XStoreName(g.dpy, g.win, "CubeUI_glx");
+  XStoreName(g.dpy, g.win, "gVRMod");
   XMapWindow(g.dpy, g.win);
   XFlush(g.dpy);
   g.ctx = glXCreateContext(g.dpy, vi, nullptr, GL_TRUE);
