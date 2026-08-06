@@ -27,32 +27,25 @@
 **Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
 It is not shown on other maps, OpenVR, or outside VR.
 
-### Depth void (no color key — black is fine)
+### AR content layer (the real product path)
 
-**Any RGB key (green, magenta, black) will punch materials that share that color.**  
-Source writes opaque RGB; OpenXR holes need **alpha**. We use **depth**, not color:
+Not a chroma key. Two layers:
 
-| Layer | Behavior |
-|-------|----------|
-| World / sky | Hidden → depth stays at **clear (~1.0)** |
-| Props / models | Write closer depth (including pure black models) |
-| Module v50 | `alpha = 0` only where depth is at far/clear |
-| OpenXR | `ALPHA_BLEND` composites the room under sky holes |
+| Layer | What |
+|-------|------|
+| **Room** | OpenXR `ALPHA_BLEND` / runtime passthrough under the projection |
+| **Content** | Only CubeHome platforms + player + VR hands (map/InfMap **not drawn**) |
 
-If depth RT cannot be sampled, void is **refused** (stays opaque) rather than
-falling back to a color key.
+Pipeline:
 
-```
-VRMOD_SetPassthroughChroma(true, 0.04)  -- enables depth void (tol = far-edge soft)
-VRMOD_SetEnvironmentBlendMode(3)
-```
+1. Lua: `r_drawworld 0`, hide InfMap / non-content ents, invisible colliders (no couch cubes)  
+2. Eye RT: clear depth; only AR content writes depth  
+3. Module: clear swapchain **alpha 0** → blit color → **depth → alpha** (far = hole)  
+4. `xrEndFrame` with `ALPHA_BLEND` + source alpha  
 
-### Why not an “invisible texture”?
+Signal: `VRMOD_SetPassthroughChroma(true)` + `g_VR.cubeHomeArLayer = true` before submit.
 
-Source cannot emit alpha-only holes into the VR color RT. Real options:
-
-1. **Depth far-plane void** (shipped)  
-2. **`XR_FB_passthrough` under projection** (true cameras; next / CubeUI already)
+No green/black key colors. Black models stay solid (they still write depth).
 
 ## Dynamic layout
 

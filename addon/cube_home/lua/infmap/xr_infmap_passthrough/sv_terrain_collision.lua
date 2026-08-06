@@ -1,7 +1,16 @@
--- Terrain colliders for home map (adapted from InfMap base gm_infmap by Meetric).
--- Upstream: https://github.com/meetric1/gmod-infinite-map
+-- Home map collision only — NEVER visible furniture/cubes (those looked like "exploded sim").
+-- InfMap still needs chunk colliders; they stay EF_NODRAW / RENDERMODE_NONE.
 
 InfMap.chunk_table = InfMap.chunk_table or {}
+
+local function makeInvisibleSolid(e)
+	if not IsValid(e) then return end
+	e:SetNoDraw(true)
+	e:DrawShadow(false)
+	e:SetRenderMode(RENDERMODE_NONE)
+	e:SetColor(Color(0, 0, 0, 0))
+	e.CubeHomeInvisibleCollider = true
+end
 
 local function try_invalid_chunk(chunk, filter)
 	if not chunk then return end
@@ -24,20 +33,22 @@ local function update_chunk(ent, chunk, oldchunk)
 		local e = ents.Create("infmap_terrain_collider")
 		if not IsValid(e) then return end
 		InfMap.prop_update_chunk(e, chunk)
-		e:SetModel("models/props_c17/FurnitureCouch002a.mdl")
+		-- Tiny invisible hull — never couch / hunter cubes on screen
+		e:SetModel("models/hunter/plates/plate025x025.mdl")
 		e:Spawn()
+		makeInvisibleSolid(e)
 		InfMap.chunk_table[InfMap.ezcoord(chunk)] = e
 	end
 end
 
 local function resetAll()
+	-- Invisible walk floor under the plaza (no debugwhite cubes)
 	local e = ents.Create("prop_physics")
 	if not IsValid(e) then return end
 	e:InfMap_SetPos(Vector(0, 0, -4))
-	e:SetModel("models/hunter/blocks/cube8x8x025.mdl")
-	e:SetMaterial("models/debug/debugwhite")
-	e:SetColor(Color(36, 40, 52))
+	e:SetModel("models/hunter/plates/plate8x8.mdl")
 	e:Spawn()
+	makeInvisibleSolid(e)
 	local phys = e:GetPhysicsObject()
 	if IsValid(phys) then phys:EnableMotion(false) end
 	constraint.Weld(e, game.GetWorld(), 0, 0, 0)
@@ -57,7 +68,6 @@ end)
 hook.Add("PropUpdateChunk", "cube_home_infgen_terrain", function(ent, chunk, oldchunk)
 	update_chunk(ent, chunk, oldchunk)
 	if chunk[3] <= -100 then
-		print("[cube_home] Force removing stray", ent)
 		SafeRemoveEntity(ent)
 	end
 end)
