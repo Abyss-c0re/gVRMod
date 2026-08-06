@@ -39,26 +39,9 @@ local function hillScale()
 	return math.max(0, s)
 end
 
--- Height-function: infinite flat void floor (collision only — visuals off by default).
--- Product look is AR passthrough; hills optional if cube_home_draw_terrain 1.
+-- Flat magenta InfMap floor everywhere (visual mesh is solid #FF00FF on client).
 function InfMap.height_function(x, y)
-	local r = math.sqrt(x * x + y * y)
-	local pad = plazaRadius()
-
-	-- Level plaza under the hub platforms.
-	if r < pad + 2 then
-		return 0
-	end
-
-	-- Beyond plaza: still flat void (no mountains — not flatgrass cosplay).
-	if hillScale() <= 0.01 or not noise2d then
-		return 0
-	end
-
-	-- Subtle undulation only when hill_scale > 0 in layout (still muted).
-	x = x - 1.5
-	local final = (noise2d(x / 40, y / 40 + 100000)) * 800 * hillScale()
-	return math.min(final, 2000)
+	return 0
 end
 
 function InfMap.planet_height_function(x, y)

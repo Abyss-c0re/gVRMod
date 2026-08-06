@@ -1,23 +1,21 @@
--- XR Home Passthrough — single MAGENTA void (#FF00FF).
--- Solid fill only (no checker). Module keys that one color → alpha 0 → room.
+-- XR Home Passthrough — InfMap terrain is already solid magenta (#FF00FF).
+-- This file only toggles chroma punch + OpenXR blend. Does NOT paint black.
 
 if not CLIENT then return end
 
 CubeHome = CubeHome or {}
 CubeHome.Passthrough = CubeHome.Passthrough or { active = false, menu = false }
 
--- Pure magenta (classic chroma key; rare on normal props)
 CubeHome.VOID_KEY = { r = 255, g = 0, b = 255 }
 CubeHome.VOID_KEY_N = { r = 1, g = 0, b = 1 }
 
 local cvEnable = CreateClientConVar("cube_home_passthrough", "1", true, FCVAR_ARCHIVE,
-	"XR Home: solid magenta void → room passthrough")
-local cvTol = CreateClientConVar("cube_home_passthrough_tol", "0.20", true, FCVAR_ARCHIVE,
-	"Magenta key distance 0.10–0.40")
+	"XR Home: punch InfMap magenta → room passthrough")
+local cvTol = CreateClientConVar("cube_home_passthrough_tol", "0.22", true, FCVAR_ARCHIVE,
+	"Magenta key distance")
 
 local MENU_NAME = "Passthrough"
 local MENU_ID = "cube_home_passthrough"
-local voidMat
 
 local function isOpenXR()
 	if isfunction(VRMOD_GetBackend) then
@@ -48,43 +46,38 @@ local function applyOpenXR(on)
 	local kn = CubeHome.VOID_KEY_N
 	if on then
 		if isfunction(VRMOD_SetPassthroughChromaKey) then
-			VRMOD_SetPassthroughChromaKey(kn.r, kn.g, kn.b)
+			VRMOD_SetPassthroughChromaKey(1, 0, 1)
 		end
-		-- Pink-only mask (bit 1); no black dual key
 		if isfunction(VRMOD_SetPassthroughChromaMask) then
-			VRMOD_SetPassthroughChromaMask(1)
+			VRMOD_SetPassthroughChromaMask(1) -- magenta only
 		end
 		if isfunction(VRMOD_SetPassthroughChroma) then
-			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.10, 0.40))
+			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.12, 0.40))
 		end
-		VRMOD_SetEnvironmentBlendMode(1) -- ALPHA_BLEND
+		VRMOD_SetEnvironmentBlendMode(1)
 	else
 		if isfunction(VRMOD_SetPassthroughChroma) then
-			VRMOD_SetPassthroughChroma(false, 0.20)
+			VRMOD_SetPassthroughChroma(false, 0.22)
 		end
 		VRMOD_SetEnvironmentBlendMode(0)
 	end
 	return true
 end
 
-local function applyWorld(on)
-	if on then
-		RunConsoleCommand("r_drawworld", "0")
-		RunConsoleCommand("r_3dsky", "0")
-		RunConsoleCommand("r_drawskybox", "0")
-		RunConsoleCommand("fog_override", "1")
-		RunConsoleCommand("fog_color", "255", "0", "255")
-		RunConsoleCommand("fog_start", "99999")
-		RunConsoleCommand("fog_end", "99999")
-		if InfMap then
-			InfMap.render_distance = 0
-			InfMap.planet_render_distance = 0
-		end
-	else
-		RunConsoleCommand("r_drawworld", "1")
-		RunConsoleCommand("r_3dsky", "1")
-		RunConsoleCommand("r_drawskybox", "1")
-		RunConsoleCommand("fog_override", "0")
+-- Keep map magenta always; PT only toggles key punch (not map color).
+local function applyWorldForPT(on)
+	-- Never leave black: brush world off; InfMap magenta mesh is the map.
+	RunConsoleCommand("r_drawworld", "0")
+	RunConsoleCommand("r_3dsky", "0")
+	RunConsoleCommand("r_drawskybox", "0")
+	RunConsoleCommand("fog_override", "1")
+	RunConsoleCommand("fog_color", "255", "0", "255")
+	RunConsoleCommand("fog_start", "99999")
+	RunConsoleCommand("fog_end", "99999")
+	if InfMap then
+		InfMap.terrain_material = "cube_home/pt_void"
+		InfMap.render_distance = math.max(InfMap.render_distance or 0, 2)
+		InfMap.planet_render_distance = 0
 	end
 end
 
@@ -94,17 +87,18 @@ function CubeHome.EnablePassthrough(reason)
 		print("[cube_home] passthrough needs OpenXR")
 		return
 	end
+	applyWorldForPT(true)
 	local ok = applyOpenXR(true)
 	CubeHome.Passthrough.active = true
-	applyWorld(true)
-	print(string.format("[cube_home] PT ON solid magenta #FF00FF reason=%s ok=%s",
+	print(string.format("[cube_home] PT ON (InfMap magenta punch) reason=%s ok=%s",
 		tostring(reason or "?"), tostring(ok)))
 end
 
 function CubeHome.DisablePassthrough(reason)
 	CubeHome.Passthrough.active = false
 	applyOpenXR(false)
-	if onHomeMap() then applyWorld(false) end
+	-- Map stays magenta even with PT off
+	if onHomeMap() then applyWorldForPT(false) end
 	print("[cube_home] PT OFF reason=" .. tostring(reason or "?"))
 end
 
@@ -120,76 +114,24 @@ function CubeHome.TogglePassthrough()
 	CubeHome.SetPassthrough(nextOn, "quickmenu")
 end
 
-local function ensureVoidMat()
-	if voidMat and not voidMat:IsError() then return voidMat end
-	voidMat = Material("cube_home/pt_void")
-	if voidMat:IsError() then voidMat = Material("vgui/white") end
-	return voidMat
-end
-
--- Solid magenta floor plane (single color, no checker).
-local size = 1e9
-local minZ = -1000
-local voidMesh
-local function ensureVoidMesh()
-	if voidMesh then return voidMesh end
-	voidMesh = Mesh()
-	voidMesh:BuildFromTriangles({
-		{ pos = Vector(size, size, minZ), normal = Vector(0, 0, 1), u = 1, v = 0 },
-		{ pos = Vector(size, -size, minZ), normal = Vector(0, 0, 1), u = 1, v = 1 },
-		{ pos = Vector(-size, -size, minZ), normal = Vector(0, 0, 1), u = 0, v = 1 },
-		{ pos = Vector(size, size, minZ), normal = Vector(0, 0, 1), u = 1, v = 0 },
-		{ pos = Vector(-size, -size, minZ), normal = Vector(0, 0, 1), u = 0, v = 1 },
-		{ pos = Vector(-size, size, minZ), normal = Vector(0, 0, 1), u = 0, v = 0 },
-	})
-	return voidMesh
-end
-
--- Force sky/clear to pure magenta every frame (map "is" this color — no black fight).
-hook.Add("PreDrawSkyBox", "cube_home_magenta_clear", function()
-	if not onHomeMap() or not CubeHome.Passthrough.active then return end
+-- Always keep clear/sky magenta on this map (no black start).
+hook.Add("PreDrawSkyBox", "cube_home_always_magenta", function()
+	if not onHomeMap() then return end
 	render.Clear(255, 0, 255, 255, true, true)
 	return true
 end)
 
-hook.Add("PostDraw2DSkyBox", "cube_home_magenta_void", function()
-	if not onHomeMap() or not CubeHome.Passthrough.active then return end
-	local mat = ensureVoidMat()
-	local mesh = ensureVoidMesh()
-	render.OverrideDepthEnable(true, false)
-	render.SetMaterial(mat)
-	render.ResetModelLighting(1, 1, 1)
-	render.SetLocalModelLights()
-	render.SetColorModulation(1, 0, 1) -- pure #FF00FF
-	mesh:Draw()
-	render.SetColorModulation(1, 1, 1)
-	render.OverrideDepthEnable(false, false)
-end)
-
 hook.Add("SetupWorldFog", "cube_home_pt_fog", function()
-	if not onHomeMap() or not CubeHome.Passthrough.active then return end
+	if not onHomeMap() then return end
 	render.FogMode(MATERIAL_FOG_NONE)
 	return true
 end)
 
-hook.Add("PreDrawOpaqueRenderables", "cube_home_pt_hide_infmap_mesh", function()
-	if not onHomeMap() or not CubeHome.Passthrough.active then return end
-	if InfMap and InfMap.client_chunks then
-		for _, row in pairs(InfMap.client_chunks) do
-			if istable(row) then
-				for _, e in pairs(row) do
-					if IsValid(e) then e:SetNoDraw(true) end
-				end
-			end
-		end
-	end
-end)
-
 local function menuHint()
 	if CubeHome.Passthrough.active then
-		return "ON · magenta void → room"
+		return "ON · magenta InfMap → room"
 	end
-	return "OFF · full VR"
+	return "OFF · magenta world (no punch)"
 end
 
 function CubeHome.RemovePassthroughMenu()
@@ -224,12 +166,12 @@ local function syncFromCvar()
 		if CubeHome.Passthrough.active then CubeHome.DisablePassthrough("left_map") end
 		return
 	end
+	applyWorldForPT(true) -- always magenta map
 	if not isOpenXR() or not (g_VR and g_VR.active) then
 		CubeHome.RemovePassthroughMenu()
 		if CubeHome.Passthrough.active then
 			applyOpenXR(false)
 			CubeHome.Passthrough.active = false
-			applyWorld(false)
 		end
 		return
 	end
@@ -243,9 +185,7 @@ end
 
 hook.Add("InitPostEntity", "cube_home_pt_boot", function()
 	if not onHomeMap() then return end
-	timer.Simple(1, function()
-		if cvEnable:GetBool() then applyWorld(true) end
-	end)
+	applyWorldForPT(true)
 end)
 
 hook.Add("VRMod_Start", "cube_home_pt_vrstart", function()
@@ -255,7 +195,7 @@ end)
 hook.Add("VRMod_Exit", "cube_home_pt_vrexit", function()
 	CubeHome.RemovePassthroughMenu()
 	if isfunction(VRMOD_SetEnvironmentBlendMode) then VRMOD_SetEnvironmentBlendMode(0) end
-	if isfunction(VRMOD_SetPassthroughChroma) then VRMOD_SetPassthroughChroma(false, 0.20) end
+	if isfunction(VRMOD_SetPassthroughChroma) then VRMOD_SetPassthroughChroma(false, 0.22) end
 	CubeHome.Passthrough.active = false
 end)
 
@@ -274,7 +214,7 @@ end, "cube_home_pt")
 
 cvars.AddChangeCallback("cube_home_passthrough_tol", function(_, _, new)
 	if CubeHome.Passthrough.active and isfunction(VRMOD_SetPassthroughChroma) then
-		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.20, 0.10, 0.40))
+		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.22, 0.12, 0.40))
 	end
 end, "cube_home_pt_tol")
 
