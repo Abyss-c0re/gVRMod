@@ -101,7 +101,11 @@ static bool g_hasAlphaBlend = false;
 static bool g_hasAdditive = false;
 static XrEnvironmentBlendMode g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 static bool g_passthroughChroma = false;
-static float g_passthroughChromaKey = 0.10f;
+static float g_passthroughChromaTol = 0.22f; // RGB distance from key → transparent
+// Pure green void key (not black — dark model pixels stay opaque).
+static float g_passthroughKeyR = 0.0f;
+static float g_passthroughKeyG = 1.0f;
+static float g_passthroughKeyB = 0.0f;
 
 static void XR_EnumerateBlendModes() {
     g_hasAlphaBlend = false;
@@ -154,16 +158,36 @@ int XR_GetEnvironmentBlendMode() {
 
 bool XR_SupportsAlphaBlend() { return g_hasAlphaBlend; }
 
-void XR_SetPassthroughChroma(bool enable, float threshold) {
+void XR_SetPassthroughChroma(bool enable, float tolerance) {
     g_passthroughChroma = enable;
-    if (threshold < 0.01f) threshold = 0.01f;
-    if (threshold > 0.95f) threshold = 0.95f;
-    g_passthroughChromaKey = threshold;
-    VRMOD_LOG_INFO("Passthrough chroma %s threshold=%.3f", enable ? "ON" : "OFF", g_passthroughChromaKey);
+    if (tolerance < 0.02f) tolerance = 0.02f;
+    if (tolerance > 0.9f) tolerance = 0.9f;
+    g_passthroughChromaTol = tolerance;
+    VRMOD_LOG_INFO("Passthrough chroma %s tol=%.3f key=(%.2f,%.2f,%.2f)",
+                   enable ? "ON" : "OFF", g_passthroughChromaTol,
+                   g_passthroughKeyR, g_passthroughKeyG, g_passthroughKeyB);
+}
+
+void XR_SetPassthroughChromaKey(float keyR, float keyG, float keyB) {
+    auto clamp01 = [](float v) {
+        if (v < 0.f) return 0.f;
+        if (v > 1.f) return 1.f;
+        return v;
+    };
+    g_passthroughKeyR = clamp01(keyR);
+    g_passthroughKeyG = clamp01(keyG);
+    g_passthroughKeyB = clamp01(keyB);
+    VRMOD_LOG_INFO("Passthrough chroma key RGB=(%.3f,%.3f,%.3f)",
+                   g_passthroughKeyR, g_passthroughKeyG, g_passthroughKeyB);
 }
 
 bool XR_GetPassthroughChroma() { return g_passthroughChroma; }
-float XR_GetPassthroughChromaThreshold() { return g_passthroughChromaKey; }
+float XR_GetPassthroughChromaThreshold() { return g_passthroughChromaTol; }
+void XR_GetPassthroughChromaKey(float* r, float* g, float* b) {
+    if (r) *r = g_passthroughKeyR;
+    if (g) *g = g_passthroughKeyG;
+    if (b) *b = g_passthroughKeyB;
+}
 
 XrEnvironmentBlendMode XR_ActiveEnvironmentBlendMode() { return g_envBlendMode; }
 

@@ -128,11 +128,15 @@ void XR_MarkFrameEnded();
 int XR_SetEnvironmentBlendMode(int mode);
 int XR_GetEnvironmentBlendMode(); // 0/1/2
 bool XR_SupportsAlphaBlend();
-// When alpha blend is active, near-black Source pixels become transparent so
-// real-world / runtime passthrough shows through (chroma threshold 0..1).
-void XR_SetPassthroughChroma(bool enable, float threshold);
+// Color-key chroma: pixels near key RGB become transparent (alpha 0) so room
+// shows through under ALPHA_BLEND. Prefer pure green void (0,1,0) — not black —
+// so dark model shading stays solid. tolerance = max RGB distance 0..√3.
+void XR_SetPassthroughChroma(bool enable, float tolerance);
+// keyR/G/B in 0..1. Default key = pure green (0,1,0).
+void XR_SetPassthroughChromaKey(float keyR, float keyG, float keyB);
 bool XR_GetPassthroughChroma();
 float XR_GetPassthroughChromaThreshold();
+void XR_GetPassthroughChromaKey(float* r, float* g, float* b);
 // Active XrEnvironmentBlendMode for xrEndFrame (defaults OPAQUE).
 XrEnvironmentBlendMode XR_ActiveEnvironmentBlendMode();
 

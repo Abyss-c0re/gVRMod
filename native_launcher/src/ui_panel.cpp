@@ -719,7 +719,7 @@ void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot) {
     MapCategory c;
     c.name = "Sandbox";
     // Product default: InfMap home hub when present; construct/flatgrass fallbacks.
-    c.maps = {"gm_infmap_home", "gm_construct", "gm_flatgrass"};
+    c.maps = {"xr_infmap_passthrough", "gm_construct", "gm_flatgrass"};
     c.order = 0;
     s.categories.push_back(c);
   }
@@ -730,8 +730,8 @@ void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot) {
     }
   }
   auto& maps = s.categories[s.catIndex].maps;
-  // Prefer gVRMod home map, then classic construct.
-  static const char* kDefaultMaps[] = {"gm_infmap_home", "gm_construct", "gm_flatgrass"};
+  // Prefer XR Home Passthrough hub, then classic construct.
+  static const char* kDefaultMaps[] = {"xr_infmap_passthrough", "gm_construct", "gm_flatgrass"};
   bool picked = false;
   for (const char* want : kDefaultMaps) {
     for (size_t i = 0; i < maps.size(); ++i) {
@@ -913,7 +913,7 @@ bool CubeUI_SaveBindingsIfDirty(CubeUIState& s) {
 
 const std::string& CubeUI_SelectedMap(const CubeUIState& s) {
   // Product fallback: InfMap home hub (Cube ensures BSP + InfMap base on Start).
-  static std::string fallback = "gm_infmap_home";
+  static std::string fallback = "xr_infmap_passthrough";
   if (s.categories.empty()) return fallback;
   const auto& maps = s.categories[s.catIndex].maps;
   if (maps.empty()) return fallback;

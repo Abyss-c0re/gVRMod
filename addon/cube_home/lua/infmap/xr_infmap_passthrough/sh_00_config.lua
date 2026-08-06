@@ -1,13 +1,18 @@
--- gVRMod Home — shared layout defaults + load/save paths.
--- Map-local InfMap scripts run only when game.GetMap() == gm_infmap_home.
+-- XR Home Passthrough — map-local InfMap scripts (game.GetMap() == xr_infmap_passthrough).
+-- InfMap requires second map token "infmap" → xr_infmap_passthrough.
 
 CubeHome = CubeHome or {}
-CubeHome.MAP = "gm_infmap_home"
+CubeHome.MAP = "xr_infmap_passthrough"
+CubeHome.TITLE = "XR Home Passthrough"
 CubeHome.INFMAP_WORKSHOP = "2905327911"
 -- InfMap by Meetric — https://github.com/meetric1/gmod-infinite-map (GPL-3.0)
 CubeHome.INFMAP_AUTHOR = "Meetric"
 CubeHome.INFMAP_REPO = "https://github.com/meetric1/gmod-infinite-map"
 CubeHome.INFMAP_WORKSHOP_URL = "https://steamcommunity.com/workshop/filedetails/?id=2905327911"
+-- Pure green void key (module chroma). Not black — preserves dark model pixels.
+CubeHome.VOID_KEY = { r = 0, g = 255, b = 0 }
+CubeHome.VOID_KEY_N = { r = 0, g = 1, b = 0 } -- 0..1 for module
+CubeHome.VOID_TOLERANCE = 0.22
 CubeHome.DATA_DIR = "cube_home"
 CubeHome.LAYOUT_FILE = "cube_home/layout.json"
 CubeHome.LAYOUT_DEFAULT = "cube_home/layout_default.json"
@@ -20,7 +25,7 @@ end
 function CubeHome.DefaultLayout()
 	return {
 		v = 1,
-		name = "gVRMod Home",
+		name = "XR Home Passthrough",
 		seed = 1,
 		plaza_radius = 2.5,
 		hill_scale = 0.0,
@@ -87,7 +92,6 @@ function CubeHome.NormalizeLayout(raw)
 end
 
 function CubeHome.LoadLayoutFromDisk()
-	-- Prefer player-edited data file; fall back to default shipped with addon.
 	local path = CubeHome.LAYOUT_FILE
 	if file.Exists(path, "DATA") then
 		local raw = file.Read(path, "DATA")
@@ -98,7 +102,6 @@ function CubeHome.LoadLayoutFromDisk()
 			end
 		end
 	end
-	-- Addon-shipped default (GAME path after addon mount)
 	local defPath = "data/" .. CubeHome.LAYOUT_DEFAULT
 	if file.Exists(defPath, "GAME") then
 		local raw = file.Read(defPath, "GAME")
@@ -122,5 +125,4 @@ function CubeHome.SaveLayout(layout)
 	return true
 end
 
--- Active layout (shared); server rebuilds world from this.
 CubeHome.Layout = CubeHome.Layout or CubeHome.DefaultLayout()

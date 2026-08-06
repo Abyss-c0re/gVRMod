@@ -103,8 +103,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v47: OpenXR environment blend + passthrough chroma (AR home map).
-    LUA->PushNumber(47);
+    // v48: green-key passthrough chroma (void key RGB, not black luminance).
+    LUA->PushNumber(48);
     return 1;
 }
 
@@ -127,10 +127,10 @@ LUA_FUNCTION(SupportsAlphaBlend) {
     return 1;
 }
 
-// enable[, threshold 0..1] — near-black Source pixels become transparent in HMD.
+// enable[, tolerance 0..1] — color-key chroma (default key pure green).
 LUA_FUNCTION(SetPassthroughChroma) {
     bool en = false;
-    float thr = 0.10f;
+    float thr = 0.22f;
     if (LUA->IsType(1, GarrysMod::Lua::Type::BOOL))
         en = LUA->GetBool(1);
     else if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER))
@@ -138,6 +138,16 @@ LUA_FUNCTION(SetPassthroughChroma) {
     if (LUA->IsType(2, GarrysMod::Lua::Type::NUMBER))
         thr = (float)LUA->GetNumber(2);
     XR_SetPassthroughChroma(en, thr);
+    return 0;
+}
+
+// r,g,b in 0..1 — void key color (default 0,1,0 pure green).
+LUA_FUNCTION(SetPassthroughChromaKey) {
+    float r = 0.f, g = 1.f, b = 0.f;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) r = (float)LUA->GetNumber(1);
+    if (LUA->IsType(2, GarrysMod::Lua::Type::NUMBER)) g = (float)LUA->GetNumber(2);
+    if (LUA->IsType(3, GarrysMod::Lua::Type::NUMBER)) b = (float)LUA->GetNumber(3);
+    XR_SetPassthroughChromaKey(r, g, b);
     return 0;
 }
 
@@ -1416,6 +1426,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SupportsAlphaBlend");
     LUA->PushCFunction(SetPassthroughChroma);
     LUA->SetField(-2, "SetPassthroughChroma");
+    LUA->PushCFunction(SetPassthroughChromaKey);
+    LUA->SetField(-2, "SetPassthroughChromaKey");
     LUA->PushCFunction(GetPassthroughChroma);
     LUA->SetField(-2, "GetPassthroughChroma");
     LUA->PushCFunction(ShouldRender);

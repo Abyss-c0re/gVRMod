@@ -22,10 +22,10 @@ project recreated that idea with a modern chunk/detour API.
 
 ### What gVRMod ships
 
-- `maps/gm_infmap_home.bsp` — empty InfMap-style BSP (same role as base `gm_infmap`)
-- `lua/infmap/gm_infmap_home/*` — home hub terrain height + JSON layout (adapted
-  from InfMap’s `gm_infmap` map-local pattern; see Meetric’s docs)
-- Live improve commands (`cube_home_*`) — gVRMod product layer only
+- `maps/xr_infmap_passthrough.bsp` — empty InfMap-style BSP (same role as base `gm_infmap`)
+- `lua/infmap/xr_infmap_passthrough/*` — XR Home void + layout (adapted from InfMap’s
+  `gm_infmap` map-local pattern; see Meetric’s docs)
+- Green-key passthrough + live improve (`cube_home_*`) — gVRMod product layer only
 
 ### Runtime dependency
 

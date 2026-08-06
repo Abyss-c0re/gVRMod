@@ -1,85 +1,71 @@
-# gVRMod Home Map (InfMap)
+# XR Home Passthrough
 
-**Map:** `gm_infmap_home`  
+**Map:** `xr_infmap_passthrough`  
+**Title:** XR Home Passthrough  
 **Addon:** `gVRMod/addon/cube_home` → `garrysmod/addons/cube_home`
 
-## Credits
+> InfMap only loads when the **second `_` token** is `infmap`.  
+> So the map is `xr_infmap_passthrough` (not `xr_home_passthrough`).
 
-Home runs on **InfMap** by **Meetric** (GPL-3.0). We ship a map-local hub layout only; the chunk engine and base package are theirs.
+## Credits
 
 | | |
 |--|--|
 | Author | Meetric |
 | GitHub | https://github.com/meetric1/gmod-infinite-map |
-| Workshop | https://steamcommunity.com/workshop/filedetails/?id=2905327911 (`2905327911`) |
-| Docs | https://github.com/meetric1/gmod-infinite-map/blob/main/docs.md |
+| Workshop | https://steamcommunity.com/workshop/filedetails/?id=2905327911 |
 | Full note | [`addon/cube_home/CREDITS.md`](../addon/cube_home/CREDITS.md) |
 
-## Intent
+## Passthrough (OpenXR + this map only)
 
-A **home hub** for Cube/VR that can be **improved live** (JSON layout + console) without remapping or forking InfMap.
+| Condition | Required |
+|-----------|----------|
+| Map | `xr_infmap_passthrough` |
+| Backend | OpenXR (`vrmod_xr`) |
+| VR | Live session |
 
-## Passthrough / AR void (default)
+**Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
+It is not shown on other maps, OpenVR, or outside VR.
 
-The home map is **not** meant to look like flatgrass. Default product look:
+### Green-key void (not black)
+
+Black chroma punched shadows/dark models. Instead:
 
 | Layer | Behavior |
 |-------|----------|
-| World | `r_drawworld 0` — no brush geometry |
-| Terrain mesh | Off (`cube_home_draw_terrain 0`) |
-| Sky / clear | Pure black |
-| Platforms | Layout props only (opaque) |
-| OpenXR | `ALPHA_BLEND` + **dark chroma** → black pixels transparent so the real room shows through (WiVRn/Quest when supported) |
+| Void | Pure **green** (`cube_home/pt_void` material + sky plane) |
+| Module | Color-key chroma: distance to key RGB → alpha |
+| Models | Normal materials — stay solid (not green) |
+| OpenXR | `ALPHA_BLEND` + source alpha |
 
-| Convar / command | Effect |
-|------------------|--------|
-| `cube_home_passthrough 1` | AR void on (default) |
-| `cube_home_passthrough_key 0.12` | Chroma threshold (higher = more transparent) |
-| `cube_home_draw_terrain 1` | Optional InfMap ground mesh (flatgrass-like) |
-| `cube_home_passthrough_toggle` | Flip AR mode |
+| Cvar / control | Effect |
+|----------------|--------|
+| Quick menu **Passthrough** | Toggle (map+OpenXR only) |
+| `cube_home_passthrough 0/1` | Preference (archive) |
+| `cube_home_passthrough_tol 0.22` | Key softness |
+| `cube_home_draw_terrain 0` | Keep void (no flatgrass mesh) |
 
-Module API (v47+): `VRMOD_SetEnvironmentBlendMode(3)`, `VRMOD_SetPassthroughChroma(true, 0.12)`.
-
-If the runtime has no alpha blend, you still get a black void with floating platforms (better than flatgrass); rebuild/install `gmcl_vrmod_xr` for full room passthrough.
-
-| Layer | Source |
-|-------|--------|
-| Infinite BSP + chunk API | InfMap base (required) |
-| Home BSP rename | `maps/gm_infmap_home.bsp` (copy of base empty map) |
-| Terrain (flat plaza + hills) | `lua/infmap/gm_infmap_home/` |
-| Dynamic props/zones | `data/cube_home/layout.json` |
-
-InfMap only initializes when the **second `_` token** of the map name is `infmap`  
-(`gm_infmap_home` → `gm` | `infmap` | `home`).
-
-## CubeUI
-
-- Default selection (no last-play): **`gm_infmap_home`**
-- Pinned first in Sandbox list when present
-- On Start: `EnsureMapAvailable` also pulls InfMap base (WS extract) if missing
-
-## Live improve
+Module API (v48+):
 
 ```
-cube_home_set_spawn          # save spawn to layout.json
-cube_home_add_prop [model]   # frozen prop at feet
-cube_home_reload             # rebuild from disk
-cube_home_save / reset
-cube_home_goto sandbox|range|build|plaza
+VRMOD_SetPassthroughChromaKey(0, 1, 0)  -- pure green
+VRMOD_SetPassthroughChroma(true, 0.22)
+VRMOD_SetEnvironmentBlendMode(3)       -- auto alpha
 ```
 
-Edit `garrysmod/data/cube_home/layout.json` (zones, props, `plaza_radius`, `hill_scale`) then reload.
+### Future: “true” passthrough texture
 
-## Install
+Ideal path is a stencil/alpha material the engine writes without a visible key color
+(or FB passthrough layer under projection). Green-key is the Source-safe PoC until
+that exists. Avoid pure green on player models while PT is on.
 
-```bash
-./install.sh --skip-build   # or full install
-# links addons/cube_home → monorepo addon/cube_home
-# subscribe InfMap base on Steam if not already
+## Dynamic layout
+
+```
+cube_home_set_spawn
+cube_home_add_prop [model]
+cube_home_reload / save / reset
+cube_home_goto plaza|sandbox|range|build
 ```
 
-## Growth path
-
-1. Add zones/props in JSON (no code)
-2. New map-local scripts under `lua/infmap/gm_infmap_home/` (terrain, lighting, portals)
-3. Optional: second map `gm_infmap_home_v2` with its own folder when a clean slate is needed
+Layout: `garrysmod/data/cube_home/layout.json`

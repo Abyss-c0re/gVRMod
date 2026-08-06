@@ -590,11 +590,11 @@ fi
 
 echo
 echo "=== Installing home map addon (addon/cube_home) ==="
-if [[ -f "$HOME_ADDON_SRC/maps/gm_infmap_home.bsp" ]] || [[ -d "$HOME_ADDON_SRC/lua" ]]; then
+if [[ -f "$HOME_ADDON_SRC/maps/xr_infmap_passthrough.bsp" ]] || [[ -d "$HOME_ADDON_SRC/lua" ]]; then
     link_addon "$HOME_ADDON_SRC" "$HOME_ADDON_INSTALL_NAME" || true
-    echo "  Home map: gm_infmap_home (needs InfMap base Workshop 2905327911)"
+    echo "  Home map: xr_infmap_passthrough (XR Home Passthrough; needs InfMap WS 2905327911)"
 else
-    echo "  WARNING: cube_home missing maps/gm_infmap_home.bsp — home map unavailable"
+    echo "  WARNING: cube_home missing maps/xr_infmap_passthrough.bsp — home map unavailable"
 fi
 
 # Best-effort: extract InfMap base from Steam workshop if subscribed

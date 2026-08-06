@@ -1,5 +1,3 @@
--- Client hints for gVRMod Home map.
-
 if not CLIENT then return end
 
 CubeHome = CubeHome or {}
@@ -7,16 +5,15 @@ CubeHome = CubeHome or {}
 hook.Add("InitPostEntity", "cube_home_welcome", function()
 	if not CubeHome.IsHomeMap or not CubeHome.IsHomeMap() then return end
 	timer.Simple(2, function()
-		chat.AddText(Color(90, 160, 255), "[gVRMod Home] ", color_white,
-			"AR void hub (passthrough). Platforms only — room shows through black.")
+		chat.AddText(Color(90, 160, 255), "[XR Home Passthrough] ", color_white,
+			"Map " .. tostring(CubeHome.MAP) .. " · green-key void (models stay solid).")
 		chat.AddText(Color(180, 200, 220), "  ", color_white,
-			"cube_home_passthrough 0/1 · cube_home_passthrough_key · cube_home_add_prop · cube_home_goto")
+			"Quick menu → Passthrough ON/OFF (only here + OpenXR).")
 		chat.AddText(Color(140, 160, 180), "  InfMap by Meetric: ", Color(120, 180, 255),
 			"https://github.com/meetric1/gmod-infinite-map")
 	end)
 end)
 
--- Simple world labels for zones (screen-space when close).
 hook.Add("HUDPaint", "cube_home_zone_labels", function()
 	if not CubeHome.IsHomeMap or not CubeHome.IsHomeMap() then return end
 	local layout = CubeHome.Layout
@@ -38,11 +35,9 @@ hook.Add("HUDPaint", "cube_home_zone_labels", function()
 	end
 end)
 
--- Keep client layout mirror in sync when server rebuilds (singleplayer friendly).
 hook.Add("InitPostEntity", "cube_home_client_layout", function()
 	if not CubeHome.IsHomeMap or not CubeHome.IsHomeMap() then return end
 	if CubeHome.LoadLayoutFromDisk then
-		local layout = CubeHome.LoadLayoutFromDisk()
-		CubeHome.Layout = layout
+		CubeHome.Layout = CubeHome.LoadLayoutFromDisk()
 	end
 end)

@@ -578,7 +578,7 @@ std::vector<MapCategory> ScanGModMaps(const std::string& gmodRoot) {
     std::sort(kv.second.maps.begin(), kv.second.maps.end());
 
   // Pin gVRMod home hub to front of Sandbox (product default map).
-  static const char* kHomeMap = "gm_infmap_home";
+  static const char* kHomeMap = "xr_infmap_passthrough";
   if (cats.count("Sandbox")) {
     auto& maps = cats["Sandbox"].maps;
     auto it = std::find(maps.begin(), maps.end(), kHomeMap);
@@ -837,7 +837,7 @@ static bool ExtractWorkshopMap(const std::string& gmodRoot, const std::string& m
 
 // InfMap base by Meetric (WS 2905327911, github.com/meetric1/gmod-infinite-map)
 // is required for any map whose second token is "infmap".
-// Home hub gm_infmap_home ships its own BSP but still needs InfMap lua/entities.
+// XR Home Passthrough (xr_infmap_passthrough) ships its own BSP but still needs InfMap lua/entities.
 static bool MapNeedsInfMapBase(const std::string& mapBare) {
   // second word == "infmap" (InfMap autorun gate)
   size_t a = mapBare.find('_');

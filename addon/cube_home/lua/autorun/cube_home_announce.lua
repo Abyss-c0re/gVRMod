@@ -1,12 +1,16 @@
--- Always-loaded: advertise home map identity to Cube / VRMod (even before InfMap map scripts).
+-- Always-loaded: map identity + credit (even before InfMap map scripts).
 
 CubeHome = CubeHome or {}
-CubeHome.MAP = CubeHome.MAP or "gm_infmap_home"
+-- InfMap second token must be "infmap" → xr_infmap_passthrough (product: XR Home Passthrough).
+CubeHome.MAP = CubeHome.MAP or "xr_infmap_passthrough"
+CubeHome.TITLE = CubeHome.TITLE or "XR Home Passthrough"
 CubeHome.INFMAP_WORKSHOP = CubeHome.INFMAP_WORKSHOP or "2905327911"
 CubeHome.INFMAP_AUTHOR = CubeHome.INFMAP_AUTHOR or "Meetric"
 CubeHome.INFMAP_REPO = CubeHome.INFMAP_REPO or "https://github.com/meetric1/gmod-infinite-map"
 CubeHome.INFMAP_WORKSHOP_URL = CubeHome.INFMAP_WORKSHOP_URL
 	or "https://steamcommunity.com/workshop/filedetails/?id=2905327911"
+CubeHome.VOID_KEY = CubeHome.VOID_KEY or { r = 0, g = 255, b = 0 }
+CubeHome.VOID_KEY_N = CubeHome.VOID_KEY_N or { r = 0, g = 1, b = 0 }
 
 function CubeHome.IsHomeMap(map)
 	map = string.lower(map or (game.GetMap and game.GetMap()) or "")
@@ -14,13 +18,12 @@ function CubeHome.IsHomeMap(map)
 end
 
 if SERVER then
-	-- Help operators spot missing InfMap base.
 	hook.Add("InitPostEntity", "cube_home_check_infmap", function()
 		if not CubeHome.IsHomeMap() then return end
 		if InfMap == nil then
 			ErrorNoHalt("[cube_home] InfMap base missing — subscribe Workshop "
 				.. CubeHome.INFMAP_WORKSHOP
-				.. " by Meetric (Infinite Map Base) or extract it so terrain/entities load.\n"
+				.. " by Meetric or extract it so terrain/entities load.\n"
 				.. "  " .. tostring(CubeHome.INFMAP_REPO) .. "\n")
 		end
 	end)
@@ -28,28 +31,27 @@ end
 
 if CLIENT then
 	list.Set("DesktopWindows", "CubeHomeHelp", {
-		title = "gVRMod Home",
+		title = "XR Home Passthrough",
 		icon = "icon16/world.png",
-		width = 360,
-		height = 280,
+		width = 380,
+		height = 300,
 		onewindow = true,
 		init = function(icon, window)
-			window:SetTitle("gVRMod Home")
+			window:SetTitle("XR Home Passthrough")
 			local l = vgui.Create("DLabel", window)
 			l:Dock(FILL)
 			l:DockMargin(12, 12, 12, 12)
 			l:SetWrap(true)
 			l:SetText(
-				"Home map: gm_infmap_home\n\n"
-					.. "Built on InfMap by Meetric (GPL-3.0)\n"
+				"Map: " .. tostring(CubeHome.MAP) .. "\n"
+					.. "Product: " .. tostring(CubeHome.TITLE) .. "\n\n"
+					.. "Passthrough (OpenXR only, this map only):\n"
+					.. "  Quick menu → Passthrough ON/OFF\n"
+					.. "  cube_home_passthrough 0/1\n"
+					.. "  Green void key material: cube_home/pt_void\n\n"
+					.. "InfMap by Meetric (GPL-3.0)\n"
 					.. "  github.com/meetric1/gmod-infinite-map\n"
-					.. "  Workshop " .. tostring(CubeHome.INFMAP_WORKSHOP) .. "\n\n"
-					.. "Improve live:\n"
-					.. "  cube_home_set_spawn\n"
-					.. "  cube_home_add_prop [model]\n"
-					.. "  cube_home_reload / cube_home_save / cube_home_reset\n"
-					.. "  cube_home_goto plaza|sandbox|range|build\n\n"
-					.. "Layout: garrysmod/data/cube_home/layout.json"
+					.. "  Workshop " .. tostring(CubeHome.INFMAP_WORKSHOP)
 			)
 		end,
 	})

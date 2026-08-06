@@ -168,6 +168,7 @@ static PFNGLDELETEPROGRAMPROC      glDeleteProgramPtr = nullptr;
 static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocationPtr = nullptr;
 static PFNGLUNIFORM1IPROC          glUniform1iPtr = nullptr;
 static PFNGLUNIFORM1FPROC          glUniform1fPtr = nullptr;
+static PFNGLUNIFORM3FPROC          glUniform3fPtr = nullptr;
 static PFNGLGENVERTEXARRAYSPROC    glGenVertexArraysPtr = nullptr;
 static PFNGLBINDVERTEXARRAYPROC    glBindVertexArrayPtr = nullptr;
 static PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArraysPtr = nullptr;
@@ -189,15 +190,18 @@ static const char* kChromaVS =
     "  vUV = p;\n"
     "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
     "}\n";
+// Color-key (default pure green void). Distance-from-key → alpha.
+// Black/dark model pixels are far from green → stay opaque (no ugly cutouts).
 static const char* kChromaFS =
     "#version 130\n"
     "in vec2 vUV;\n"
     "uniform sampler2D uTex;\n"
-    "uniform float uKey;\n"
+    "uniform float uTol;\n"
+    "uniform vec3 uKeyRgb;\n"
     "void main(){\n"
     "  vec4 c = texture(uTex, vUV);\n"
-    "  float l = max(c.r, max(c.g, c.b));\n"
-    "  float a = smoothstep(uKey * 0.55, uKey, l);\n"
+    "  float d = distance(c.rgb, uKeyRgb);\n"
+    "  float a = smoothstep(uTol * 0.45, uTol, d);\n"
     "  gl_FragColor = vec4(c.rgb, a);\n"
     "}\n";
 
@@ -316,8 +320,14 @@ static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h) {
         if (loc >= 0) glUniform1iPtr(loc, 0);
     }
     if (glUniform1fPtr) {
-        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uKey");
+        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uTol");
         if (loc >= 0) glUniform1fPtr(loc, XR_GetPassthroughChromaThreshold());
+    }
+    if (glUniform3fPtr) {
+        float kr = 0.f, kg = 1.f, kb = 0.f;
+        XR_GetPassthroughChromaKey(&kr, &kg, &kb);
+        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uKeyRgb");
+        if (loc >= 0) glUniform3fPtr(loc, kr, kg, kb);
     }
     if (glBindVertexArrayPtr && g_chromaVao) glBindVertexArrayPtr(g_chromaVao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -357,6 +367,7 @@ static bool LoadGLExtensions() {
     glGetUniformLocationPtr = (PFNGLGETUNIFORMLOCATIONPROC)glXGetProcAddress((const GLubyte*)"glGetUniformLocation");
     glUniform1iPtr = (PFNGLUNIFORM1IPROC)glXGetProcAddress((const GLubyte*)"glUniform1i");
     glUniform1fPtr = (PFNGLUNIFORM1FPROC)glXGetProcAddress((const GLubyte*)"glUniform1f");
+    glUniform3fPtr = (PFNGLUNIFORM3FPROC)glXGetProcAddress((const GLubyte*)"glUniform3f");
     glGenVertexArraysPtr = (PFNGLGENVERTEXARRAYSPROC)glXGetProcAddress((const GLubyte*)"glGenVertexArrays");
     glBindVertexArrayPtr = (PFNGLBINDVERTEXARRAYPROC)glXGetProcAddress((const GLubyte*)"glBindVertexArray");
     glDeleteVertexArraysPtr = (PFNGLDELETEVERTEXARRAYSPROC)glXGetProcAddress((const GLubyte*)"glDeleteVertexArrays");
