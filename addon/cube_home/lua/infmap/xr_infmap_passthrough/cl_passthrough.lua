@@ -1,9 +1,12 @@
--- XR Home Passthrough — Source error CHECKER void + dual chroma.
+-- XR Home Passthrough — stable error-CHECKER void + dual chroma (no flicker).
 --
--- Void is painted as the classic missing-texture mosaic:
---   bright #FF00DC (255,0,220)  +  dark #010001 (1,0,1)
--- Module dual-keys both colors → alpha 0 (room). Keys also work separately:
---   mask 1 = pink only, 2 = black only, 7 = both + black-needs-pink-near (checker).
+-- Flicker causes we avoid:
+--   * black clear fighting a colored plane
+--   * LINEAR blit blurring pink/black (module uses NEAREST when PT on)
+--   * regenerating the checker RT every frame
+--
+-- Void = Source error mosaic (#FF00DC / #010001). Module keys both → alpha 0.
+-- FB passthrough layer (if runtime supports) puts the real room under holes.
 
 if not CLIENT then return end
 
@@ -17,20 +20,19 @@ CubeHome.VOID_KEY2_N = { r = 1 / 255, g = 0, b = 1 / 255 }
 
 local cvEnable = CreateClientConVar("cube_home_passthrough", "1", true, FCVAR_ARCHIVE,
 	"XR Home: error-checker void → room passthrough")
-local cvTol = CreateClientConVar("cube_home_passthrough_tol", "0.18", true, FCVAR_ARCHIVE,
-	"Pink key distance")
-local cvTol2 = CreateClientConVar("cube_home_passthrough_tol2", "0.08", true, FCVAR_ARCHIVE,
+local cvTol = CreateClientConVar("cube_home_passthrough_tol", "0.22", true, FCVAR_ARCHIVE,
+	"Pink key distance (wider = less pink fringe)")
+local cvTol2 = CreateClientConVar("cube_home_passthrough_tol2", "0.12", true, FCVAR_ARCHIVE,
 	"Black-cell key distance")
--- 1=pink 2=black 3=both indep 7=checker (both + black needs pink near)
+-- 7 = full checker (pink + black-with-pink-near)
 local cvMask = CreateClientConVar("cube_home_passthrough_mask", "7", true, FCVAR_ARCHIVE,
-	"Chroma mask: 1=pink 2=black 3=both 7=checker dual")
+	"1=pink 2=black 3=both indep 7=checker")
 
 local MENU_NAME = "Passthrough"
 local MENU_ID = "cube_home_passthrough"
-
-local CHECKER_RT_NAME = "cube_home_error_checker_rt"
-local CHECKER_MAT_NAME = "cube_home_error_checker_mat"
-local checkerReady = false
+local CHECKER_RT_NAME = "cube_home_error_checker_rt_v2"
+local CHECKER_MAT_NAME = "cube_home_error_checker_mat_v2"
+local checkerBuilt = false
 local voidMat
 
 local function isOpenXR()
@@ -57,32 +59,27 @@ function CubeHome.CanUsePassthrough()
 	return onHomeMap() and isOpenXR() and g_VR and g_VR.active
 end
 
---- Build Source-style error mosaic once (pink / near-black checker).
+--- One-shot Source error mosaic (large cells so NEAREST blit keeps pure keys).
 function CubeHome.EnsureErrorCheckerMaterial()
-	if checkerReady and voidMat and not voidMat:IsError() then return voidMat end
+	if checkerBuilt and voidMat and not voidMat:IsError() then return voidMat end
 
-	local sz = 64
-	local cell = 8
-	local rt = GetRenderTargetEx(
-		CHECKER_RT_NAME, sz, sz,
-		RT_SIZE_NO_CHANGE, MATERIAL_RT_DEPTH_NONE,
-		bit.bor(1, 256), -- clamp + anisotropic off
-		0, IMAGE_FORMAT_RGBA8888
-	)
+	local sz, cell = 128, 32 -- large cells → survive downsample without pink/black mud
+	local rt = GetRenderTarget(CHECKER_RT_NAME, sz, sz)
 	if not rt then
 		voidMat = Material("cube_home/pt_void")
+		checkerBuilt = true
 		return voidMat
 	end
 
 	render.PushRenderTarget(rt)
-	render.Clear(0, 0, 0, 255, true, true)
+	render.Clear(255, 0, 220, 255, true, true)
 	cam.Start2D()
 	for cy = 0, (sz / cell) - 1 do
 		for cx = 0, (sz / cell) - 1 do
 			if (cx + cy) % 2 == 0 then
-				surface.SetDrawColor(255, 0, 220, 255) -- #FF00DC
+				surface.SetDrawColor(255, 0, 220, 255)
 			else
-				surface.SetDrawColor(1, 0, 1, 255) -- #010001
+				surface.SetDrawColor(1, 0, 1, 255)
 			end
 			surface.DrawRect(cx * cell, cy * cell, cell, cell)
 		end
@@ -93,26 +90,22 @@ function CubeHome.EnsureErrorCheckerMaterial()
 	voidMat = CreateMaterial(CHECKER_MAT_NAME, "UnlitGeneric", {
 		["$basetexture"] = rt:GetName(),
 		["$nofog"] = "1",
-		["$ignorez"] = "0",
 		["$nocull"] = "1",
+		["$ignorez"] = "0",
+		["$model"] = "1",
 		["$vertexcolor"] = "0",
 		["$vertexalpha"] = "0",
-		["$model"] = "1",
-		["$translucent"] = "0",
 	})
 	if voidMat and not voidMat:IsError() then
 		voidMat:SetTexture("$basetexture", rt)
-		-- Tile so world-scale void shows many cells
-		voidMat:SetFloat("$detailscale", 1)
 	end
-	checkerReady = true
+	checkerBuilt = true
 	return voidMat
 end
 
 local function applyOpenXR(on)
 	if not isfunction(VRMOD_SetEnvironmentBlendMode) then return false end
-	local kn = CubeHome.VOID_KEY_N
-	local kn2 = CubeHome.VOID_KEY2_N
+	local kn, kn2 = CubeHome.VOID_KEY_N, CubeHome.VOID_KEY2_N
 	if on then
 		if isfunction(VRMOD_SetPassthroughChromaKey) then
 			VRMOD_SetPassthroughChromaKey(kn.r, kn.g, kn.b)
@@ -121,18 +114,21 @@ local function applyOpenXR(on)
 			VRMOD_SetPassthroughChromaKey2(kn2.r, kn2.g, kn2.b)
 		end
 		if isfunction(VRMOD_SetPassthroughChromaTol2) then
-			VRMOD_SetPassthroughChromaTol2(math.Clamp(cvTol2:GetFloat(), 0.04, 0.2))
+			VRMOD_SetPassthroughChromaTol2(math.Clamp(cvTol2:GetFloat(), 0.06, 0.2))
 		end
 		if isfunction(VRMOD_SetPassthroughChromaMask) then
 			VRMOD_SetPassthroughChromaMask(math.floor(cvMask:GetInt()))
 		end
 		if isfunction(VRMOD_SetPassthroughChroma) then
-			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.08, 0.35))
+			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.12, 0.4))
 		end
-		VRMOD_SetEnvironmentBlendMode(3)
+		-- Force alpha blend path (module also forces this when chroma on)
+		if isfunction(VRMOD_SetEnvironmentBlendMode) then
+			VRMOD_SetEnvironmentBlendMode(1) -- ALPHA_BLEND explicit
+		end
 	else
 		if isfunction(VRMOD_SetPassthroughChroma) then
-			VRMOD_SetPassthroughChroma(false, 0.18)
+			VRMOD_SetPassthroughChroma(false, 0.22)
 		end
 		VRMOD_SetEnvironmentBlendMode(0)
 	end
@@ -145,6 +141,7 @@ local function applyWorld(on)
 		RunConsoleCommand("r_3dsky", "0")
 		RunConsoleCommand("r_drawskybox", "0")
 		RunConsoleCommand("fog_override", "1")
+		-- Clear/fog match bright key so we never alternate black↔pink (flicker root cause)
 		RunConsoleCommand("fog_color", "255", "0", "220")
 		RunConsoleCommand("fog_start", "99999")
 		RunConsoleCommand("fog_end", "99999")
@@ -170,7 +167,7 @@ function CubeHome.EnablePassthrough(reason)
 	local ok = applyOpenXR(true)
 	CubeHome.Passthrough.active = true
 	applyWorld(true)
-	print(string.format("[cube_home] passthrough ON (error CHECKER void, mask=%d) reason=%s ok=%s",
+	print(string.format("[cube_home] PT ON checker void mask=%d reason=%s ok=%s",
 		cvMask:GetInt(), tostring(reason or "?"), tostring(ok)))
 end
 
@@ -178,7 +175,7 @@ function CubeHome.DisablePassthrough(reason)
 	CubeHome.Passthrough.active = false
 	applyOpenXR(false)
 	if onHomeMap() then applyWorld(false) end
-	print("[cube_home] passthrough OFF reason=" .. tostring(reason or "?"))
+	print("[cube_home] PT OFF reason=" .. tostring(reason or "?"))
 end
 
 function CubeHome.SetPassthrough(on, reason)
@@ -193,10 +190,10 @@ function CubeHome.TogglePassthrough()
 	CubeHome.SetPassthrough(nextOn, "quickmenu")
 end
 
--- Checker void plane (tiled UVs so mosaic is visible / keyable).
+-- Stable checker void plane (built once).
 local size = 1e9
-local minZ = -1e5
-local uvScale = 50000 -- many cells across the void
+local minZ = -50000
+local uvScale = 200 -- fewer, larger tiles in world space
 local voidMesh
 local function ensureVoidMesh()
 	if voidMesh then return voidMesh end
@@ -227,6 +224,13 @@ hook.Add("PostDraw2DSkyBox", "cube_home_error_checker_void", function()
 	render.OverrideDepthEnable(false, false)
 end)
 
+-- Also fill 3D sky/world clear with bright key so no black frames (flicker fix)
+hook.Add("PreDrawSkyBox", "cube_home_pt_pink_clear", function()
+	if not onHomeMap() or not CubeHome.Passthrough.active then return end
+	render.Clear(255, 0, 220, 255, true, true)
+	return true -- skip default sky (stable pink clear)
+end)
+
 hook.Add("SetupWorldFog", "cube_home_pt_fog", function()
 	if not onHomeMap() or not CubeHome.Passthrough.active then return end
 	render.FogMode(MATERIAL_FOG_NONE)
@@ -248,9 +252,9 @@ end)
 
 local function menuHint()
 	if CubeHome.Passthrough.active then
-		return "ON · error checker void → room"
+		return "ON · error checker → room"
 	end
-	return "OFF · full VR opaque"
+	return "OFF · full VR"
 end
 
 function CubeHome.RemovePassthroughMenu()
@@ -311,13 +315,14 @@ hook.Add("InitPostEntity", "cube_home_pt_boot", function()
 end)
 
 hook.Add("VRMod_Start", "cube_home_pt_vrstart", function()
-	timer.Simple(0.5, function() syncFromCvar() end)
+	-- After session exists so FB passthrough can attach
+	timer.Simple(1.0, function() syncFromCvar() end)
 end)
 
 hook.Add("VRMod_Exit", "cube_home_pt_vrexit", function()
 	CubeHome.RemovePassthroughMenu()
 	if isfunction(VRMOD_SetEnvironmentBlendMode) then VRMOD_SetEnvironmentBlendMode(0) end
-	if isfunction(VRMOD_SetPassthroughChroma) then VRMOD_SetPassthroughChroma(false, 0.18) end
+	if isfunction(VRMOD_SetPassthroughChroma) then VRMOD_SetPassthroughChroma(false, 0.22) end
 	CubeHome.Passthrough.active = false
 end)
 
@@ -336,13 +341,13 @@ end, "cube_home_pt")
 
 cvars.AddChangeCallback("cube_home_passthrough_tol", function(_, _, new)
 	if CubeHome.Passthrough.active and isfunction(VRMOD_SetPassthroughChroma) then
-		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.18, 0.08, 0.35))
+		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.22, 0.12, 0.4))
 	end
 end, "cube_home_pt_tol")
 
 cvars.AddChangeCallback("cube_home_passthrough_tol2", function(_, _, new)
 	if CubeHome.Passthrough.active and isfunction(VRMOD_SetPassthroughChromaTol2) then
-		VRMOD_SetPassthroughChromaTol2(math.Clamp(tonumber(new) or 0.08, 0.04, 0.2))
+		VRMOD_SetPassthroughChromaTol2(math.Clamp(tonumber(new) or 0.12, 0.06, 0.2))
 	end
 end, "cube_home_pt_tol2")
 
@@ -360,16 +365,12 @@ concommand.Add("cube_home_passthrough_toggle", function()
 	CubeHome.TogglePassthrough()
 end)
 
--- Quick helpers: key either color alone (still dual-capable when mask=7)
 concommand.Add("cube_home_chroma_pink_only", function()
 	RunConsoleCommand("cube_home_passthrough_mask", "1")
-	print("[cube_home] chroma mask = pink only")
 end)
 concommand.Add("cube_home_chroma_black_only", function()
 	RunConsoleCommand("cube_home_passthrough_mask", "2")
-	print("[cube_home] chroma mask = black only (independent)")
 end)
 concommand.Add("cube_home_chroma_checker", function()
 	RunConsoleCommand("cube_home_passthrough_mask", "7")
-	print("[cube_home] chroma mask = full error checker")
 end)

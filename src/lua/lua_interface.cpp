@@ -103,8 +103,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v53: checker void + dual chroma mask (pink/black independent or together).
-    LUA->PushNumber(53);
+    // v54: FB passthrough layer + NEAREST chroma (fix flicker, real room).
+    LUA->PushNumber(54);
     return 1;
 }
 

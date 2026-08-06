@@ -145,6 +145,9 @@ void XR_GetPassthroughChromaKey2(float* r, float* g, float* b);
 float XR_GetPassthroughChromaTol2();
 // Active XrEnvironmentBlendMode for xrEndFrame (defaults OPAQUE).
 XrEnvironmentBlendMode XR_ActiveEnvironmentBlendMode();
+// XR_FB_passthrough layer under projection when home void is on (real room cameras).
+XrPassthroughLayerFB XR_GetFbPassthroughLayer();
+bool XR_HasFbPassthrough();
 
 // ── View/display info ──
 struct XrDisplayInfo {

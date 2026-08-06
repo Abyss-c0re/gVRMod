@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 #include <cstdlib>
+#include <vector>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -102,8 +103,8 @@ static bool g_hasAdditive = false;
 static XrEnvironmentBlendMode g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 static bool g_passthroughChroma = false;
 // Dual Source error mosaic keys (see ApplyPassthroughChroma shader).
-static float g_passthroughChromaTol = 0.18f;  // pink
-static float g_passthroughChromaTol2 = 0.08f; // black cell (tighter)
+static float g_passthroughChromaTol = 0.22f;  // pink (slightly wide for sRGB/blit)
+static float g_passthroughChromaTol2 = 0.12f; // black cell
 // Bright cell #FF00DC (255, 0, 220)
 static float g_passthroughKeyR = 1.0f;
 static float g_passthroughKeyG = 0.0f;
@@ -114,6 +115,17 @@ static float g_passthroughKey2G = 0.0f;
 static float g_passthroughKey2B = 1.f / 255.f;
 // 1=pink 2=black 4=black needs pink neighbor (error checker)
 static int g_passthroughChromaMask = 1 | 2 | 4;
+
+// XR_FB_passthrough — real camera under projection (void = room, not black).
+static bool g_fbPtExtEnabled = false;
+static XrPassthroughFB g_fbPassthrough = XR_NULL_HANDLE;
+static XrPassthroughLayerFB g_fbPtLayer = XR_NULL_HANDLE;
+static PFN_xrCreatePassthroughFB g_pfnCreatePt = nullptr;
+static PFN_xrDestroyPassthroughFB g_pfnDestroyPt = nullptr;
+static PFN_xrPassthroughStartFB g_pfnStartPt = nullptr;
+static PFN_xrPassthroughPauseFB g_pfnPausePt = nullptr;
+static PFN_xrCreatePassthroughLayerFB g_pfnCreatePtLayer = nullptr;
+static PFN_xrDestroyPassthroughLayerFB g_pfnDestroyPtLayer = nullptr;
 
 static void XR_EnumerateBlendModes() {
     g_hasAlphaBlend = false;
@@ -166,14 +178,87 @@ int XR_GetEnvironmentBlendMode() {
 
 bool XR_SupportsAlphaBlend() { return g_hasAlphaBlend; }
 
+static void XR_LoadFbPassthroughPfns() {
+    if (!g_xrInstance || !g_fbPtExtEnabled || g_pfnCreatePt) return;
+    g_xrGetInstanceProcAddr(g_xrInstance, "xrCreatePassthroughFB", (PFN_xrVoidFunction*)&g_pfnCreatePt);
+    g_xrGetInstanceProcAddr(g_xrInstance, "xrDestroyPassthroughFB", (PFN_xrVoidFunction*)&g_pfnDestroyPt);
+    g_xrGetInstanceProcAddr(g_xrInstance, "xrPassthroughStartFB", (PFN_xrVoidFunction*)&g_pfnStartPt);
+    g_xrGetInstanceProcAddr(g_xrInstance, "xrPassthroughPauseFB", (PFN_xrVoidFunction*)&g_pfnPausePt);
+    g_xrGetInstanceProcAddr(g_xrInstance, "xrCreatePassthroughLayerFB", (PFN_xrVoidFunction*)&g_pfnCreatePtLayer);
+    g_xrGetInstanceProcAddr(g_xrInstance, "xrDestroyPassthroughLayerFB", (PFN_xrVoidFunction*)&g_pfnDestroyPtLayer);
+}
+
+static void XR_DestroyFbPassthroughLayer() {
+    if (g_fbPtLayer != XR_NULL_HANDLE && g_pfnDestroyPtLayer) {
+        g_pfnDestroyPtLayer(g_fbPtLayer);
+        g_fbPtLayer = XR_NULL_HANDLE;
+    }
+    if (g_fbPassthrough != XR_NULL_HANDLE && g_pfnDestroyPt) {
+        g_pfnDestroyPt(g_fbPassthrough);
+        g_fbPassthrough = XR_NULL_HANDLE;
+    }
+}
+
+// Create/start or pause FB camera layer under the game projection.
+static void XR_SyncFbPassthroughLayer() {
+    if (!g_fbPtExtEnabled || !g_xrSession) return;
+    XR_LoadFbPassthroughPfns();
+    if (!g_pfnCreatePt || !g_pfnCreatePtLayer || !g_pfnStartPt) return;
+
+    if (g_passthroughChroma) {
+        if (g_fbPassthrough == XR_NULL_HANDLE) {
+            XrPassthroughCreateInfoFB pci{XR_TYPE_PASSTHROUGH_CREATE_INFO_FB};
+            pci.flags = XR_PASSTHROUGH_IS_RUNNING_AT_CREATION_BIT_FB;
+            if (g_pfnCreatePt(g_xrSession, &pci, &g_fbPassthrough) != XR_SUCCESS) {
+                VRMOD_LOG_WARN("xrCreatePassthroughFB failed");
+                g_fbPassthrough = XR_NULL_HANDLE;
+                return;
+            }
+            XrPassthroughLayerCreateInfoFB lci{XR_TYPE_PASSTHROUGH_LAYER_CREATE_INFO_FB};
+            lci.passthrough = g_fbPassthrough;
+            lci.flags = XR_PASSTHROUGH_IS_RUNNING_AT_CREATION_BIT_FB;
+            lci.purpose = XR_PASSTHROUGH_LAYER_PURPOSE_RECONSTRUCTION_FB;
+            if (g_pfnCreatePtLayer(g_xrSession, &lci, &g_fbPtLayer) != XR_SUCCESS) {
+                VRMOD_LOG_WARN("xrCreatePassthroughLayerFB failed");
+                if (g_pfnDestroyPt) g_pfnDestroyPt(g_fbPassthrough);
+                g_fbPassthrough = XR_NULL_HANDLE;
+                g_fbPtLayer = XR_NULL_HANDLE;
+                return;
+            }
+            g_pfnStartPt(g_fbPassthrough);
+            VRMOD_LOG_INFO("FB passthrough layer ACTIVE (void = real room cameras)");
+        } else if (g_pfnStartPt) {
+            g_pfnStartPt(g_fbPassthrough);
+        }
+    } else if (g_fbPassthrough != XR_NULL_HANDLE && g_pfnPausePt) {
+        g_pfnPausePt(g_fbPassthrough);
+        VRMOD_LOG_INFO("FB passthrough layer paused");
+    }
+}
+
+XrPassthroughLayerFB XR_GetFbPassthroughLayer() {
+    if (!g_passthroughChroma) return XR_NULL_HANDLE;
+    return g_fbPtLayer;
+}
+
+bool XR_HasFbPassthrough() {
+    return g_fbPtExtEnabled && g_fbPtLayer != XR_NULL_HANDLE && g_passthroughChroma;
+}
+
 void XR_SetPassthroughChroma(bool enable, float tolerance) {
     g_passthroughChroma = enable;
     if (tolerance < 0.02f) tolerance = 0.02f;
     if (tolerance > 0.9f) tolerance = 0.9f;
     g_passthroughChromaTol = tolerance;
-    VRMOD_LOG_INFO("Passthrough chroma %s tol=%.3f key=(%.2f,%.2f,%.2f)",
+    // When void chroma is on, always request ALPHA_BLEND so punched alpha is not ignored.
+    if (enable) {
+        g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND;
+    }
+    XR_SyncFbPassthroughLayer();
+    VRMOD_LOG_INFO("Passthrough chroma %s tol=%.3f key=(%.2f,%.2f,%.2f) blend=%d fbPt=%d",
                    enable ? "ON" : "OFF", g_passthroughChromaTol,
-                   g_passthroughKeyR, g_passthroughKeyG, g_passthroughKeyB);
+                   g_passthroughKeyR, g_passthroughKeyG, g_passthroughKeyB,
+                   (int)g_envBlendMode, (int)(g_fbPtLayer != XR_NULL_HANDLE));
 }
 
 void XR_SetPassthroughChromaKey(float keyR, float keyG, float keyB) {
@@ -458,27 +543,54 @@ bool XR_Init(char* errMsg, int errMsgLen) {
         return false;
     }
 
-    // 1) Create instance with graphics API extension (GLX Linux / D3D11 Windows)
+    // 1) Create instance with graphics API + optional FB passthrough (void = real room).
+    g_fbPtExtEnabled = false;
+    std::vector<const char*> extList;
 #ifdef _WIN32
-    const char* extensions[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+    extList.push_back(XR_KHR_D3D11_ENABLE_EXTENSION_NAME);
 #else
-    const char* extensions[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME };
+    extList.push_back(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
 #endif
+    // Probe FB passthrough before CreateInstance
+    {
+        uint32_t n = 0;
+        if (g_xrEnumerateInstanceExtensionProperties)
+            g_xrEnumerateInstanceExtensionProperties(nullptr, 0, &n, nullptr);
+        std::vector<XrExtensionProperties> props(n, {XR_TYPE_EXTENSION_PROPERTIES});
+        if (n && g_xrEnumerateInstanceExtensionProperties)
+            g_xrEnumerateInstanceExtensionProperties(nullptr, n, &n, props.data());
+        for (uint32_t i = 0; i < n; ++i) {
+            if (std::strcmp(props[i].extensionName, XR_FB_PASSTHROUGH_EXTENSION_NAME) == 0) {
+                extList.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
+                g_fbPtExtEnabled = true;
+                break;
+            }
+        }
+    }
     XrInstanceCreateInfo ici = {XR_TYPE_INSTANCE_CREATE_INFO};
     strncpy(ici.applicationInfo.applicationName, "gVRMod", XR_MAX_APPLICATION_NAME_SIZE - 1);
     ici.applicationInfo.applicationVersion = 1;
     ici.applicationInfo.engineName[0] = '\0';
     ici.applicationInfo.engineVersion = 0;
     ici.applicationInfo.apiVersion = XR_MAKE_VERSION(1, 0, 0);
-    ici.enabledExtensionCount = 1;
-    ici.enabledExtensionNames = extensions;
+    ici.enabledExtensionCount = (uint32_t)extList.size();
+    ici.enabledExtensionNames = extList.data();
 
     XrResult res = g_xrCreateInstance(&ici, &g_xrInstance);
+    if (res != XR_SUCCESS && g_fbPtExtEnabled) {
+        // Retry without FB passthrough
+        VRMOD_LOG_WARN("xrCreateInstance failed with FB passthrough — retry without");
+        g_fbPtExtEnabled = false;
+        extList.resize(1);
+        ici.enabledExtensionCount = 1;
+        ici.enabledExtensionNames = extList.data();
+        res = g_xrCreateInstance(&ici, &g_xrInstance);
+    }
     if (res != XR_SUCCESS) {
         snprintf(errMsg, errMsgLen, "VRMOD OpenXR: xrCreateInstance failed (%d)", (int)res);
         return false;
     }
-    VRMOD_LOG_INFO("OpenXR instance created");
+    VRMOD_LOG_INFO("OpenXR instance created (FB_passthrough ext=%d)", (int)g_fbPtExtEnabled);
 
     // Load all instance functions
     XR_LOAD(xrDestroyInstance);
@@ -714,6 +826,8 @@ bool XR_CreateSessionWithCurrentGL(char* errMsg, int errMsgLen) {
 #else
     VRMOD_LOG_INFO("OpenXR GL session + spaces ready (deferred path)");
 #endif
+    // If Lua already requested home passthrough before session existed, create FB layer now.
+    XR_SyncFbPassthroughLayer();
     return true;
 }
 
@@ -974,6 +1088,8 @@ void XR_Shutdown() {
         XR_EndFrame();
     }
     g_xrFrameBegun = false;
+
+    XR_DestroyFbPassthroughLayer();
 
     // 1) Session-tied action spaces first (while session + PFNs still valid).
     XR_DestroyActionSpacesOnly();

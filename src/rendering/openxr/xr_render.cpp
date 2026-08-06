@@ -1191,12 +1191,14 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     glClear(GL_COLOR_BUFFER_BIT);
                 }
 
+                // NEAREST when chroma on — LINEAR blurs pink/black cells → flicker + missed keys.
+                const GLenum filter = XR_GetPassthroughChroma() ? GL_NEAREST : GL_LINEAR;
                 glBlitFramebufferPtr(
                     srcX0, srcY0, srcX1, srcY1,
                     0, dstY0, (GLint)g_xrSwapchainWidth, dstY1,
-                    GL_COLOR_BUFFER_BIT, GL_LINEAR);
+                    GL_COLOR_BUFFER_BIT, filter);
 
-                // Source error-pink chroma → alpha 0 (room under ALPHA_BLEND).
+                // Error mosaic chroma → alpha 0 (room / FB passthrough under holes).
                 if (XR_GetPassthroughChroma()) {
                     ApplyPassthroughChroma(dstTexture, g_xrSwapchainWidth, g_xrSwapchainHeight);
                 }
@@ -1235,12 +1237,11 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
     // (glFinish is always forbidden — kills CThread.)
     // glFlush();
 
-    // Submit frame
+    // Submit frame: optional FB camera layer UNDER projection (void = room).
     XrCompositionLayerProjection projLayer = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};
     projLayer.space = g_xrStageSpace;
     projLayer.viewCount = 2;
     projLayer.views = projViews;
-    // Source alpha from chroma pass drives room visibility under ALPHA_BLEND.
     if (XR_ActiveEnvironmentBlendMode() != XR_ENVIRONMENT_BLEND_MODE_OPAQUE ||
         XR_GetPassthroughChroma()) {
         projLayer.layerFlags =
@@ -1248,19 +1249,33 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
             XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
     }
 
-    const XrCompositionLayerBaseHeader* layers[] = {
-        (XrCompositionLayerBaseHeader*)&projLayer
-    };
+    XrCompositionLayerPassthroughFB ptComp{};
+    const XrCompositionLayerBaseHeader* layers[2] = {};
+    uint32_t layerCount = 0;
+    XrPassthroughLayerFB ptLayer = XR_GetFbPassthroughLayer();
+    if (ptLayer != XR_NULL_HANDLE) {
+        ptComp = {XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_FB};
+        ptComp.flags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+        ptComp.space = g_xrStageSpace;
+        ptComp.layerHandle = ptLayer;
+        layers[layerCount++] = (const XrCompositionLayerBaseHeader*)&ptComp;
+    }
+    layers[layerCount++] = (const XrCompositionLayerBaseHeader*)&projLayer;
 
     XrFrameEndInfo fei = {XR_TYPE_FRAME_END_INFO};
     fei.displayTime = g_xrFrameState.predictedDisplayTime;
-    fei.environmentBlendMode = XR_ActiveEnvironmentBlendMode();
-    fei.layerCount = 1;
+    // With FB passthrough layer, OPAQUE projection + alpha holes still shows cameras under it.
+    // Prefer ALPHA_BLEND when chroma is on so holes are not filled black.
+    fei.environmentBlendMode = XR_GetPassthroughChroma()
+        ? XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND
+        : XR_ActiveEnvironmentBlendMode();
+    fei.layerCount = layerCount;
     fei.layers = layers;
 
     if ((s_submitCallCount % 90) == 0) {
-        VRMOD_LOG_INFO("xrEndFrame: submitting layer space=stage views=2 srcTex=%u swap=%ux%u fmt=0x%llx",
-            srcTex, g_xrSwapchainWidth, g_xrSwapchainHeight, (unsigned long long)g_xrSwapchainFormat);
+        VRMOD_LOG_INFO("xrEndFrame: layers=%u chroma=%d fbPt=%d blend=%d srcTex=%u",
+            layerCount, (int)XR_GetPassthroughChroma(), (int)XR_HasFbPassthrough(),
+            (int)fei.environmentBlendMode, srcTex);
     }
     res = g_xrEndFrame(g_xrSession, &fei);
     // Frame is closed whether EndFrame succeeded or not (do not double-end).
