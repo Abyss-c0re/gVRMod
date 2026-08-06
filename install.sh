@@ -117,11 +117,11 @@ install_desktop_entry() {
         echo "  icon: steam_icon_4000 (banner.png not found)"
     fi
 
-    # Terminal=true often hides apps from KDE "Games" (only search finds them).
-    # Use konsole for logs but keep Categories=Game so it appears in Games.
+    # Prefer host launcher (clean env, no rebuild). Falls back to CubeUI.sh.
+    local host_launcher="$SCRIPT_DIR/scripts/CubeUI_host.sh"
     local exec_line="$launcher"
-    if command -v konsole >/dev/null 2>&1; then
-        exec_line="konsole --workdir $SCRIPT_DIR -qwindowtitle \"gVRMod\" -e $launcher"
+    if [[ -x "$host_launcher" ]]; then
+        exec_line="$host_launcher"
     fi
 
     # Always write a fresh .desktop with absolute paths for this install tree
@@ -132,7 +132,7 @@ Type=Application
 Name=gVRMod
 GenericName=VR Launcher for Garry's Mod
 Comment=OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
-TryExec=$launcher
+TryExec=$SCRIPT_DIR/install/native/CubeUI
 Exec=$exec_line
 Path=$SCRIPT_DIR
 Icon=$icon_name
@@ -153,7 +153,7 @@ Type=Application
 Name=gVRMod
 GenericName=VR Launcher for Garry's Mod
 Comment=OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
-TryExec=$launcher
+TryExec=$SCRIPT_DIR/install/native/CubeUI
 Exec=$exec_line
 Path=$SCRIPT_DIR
 Icon=$icon_name

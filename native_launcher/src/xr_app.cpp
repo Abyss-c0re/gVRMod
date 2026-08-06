@@ -1135,7 +1135,16 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
     xrEndFrame(session, &fei);
   }
 
-  // Tear down without C++ exception escape (WiVRn: "terminate called without an active exception")
+  // Join addon workers BEFORE destroying ui / leaving main.
+  // Joinable std::thread destructor calls std::terminate →
+  // "terminate called without an active exception" (KDE: "CubeUI.sh crashed").
+  try {
+    Addons_Shutdown(ui.addons);
+  } catch (...) {
+    fprintf(stderr, "[CubeUI] Addons_Shutdown exception swallowed\n");
+  }
+
+  // Tear down without C++ exception escape
   try {
     if (sessionRunning && session) {
       xrRequestExitSession(session);
