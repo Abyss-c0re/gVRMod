@@ -1,5 +1,5 @@
 {
-    "title": "gVRMod Home (InfMap)",
+    "title": "gVRMod Home (InfMap by Meetric)",
     "type": "map",
     "tags": ["roleplay", "scenic"],
     "ignore": [
@@ -7,6 +7,7 @@
         ".git*",
         "docs/*",
         "README.md",
+        "CREDITS.md",
         "**/*.md"
     ]
 }

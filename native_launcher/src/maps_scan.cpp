@@ -835,7 +835,8 @@ static bool ExtractWorkshopMap(const std::string& gmodRoot, const std::string& m
   return false;
 }
 
-// InfMap base (WS 2905327911) is required for any map whose second token is "infmap".
+// InfMap base by Meetric (WS 2905327911, github.com/meetric1/gmod-infinite-map)
+// is required for any map whose second token is "infmap".
 // Home hub gm_infmap_home ships its own BSP but still needs InfMap lua/entities.
 static bool MapNeedsInfMapBase(const std::string& mapBare) {
   // second word == "infmap" (InfMap autorun gate)

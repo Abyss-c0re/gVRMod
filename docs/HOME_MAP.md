@@ -1,8 +1,19 @@
 # gVRMod Home Map (InfMap)
 
 **Map:** `gm_infmap_home`  
-**Base:** [InfMap – Infinite Map Base](https://steamcommunity.com/workshop/filedetails/?id=2905327911) (Workshop **2905327911**)  
 **Addon:** `gVRMod/addon/cube_home` → `garrysmod/addons/cube_home`
+
+## Credits
+
+Home runs on **InfMap** by **Meetric** (GPL-3.0). We ship a map-local hub layout only; the chunk engine and base package are theirs.
+
+| | |
+|--|--|
+| Author | Meetric |
+| GitHub | https://github.com/meetric1/gmod-infinite-map |
+| Workshop | https://steamcommunity.com/workshop/filedetails/?id=2905327911 (`2905327911`) |
+| Docs | https://github.com/meetric1/gmod-infinite-map/blob/main/docs.md |
+| Full note | [`addon/cube_home/CREDITS.md`](../addon/cube_home/CREDITS.md) |
 
 ## Intent
 

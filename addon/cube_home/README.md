@@ -1,6 +1,19 @@
 # gVRMod Home (`gm_infmap_home`)
 
-VR home hub built on **[InfMap – Infinite Map Base](https://steamcommunity.com/workshop/filedetails/?id=2905327911)** (Workshop `2905327911`).
+VR home hub built on **InfMap – Infinite Map Base** by **Meetric**.
+
+## Credits (required reading)
+
+This product layer sits on Meetric’s infinite-map engine. Full attribution:
+
+→ **[CREDITS.md](./CREDITS.md)**
+
+| | |
+|--|--|
+| Author | **Meetric** |
+| Repo | https://github.com/meetric1/gmod-infinite-map |
+| Workshop | https://steamcommunity.com/workshop/filedetails/?id=2905327911 |
+| License | GPL-3.0 |
 
 ## Why InfMap
 
@@ -48,3 +61,5 @@ Edit JSON (zones, props, `plaza_radius`, `hill_scale`) then `cube_home_reload`.
 ## Dependency
 
 InfMap base must provide `InfMap` global, `simplex.lua`, and entities (`infmap_terrain_*`). Without it the BSP still loads but terrain/layout will error — Cube prints a clear InitPostEntity warning.
+
+Do **not** remove credit from in-game welcome, CREDITS.md, or docs when extending this hub.

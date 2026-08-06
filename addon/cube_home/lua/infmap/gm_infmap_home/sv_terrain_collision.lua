@@ -1,4 +1,5 @@
--- Terrain colliders for home map (adapted from InfMap base gm_infmap).
+-- Terrain colliders for home map (adapted from InfMap base gm_infmap by Meetric).
+-- Upstream: https://github.com/meetric1/gmod-infinite-map
 
 InfMap.chunk_table = InfMap.chunk_table or {}
 

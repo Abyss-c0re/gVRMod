@@ -8,7 +8,9 @@ hook.Add("InitPostEntity", "cube_home_welcome", function()
 	if not CubeHome.IsHomeMap or not CubeHome.IsHomeMap() then return end
 	timer.Simple(2, function()
 		chat.AddText(Color(90, 160, 255), "[gVRMod Home] ", color_white,
-			"Dynamic hub on InfMap. Improve with: cube_home_set_spawn · cube_home_add_prop · cube_home_reload · cube_home_goto <zone>")
+			"Dynamic hub on InfMap by Meetric. Improve with: cube_home_set_spawn · cube_home_add_prop · cube_home_reload · cube_home_goto <zone>")
+		chat.AddText(Color(140, 160, 180), "  InfMap credits: ", Color(120, 180, 255),
+			"https://github.com/meetric1/gmod-infinite-map", color_white, " · Workshop 2905327911")
 	end)
 end)
 

@@ -4,6 +4,10 @@
 CubeHome = CubeHome or {}
 CubeHome.MAP = "gm_infmap_home"
 CubeHome.INFMAP_WORKSHOP = "2905327911"
+-- InfMap by Meetric — https://github.com/meetric1/gmod-infinite-map (GPL-3.0)
+CubeHome.INFMAP_AUTHOR = "Meetric"
+CubeHome.INFMAP_REPO = "https://github.com/meetric1/gmod-infinite-map"
+CubeHome.INFMAP_WORKSHOP_URL = "https://steamcommunity.com/workshop/filedetails/?id=2905327911"
 CubeHome.DATA_DIR = "cube_home"
 CubeHome.LAYOUT_FILE = "cube_home/layout.json"
 CubeHome.LAYOUT_DEFAULT = "cube_home/layout_default.json"

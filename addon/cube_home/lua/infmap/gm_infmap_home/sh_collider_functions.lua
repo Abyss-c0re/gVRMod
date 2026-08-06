@@ -1,5 +1,6 @@
 -- gVRMod Home terrain: large flat plaza for VR, soft hills beyond (config-driven).
--- Requires InfMap base (Workshop 2905327911) so InfMap.simplex + terrain ents exist.
+-- Requires InfMap base by Meetric (Workshop 2905327911 / github.com/meetric1/gmod-infinite-map)
+-- so InfMap.simplex + terrain ents exist. Pattern adapted from InfMap's gm_infmap map scripts.
 
 InfMap.simplex = InfMap.simplex or include("simplex.lua")
 InfMap.chunk_resolution = 3
