@@ -210,7 +210,7 @@ PY
     fi
 
     echo "  desktop: $desktop_dst"
-    echo "  name:    gVRMod Cube  (Application Launcher → Games)"
+    echo "  name:    gVRMod  (Application Launcher → Games)"
     echo "  launch:  $launcher  (Cube UI — not GMod-first)"
 }
 
@@ -538,30 +538,33 @@ mkdir -p "$ADDONS_DIR"
 
 if [[ -d "$ADDON_SRC/lua" ]]; then
     # Drop legacy folder name from older gVRMod installs
-    if [[ -d "$ADDONS_DIR/gvrmod" ]]; then
+    if [[ -d "$ADDONS_DIR/gvrmod" ]] || [[ -L "$ADDONS_DIR/gvrmod" ]]; then
         echo "  Removing legacy addon: $ADDONS_DIR/gvrmod"
         rm -rf "$ADDONS_DIR/gvrmod"
     fi
     DEST="$ADDONS_DIR/$ADDON_INSTALL_NAME"
-    if [[ -d "$DEST" ]]; then
-        echo "  Removing existing addon: $DEST"
-        rm -rf "$DEST"
-    fi
-    mkdir -p "$DEST"
-    if command -v rsync >/dev/null 2>&1; then
-        rsync -a \
-          --exclude '.git/' \
-          --exclude 'state/' \
-          --exclude 'docs/' \
-          --exclude '.github/' \
-          --exclude '.workshop_id' \
-          "$ADDON_SRC/" "$DEST/"
+    # Prefer symlink to gVRMod submodule so GMod always loads live Dev tree
+    # (no stale rsync copies). Replace real dirs / wrong links.
+    if [[ -L "$DEST" ]]; then
+        cur="$(readlink -f "$DEST" 2>/dev/null || true)"
+        want="$(readlink -f "$ADDON_SRC")"
+        if [[ "$cur" == "$want" ]]; then
+            echo "  already linked: $DEST → $want"
+        else
+            rm -f "$DEST"
+            ln -sfn "$want" "$DEST"
+            echo "  relinked: $DEST → $want"
+        fi
     else
-        cp -a "$ADDON_SRC/." "$DEST/"
-        rm -rf "$DEST/.git" "$DEST/state" "$DEST/docs" "$DEST/.github" 2>/dev/null || true
+        if [[ -e "$DEST" ]]; then
+            echo "  Removing existing addon tree: $DEST"
+            rm -rf "$DEST"
+        fi
+        want="$(readlink -f "$ADDON_SRC")"
+        ln -sfn "$want" "$DEST"
+        echo "  linked: $DEST → $want"
     fi
     echo "garrysmod/addons/$ADDON_INSTALL_NAME" >> "$MANIFEST"
-    echo "  copied: addon/vrmod-x64/ → garrysmod/addons/$ADDON_INSTALL_NAME/"
 else
     echo "  WARNING: No addon at $ADDON_SRC — run: git submodule update --init --recursive"
 fi
@@ -578,7 +581,7 @@ echo
 echo "A manifest was written to:"
 echo "    $MANIFEST"
 echo
-echo "App menu: search for \"gVRMod Cube\" → scripts/CubeUI.sh"
+echo "App menu: search for \"gVRMod\" → scripts/CubeUI.sh"
 echo "(GMod is started only after START GAME in the Cube headset menu.)"
 echo "Legacy GMod-only helper: scripts/gvrmod_launcher.sh"
 echo "If you ever want to remove everything this script installed, run:"
@@ -589,6 +592,6 @@ echo "  Binaries: OpenXR = gmcl_vrmod_xr_* ; OpenVR = gmcl_vrmod_* (both may coe
 echo "  Prefer:   vrmod_prefer_backend auto|openxr|openvr"
 echo "  Status:   vrmod_backend"
 echo "  OpenXR:   any active runtime (SteamVR OpenXR, Monado, ALVR, WiVRn, …)"
-echo "  Start:    desktop \"gVRMod Cube\" (Cube UI) → START GAME → GMod"
+echo "  Start:    desktop \"gVRMod\" (Cube UI) → START GAME → GMod"
 echo
 echo "Tip: re-run this installer after updating packages or the submodule."
