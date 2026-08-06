@@ -889,13 +889,19 @@ static XrAction CreateInternalVector2Action(XrActionSet set, const char* name) {
     return a;
 }
 
+// Raw state for controller SOURCES and app-synthesized chords.
+// Do NOT gate on isActive: WiVRn/Monado (and some secondary paths) often report
+// isActive=false while currentState still tracks the button. OpenXR says inactive
+// state must be zeroed — so compliant runtimes are unchanged. Gating here made
+// mode=all chords (reload, teleport, Lua remaps) drop whenever one member
+// flickered inactive. Logical GetActions still uses isActive for set priority.
 static float ReadFloatActionRaw(XrAction action) {
     if (action == XR_NULL_HANDLE || !g_xrSession) return 0.0f;
     XrActionStateGetInfo getInfo = {XR_TYPE_ACTION_STATE_GET_INFO};
     getInfo.action = action;
     XrActionStateFloat state = {XR_TYPE_ACTION_STATE_FLOAT};
     if (g_xrGetActionStateFloat(g_xrSession, &getInfo, &state) != XR_SUCCESS) return 0.0f;
-    return state.isActive ? state.currentState : 0.0f;
+    return state.currentState;
 }
 
 static bool ReadBooleanActionRaw(XrAction action) {
@@ -904,7 +910,7 @@ static bool ReadBooleanActionRaw(XrAction action) {
     getInfo.action = action;
     XrActionStateBoolean state = {XR_TYPE_ACTION_STATE_BOOLEAN};
     if (g_xrGetActionStateBoolean(g_xrSession, &getInfo, &state) != XR_SUCCESS) return false;
-    return state.isActive && state.currentState;
+    return state.currentState == XR_TRUE;
 }
 
 bool XR_AttachActionSets() {
@@ -1042,7 +1048,8 @@ static bool ReadStickDpad(int index, float* valueOut, bool* activeOut) {
     XrActionStateVector2f state = {XR_TYPE_ACTION_STATE_VECTOR2F};
     if (g_xrGetActionStateVector2f(g_xrSession, &getInfo, &state) != XR_SUCCESS) return false;
     if (activeOut) *activeOut = state.isActive;
-    if (!state.isActive) return true;
+    // Same chord policy as Read*ActionRaw: evaluate axes even if isActive flickers.
+    // Compliant runtimes zero currentState when inactive.
     bool pressed = StickDpadFromAxes(state.currentState.x, state.currentState.y,
                                      s.stickAxis, kStickDpadThreshold);
     if (valueOut) *valueOut = pressed ? 1.0f : 0.0f;
@@ -1373,7 +1380,9 @@ bool XR_GetBooleanAction(VRActionHandle handle, bool* changed, bool* isActiveOut
                 active = true;
             }
 
-            // SteamVR chords (OpenXR has no chord API) — Quest 3 / oculus_touch scheme:
+            // App-synthesized chords (OpenXR has no chord API) — Quest 3 gold.
+            // Uses ReadBooleanActionRaw (value, not isActive) so one flaky active
+            // bit cannot kill the AND. See Read*ActionRaw comment above.
             //   reload  = both thumbrests touch
             //   teleport = left stick click (held) + right thumbrest touch
             if (strcmp(name, "boolean_reload") == 0) {

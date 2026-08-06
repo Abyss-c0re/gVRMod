@@ -563,18 +563,20 @@ LUA_FUNCTION(GetControllerSources) {
         LUA->SetField(-2, "label");
         LUA->PushBool(XR_GetControllerSourceIsFloat(i));
         LUA->SetField(-2, "analog");
-        LUA->PushNumber(XR_GetControllerSourceValue(i));
+        float value = XR_GetControllerSourceValue(i);
+        LUA->PushNumber(value);
         LUA->SetField(-2, "value");
         bool active = XR_GetControllerSourceIsActive(i);
         LUA->PushBool(active);
         LUA->SetField(-2, "active");
-        // pressed: bool sources as-is; floats use 0.55 threshold (matches fire/pickup)
-        bool pressed = false;
-        if (active) {
-            pressed = XR_GetControllerSourceIsFloat(i)
-                ? (XR_GetControllerSourceValue(i) >= 0.55f)
-                : (XR_GetControllerSourceValue(i) >= 0.5f);
-        }
+        // pressed from raw value — do NOT gate on isActive.
+        // OpenXR often reports isActive=false for unbound/secondary paths while
+        // currentState still updates; gating made Lua chords (mode=all) flaky
+        // because any single dead active bit killed the whole chord.
+        // Thresholds match fire/pickup synthesis in xr_input.cpp.
+        bool pressed = XR_GetControllerSourceIsFloat(i)
+            ? (value >= 0.55f)
+            : (value >= 0.5f);
         LUA->PushBool(pressed);
         LUA->SetField(-2, "pressed");
         LUA->SetField(-2, id);
