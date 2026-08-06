@@ -9,8 +9,8 @@ CubeHome.INFMAP_AUTHOR = CubeHome.INFMAP_AUTHOR or "Meetric"
 CubeHome.INFMAP_REPO = CubeHome.INFMAP_REPO or "https://github.com/meetric1/gmod-infinite-map"
 CubeHome.INFMAP_WORKSHOP_URL = CubeHome.INFMAP_WORKSHOP_URL
 	or "https://steamcommunity.com/workshop/filedetails/?id=2905327911"
-CubeHome.VOID_KEY = CubeHome.VOID_KEY or { r = 0, g = 255, b = 0 }
-CubeHome.VOID_KEY_N = CubeHome.VOID_KEY_N or { r = 0, g = 1, b = 0 }
+CubeHome.VOID_KEY = CubeHome.VOID_KEY or { r = 255, g = 0, b = 255 }
+CubeHome.VOID_KEY_N = CubeHome.VOID_KEY_N or { r = 1, g = 0, b = 1 }
 
 function CubeHome.IsHomeMap(map)
 	map = string.lower(map or (game.GetMap and game.GetMap()) or "")

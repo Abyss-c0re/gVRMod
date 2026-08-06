@@ -1,11 +1,9 @@
-// Source-engine missing-texture pink (error mosaic bright cell).
-// RGB (255, 0, 220) = #FF00DC — used as chroma key for XR home passthrough.
-// Do not use this color on props/avatars while passthrough is on.
+// Solid pure magenta void for single-key chroma (#FF00FF).
 "UnlitGeneric"
 {
 	"$basetexture" "vgui/white"
-	"$color" "[1 0 0.863]"
-	"$color2" "[1 0 0.863]"
+	"$color" "[1 0 1]"
+	"$color2" "[1 0 1]"
 	"$model" "1"
 	"$nofog" "1"
 	"$ignorez" "0"

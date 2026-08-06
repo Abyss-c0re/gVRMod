@@ -103,18 +103,17 @@ static bool g_hasAdditive = false;
 static XrEnvironmentBlendMode g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 static bool g_passthroughChroma = false;
 // Dual Source error mosaic keys (see ApplyPassthroughChroma shader).
-static float g_passthroughChromaTol = 0.22f;  // pink (slightly wide for sRGB/blit)
-static float g_passthroughChromaTol2 = 0.12f; // black cell
-// Bright cell #FF00DC (255, 0, 220)
+static float g_passthroughChromaTol = 0.20f;  // single magenta key
+static float g_passthroughChromaTol2 = 0.08f; // unused when mask=pink only
+// Pure magenta #FF00FF
 static float g_passthroughKeyR = 1.0f;
 static float g_passthroughKeyG = 0.0f;
-static float g_passthroughKeyB = 220.f / 255.f;
-// Dark cell #010001 ≈ (1, 0, 1)
-static float g_passthroughKey2R = 1.f / 255.f;
-static float g_passthroughKey2G = 0.0f;
-static float g_passthroughKey2B = 1.f / 255.f;
-// 1=pink 2=black 4=black needs pink neighbor (error checker)
-static int g_passthroughChromaMask = 1 | 2 | 4;
+static float g_passthroughKeyB = 1.0f;
+static float g_passthroughKey2R = 0.f;
+static float g_passthroughKey2G = 0.f;
+static float g_passthroughKey2B = 0.f;
+// Default: magenta only (bit 1)
+static int g_passthroughChromaMask = 1;
 
 // XR_FB_passthrough — real camera under projection (void = room, not black).
 static bool g_fbPtExtEnabled = false;

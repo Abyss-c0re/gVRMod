@@ -6,7 +6,7 @@ hook.Add("InitPostEntity", "cube_home_welcome", function()
 	if not CubeHome.IsHomeMap or not CubeHome.IsHomeMap() then return end
 	timer.Simple(2, function()
 		chat.AddText(Color(90, 160, 255), "[XR Home Passthrough] ", color_white,
-			"Dual chroma: Source error mosaic pink+black → room. GPU real-time.")
+			"Solid magenta void (#FF00FF) → room chroma.")
 		chat.AddText(Color(180, 200, 220), "  ", color_white,
 			"Quick menu → Passthrough (this map + OpenXR only).")
 		chat.AddText(Color(140, 160, 180), "  InfMap by Meetric: ", Color(120, 180, 255),
