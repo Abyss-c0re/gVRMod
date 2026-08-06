@@ -27,25 +27,30 @@
 **Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
 It is not shown on other maps, OpenVR, or outside VR.
 
-### Error-pink chroma void (stable PoC)
+### Dual chroma — Source error mosaic (real-time GPU)
 
-Depth / “invisible texture” experiments regressed the headset view. Restored simple
-chroma that worked as a PoC, using the **Source missing-texture pink** (not black/green):
+Full missing-texture checkerboard keys (both cells), processed **in the submit
+pass** (stolen RT → alpha) — one fullscreen shader / eye, VR-rate, not lagged async.
 
-| | |
-|--|--|
-| Key color | **`#FF00DC` (255, 0, 220)** — bright cell of the classic error mosaic |
-| Void | Large unlit plane + `r_drawworld 0` (sky off) |
-| Module v51 | Distance to key RGB → alpha 0 |
-| Room | OpenXR `ALPHA_BLEND` under transparent holes |
+| Cell | Color | Hex |
+|------|-------|-----|
+| Bright | (255, 0, 220) | `#FF00DC` |
+| Dark | (1, 0, 1) | `#010001` |
+
+| Rule | |
+|------|--|
+| Pink | Always → transparent |
+| Black | Transparent **only if pink is in 3×3 neighborhood** (checker), so solid black models stay |
+| Cost | ~9 texture samples/pixel — fine at 2× eye res / 90 Hz |
 
 ```
-VRMOD_SetPassthroughChromaKey(1, 0, 220/255)
+VRMOD_SetPassthroughChromaKey(1, 0, 220/255)   -- pink
+VRMOD_SetPassthroughChromaKey2(1/255, 0, 1/255) -- black cell
 VRMOD_SetPassthroughChroma(true, 0.18)
 VRMOD_SetEnvironmentBlendMode(3)
 ```
 
-Material: `cube_home/pt_void`. Avoid pure error-pink on props while PT is on.
+Void fill: `cube_home/pt_void` (pink). Dual key also punches real `error` checker textures.
 
 ## Dynamic layout
 

@@ -101,12 +101,17 @@ static bool g_hasAlphaBlend = false;
 static bool g_hasAdditive = false;
 static XrEnvironmentBlendMode g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 static bool g_passthroughChroma = false;
-// RGB distance tol for pink-key chroma (Source missing-texture mosaic pink).
-static float g_passthroughChromaTol = 0.18f;
-// Source error texture bright cell: #FF00DC ≈ (255, 0, 220)
+// Dual Source error mosaic keys (see ApplyPassthroughChroma shader).
+static float g_passthroughChromaTol = 0.18f;  // pink
+static float g_passthroughChromaTol2 = 0.08f; // black cell (tighter)
+// Bright cell #FF00DC (255, 0, 220)
 static float g_passthroughKeyR = 1.0f;
 static float g_passthroughKeyG = 0.0f;
 static float g_passthroughKeyB = 220.f / 255.f;
+// Dark cell #010001 ≈ (1, 0, 1)
+static float g_passthroughKey2R = 1.f / 255.f;
+static float g_passthroughKey2G = 0.0f;
+static float g_passthroughKey2B = 1.f / 255.f;
 
 static void XR_EnumerateBlendModes() {
     g_hasAlphaBlend = false;
@@ -178,12 +183,37 @@ void XR_SetPassthroughChromaKey(float keyR, float keyG, float keyB) {
     g_passthroughKeyR = clamp01(keyR);
     g_passthroughKeyG = clamp01(keyG);
     g_passthroughKeyB = clamp01(keyB);
-    VRMOD_LOG_INFO("Passthrough chroma key RGB=(%.3f,%.3f,%.3f)",
+    VRMOD_LOG_INFO("Passthrough chroma key1 (pink) RGB=(%.3f,%.3f,%.3f)",
                    g_passthroughKeyR, g_passthroughKeyG, g_passthroughKeyB);
+}
+
+void XR_SetPassthroughChromaKey2(float keyR, float keyG, float keyB) {
+    auto clamp01 = [](float v) {
+        if (v < 0.f) return 0.f;
+        if (v > 1.f) return 1.f;
+        return v;
+    };
+    g_passthroughKey2R = clamp01(keyR);
+    g_passthroughKey2G = clamp01(keyG);
+    g_passthroughKey2B = clamp01(keyB);
+    VRMOD_LOG_INFO("Passthrough chroma key2 (black cell) RGB=(%.3f,%.3f,%.3f)",
+                   g_passthroughKey2R, g_passthroughKey2G, g_passthroughKey2B);
+}
+
+void XR_SetPassthroughChromaTol2(float tolerance) {
+    if (tolerance < 0.02f) tolerance = 0.02f;
+    if (tolerance > 0.5f) tolerance = 0.5f;
+    g_passthroughChromaTol2 = tolerance;
 }
 
 bool XR_GetPassthroughChroma() { return g_passthroughChroma; }
 float XR_GetPassthroughChromaThreshold() { return g_passthroughChromaTol; }
+float XR_GetPassthroughChromaTol2() { return g_passthroughChromaTol2; }
+void XR_GetPassthroughChromaKey2(float* r, float* g, float* b) {
+    if (r) *r = g_passthroughKey2R;
+    if (g) *g = g_passthroughKey2G;
+    if (b) *b = g_passthroughKey2B;
+}
 void XR_GetPassthroughChromaKey(float* r, float* g, float* b) {
     if (r) *r = g_passthroughKeyR;
     if (g) *g = g_passthroughKeyG;

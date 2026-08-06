@@ -173,9 +173,10 @@ static PFNGLGENVERTEXARRAYSPROC    glGenVertexArraysPtr = nullptr;
 static PFNGLBINDVERTEXARRAYPROC    glBindVertexArrayPtr = nullptr;
 static PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArraysPtr = nullptr;
 
-// Chroma-key void: Source missing-texture pink (error mosaic) → alpha 0.
-// Default key RGB = (1, 0, 220/255) ≈ #FF00DC — the bright magenta/pink cell
-// of the classic Source error checkerboard (not black, not green).
+// Dual chroma-key: full Source error mosaic (pink #FF00DC + black #010001) → α0.
+// Real-time GPU pass on stolen eye RT at submit (one fullscreen triangle / eye).
+// Black cell only punches when a pink neighbor is nearby → checker pattern, not
+// solid black props. Cost: ~9 texels/pixel — fine at VR rates.
 static GLuint g_chromaProg = 0;
 static GLuint g_chromaTempTex = 0;
 static GLuint g_chromaVao = 0;
@@ -192,17 +193,36 @@ static const char* kChromaVS =
     "  vUV = p;\n"
     "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
     "}\n";
-// Distance to key RGB → alpha. Pink error color is rare in normal art.
+// Dual Source error checker: pink always; black only with pink neighborhood.
 static const char* kChromaFS =
     "#version 130\n"
     "in vec2 vUV;\n"
     "uniform sampler2D uTex;\n"
-    "uniform float uTol;\n"
-    "uniform vec3 uKeyRgb;\n"
+    "uniform vec2 uTexel;\n"       // 1/width, 1/height
+    "uniform float uTolPink;\n"
+    "uniform float uTolBlack;\n"
+    "uniform vec3 uKeyPink;\n"     // #FF00DC
+    "uniform vec3 uKeyBlack;\n"    // #010001
+    "float keyMask(vec3 c, vec3 key, float tol){\n"
+    "  float d = distance(c, key);\n"
+    "  return 1.0 - smoothstep(tol * 0.45, tol, d);\n" // 1 = is key
+    "}\n"
     "void main(){\n"
     "  vec4 c = texture(uTex, vUV);\n"
-    "  float d = distance(c.rgb, uKeyRgb);\n"
-    "  float a = smoothstep(uTol * 0.45, uTol, d);\n"
+    "  float mPink = keyMask(c.rgb, uKeyPink, uTolPink);\n"
+    "  float mBlack = keyMask(c.rgb, uKeyBlack, uTolBlack);\n"
+    "  // Pink presence in 3x3 (checker adjacency) — allow black cell punch only then.\n"
+    "  float pinkNear = mPink;\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x, 0.0)).rgb, uKeyPink, uTolPink));\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x, 0.0)).rgb, uKeyPink, uTolPink));\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(0.0,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(0.0, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "  float punch = max(mPink, mBlack * pinkNear);\n"
+    "  float a = 1.0 - punch;\n"
     "  gl_FragColor = vec4(c.rgb, a);\n"
     "}\n";
 
@@ -316,17 +336,38 @@ static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h) {
         if (loc >= 0) glUniform1iPtr(loc, 0);
     }
     if (glUniform1fPtr) {
-        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uTol");
-        float tol = XR_GetPassthroughChromaThreshold();
-        if (tol < 0.05f) tol = 0.18f;
-        if (tol > 0.45f) tol = 0.45f;
-        if (loc >= 0) glUniform1fPtr(loc, tol);
+        float tolP = XR_GetPassthroughChromaThreshold();
+        float tolB = XR_GetPassthroughChromaTol2();
+        if (tolP < 0.05f) tolP = 0.18f;
+        if (tolP > 0.45f) tolP = 0.45f;
+        if (tolB < 0.02f) tolB = 0.08f;
+        if (tolB > 0.25f) tolB = 0.25f;
+        GLint lp = glGetUniformLocationPtr(g_chromaProg, "uTolPink");
+        GLint lb = glGetUniformLocationPtr(g_chromaProg, "uTolBlack");
+        if (lp >= 0) glUniform1fPtr(lp, tolP);
+        if (lb >= 0) glUniform1fPtr(lb, tolB);
     }
     if (glUniform3fPtr) {
-        float kr = 1.f, kg = 0.f, kb = 220.f / 255.f; // #FF00DC Source error pink
-        XR_GetPassthroughChromaKey(&kr, &kg, &kb);
-        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uKeyRgb");
-        if (loc >= 0) glUniform3fPtr(loc, kr, kg, kb);
+        float pr = 1.f, pg = 0.f, pb = 220.f / 255.f;
+        float br = 1.f / 255.f, bg = 0.f, bb = 1.f / 255.f;
+        XR_GetPassthroughChromaKey(&pr, &pg, &pb);
+        XR_GetPassthroughChromaKey2(&br, &bg, &bb);
+        GLint lp = glGetUniformLocationPtr(g_chromaProg, "uKeyPink");
+        GLint lb = glGetUniformLocationPtr(g_chromaProg, "uKeyBlack");
+        if (lp >= 0) glUniform3fPtr(lp, pr, pg, pb);
+        if (lb >= 0) glUniform3fPtr(lb, br, bg, bb);
+    }
+    // Texel size for 3x3 pink-neighbor probe
+    {
+        // glUniform2f may not be loaded — use two 1f or get glUniform2f
+        typedef void (*PFNGLUNIFORM2FPROC)(GLint, GLfloat, GLfloat);
+        static PFNGLUNIFORM2FPROC glUniform2fPtr = nullptr;
+        if (!glUniform2fPtr)
+            glUniform2fPtr = (PFNGLUNIFORM2FPROC)glXGetProcAddress((const GLubyte*)"glUniform2f");
+        if (glUniform2fPtr) {
+            GLint lt = glGetUniformLocationPtr(g_chromaProg, "uTexel");
+            if (lt >= 0) glUniform2fPtr(lt, 1.f / (float)w, 1.f / (float)h);
+        }
     }
     if (glBindVertexArrayPtr && g_chromaVao) glBindVertexArrayPtr(g_chromaVao);
     glDrawArrays(GL_TRIANGLES, 0, 3);

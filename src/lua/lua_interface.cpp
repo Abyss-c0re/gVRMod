@@ -103,8 +103,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v51: Source error-pink (#FF00DC) chroma key for home passthrough.
-    LUA->PushNumber(51);
+    // v52: dual chroma Source error mosaic (pink+black checker) for home PT.
+    LUA->PushNumber(52);
     return 1;
 }
 
@@ -127,10 +127,10 @@ LUA_FUNCTION(SupportsAlphaBlend) {
     return 1;
 }
 
-// enable[, tolerance 0..1] — color-key chroma (default key pure green).
+// enable[, pinkTol] — dual Source error mosaic chroma (pink + neighbor-gated black).
 LUA_FUNCTION(SetPassthroughChroma) {
     bool en = false;
-    float thr = 0.22f;
+    float thr = 0.18f;
     if (LUA->IsType(1, GarrysMod::Lua::Type::BOOL))
         en = LUA->GetBool(1);
     else if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER))
@@ -141,13 +141,30 @@ LUA_FUNCTION(SetPassthroughChroma) {
     return 0;
 }
 
-// r,g,b in 0..1 — void key color (default 0,1,0 pure green).
+// r,g,b in 0..1 — pink key (default #FF00DC).
 LUA_FUNCTION(SetPassthroughChromaKey) {
-    float r = 0.f, g = 1.f, b = 0.f;
+    float r = 1.f, g = 0.f, b = 220.f / 255.f;
     if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) r = (float)LUA->GetNumber(1);
     if (LUA->IsType(2, GarrysMod::Lua::Type::NUMBER)) g = (float)LUA->GetNumber(2);
     if (LUA->IsType(3, GarrysMod::Lua::Type::NUMBER)) b = (float)LUA->GetNumber(3);
     XR_SetPassthroughChromaKey(r, g, b);
+    return 0;
+}
+
+// r,g,b in 0..1 — black mosaic cell (default #010001).
+LUA_FUNCTION(SetPassthroughChromaKey2) {
+    float r = 1.f / 255.f, g = 0.f, b = 1.f / 255.f;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) r = (float)LUA->GetNumber(1);
+    if (LUA->IsType(2, GarrysMod::Lua::Type::NUMBER)) g = (float)LUA->GetNumber(2);
+    if (LUA->IsType(3, GarrysMod::Lua::Type::NUMBER)) b = (float)LUA->GetNumber(3);
+    XR_SetPassthroughChromaKey2(r, g, b);
+    return 0;
+}
+
+LUA_FUNCTION(SetPassthroughChromaTol2) {
+    float t = 0.08f;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) t = (float)LUA->GetNumber(1);
+    XR_SetPassthroughChromaTol2(t);
     return 0;
 }
 
@@ -1428,6 +1445,10 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SetPassthroughChroma");
     LUA->PushCFunction(SetPassthroughChromaKey);
     LUA->SetField(-2, "SetPassthroughChromaKey");
+    LUA->PushCFunction(SetPassthroughChromaKey2);
+    LUA->SetField(-2, "SetPassthroughChromaKey2");
+    LUA->PushCFunction(SetPassthroughChromaTol2);
+    LUA->SetField(-2, "SetPassthroughChromaTol2");
     LUA->PushCFunction(GetPassthroughChroma);
     LUA->SetField(-2, "GetPassthroughChroma");
     LUA->PushCFunction(ShouldRender);

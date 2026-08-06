@@ -128,14 +128,21 @@ void XR_MarkFrameEnded();
 int XR_SetEnvironmentBlendMode(int mode);
 int XR_GetEnvironmentBlendMode(); // 0/1/2
 bool XR_SupportsAlphaBlend();
-// Pink chroma key (Source missing-texture #FF00DC) → alpha 0 for ALPHA_BLEND.
-// tolerance = RGB distance (default ~0.18). Prefer error-pink void plane, not black.
+// Dual chroma: Source error mosaic (pink #FF00DC + black #010001) → alpha 0.
+// GPU fullscreen pass at submit (real-time, not lagged async). Black cells only
+// punch when a pink neighbor is nearby (checker) so solid black models stay.
 void XR_SetPassthroughChroma(bool enable, float tolerance);
-// Key RGB 0..1 — default Source error pink (1, 0, 220/255).
+// Primary key RGB 0..1 — default error pink (1, 0, 220/255).
 void XR_SetPassthroughChromaKey(float keyR, float keyG, float keyB);
+// Secondary key RGB 0..1 — default error black cell (~0,0,0 / #010001).
+void XR_SetPassthroughChromaKey2(float keyR, float keyG, float keyB);
+// Black-key tolerance (tighter than pink). Default ~0.08.
+void XR_SetPassthroughChromaTol2(float tolerance);
 bool XR_GetPassthroughChroma();
 float XR_GetPassthroughChromaThreshold();
 void XR_GetPassthroughChromaKey(float* r, float* g, float* b);
+void XR_GetPassthroughChromaKey2(float* r, float* g, float* b);
+float XR_GetPassthroughChromaTol2();
 // Active XrEnvironmentBlendMode for xrEndFrame (defaults OPAQUE).
 XrEnvironmentBlendMode XR_ActiveEnvironmentBlendMode();
 

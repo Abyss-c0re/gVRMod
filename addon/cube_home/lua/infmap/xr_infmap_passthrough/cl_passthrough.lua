@@ -9,9 +9,11 @@ if not CLIENT then return end
 CubeHome = CubeHome or {}
 CubeHome.Passthrough = CubeHome.Passthrough or { active = false, menu = false }
 
--- Source error mosaic bright cell (Valve missing texture pink)
-CubeHome.VOID_KEY = { r = 255, g = 0, b = 220 } -- #FF00DC
+-- Source error mosaic dual cells (Valve missing texture checkerboard)
+CubeHome.VOID_KEY = { r = 255, g = 0, b = 220 } -- #FF00DC bright
 CubeHome.VOID_KEY_N = { r = 1, g = 0, b = 220 / 255 }
+CubeHome.VOID_KEY2 = { r = 1, g = 0, b = 1 } -- #010001 dark cell
+CubeHome.VOID_KEY2_N = { r = 1 / 255, g = 0, b = 1 / 255 }
 
 local cvEnable = CreateClientConVar("cube_home_passthrough", "1", true, FCVAR_ARCHIVE,
 	"XR Home: error-pink chroma void → room passthrough")
@@ -50,8 +52,15 @@ local function applyOpenXR(on)
 	if not isfunction(VRMOD_SetEnvironmentBlendMode) then return false end
 	local kn = CubeHome.VOID_KEY_N
 	if on then
+		local kn2 = CubeHome.VOID_KEY2_N
 		if isfunction(VRMOD_SetPassthroughChromaKey) then
 			VRMOD_SetPassthroughChromaKey(kn.r, kn.g, kn.b)
+		end
+		if isfunction(VRMOD_SetPassthroughChromaKey2) then
+			VRMOD_SetPassthroughChromaKey2(kn2.r, kn2.g, kn2.b)
+		end
+		if isfunction(VRMOD_SetPassthroughChromaTol2) then
+			VRMOD_SetPassthroughChromaTol2(0.08)
 		end
 		if isfunction(VRMOD_SetPassthroughChroma) then
 			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.08, 0.35))
@@ -97,7 +106,7 @@ function CubeHome.EnablePassthrough(reason)
 	local ok = applyOpenXR(true)
 	CubeHome.Passthrough.active = true
 	applyWorld(true)
-	print(string.format("[cube_home] passthrough ON (error-pink #FF00DC key) reason=%s ok=%s",
+	print(string.format("[cube_home] passthrough ON (dual error mosaic #FF00DC+#010001) reason=%s ok=%s",
 		tostring(reason or "?"), tostring(ok)))
 end
 
