@@ -78,7 +78,7 @@ Note:
 - OpenXR runtime libraries → bin/linux64/
 - OpenXR Lua module         → garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll
   (OpenVR gmcl_vrmod_linux64.dll is never overwritten — dual install OK)
-- Client addon              → garrysmod/addons/vrmod-x64/  (from submodule addon/vrmod-x64)
+- Client addon              → garrysmod/addons/vrmod-x64 → symlink to addon/vrmod-x64
 - Desktop launcher          → ~/.local/share/applications/gvrmod.desktop
 EOF
 }
