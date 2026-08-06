@@ -8,6 +8,9 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <vector>
+#include <cstdlib>
 
 static uint8_t Glyph(char c, int row) {
   static const uint8_t A[] = {0x0E,0x11,0x11,0x1F,0x11,0x11,0x11};
@@ -119,6 +122,7 @@ static void DrawText(unsigned char* rgba, int x, int y, const char* s, int r, in
 enum SetRow : int {
   SR_PRESET = 0,
   SR_RES,
+  SR_WINMODE, // windowed framed | borderless | fullscreen (desktop mirror)
   SR_TEX,
   SR_MODELS,
   SR_AA,
@@ -155,16 +159,148 @@ enum SetRow : int {
 
 int CubeUI_SettingsRowCount() { return SR_COUNT; }
 
-struct WinRes { int w, h; const char* label; };
-static const WinRes kRes[] = {
-  {720, 480, "720x480"},
-  {960, 540, "960x540"},
-  {1280, 720, "1280x720"},
-  {1600, 900, "1600x900"},
-  {1920, 1080, "1920x1080"},
-  {2560, 1440, "2560x1440"},
+// Desktop mirror resolutions — match what GMod/Source can actually use:
+// primary display modes from xrandr (same pool the OS video settings see),
+// not a fixed 720–1080 toy ladder.
+struct WinRes {
+  int w = 0, h = 0;
+  char label[40]{};
 };
-static constexpr int kResN = 6;
+static std::vector<WinRes> gRes;
+static int ResN() { return std::max(1, (int)gRes.size()); }
+static const WinRes& ResAt(int i) {
+  static const WinRes kFallback{720, 480, "720x480"};
+  if (gRes.empty()) return kFallback;
+  i = std::clamp(i, 0, (int)gRes.size() - 1);
+  return gRes[(size_t)i];
+}
+
+static void ResAddUnique(int w, int h, bool native = false) {
+  if (w < 640 || h < 480) return;
+  if (w > 7680 || h > 4320) return;
+  for (const auto& r : gRes)
+    if (r.w == w && r.h == h) return;
+  WinRes r;
+  r.w = w;
+  r.h = h;
+  if (native)
+    std::snprintf(r.label, sizeof(r.label), "NATIVE %dx%d", w, h);
+  else
+    std::snprintf(r.label, sizeof(r.label), "%dx%d", w, h);
+  gRes.push_back(r);
+}
+
+/// Classic Source/GMod dropdown modes (subset that mat_setvideomode accepts well).
+static void ResAddSourceClassic(int maxW, int maxH) {
+  static const int kClassic[][2] = {
+      {640, 480},   {720, 480},   {720, 576},   {800, 600},   {1024, 768},
+      {1152, 864},  {1280, 720},  {1280, 768},  {1280, 800},  {1280, 960},
+      {1280, 1024}, {1360, 768},  {1366, 768},  {1440, 900},  {1600, 900},
+      {1600, 1024}, {1600, 1200}, {1680, 1050}, {1920, 1080}, {1920, 1200},
+      {2048, 1152}, {2560, 1440}, {2560, 1600}, {3440, 1440}, {3840, 1600},
+      {3840, 2160},
+  };
+  for (const auto& m : kClassic) {
+    if (m[0] <= maxW && m[1] <= maxH) ResAddUnique(m[0], m[1]);
+  }
+}
+
+/// Prefer modes reported by the desktop (what GMod lists on Linux).
+static void ResAddFromXrandr(int* outMaxW, int* outMaxH) {
+  int maxW = 0, maxH = 0;
+  FILE* f = popen("xrandr --query 2>/dev/null", "r");
+  if (!f) return;
+  char line[512];
+  bool inConnected = false;
+  int bestArea = 0;
+  int primaryW = 0, primaryH = 0;
+  while (fgets(line, sizeof(line), f)) {
+    // "DP-2 connected primary 4300x1800+0+0 ..."
+    if (std::strstr(line, " connected")) {
+      inConnected = true;
+      // current mode after "connected" / "primary"
+      const char* p = line;
+      while (*p) {
+        if (*p >= '0' && *p <= '9') {
+          int w = 0, h = 0, n = 0;
+          if (std::sscanf(p, "%dx%d%n", &w, &h, &n) == 2 && w >= 640 && h >= 480) {
+            // Prefer token that looks like current geometry (has +x+y after)
+            const char* after = p + n;
+            if (*after == '+' || *after == ' ' || *after == '\t' || *after == '(') {
+              int area = w * h;
+              if (area > bestArea) {
+                bestArea = area;
+                primaryW = w;
+                primaryH = h;
+              }
+              if (w > maxW) maxW = w;
+              if (h > maxH) maxH = h;
+            }
+            p += n;
+            continue;
+          }
+        }
+        ++p;
+      }
+      continue;
+    }
+    if (line[0] != ' ' && line[0] != '\t') {
+      inConnected = false;
+      continue;
+    }
+    if (!inConnected) continue;
+    // "   1920x1080     60.00*+"
+    int w = 0, h = 0;
+    if (std::sscanf(line, " %dx%d", &w, &h) == 2) {
+      ResAddUnique(w, h);
+      if (w > maxW) maxW = w;
+      if (h > maxH) maxH = h;
+    }
+  }
+  pclose(f);
+  if (primaryW > 0 && primaryH > 0) {
+    // Ensure native/current is present and labeled
+    bool found = false;
+    for (auto& r : gRes) {
+      if (r.w == primaryW && r.h == primaryH) {
+        std::snprintf(r.label, sizeof(r.label), "NATIVE %dx%d", primaryW, primaryH);
+        found = true;
+        break;
+      }
+    }
+    if (!found) ResAddUnique(primaryW, primaryH, true);
+    if (primaryW > maxW) maxW = primaryW;
+    if (primaryH > maxH) maxH = primaryH;
+  }
+  if (outMaxW) *outMaxW = maxW;
+  if (outMaxH) *outMaxH = maxH;
+}
+
+static void BuildResList() {
+  gRes.clear();
+  int maxW = 0, maxH = 0;
+  ResAddFromXrandr(&maxW, &maxH);
+  if (maxW < 640 || maxH < 480) {
+    // No xrandr — still offer Source classic list up to 4K
+    maxW = 3840;
+    maxH = 2160;
+  }
+  // Merge classic GMod list (only modes that fit the desktop) so ladder matches Options → Video
+  ResAddSourceClassic(maxW, maxH);
+  // Sort by width then height (Source-style ascending)
+  std::sort(gRes.begin(), gRes.end(), [](const WinRes& a, const WinRes& b) {
+    if (a.w != b.w) return a.w < b.w;
+    return a.h < b.h;
+  });
+  // Keep NATIVE label on the largest entry if it matches max
+  for (auto& r : gRes) {
+    if (r.w == maxW && r.h == maxH && std::strncmp(r.label, "NATIVE", 6) != 0)
+      std::snprintf(r.label, sizeof(r.label), "NATIVE %dx%d", r.w, r.h);
+  }
+  if (gRes.empty()) ResAddUnique(720, 480);
+  fprintf(stderr, "[CubeUI] resolution ladder: %d modes (max %dx%d)\n",
+          (int)gRes.size(), maxW, maxH);
+}
 static const int kAa[] = {0, 2, 4, 8};
 static const int kAf[] = {0, 2, 4, 8, 16};
 static const int kFps[] = {0, 60, 90, 120, 144, 240};
@@ -242,10 +378,12 @@ void CubeUI_ApplyGfxPreset(CubeUIState& s, int preset) {
 }
 
 static void SyncResFromIdx(GModGfxSettings& g) {
-  int i = std::clamp(g.resIdx, 0, kResN - 1);
+  if (gRes.empty()) BuildResList();
+  int i = std::clamp(g.resIdx, 0, ResN() - 1);
   g.resIdx = i;
-  g.winW = kRes[i].w;
-  g.winH = kRes[i].h;
+  const WinRes& r = ResAt(i);
+  g.winW = r.w;
+  g.winH = r.h;
 }
 
 static void FormatSettingRow(const CubeUIState& s, int row, char* out, int outN);
@@ -261,10 +399,30 @@ void CubeUI_CycleSetting(CubeUIState& s, int row, int dir) {
       CubeUI_ApplyGfxPreset(s, g.preset);
       break;
     case SR_RES:
-      g.resIdx = (g.resIdx + dir + kResN) % kResN;
+      if (gRes.empty()) BuildResList();
+      g.resIdx = (g.resIdx + dir + ResN()) % ResN();
       SyncResFromIdx(g);
       g.preset = -1;
       break;
+    case SR_WINMODE: {
+      // 0 windowed framed · 1 borderless window · 2 fullscreen
+      int mode = 0;
+      if (!g.windowed) mode = 2;
+      else if (g.noborder) mode = 1;
+      mode = (mode + dir + 3) % 3;
+      if (mode == 0) {
+        g.windowed = true;
+        g.noborder = false;
+      } else if (mode == 1) {
+        g.windowed = true;
+        g.noborder = true;
+      } else {
+        g.windowed = false;
+        g.noborder = false;
+      }
+      g.preset = -1;
+      break;
+    }
     case SR_TEX: {
       // Wrap ladder so every trigger click always changes label
       int i = IndexOf(kTexPicmip, kTexN, g.matPicmip);
@@ -415,7 +573,17 @@ static void FormatSettingRow(const CubeUIState& s, int row, char* out, int outN)
   const auto& g = s.gfx;
   switch (row) {
     case SR_PRESET: snprintf(out, outN, "PRESET          %s", PresetLabel(g.preset)); break;
-    case SR_RES: snprintf(out, outN, "WINDOW          %s", kRes[std::clamp(g.resIdx, 0, kResN - 1)].label); break;
+    case SR_RES:
+      if (gRes.empty()) BuildResList();
+      snprintf(out, outN, "RESOLUTION      %s", ResAt(g.resIdx).label);
+      break;
+    case SR_WINMODE: {
+      const char* mode = "WINDOWED";
+      if (!g.windowed) mode = "FULLSCREEN";
+      else if (g.noborder) mode = "BORDERLESS";
+      snprintf(out, outN, "DISPLAY MODE    %s", mode);
+      break;
+    }
     case SR_TEX: snprintf(out, outN, "TEXTURES        %s", PicmipLabel(g.matPicmip)); break;
     case SR_MODELS: snprintf(out, outN, "MODELS          %s", LodLabel(g.rRootLod)); break;
     case SR_AA:
@@ -496,6 +664,7 @@ static void FormatSettingRow(const CubeUIState& s, int row, char* out, int outN)
 }
 
 void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot) {
+  BuildResList();
   // In-place reset (AddonManager holds mutex — not assignable)
   s.gmodRoot = gmodRoot;
   s.page = CubeUIPage::NewGame;
@@ -572,11 +741,26 @@ void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot) {
   s.hasLastPlay = false;
   s.lastPlayMap.clear();
   if (CubeUI_LoadLastPlay(s)) {
-    // Match resIdx ladder to restored window size
-    for (int i = 0; i < kResN; ++i) {
-      if (kRes[i].w == s.gfx.winW && kRes[i].h == s.gfx.winH) {
+    // Match resIdx to restored window size; keep custom sizes on the ladder
+    bool matched = false;
+    for (int i = 0; i < ResN(); ++i) {
+      if (ResAt(i).w == s.gfx.winW && ResAt(i).h == s.gfx.winH) {
         s.gfx.resIdx = i;
+        matched = true;
         break;
+      }
+    }
+    if (!matched && s.gfx.winW >= 640 && s.gfx.winH >= 480) {
+      ResAddUnique(s.gfx.winW, s.gfx.winH);
+      std::sort(gRes.begin(), gRes.end(), [](const WinRes& a, const WinRes& b) {
+        if (a.w != b.w) return a.w < b.w;
+        return a.h < b.h;
+      });
+      for (int i = 0; i < ResN(); ++i) {
+        if (ResAt(i).w == s.gfx.winW && ResAt(i).h == s.gfx.winH) {
+          s.gfx.resIdx = i;
+          break;
+        }
       }
     }
     SyncResFromIdx(s.gfx);
@@ -681,8 +865,9 @@ bool CubeUI_LoadLastPlay(CubeUIState& s) {
   s.gfx.xr.scaleFactor = lp.xrScaleFactor;
   s.gfx.xr.desktopView = lp.xrDesktopView;
   // Match resIdx if window size is a known ladder entry
-  for (int i = 0; i < kResN; ++i) {
-    if (kRes[i].w == s.gfx.winW && kRes[i].h == s.gfx.winH) {
+  if (gRes.empty()) BuildResList();
+  for (int i = 0; i < ResN(); ++i) {
+    if (ResAt(i).w == s.gfx.winW && ResAt(i).h == s.gfx.winH) {
       s.gfx.resIdx = i;
       break;
     }

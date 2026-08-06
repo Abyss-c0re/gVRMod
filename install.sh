@@ -117,6 +117,13 @@ install_desktop_entry() {
         echo "  icon: steam_icon_4000 (banner.png not found)"
     fi
 
+    # Terminal=true often hides apps from KDE "Games" (only search finds them).
+    # Use konsole for logs but keep Categories=Game so it appears in Games.
+    local exec_line="$launcher"
+    if command -v konsole >/dev/null 2>&1; then
+        exec_line="konsole --workdir $SCRIPT_DIR -qwindowtitle \"gVRMod Cube\" -e $launcher"
+    fi
+
     # Always write a fresh .desktop with absolute paths for this install tree
     cat > "$desktop_dst" <<EOF
 [Desktop Entry]
@@ -125,18 +132,19 @@ Type=Application
 Name=gVRMod Cube
 GenericName=Cube VR Launcher for Garry's Mod
 Comment=Native OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
-Exec=$launcher
+TryExec=$launcher
+Exec=$exec_line
 Path=$SCRIPT_DIR
 Icon=$icon_name
-Terminal=true
+Terminal=false
 StartupNotify=true
-Categories=Game;ActionGame;
-Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;
+Categories=Game;ActionGame;Simulation;
+Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;Garry;
 StartupWMClass=CubeUI_glx
 EOF
     chmod +x "$desktop_dst" 2>/dev/null || true
 
-    # Repo template (install rewrites absolute Exec; template keeps portable name)
+    # Repo template (install rewrites absolute Exec)
     if [[ -d "$SCRIPT_DIR/scripts" ]]; then
         cat > "$desktop_src" <<EOF
 [Desktop Entry]
@@ -145,13 +153,14 @@ Type=Application
 Name=gVRMod Cube
 GenericName=Cube VR Launcher for Garry's Mod
 Comment=Native OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
-Exec=$launcher
+TryExec=$launcher
+Exec=$exec_line
 Path=$SCRIPT_DIR
 Icon=$icon_name
-Terminal=true
+Terminal=false
 StartupNotify=true
-Categories=Game;ActionGame;
-Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;
+Categories=Game;ActionGame;Simulation;
+Keywords=GMod;VR;OpenXR;WiVRn;Quest;gVRMod;Cube;Launcher;Garry;
 StartupWMClass=CubeUI_glx
 EOF
     fi
