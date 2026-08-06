@@ -121,7 +121,7 @@ install_desktop_entry() {
     # Use konsole for logs but keep Categories=Game so it appears in Games.
     local exec_line="$launcher"
     if command -v konsole >/dev/null 2>&1; then
-        exec_line="konsole --workdir $SCRIPT_DIR -qwindowtitle \"gVRMod Cube\" -e $launcher"
+        exec_line="konsole --workdir $SCRIPT_DIR -qwindowtitle \"gVRMod\" -e $launcher"
     fi
 
     # Always write a fresh .desktop with absolute paths for this install tree
@@ -129,9 +129,9 @@ install_desktop_entry() {
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=gVRMod Cube
-GenericName=Cube VR Launcher for Garry's Mod
-Comment=Native OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
+Name=gVRMod
+GenericName=VR Launcher for Garry's Mod
+Comment=OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
 TryExec=$launcher
 Exec=$exec_line
 Path=$SCRIPT_DIR
@@ -150,9 +150,9 @@ EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=gVRMod Cube
-GenericName=Cube VR Launcher for Garry's Mod
-Comment=Native OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
+Name=gVRMod
+GenericName=VR Launcher for Garry's Mod
+Comment=OpenXR Cube menu — maps, addons, settings, bindings; GMod starts on START GAME
 TryExec=$launcher
 Exec=$exec_line
 Path=$SCRIPT_DIR

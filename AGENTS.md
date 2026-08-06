@@ -33,7 +33,7 @@ New `vrmod.*` / `vrmod.utils.*` symbols must appear in contracts after `gen_cont
 
 ## Cube native launcher (default desktop entry)
 
-- **Default product entry:** desktop **gVRMod Cube** → `scripts/CubeUI.sh` → `install/native/CubeUI`
+- **Default product entry:** desktop **gVRMod** → `scripts/CubeUI.sh` → `install/native/CubeUI`
 - Installer (`install.sh`) writes `~/.local/share/applications/gvrmod.desktop` to that script
 - `scripts/gvrmod_launcher.sh` is **GMod-only helper** (after Start), not the menu
 - Source: `native_launcher/`
