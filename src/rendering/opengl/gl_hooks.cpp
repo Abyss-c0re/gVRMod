@@ -15,6 +15,9 @@ bool                g_glIsPatched = false;
 bool                g_captureStealActive = false;
 
 // Per-eye support (proper separate RT per eye, no more side-by-side packing hacks).
+GLuint              g_leftEyeDepthTex = 0;
+GLuint              g_rightEyeDepthTex = 0;
+GLuint              g_vrRtDepthTex = 0;
 GLuint              g_leftEyeTexture = 0;
 GLuint              g_rightEyeTexture = 0;
 GLuint              g_leftEyeFBO = 0;
@@ -117,13 +120,33 @@ void FramebufferTextureHook(GLenum target, GLenum attachment, GLenum textarget, 
     typedef void (*glFramebufferTexture2D_t)(GLenum, GLenum, GLenum, GLuint, GLint);
     ((glFramebufferTexture2D_t)g_framebufferTexture2D)(target, attachment, textarget, texture, level);
 
+    GLint currentFBO = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &currentFBO);
+
+    // Depth textures for AR void (no color key): far-plane pixels → transparent.
+    if (g_glIsPatched && texture != 0 &&
+        (attachment == GL_DEPTH_ATTACHMENT || attachment == GL_DEPTH_STENCIL_ATTACHMENT ||
+         attachment == 0x8D00 /* GL_DEPTH_ATTACHMENT */)) {
+        if (currentFBO != 0 && (GLuint)currentFBO == g_leftEyeFBO)
+            g_leftEyeDepthTex = texture;
+        else if (currentFBO != 0 && (GLuint)currentFBO == g_rightEyeFBO)
+            g_rightEyeDepthTex = texture;
+        else if (g_leftEyeDepthTex == 0)
+            g_leftEyeDepthTex = texture;
+        else if (g_rightEyeDepthTex == 0 && texture != g_leftEyeDepthTex)
+            g_rightEyeDepthTex = texture;
+        g_vrRtDepthTex = texture;
+        static int s_depthLog = 0;
+        if ((s_depthLog++ % 60) == 0)
+            VRMOD_LOG_INFO("Depth attach observed: tex=%u fbo=%u Ldepth=%u Rdepth=%u",
+                texture, (unsigned)currentFBO, g_leftEyeDepthTex, g_rightEyeDepthTex);
+    }
+
     // While a share/capture steal window is active, COLOR_ATTACHMENT0 is the authoritative
     // signal for per-eye RTs (depth attaches and extra gens must not steal slots).
     // We count distinct color attachments: 1st → left, 2nd → right.
     if (g_glIsPatched && attachment == GL_COLOR_ATTACHMENT0 && texture != 0) {
         g_vrRtColorTex = texture;
-        GLint currentFBO = 0;
-        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &currentFBO);
         if (currentFBO != 0) {
             g_vrRtFBO = (GLuint)currentFBO;
         }
@@ -232,6 +255,7 @@ int ShareTextureBegin(uint32_t texWidth, uint32_t texHeight, ErrorFunc errFunc) 
     g_rightEyeTexture = 0;
     g_leftEyeFBO = g_rightEyeFBO = 0;
     g_leftEyeColorTex = g_rightEyeColorTex = 0;
+    g_leftEyeDepthTex = g_rightEyeDepthTex = g_vrRtDepthTex = 0;
     g_vrRtFBO = 0;
     g_vrRtColorTex = 0;
     g_eyeStealIndex = 0;

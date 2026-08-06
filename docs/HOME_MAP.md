@@ -27,36 +27,32 @@
 **Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
 It is not shown on other maps, OpenVR, or outside VR.
 
-### Invisible void (no key color)
+### Depth void (no color key — black is fine)
 
-**Any visible key color flickers and ruins models.** Source writes opaque RGB every
-pixel; OpenXR only composites on **alpha**. We never draw a green/magenta plane.
+**Any RGB key (green, magenta, black) will punch materials that share that color.**  
+Source writes opaque RGB; OpenXR holes need **alpha**. We use **depth**, not color:
 
 | Layer | Behavior |
 |-------|----------|
-| World / sky | Hidden → empty pixels = pure engine black |
-| Module | Punch **only pure neutral black** → alpha 0 (thr ~0.04) |
-| Models | Normal materials (dark grey ≠ pure black → solid) |
-| OpenXR | `ALPHA_BLEND` + source alpha |
+| World / sky | Hidden → depth stays at **clear (~1.0)** |
+| Props / models | Write closer depth (including pure black models) |
+| Module v50 | `alpha = 0` only where depth is at far/clear |
+| OpenXR | `ALPHA_BLEND` composites the room under sky holes |
 
-| Cvar | Effect |
-|------|--------|
-| Quick menu **Passthrough** | Toggle (map+OpenXR only) |
-| `cube_home_passthrough 0/1` | Preference |
-| `cube_home_passthrough_tol 0.04` | Sky-black threshold (use 0.02–0.08 only) |
+If depth RT cannot be sampled, void is **refused** (stays opaque) rather than
+falling back to a color key.
 
 ```
-VRMOD_SetPassthroughChroma(true, 0.04)  -- void-alpha, not a color key
+VRMOD_SetPassthroughChroma(true, 0.04)  -- enables depth void (tol = far-edge soft)
 VRMOD_SetEnvironmentBlendMode(3)
 ```
 
 ### Why not an “invisible texture”?
 
-Source cannot write alpha-only holes into the VR RT reliably. Options:
+Source cannot emit alpha-only holes into the VR color RT. Real options:
 
-1. **Strict sky black → alpha** (shipped now)  
-2. **Depth far-plane void** (next, if depth RT is bindable at submit)  
-3. **`XR_FB_passthrough` under projection** (true cameras; CubeUI already does this)
+1. **Depth far-plane void** (shipped)  
+2. **`XR_FB_passthrough` under projection** (true cameras; next / CubeUI already)
 
 ## Dynamic layout
 

@@ -1,16 +1,12 @@
--- XR Home Passthrough — invisible void (NO green/magenta key color).
+-- XR Home Passthrough — DEPTH void (no color key of any kind).
 --
--- Why not "invisible texture" / green screen:
---   Source writes opaque RGB every pixel. OpenXR ALPHA_BLEND only sees alpha.
---   A colored key plane (green/black fighting) flickers and tints models.
+-- Black/green/magenta keys punch models that share that color. Wrong.
 --
--- What we do instead:
---   1) Hide world/sky (r_drawworld 0) so empty pixels are pure engine black
---   2) Module punches ONLY pure neutral black → alpha 0 (tight thr, achromatic)
---   3) OpenXR ALPHA_BLEND composites the room under those holes
---   4) Models keep normal materials (dark greys are not pure black → stay solid)
+-- Method: hide world/sky so empty pixels keep *clear depth* (~1.0). Props write
+-- closer depth. Module sets alpha=0 only where depth is at far/clear — RGB ignored.
+-- OpenXR ALPHA_BLEND composites the room under those holes.
 --
--- Future: depth-based void or XR_FB_passthrough layer (true camera, no punch).
+-- If depth RT is unavailable, void is refused (opaque) rather than color-keying.
 
 if not CLIENT then return end
 
@@ -21,12 +17,11 @@ CubeHome.Passthrough = CubeHome.Passthrough or {
 }
 
 local cvEnable = CreateClientConVar("cube_home_passthrough", "1", true, FCVAR_ARCHIVE,
-	"XR Home: invisible void + OpenXR alpha (this map only)")
--- Tight: 0.04 ≈ pure sky black only. Raise slightly if sky is noisy; never use 0.2+.
+	"XR Home: depth void + OpenXR alpha (this map only; no color key)")
 local cvTol = CreateClientConVar("cube_home_passthrough_tol", "0.04", true, FCVAR_ARCHIVE,
-	"Void black threshold 0.02–0.08 (lower = safer for dark models)")
+	"Depth far-threshold softness (maps to ~0.998–0.999; not a color thr)")
 local cvWorld = CreateClientConVar("cube_home_drawworld", "0", true, FCVAR_ARCHIVE,
-	"0 = hide brush world (void); 1 = show Source world")
+	"0 = hide brush world (depth stays clear); 1 = show world")
 
 local MENU_NAME = "Passthrough"
 local MENU_ID = "cube_home_passthrough"
@@ -58,14 +53,11 @@ end
 local function applyOpenXR(on)
 	if not isfunction(VRMOD_SetEnvironmentBlendMode) then return false end
 	if on then
-		-- No key color — void alpha uses pure sky black only.
-		if isfunction(VRMOD_SetPassthroughChromaKey) then
-			VRMOD_SetPassthroughChromaKey(0, 0, 0)
-		end
 		if isfunction(VRMOD_SetPassthroughChroma) then
-			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.02, 0.08))
+			-- Enable depth void; tol only softens far-depth edge (not RGB).
+			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.01, 0.1))
 		end
-		VRMOD_SetEnvironmentBlendMode(3) -- AUTO → ALPHA_BLEND when available
+		VRMOD_SetEnvironmentBlendMode(3)
 	else
 		if isfunction(VRMOD_SetPassthroughChroma) then
 			VRMOD_SetPassthroughChroma(false, 0.04)
@@ -81,8 +73,6 @@ local function applyVoidWorld(on)
 		RunConsoleCommand("r_3dsky", "0")
 		RunConsoleCommand("r_drawskybox", "0")
 		RunConsoleCommand("fog_override", "1")
-		-- Neutral black fog (not green) if fog ever samples
-		RunConsoleCommand("fog_color", "0", "0", "0")
 		RunConsoleCommand("fog_start", "99999")
 		RunConsoleCommand("fog_end", "99999")
 	else
@@ -102,7 +92,7 @@ function CubeHome.EnablePassthrough(reason)
 	local ok = applyOpenXR(true)
 	CubeHome.Passthrough.active = true
 	applyVoidWorld(true)
-	print(string.format("[cube_home] passthrough ON (invisible void, no key color) reason=%s api=%s",
+	print(string.format("[cube_home] passthrough ON (DEPTH void, no color key) reason=%s api=%s",
 		tostring(reason or "?"), tostring(ok)))
 end
 
@@ -129,8 +119,6 @@ function CubeHome.TogglePassthrough()
 	CubeHome.SetPassthrough(nextOn, "quickmenu")
 end
 
--- No colored void plane. Sky stays engine black; module opens alpha there only.
-
 hook.Add("SetupWorldFog", "cube_home_pt_fog", function()
 	if not onHomeMap() or not CubeHome.Passthrough.active then return end
 	render.FogMode(MATERIAL_FOG_NONE)
@@ -152,7 +140,7 @@ end)
 
 local function menuHint()
 	if CubeHome.Passthrough.active then
-		return "ON · invisible void · room through black sky"
+		return "ON · depth void · room through sky"
 	end
 	return "OFF · full VR opaque"
 end
@@ -250,7 +238,7 @@ end, "cube_home_pt")
 
 cvars.AddChangeCallback("cube_home_passthrough_tol", function(_, _, new)
 	if CubeHome.Passthrough.active and isfunction(VRMOD_SetPassthroughChroma) then
-		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.04, 0.02, 0.08))
+		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.04, 0.01, 0.1))
 	end
 end, "cube_home_pt_tol")
 

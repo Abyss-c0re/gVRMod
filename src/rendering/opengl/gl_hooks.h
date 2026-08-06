@@ -67,6 +67,11 @@ extern GLuint g_leftEyeFBO;
 extern GLuint g_leftEyeColorTex;
 extern GLuint g_rightEyeFBO;
 extern GLuint g_rightEyeColorTex;
+// Depth textures (if engine attached DEPTH as texture — not renderbuffer).
+// Used for passthrough void: far/clear depth → alpha 0 without any color key.
+extern GLuint g_leftEyeDepthTex;
+extern GLuint g_rightEyeDepthTex;
+extern GLuint g_vrRtDepthTex;
 
 // Whether the engine RT textures need V flip when blitting to OpenXR swapchains.
 // On Linux/OpenGL the RTs from GetRenderTargetEx are Y-inverted relative to
