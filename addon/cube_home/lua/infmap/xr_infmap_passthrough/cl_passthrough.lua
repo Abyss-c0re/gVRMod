@@ -1,37 +1,26 @@
--- XR Home Passthrough — AR content layer only.
+-- XR Home Passthrough — Source error-pink chroma key (pre-regression simple path).
 --
--- Prophecy path (not color keys):
---   1) Do not draw the map / InfMap / world / sky (empty RT = clear depth)
---   2) Draw only: CubeHome layout props, local player, VR hands/weapons
---   3) Before XR submit: module clears swapchain alpha=0, depth→alpha holes,
---      OpenXR ALPHA_BLEND composites the real room under the content layer
---
--- Signal to native: VRMOD_SetPassthroughChroma(true) + EnvironmentBlendMode AUTO.
+-- Void fill color = missing-texture mosaic pink #FF00DC (255, 0, 220).
+-- Module punches that color → alpha 0; OpenXR ALPHA_BLEND shows the room.
+-- Not black (punches dark models). Not green (flickered). Pink is rare in art.
 
 if not CLIENT then return end
 
 CubeHome = CubeHome or {}
-CubeHome.Passthrough = CubeHome.Passthrough or {
-	active = false,
-	menu = false,
-}
+CubeHome.Passthrough = CubeHome.Passthrough or { active = false, menu = false }
 
--- Product default ON for this map.
+-- Source error mosaic bright cell (Valve missing texture pink)
+CubeHome.VOID_KEY = { r = 255, g = 0, b = 220 } -- #FF00DC
+CubeHome.VOID_KEY_N = { r = 1, g = 0, b = 220 / 255 }
+
 local cvEnable = CreateClientConVar("cube_home_passthrough", "1", true, FCVAR_ARCHIVE,
-	"XR Home AR layer (depth void + OpenXR; no color key)")
-local cvTol = CreateClientConVar("cube_home_passthrough_tol", "0.04", true, FCVAR_ARCHIVE,
-	"Depth far-edge soft (not a color thr)")
+	"XR Home: error-pink chroma void → room passthrough")
+local cvTol = CreateClientConVar("cube_home_passthrough_tol", "0.18", true, FCVAR_ARCHIVE,
+	"Chroma distance 0.08–0.35 around #FF00DC")
 
 local MENU_NAME = "Passthrough"
 local MENU_ID = "cube_home_passthrough"
-
-local HIDDEN_CLASSES = {
-	infmap_terrain_collider = true,
-	infmap_terrain_render = true,
-	infmap_planet = true,
-	infmap_clone = true,
-	infmap_obj_collider = true,
-}
+local voidMat
 
 local function isOpenXR()
 	if isfunction(VRMOD_GetBackend) then
@@ -57,58 +46,36 @@ function CubeHome.CanUsePassthrough()
 	return onHomeMap() and isOpenXR() and g_VR and g_VR.active
 end
 
---- Entities that form the AR content layer (drawn over the room).
-function CubeHome.IsArContentEnt(ent)
-	if not IsValid(ent) then return false end
-	if ent.CubeHomeManaged or ent.CubeHomeAnchor then return true end
-	if ent.CubeHomeInvisibleCollider then return false end
-	if ent:IsPlayer() then return true end
-	if ent:IsWeapon() then return true end
-	local cls = ent:GetClass() or ""
-	if HIDDEN_CLASSES[cls] then return false end
-	if string.find(cls, "infmap", 1, true) then return false end
-	if string.find(cls, "viewmodel", 1, true) then return true end
-	if string.find(cls, "gmod_hands", 1, true) then return true end
-	if string.find(cls, "physgun", 1, true) then return true end
-	-- VRMod hand / avatar twins
-	if ent.IsVRHand or ent.vrmod_hand then return true end
-	local owner = ent:GetOwner()
-	if IsValid(owner) and owner:IsPlayer() then return true end
-	local parent = ent:GetParent()
-	if IsValid(parent) and (parent:IsPlayer() or parent.CubeHomeManaged) then return true end
-	return false
-end
-
 local function applyOpenXR(on)
 	if not isfunction(VRMOD_SetEnvironmentBlendMode) then return false end
+	local kn = CubeHome.VOID_KEY_N
 	if on then
-		if isfunction(VRMOD_SetPassthroughChroma) then
-			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.01, 0.1))
+		if isfunction(VRMOD_SetPassthroughChromaKey) then
+			VRMOD_SetPassthroughChromaKey(kn.r, kn.g, kn.b)
 		end
-		-- Sticky product signal for submit path
-		if g_VR then g_VR.cubeHomeArLayer = true end
+		if isfunction(VRMOD_SetPassthroughChroma) then
+			VRMOD_SetPassthroughChroma(true, math.Clamp(cvTol:GetFloat(), 0.08, 0.35))
+		end
 		VRMOD_SetEnvironmentBlendMode(3)
 	else
 		if isfunction(VRMOD_SetPassthroughChroma) then
-			VRMOD_SetPassthroughChroma(false, 0.04)
+			VRMOD_SetPassthroughChroma(false, 0.18)
 		end
-		if g_VR then g_VR.cubeHomeArLayer = false end
 		VRMOD_SetEnvironmentBlendMode(0)
 	end
 	return true
 end
 
---- Kill map layer: world, sky, InfMap, everything not AR content.
-local function applyArWorldLayer(on)
+local function applyWorld(on)
 	if on then
 		RunConsoleCommand("r_drawworld", "0")
 		RunConsoleCommand("r_3dsky", "0")
 		RunConsoleCommand("r_drawskybox", "0")
-		RunConsoleCommand("r_drawdetailprops", "0")
 		RunConsoleCommand("fog_override", "1")
+		-- Match void key so fog edges don't flash wrong color
+		RunConsoleCommand("fog_color", "255", "0", "220")
 		RunConsoleCommand("fog_start", "99999")
 		RunConsoleCommand("fog_end", "99999")
-		-- Suppress InfMap client mesh distance
 		if InfMap then
 			InfMap.render_distance = 0
 			InfMap.planet_render_distance = 0
@@ -117,81 +84,32 @@ local function applyArWorldLayer(on)
 		RunConsoleCommand("r_drawworld", "1")
 		RunConsoleCommand("r_3dsky", "1")
 		RunConsoleCommand("r_drawskybox", "1")
-		RunConsoleCommand("r_drawdetailprops", "1")
 		RunConsoleCommand("fog_override", "0")
-	end
-end
-
-local function sweepEntityVisibility(arOn)
-	for _, ent in ipairs(ents.GetAll()) do
-		if not IsValid(ent) then continue end
-		if ent.CubeHomeInvisibleCollider then
-			ent:SetNoDraw(true)
-			continue
-		end
-		if arOn then
-			local keep = CubeHome.IsArContentEnt(ent)
-			if keep then
-				if ent._cubeHomeSavedNoDraw == nil then
-					ent._cubeHomeSavedNoDraw = ent:GetNoDraw()
-				end
-				ent:SetNoDraw(false)
-			else
-				if ent._cubeHomeSavedNoDraw == nil then
-					ent._cubeHomeSavedNoDraw = ent:GetNoDraw()
-				end
-				ent:SetNoDraw(true)
-			end
-		else
-			if ent._cubeHomeSavedNoDraw ~= nil then
-				ent:SetNoDraw(ent._cubeHomeSavedNoDraw)
-				ent._cubeHomeSavedNoDraw = nil
-			end
-		end
-	end
-	-- Nuke leftover InfMap client terrain ents
-	if arOn and InfMap and InfMap.client_chunks then
-		for _, row in pairs(InfMap.client_chunks) do
-			if istable(row) then
-				for _, e in pairs(row) do
-					if IsValid(e) then SafeRemoveEntity(e) end
-				end
-			end
-		end
-		InfMap.client_chunks = {}
 	end
 end
 
 function CubeHome.EnablePassthrough(reason)
 	if not onHomeMap() then return end
 	if not isOpenXR() then
-		print("[cube_home] AR layer needs OpenXR")
+		print("[cube_home] passthrough needs OpenXR")
 		return
 	end
 	local ok = applyOpenXR(true)
 	CubeHome.Passthrough.active = true
-	applyArWorldLayer(true)
-	sweepEntityVisibility(true)
-	print(string.format("[cube_home] AR content layer ON reason=%s native=%s",
+	applyWorld(true)
+	print(string.format("[cube_home] passthrough ON (error-pink #FF00DC key) reason=%s ok=%s",
 		tostring(reason or "?"), tostring(ok)))
 end
 
 function CubeHome.DisablePassthrough(reason)
 	CubeHome.Passthrough.active = false
 	applyOpenXR(false)
-	if onHomeMap() then
-		applyArWorldLayer(false)
-		sweepEntityVisibility(false)
-	end
-	print("[cube_home] AR layer OFF reason=" .. tostring(reason or "?"))
+	if onHomeMap() then applyWorld(false) end
+	print("[cube_home] passthrough OFF reason=" .. tostring(reason or "?"))
 end
 
 function CubeHome.SetPassthrough(on, reason)
-	if on then
-		CubeHome.EnablePassthrough(reason)
-	else
-		CubeHome.DisablePassthrough(reason)
-	end
+	if on then CubeHome.EnablePassthrough(reason) else CubeHome.DisablePassthrough(reason) end
 	CubeHome.RefreshPassthroughMenu()
 end
 
@@ -202,21 +120,44 @@ function CubeHome.TogglePassthrough()
 	CubeHome.SetPassthrough(nextOn, "quickmenu")
 end
 
--- Continuous enforcement while AR layer is live (ents spawn mid-session).
-hook.Add("Think", "cube_home_ar_layer_think", function()
-	if not CubeHome.Passthrough.active or not onHomeMap() then return end
-	if (FrameNumber() % 15) ~= 0 then return end
-	sweepEntityVisibility(true)
-end)
+-- Big pink void plane (chroma key). Drawn in sky path so room punches through.
+local size = 1e9
+local minZ = -1e5
+local voidMesh
+local function ensureVoidMesh()
+	if voidMesh then return voidMesh end
+	voidMesh = Mesh()
+	voidMesh:BuildFromTriangles({
+		{ pos = Vector(size, size, minZ), normal = Vector(0, 0, 1), u = 0, v = 0 },
+		{ pos = Vector(size, -size, minZ), normal = Vector(0, 0, 1), u = 1, v = 0 },
+		{ pos = Vector(-size, -size, minZ), normal = Vector(0, 0, 1), u = 1, v = 1 },
+		{ pos = Vector(size, size, minZ), normal = Vector(0, 0, 1), u = 0, v = 0 },
+		{ pos = Vector(-size, -size, minZ), normal = Vector(0, 0, 1), u = 1, v = 1 },
+		{ pos = Vector(-size, size, minZ), normal = Vector(0, 0, 1), u = 0, v = 1 },
+	})
+	return voidMesh
+end
 
-hook.Add("NetworkEntityCreated", "cube_home_ar_layer_netent", function(ent)
-	if not CubeHome.Passthrough.active or not onHomeMap() then return end
-	timer.Simple(0, function()
-		if not IsValid(ent) or not CubeHome.Passthrough.active then return end
-		if not CubeHome.IsArContentEnt(ent) then
-			ent:SetNoDraw(true)
-		end
-	end)
+local function ensureVoidMat()
+	if voidMat and not voidMat:IsError() then return voidMat end
+	voidMat = Material("cube_home/pt_void")
+	if voidMat:IsError() then voidMat = Material("vgui/white") end
+	return voidMat
+end
+
+hook.Add("PostDraw2DSkyBox", "cube_home_error_pink_void", function()
+	if not onHomeMap() or not CubeHome.Passthrough.active then return end
+	local mat = ensureVoidMat()
+	local mesh = ensureVoidMesh()
+	render.OverrideDepthEnable(true, false)
+	render.SetMaterial(mat)
+	render.ResetModelLighting(1, 1, 1)
+	render.SetLocalModelLights()
+	-- Force #FF00DC even if material falls back to white
+	render.SetColorModulation(1, 0, 220 / 255)
+	mesh:Draw()
+	render.SetColorModulation(1, 1, 1)
+	render.OverrideDepthEnable(false, false)
 end)
 
 hook.Add("SetupWorldFog", "cube_home_pt_fog", function()
@@ -225,18 +166,24 @@ hook.Add("SetupWorldFog", "cube_home_pt_fog", function()
 	return true
 end)
 
--- Clear color before engine sky dirties the RT (alpha ignored by Source, depth is clear).
-hook.Add("PreRender", "cube_home_ar_prerender", function()
-	if not CubeHome.Passthrough.active or not onHomeMap() then return end
-	if not (g_VR and g_VR.active) then return end
-	-- Keep empty buffer at clear depth; no colored void plane.
+hook.Add("PreDrawOpaqueRenderables", "cube_home_pt_hide_infmap_mesh", function()
+	if not onHomeMap() or not CubeHome.Passthrough.active then return end
+	if InfMap and InfMap.client_chunks then
+		for _, row in pairs(InfMap.client_chunks) do
+			if istable(row) then
+				for _, e in pairs(row) do
+					if IsValid(e) then e:SetNoDraw(true) end
+				end
+			end
+		end
+	end
 end)
 
 local function menuHint()
 	if CubeHome.Passthrough.active then
-		return "ON · AR layer · room under platforms"
+		return "ON · error-pink void · room through"
 	end
-	return "OFF · full VR world"
+	return "OFF · full VR opaque"
 end
 
 function CubeHome.RemovePassthroughMenu()
@@ -246,8 +193,9 @@ function CubeHome.RemovePassthroughMenu()
 	end
 	if g_VR and istable(g_VR.menuItems) then
 		for i = #g_VR.menuItems, 1, -1 do
-			local it = g_VR.menuItems[i]
-			if it and it.id == MENU_ID then table.remove(g_VR.menuItems, i) end
+			if g_VR.menuItems[i] and g_VR.menuItems[i].id == MENU_ID then
+				table.remove(g_VR.menuItems, i)
+			end
 		end
 	end
 	CubeHome.Passthrough.menu = false
@@ -275,8 +223,7 @@ local function syncFromCvar()
 		if CubeHome.Passthrough.active then
 			applyOpenXR(false)
 			CubeHome.Passthrough.active = false
-			applyArWorldLayer(false)
-			sweepEntityVisibility(false)
+			applyWorld(false)
 		end
 		return
 	end
@@ -291,10 +238,7 @@ end
 hook.Add("InitPostEntity", "cube_home_pt_boot", function()
 	if not onHomeMap() then return end
 	timer.Simple(1, function()
-		if cvEnable:GetBool() then
-			applyArWorldLayer(true)
-			sweepEntityVisibility(true)
-		end
+		if cvEnable:GetBool() then applyWorld(true) end
 	end)
 end)
 
@@ -305,13 +249,8 @@ end)
 hook.Add("VRMod_Exit", "cube_home_pt_vrexit", function()
 	CubeHome.RemovePassthroughMenu()
 	if isfunction(VRMOD_SetEnvironmentBlendMode) then VRMOD_SetEnvironmentBlendMode(0) end
-	if isfunction(VRMOD_SetPassthroughChroma) then VRMOD_SetPassthroughChroma(false, 0.04) end
-	if g_VR then g_VR.cubeHomeArLayer = false end
+	if isfunction(VRMOD_SetPassthroughChroma) then VRMOD_SetPassthroughChroma(false, 0.18) end
 	CubeHome.Passthrough.active = false
-	if onHomeMap() then
-		applyArWorldLayer(false)
-		sweepEntityVisibility(false)
-	end
 end)
 
 hook.Add("VRMod_OpenQuickMenu", "cube_home_pt_qm", function()
@@ -323,14 +262,13 @@ hook.Add("VRMod_OpenQuickMenu", "cube_home_pt_qm", function()
 end)
 
 cvars.AddChangeCallback("cube_home_passthrough", function(_, _, new)
-	if not onHomeMap() then return end
-	if not CubeHome.CanUsePassthrough() then return end
+	if not onHomeMap() or not CubeHome.CanUsePassthrough() then return end
 	CubeHome.SetPassthrough(tobool(new), "cvar")
 end, "cube_home_pt")
 
 cvars.AddChangeCallback("cube_home_passthrough_tol", function(_, _, new)
 	if CubeHome.Passthrough.active and isfunction(VRMOD_SetPassthroughChroma) then
-		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.04, 0.01, 0.1))
+		VRMOD_SetPassthroughChroma(true, math.Clamp(tonumber(new) or 0.18, 0.08, 0.35))
 	end
 end, "cube_home_pt_tol")
 

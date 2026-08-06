@@ -173,9 +173,9 @@ static PFNGLGENVERTEXARRAYSPROC    glGenVertexArraysPtr = nullptr;
 static PFNGLBINDVERTEXARRAYPROC    glBindVertexArrayPtr = nullptr;
 static PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArraysPtr = nullptr;
 
-// Passthrough void via DEPTH (no RGB key — black models stay solid).
-// Sky / empty = clear depth (~1.0 traditional GL). Geometry writes closer depth.
-// alpha = 0 where depth is at far/clear; alpha = 1 where anything was drawn.
+// Chroma-key void: Source missing-texture pink (error mosaic) → alpha 0.
+// Default key RGB = (1, 0, 220/255) ≈ #FF00DC — the bright magenta/pink cell
+// of the classic Source error checkerboard (not black, not green).
 static GLuint g_chromaProg = 0;
 static GLuint g_chromaTempTex = 0;
 static GLuint g_chromaVao = 0;
@@ -183,9 +183,6 @@ static uint32_t g_chromaTempW = 0;
 static uint32_t g_chromaTempH = 0;
 static bool g_chromaReady = false;
 static bool g_chromaFailed = false;
-// Module-owned depth sample target when engine uses a depth *renderbuffer*.
-static GLuint g_voidDepthSampleTex = 0;
-static uint32_t g_voidDepthSampleW = 0, g_voidDepthSampleH = 0;
 
 static const char* kChromaVS =
     "#version 130\n"
@@ -195,19 +192,17 @@ static const char* kChromaVS =
     "  vUV = p;\n"
     "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
     "}\n";
-// Depth void only — no RGB. Source/toGL: depth clear = 1.0 (sky/empty).
-// Anything drawn writes depth < 1 → stays opaque (including pure black models).
+// Distance to key RGB → alpha. Pink error color is rare in normal art.
 static const char* kChromaFS =
     "#version 130\n"
     "in vec2 vUV;\n"
     "uniform sampler2D uTex;\n"
-    "uniform sampler2D uDepth;\n"
-    "uniform float uFarThr;\n"
+    "uniform float uTol;\n"
+    "uniform vec3 uKeyRgb;\n"
     "void main(){\n"
     "  vec4 c = texture(uTex, vUV);\n"
-    "  float d = texture(uDepth, vUV).r;\n"
-    "  float sky = smoothstep(uFarThr, 1.0, d);\n"
-    "  float a = 1.0 - sky;\n"
+    "  float d = distance(c.rgb, uKeyRgb);\n"
+    "  float a = smoothstep(uTol * 0.45, uTol, d);\n"
     "  gl_FragColor = vec4(c.rgb, a);\n"
     "}\n";
 
@@ -262,85 +257,12 @@ static bool EnsureChromaProgram() {
     return true;
 }
 
-// Resolve a samplable depth texture for this eye (0 = unavailable).
-static GLuint ResolveVoidDepthTex(int eye, GLuint colorSrcTex, uint32_t w, uint32_t h) {
-    extern GLuint g_leftEyeDepthTex, g_rightEyeDepthTex, g_vrRtDepthTex;
-    extern GLuint g_leftEyeFBO, g_rightEyeFBO, g_vrRtFBO;
-    extern GLuint g_leftEyeColorTex, g_rightEyeColorTex;
-
-    GLuint depthTex = (eye == 0) ? g_leftEyeDepthTex : g_rightEyeDepthTex;
-    if (!depthTex) depthTex = g_vrRtDepthTex;
-    if (depthTex) return depthTex;
-
-    // Try live FBO query: depth may be a texture even if we missed the attach hook.
-    GLuint fbo = (eye == 0) ? g_leftEyeFBO : g_rightEyeFBO;
-    if (!fbo) fbo = g_vrRtFBO;
-    if (!fbo || !glGetFramebufferAttachmentParameterivPtr || !glBindFramebufferPtr)
-        return 0;
-
-    GLint prevRead = 0;
-    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
-    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, fbo);
-    GLint dtype = 0, dname = 0;
-    glGetFramebufferAttachmentParameterivPtr(GL_READ_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &dtype);
-    glGetFramebufferAttachmentParameterivPtr(GL_READ_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &dname);
-    if (dtype == GL_TEXTURE && dname != 0) {
-        glBindFramebufferPtr(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
-        if (eye == 0) g_leftEyeDepthTex = (GLuint)dname;
-        else g_rightEyeDepthTex = (GLuint)dname;
-        return (GLuint)dname;
-    }
-    // Depth renderbuffer: blit DEPTH to our sample texture (if blit supports it).
-    if (dtype == GL_RENDERBUFFER && dname != 0 && glBlitFramebufferPtr) {
-        if (!g_voidDepthSampleTex || g_voidDepthSampleW != w || g_voidDepthSampleH != h) {
-            if (g_voidDepthSampleTex) glDeleteTextures(1, &g_voidDepthSampleTex);
-            glGenTextures(1, &g_voidDepthSampleTex);
-            glBindTexture(GL_TEXTURE_2D, g_voidDepthSampleTex);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, (GLsizei)w, (GLsizei)h,
-                         0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-            g_voidDepthSampleW = w;
-            g_voidDepthSampleH = h;
-        }
-        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_blitFBO);
-        // Temporarily attach depth sample as depth attachment for blit dest
-        glFramebufferTexture2DPtr(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
-                                  g_voidDepthSampleTex, 0);
-        glFramebufferTexture2DPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                                  0, 0);
-        glBindFramebufferPtr(GL_READ_FRAMEBUFFER, fbo);
-        glBlitFramebufferPtr(0, 0, (GLint)w, (GLint)h, 0, 0, (GLint)w, (GLint)h,
-                             GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-        // Restore draw FBO color attach (caller rebinds dst color)
-        glFramebufferTexture2DPtr(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
-        glBindFramebufferPtr(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
-        return g_voidDepthSampleTex;
-    }
-    glBindFramebufferPtr(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
-    (void)colorSrcTex;
-    return 0;
-}
-
-// Depth void: far/clear depth → alpha 0. NEVER uses RGB (black models stay opaque).
-static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h, int eye,
-                                   GLuint colorSrcHint) {
+// Pink-key chroma: pixels near Source error magenta → alpha 0 (room shows through).
+static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h) {
     if (!XR_GetPassthroughChroma()) return;
     if (!EnsureChromaProgram()) return;
     if (!glBindFramebufferPtr || !glFramebufferTexture2DPtr || !glUseProgramPtr) return;
     if (w == 0 || h == 0) return;
-
-    GLuint depthTex = ResolveVoidDepthTex(eye, colorSrcHint, w, h);
-    if (!depthTex) {
-        static int s_noDepthLog = 0;
-        if ((s_noDepthLog++ % 120) == 0)
-            VRMOD_LOG_WARN("Passthrough void: no depth texture — refusing color-key (would punch black models)");
-        return; // better fully opaque than wrong color punch
-    }
 
     if (!g_chromaTempTex || g_chromaTempW != w || g_chromaTempH != h) {
         if (g_chromaTempTex) glDeleteTextures(1, &g_chromaTempTex);
@@ -373,14 +295,8 @@ static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h, in
     glGetIntegerv(GL_CURRENT_PROGRAM, &prevProg);
     GLint prevVao = 0;
     if (glBindVertexArrayPtr) glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
-    GLint prevTex0 = 0, prevTex1 = 0;
-    if (glActiveTexturePtr) {
-        glActiveTexturePtr(GL_TEXTURE0);
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex0);
-        glActiveTexturePtr(GL_TEXTURE1);
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex1);
-        glActiveTexturePtr(GL_TEXTURE0);
-    }
+    GLint prevTex = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex);
     GLboolean depthWas = glIsEnabled(GL_DEPTH_TEST);
     GLboolean blendWas = glIsEnabled(GL_BLEND);
     GLboolean cullWas = glIsEnabled(GL_CULL_FACE);
@@ -395,36 +311,29 @@ static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h, in
     glUseProgramPtr(g_chromaProg);
     if (glActiveTexturePtr) glActiveTexturePtr(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g_chromaTempTex);
-    if (glActiveTexturePtr) glActiveTexturePtr(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, depthTex);
-    if (glActiveTexturePtr) glActiveTexturePtr(GL_TEXTURE0);
     if (glUniform1iPtr) {
-        GLint locC = glGetUniformLocationPtr(g_chromaProg, "uTex");
-        GLint locD = glGetUniformLocationPtr(g_chromaProg, "uDepth");
-        if (locC >= 0) glUniform1iPtr(locC, 0);
-        if (locD >= 0) glUniform1iPtr(locD, 1);
+        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uTex");
+        if (loc >= 0) glUniform1iPtr(loc, 0);
     }
     if (glUniform1fPtr) {
-        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uFarThr");
-        // Lua thr remapped: 0.04 default → far threshold 0.999
-        float t = XR_GetPassthroughChromaThreshold();
-        float farThr = 0.999f;
-        if (t > 0.0f && t < 0.5f) farThr = 1.0f - t * 0.05f; // 0.04 → 0.998
-        if (farThr < 0.99f) farThr = 0.99f;
-        if (farThr > 0.9999f) farThr = 0.9999f;
-        if (loc >= 0) glUniform1fPtr(loc, farThr);
+        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uTol");
+        float tol = XR_GetPassthroughChromaThreshold();
+        if (tol < 0.05f) tol = 0.18f;
+        if (tol > 0.45f) tol = 0.45f;
+        if (loc >= 0) glUniform1fPtr(loc, tol);
+    }
+    if (glUniform3fPtr) {
+        float kr = 1.f, kg = 0.f, kb = 220.f / 255.f; // #FF00DC Source error pink
+        XR_GetPassthroughChromaKey(&kr, &kg, &kb);
+        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uKeyRgb");
+        if (loc >= 0) glUniform3fPtr(loc, kr, kg, kb);
     }
     if (glBindVertexArrayPtr && g_chromaVao) glBindVertexArrayPtr(g_chromaVao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glUseProgramPtr((GLuint)prevProg);
     if (glBindVertexArrayPtr) glBindVertexArrayPtr((GLuint)prevVao);
-    if (glActiveTexturePtr) {
-        glActiveTexturePtr(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, (GLuint)prevTex1);
-        glActiveTexturePtr(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, (GLuint)prevTex0);
-    }
+    glBindTexture(GL_TEXTURE_2D, (GLuint)prevTex);
     if (depthWas) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
     if (blendWas) glEnable(GL_BLEND); else glDisable(GL_BLEND);
     if (cullWas) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
@@ -1236,10 +1145,9 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     0, dstY0, (GLint)g_xrSwapchainWidth, dstY1,
                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
-                // Home AR: depth far-plane → alpha 0 (never RGB key / black punch).
+                // Source error-pink chroma → alpha 0 (room under ALPHA_BLEND).
                 if (XR_GetPassthroughChroma()) {
-                    ApplyPassthroughChroma(dstTexture, g_xrSwapchainWidth, g_xrSwapchainHeight,
-                                           eye, eyeSrcTex);
+                    ApplyPassthroughChroma(dstTexture, g_xrSwapchainWidth, g_xrSwapchainHeight);
                 }
 
                 if ((s_submitCallCount % 90) == 0 && eye == 0) {

@@ -6,9 +6,9 @@ hook.Add("InitPostEntity", "cube_home_welcome", function()
 	if not CubeHome.IsHomeMap or not CubeHome.IsHomeMap() then return end
 	timer.Simple(2, function()
 		chat.AddText(Color(90, 160, 255), "[XR Home Passthrough] ", color_white,
-			"AR content layer: platforms over your room (map not drawn).")
+			"Error-pink void (#FF00DC) → room chroma. Platforms stay solid.")
 		chat.AddText(Color(180, 200, 220), "  ", color_white,
-			"Quick menu → Passthrough · OpenXR only on this map.")
+			"Quick menu → Passthrough (this map + OpenXR only).")
 		chat.AddText(Color(140, 160, 180), "  InfMap by Meetric: ", Color(120, 180, 255),
 			"https://github.com/meetric1/gmod-infinite-map")
 	end)

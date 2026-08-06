@@ -128,10 +128,10 @@ void XR_MarkFrameEnded();
 int XR_SetEnvironmentBlendMode(int mode);
 int XR_GetEnvironmentBlendMode(); // 0/1/2
 bool XR_SupportsAlphaBlend();
-// Depth void (no color key): far/clear depth → alpha 0 so ALPHA_BLEND shows the
-// room. Black models stay solid. tolerance maps to far-depth epsilon.
+// Pink chroma key (Source missing-texture #FF00DC) → alpha 0 for ALPHA_BLEND.
+// tolerance = RGB distance (default ~0.18). Prefer error-pink void plane, not black.
 void XR_SetPassthroughChroma(bool enable, float tolerance);
-// Legacy no-op (color keys removed — depth only).
+// Key RGB 0..1 — default Source error pink (1, 0, 220/255).
 void XR_SetPassthroughChromaKey(float keyR, float keyG, float keyB);
 bool XR_GetPassthroughChroma();
 float XR_GetPassthroughChromaThreshold();

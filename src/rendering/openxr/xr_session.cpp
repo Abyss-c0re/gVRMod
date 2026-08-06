@@ -101,12 +101,12 @@ static bool g_hasAlphaBlend = false;
 static bool g_hasAdditive = false;
 static XrEnvironmentBlendMode g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 static bool g_passthroughChroma = false;
-// Strict pure-sky black threshold (linear). ~0.04 ≈ 10/255 — not wide luminance key.
-static float g_passthroughChromaTol = 0.04f;
-// Legacy key RGB unused (void is achromatic black, not a chroma color).
-static float g_passthroughKeyR = 0.0f;
+// RGB distance tol for pink-key chroma (Source missing-texture mosaic pink).
+static float g_passthroughChromaTol = 0.18f;
+// Source error texture bright cell: #FF00DC ≈ (255, 0, 220)
+static float g_passthroughKeyR = 1.0f;
 static float g_passthroughKeyG = 0.0f;
-static float g_passthroughKeyB = 0.0f;
+static float g_passthroughKeyB = 220.f / 255.f;
 
 static void XR_EnumerateBlendModes() {
     g_hasAlphaBlend = false;

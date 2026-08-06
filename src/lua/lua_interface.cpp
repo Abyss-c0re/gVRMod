@@ -103,8 +103,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v50: depth void passthrough (far depth → alpha; never RGB key).
-    LUA->PushNumber(50);
+    // v51: Source error-pink (#FF00DC) chroma key for home passthrough.
+    LUA->PushNumber(51);
     return 1;
 }
 

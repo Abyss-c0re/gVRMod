@@ -1,11 +1,11 @@
-// Pure green void key for XR passthrough chroma.
-// Only this color is punched transparent — models keep normal shading.
-// Do not use pure green on props/avatars if passthrough is on.
+// Source-engine missing-texture pink (error mosaic bright cell).
+// RGB (255, 0, 220) = #FF00DC — used as chroma key for XR home passthrough.
+// Do not use this color on props/avatars while passthrough is on.
 "UnlitGeneric"
 {
 	"$basetexture" "vgui/white"
-	"$color" "[0 1 0]"
-	"$color2" "[0 1 0]"
+	"$color" "[1 0 0.863]"
+	"$color2" "[1 0 0.863]"
 	"$model" "1"
 	"$nofog" "1"
 	"$ignorez" "0"

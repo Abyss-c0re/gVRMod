@@ -27,25 +27,25 @@
 **Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
 It is not shown on other maps, OpenVR, or outside VR.
 
-### AR content layer (the real product path)
+### Error-pink chroma void (stable PoC)
 
-Not a chroma key. Two layers:
+Depth / “invisible texture” experiments regressed the headset view. Restored simple
+chroma that worked as a PoC, using the **Source missing-texture pink** (not black/green):
 
-| Layer | What |
-|-------|------|
-| **Room** | OpenXR `ALPHA_BLEND` / runtime passthrough under the projection |
-| **Content** | Only CubeHome platforms + player + VR hands (map/InfMap **not drawn**) |
+| | |
+|--|--|
+| Key color | **`#FF00DC` (255, 0, 220)** — bright cell of the classic error mosaic |
+| Void | Large unlit plane + `r_drawworld 0` (sky off) |
+| Module v51 | Distance to key RGB → alpha 0 |
+| Room | OpenXR `ALPHA_BLEND` under transparent holes |
 
-Pipeline:
+```
+VRMOD_SetPassthroughChromaKey(1, 0, 220/255)
+VRMOD_SetPassthroughChroma(true, 0.18)
+VRMOD_SetEnvironmentBlendMode(3)
+```
 
-1. Lua: `r_drawworld 0`, hide InfMap / non-content ents, invisible colliders (no couch cubes)  
-2. Eye RT: clear depth; only AR content writes depth  
-3. Module: clear swapchain **alpha 0** → blit color → **depth → alpha** (far = hole)  
-4. `xrEndFrame` with `ALPHA_BLEND` + source alpha  
-
-Signal: `VRMOD_SetPassthroughChroma(true)` + `g_VR.cubeHomeArLayer = true` before submit.
-
-No green/black key colors. Black models stay solid (they still write depth).
+Material: `cube_home/pt_void`. Avoid pure error-pink on props while PT is on.
 
 ## Dynamic layout
 
