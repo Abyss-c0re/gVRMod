@@ -27,32 +27,20 @@
 **Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
 It is not shown on other maps, OpenVR, or outside VR.
 
-### Error-checker void + dual chroma (real-time GPU)
+### Solid magenta void (single chroma)
 
-**Void is the Source missing-texture mosaic** (not solid pink): generated RT checker
-`#FF00DC` / `#010001`, drawn as a tiled sky plane.
-
-Submit pass (stolen eye RT) dual-keys both cells → alpha 0 for the room.
-
-| Cell | RGB | Hex |
-|------|-----|-----|
-| Bright | 255, 0, 220 | `#FF00DC` |
-| Dark | 1, 0, 1 | `#010001` |
-
-| Mask (`cube_home_passthrough_mask`) | Behavior |
-|-------------------------------------|----------|
-| **7** (default) | Pink always + black if pink nearby (full checker) |
-| **1** | Pink only |
-| **2** | Black only (independent — no pink neighbor gate) |
-| **3** | Both colors independent |
+| | |
+|--|--|
+| Color | **`#FF00FF` (255, 0, 255)** pure magenta |
+| Map | Sky clear + fog + plane all magenta (no black fight) |
+| Module | Single-key chroma mask=1; NEAREST blit; ALPHA_BLEND |
+| Room | Alpha holes (+ FB passthrough layer if runtime has it) |
 
 ```
-VRMOD_SetPassthroughChromaKey(...) / Key2(...)
-VRMOD_SetPassthroughChromaMask(7)  -- or 1 / 2 for single color
-VRMOD_SetPassthroughChroma(true, 0.18)
+VRMOD_SetPassthroughChromaKey(1, 0, 1)
+VRMOD_SetPassthroughChromaMask(1)
+VRMOD_SetPassthroughChroma(true, 0.20)
 ```
-
-GPU cost ~9 samples/px when mask has bit4; still VR-rate.
 
 ## Dynamic layout
 
