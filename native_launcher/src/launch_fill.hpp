@@ -1,5 +1,6 @@
 #pragma once
 #include "gmod_spawn.hpp"
+#include "maps_scan.hpp"
 #include "ui_panel.hpp"
 #include <cstdlib>
 
@@ -13,7 +14,8 @@ inline LaunchRequest LaunchRequestFromUI(const CubeUIState& ui, const std::strin
   lr.svLan = ui.svLan;
   lr.p2p = ui.p2p;
   lr.p2pFriends = ui.p2pFriends;
-  lr.gamemode = ui.gamemode;
+  // Prefer map-prefix gamemode (ttt_ → terrortown) over stuck sandbox for addon maps
+  lr.gamemode = InferGamemodeForMap(lr.map, ui.gamemode.empty() ? "sandbox" : ui.gamemode);
   lr.winW = ui.gfx.winW;
   lr.winH = ui.gfx.winH;
   lr.windowed = ui.gfx.windowed;

@@ -5,6 +5,7 @@
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
 #include "window_chrome.hpp"
+#include "maps_scan.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -61,6 +62,17 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
 
   // Always land latest Cube Lua before Start (research-3: native path skipped this)
   SyncMonorepoLua(req.gmodRoot);
+
+  // Workshop maps live in .gma; steam +map runs before mount → main menu.
+  // Extract GMA into garrysmod/addons/cube_ws_* so +map finds a loose BSP.
+  {
+    std::string mapErr;
+    if (!EnsureMapAvailable(req.gmodRoot, req.map, mapErr)) {
+      fprintf(stderr, "[gVRMod] WARNING: map %s may fail at cold +map: %s\n",
+              req.map.c_str(), mapErr.c_str());
+      // Still launch — openxr_launch will retry map if possible
+    }
+  }
 
   const std::string cfgDir = req.gmodRoot + "/garrysmod/cfg";
   const std::string dataDir = req.gmodRoot + "/garrysmod/data/vrmod";

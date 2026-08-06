@@ -31,6 +31,12 @@ static std::string ReadFile(const std::string& path) {
   ss << f.rdbuf();
   return ss.str();
 }
+static bool WriteFile(const std::string& path, const std::string& body) {
+  std::ofstream f(path);
+  if (!f) return false;
+  f << body;
+  return true;
+}
 
 static std::string ToLower(std::string s) {
   for (char& c : s) c = (char)std::tolower((unsigned char)c);
@@ -581,4 +587,284 @@ std::vector<MapCategory> ScanGModMaps(const std::string& gmodRoot) {
   fprintf(stderr, "[CubeUI] maps scan: %zu unique maps in %zu categories\n", bare.size(),
           out.size());
   return out;
+}
+
+std::string InferGamemodeForMap(const std::string& mapName, const std::string& fallback) {
+  const std::string m = ToLower(mapName);
+  auto starts = [&](const char* p) {
+    return m.size() >= std::strlen(p) && m.compare(0, std::strlen(p), p) == 0;
+  };
+  if (starts("ttt_") || starts("gm_ttt")) return "terrortown";
+  if (starts("rp_") || starts("darkrp_")) return "darkrp";
+  if (starts("prophunt_") || starts("ph_")) return "prop_hunt";
+  if (starts("murder_")) return "murder";
+  if (starts("deathrun_") || starts("dr_")) return "deathrun";
+  if (starts("surf_")) return "base"; // often sandbox/surf addons
+  if (starts("bhop_")) return "base";
+  if (starts("zs_") || starts("zm_") || starts("zombiesurvival_")) return "zombiesurvival";
+  if (starts("cinema_") || starts("theater_")) return "cinema";
+  if (fallback.empty()) return "sandbox";
+  return fallback;
+}
+
+static bool FileExists(const std::string& p) {
+  struct stat st{};
+  return stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static void MkDirP(const std::string& path) {
+  if (path.empty() || IsDir(path)) return;
+  // Create parents
+  std::string cur;
+  for (size_t i = 0; i < path.size(); ++i) {
+    char c = path[i];
+    cur.push_back(c);
+    if (c == '/' && cur.size() > 1) {
+      mkdir(cur.c_str(), 0755);
+    }
+  }
+  mkdir(path.c_str(), 0755);
+}
+
+static bool LooseMapExists(const std::string& gmodRoot, const std::string& mapBare) {
+  const std::string b = mapBare + ".bsp";
+  const char* rels[] = {
+      "/garrysmod/maps/",
+      "/garrysmod/download/maps/",
+  };
+  for (auto r : rels) {
+    if (FileExists(gmodRoot + r + b)) return true;
+  }
+  // Enabled local addons maps/
+  std::string addons = gmodRoot + "/garrysmod/addons";
+  if (DIR* d = opendir(addons.c_str())) {
+    while (dirent* e = readdir(d)) {
+      std::string n = e->d_name;
+      if (n == "." || n == ".." || n[0] == '.') continue;
+      if (n.size() > 9 && n.compare(n.size() - 9, 9, ".disabled") == 0) continue;
+      std::string full = addons + "/" + n;
+      if (!IsDir(full)) continue;
+      if (FileExists(full + "/maps/" + b)) {
+        closedir(d);
+        return true;
+      }
+    }
+    closedir(d);
+  }
+  return false;
+}
+
+// Extract entire GMA into destRoot/ (preserves maps/, materials/, …).
+static bool ExtractGmaToDir(const std::string& gmaPath, const std::string& destRoot, std::string& err) {
+  FILE* f = std::fopen(gmaPath.c_str(), "rb");
+  if (!f) {
+    err = "open gma failed";
+    return false;
+  }
+  auto rd = [&](void* p, size_t n) -> bool { return std::fread(p, 1, n, f) == n; };
+  auto rdstr = [&]() -> std::string {
+    std::string s;
+    char c;
+    while (rd(&c, 1)) {
+      if (c == 0) break;
+      s.push_back(c);
+      if (s.size() > 8192) { s.clear(); break; }
+    }
+    return s;
+  };
+
+  char magic[4];
+  if (!rd(magic, 4) || std::memcmp(magic, "GMAD", 4) != 0) {
+    std::fclose(f);
+    err = "not a GMA";
+    return false;
+  }
+  uint8_t ver = 0;
+  if (!rd(&ver, 1)) { std::fclose(f); err = "gma trunc"; return false; }
+  uint64_t steamid = 0, ts = 0;
+  if (!rd(&steamid, 8) || !rd(&ts, 8)) { std::fclose(f); err = "gma trunc"; return false; }
+  for (;;) {
+    std::string req = rdstr();
+    if (req.empty()) break;
+  }
+  (void)rdstr();
+  (void)rdstr();
+  (void)rdstr();
+  int32_t addonVer = 0;
+  if (!rd(&addonVer, 4)) { std::fclose(f); err = "gma trunc"; return false; }
+
+  struct Ent {
+    std::string name;
+    uint64_t size = 0;
+  };
+  std::vector<Ent> ents;
+  for (;;) {
+    uint32_t idx = 0;
+    if (!rd(&idx, 4)) break;
+    if (idx == 0) break;
+    Ent e;
+    e.name = rdstr();
+    uint32_t crc = 0;
+    if (!rd(&e.size, 8) || !rd(&crc, 4)) {
+      std::fclose(f);
+      err = "gma toc trunc";
+      return false;
+    }
+    for (char& c : e.name) if (c == '\\') c = '/';
+    // safety: no absolute / path traversal
+    if (e.name.find("..") != std::string::npos || e.name.empty() || e.name[0] == '/')
+      continue;
+    ents.push_back(std::move(e));
+  }
+
+  MkDirP(destRoot);
+  for (const auto& e : ents) {
+    if (e.size > (uint64_t)2 * 1024 * 1024 * 1024ull) { // >2GB skip
+      err = "file too large in gma";
+      std::fclose(f);
+      return false;
+    }
+    std::string outPath = destRoot + "/" + e.name;
+    auto slash = outPath.find_last_of('/');
+    if (slash != std::string::npos)
+      MkDirP(outPath.substr(0, slash));
+    FILE* out = std::fopen(outPath.c_str(), "wb");
+    if (!out) {
+      err = "write failed: " + outPath;
+      std::fclose(f);
+      return false;
+    }
+    const size_t chunk = 1 << 20;
+    std::vector<char> buf(chunk);
+    uint64_t left = e.size;
+    while (left > 0) {
+      size_t n = (size_t)std::min<uint64_t>(left, chunk);
+      if (std::fread(buf.data(), 1, n, f) != n) {
+        std::fclose(out);
+        std::fclose(f);
+        err = "read payload failed";
+        return false;
+      }
+      if (std::fwrite(buf.data(), 1, n, out) != n) {
+        std::fclose(out);
+        std::fclose(f);
+        err = "write payload failed";
+        return false;
+      }
+      left -= n;
+    }
+    std::fclose(out);
+  }
+  std::fclose(f);
+  return true;
+}
+
+// Find workshop GMA containing maps/<map>.bsp and extract whole package.
+static bool ExtractWorkshopMap(const std::string& gmodRoot, const std::string& mapBare,
+                               std::string& err) {
+  std::string ws = FindWorkshopContent4000(gmodRoot);
+  if (ws.empty()) {
+    err = "no workshop content/4000";
+    return false;
+  }
+  std::unordered_set<std::string> nomount;
+  ParseNomount(gmodRoot + "/garrysmod/cfg/addonnomount.txt", nomount);
+  const std::string want = "maps/" + ToLower(mapBare) + ".bsp";
+
+  DIR* d = opendir(ws.c_str());
+  if (!d) {
+    err = "workshop dir unreadable";
+    return false;
+  }
+  while (dirent* e = readdir(d)) {
+    std::string id = e->d_name;
+    if (id == "." || id == "..") continue;
+    if (nomount.count(id)) continue;
+    std::string full = ws + "/" + id;
+    if (!IsDir(full)) continue;
+    // any .gma in folder
+    DIR* sub = opendir(full.c_str());
+    if (!sub) continue;
+    while (dirent* se = readdir(sub)) {
+      std::string n = se->d_name;
+      if (!EndsWithLower(n, ".gma")) continue;
+      std::string gma = full + "/" + n;
+      // Quick TOC check
+      std::unordered_set<std::string> maps;
+      CollectMapsFromGma(gma, maps);
+      if (!maps.count(ToLower(mapBare))) continue;
+      // Extract to local addon so GMod mounts at boot (before +map)
+      std::string dest = gmodRoot + "/garrysmod/addons/cube_ws_" + id;
+      fprintf(stderr, "[CubeUI] extracting workshop map %s from %s → %s\n",
+              mapBare.c_str(), gma.c_str(), dest.c_str());
+      std::string e2;
+      if (!ExtractGmaToDir(gma, dest, e2)) {
+        err = e2;
+        closedir(sub);
+        closedir(d);
+        return false;
+      }
+      // Write minimal addon.json so GMod recognizes folder
+      WriteFile(dest + "/addon.json",
+                std::string("{\n  \"title\": \"Cube extracted WS ") + id +
+                    "\",\n  \"type\": \"map\",\n  \"tags\": [\"map\"]\n}\n");
+      closedir(sub);
+      closedir(d);
+      if (LooseMapExists(gmodRoot, mapBare)) {
+        fprintf(stderr, "[CubeUI] map %s ready (extracted)\n", mapBare.c_str());
+        return true;
+      }
+      err = "extract ok but bsp not found under addons";
+      return false;
+    }
+    closedir(sub);
+  }
+  closedir(d);
+  err = "map not found in workshop GMAs";
+  return false;
+}
+
+bool EnsureMapAvailable(const std::string& gmodRoot, const std::string& mapBareIn, std::string& errOut) {
+  errOut.clear();
+  if (gmodRoot.empty() || mapBareIn.empty()) {
+    errOut = "empty gmodRoot/map";
+    return false;
+  }
+  std::string mapBare = ToLower(mapBareIn);
+  // strip maps/ and .bsp if pasted
+  if (mapBare.rfind("maps/", 0) == 0) mapBare = mapBare.substr(5);
+  if (EndsWithLower(mapBare, ".bsp")) mapBare = mapBare.substr(0, mapBare.size() - 4);
+
+  if (LooseMapExists(gmodRoot, mapBare)) {
+    fprintf(stderr, "[CubeUI] map %s already loose on disk\n", mapBare.c_str());
+    return true;
+  }
+
+  std::string err;
+  if (ExtractWorkshopMap(gmodRoot, mapBare, err))
+    return true;
+
+  // Last chance: local addons/*.gma
+  std::string addons = gmodRoot + "/garrysmod/addons";
+  if (DIR* d = opendir(addons.c_str())) {
+    while (dirent* e = readdir(d)) {
+      std::string n = e->d_name;
+      if (!EndsWithLower(n, ".gma")) continue;
+      std::string gma = addons + "/" + n;
+      std::unordered_set<std::string> maps;
+      CollectMapsFromGma(gma, maps);
+      if (!maps.count(mapBare)) continue;
+      std::string dest = gmodRoot + "/garrysmod/addons/cube_local_" + n.substr(0, n.size() - 4);
+      if (ExtractGmaToDir(gma, dest, err)) {
+        closedir(d);
+        if (LooseMapExists(gmodRoot, mapBare)) return true;
+      }
+    }
+    closedir(d);
+  }
+
+  errOut = err.empty() ? ("map " + mapBare + " not available as loose BSP (workshop-only?)") : err;
+  fprintf(stderr, "[CubeUI] EnsureMapAvailable FAILED map=%s: %s\n", mapBare.c_str(),
+          errOut.c_str());
+  return false;
 }
