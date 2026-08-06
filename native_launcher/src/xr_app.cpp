@@ -273,6 +273,19 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
   float grabCooldown = 0.f;              // post-end lockout so grip flicker cannot re-grab
   bool worldInitPending = true;
   bool emergencySeedOnly = false; // true after fake seed — re-anchor on first real HMD
+  // Return-from-GMod: force panel reseed when head becomes valid (often behind user otherwise)
+  bool forceReturnReseed = false;
+  {
+    CubeReturnSnapshot ret0;
+    if (ReadCubeReturnMarker(gmodRoot, ret0) && ret0.valid) {
+      const std::string ph = CubeReturn_NormalizePhase(ret0.phase);
+      if (ph == "xr_released" || ph == "vr_exit" || ph == "cube_claim" || ph == "panel_live") {
+        forceReturnReseed = true;
+        fprintf(stderr, "[CubeUI] return-from-GMod marker phase=%s — will force panel reseed to head\n",
+                ph.c_str());
+      }
+    }
+  }
 
   Vec3 grabOff{0, 0, 0};
   float stickCooldown = 0.f;
@@ -691,21 +704,28 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
     }
 
     // Product law: freeze after seed. Emergency origin seed re-anchors when head is real.
-    if (worldInitPending || emergencySeedOnly) {
+    // Return-from-GMod always force-seeds once head is valid (panel was missing in HMD).
+    if (worldInitPending || emergencySeedOnly || forceReturnReseed) {
       if (headOk) {
-        if (WorldPanelSeed(headWorld, /*force=*/emergencySeedOnly || worldInitPending)) {
+        if (WorldPanelSeed(headWorld, /*force=*/true)) {
           worldInitPending = false;
           emergencySeedOnly = false;
+          if (forceReturnReseed) {
+            fprintf(stderr, "[CubeUI] return-from-GMod panel reseed to head\n");
+            forceReturnReseed = false;
+          }
           ui.status = "PANEL LIVE · trigger=click · MENU=re-place";
           CubeUI_MarkDirty(ui);
           fprintf(stderr, "[CubeUI] PANEL VISIBLE mesh space=%s seed#%d pos=(%.2f,%.2f,%.2f)\n",
                   spaceName, WorldPanelState().seedCount,
                   WorldPanelState().c.x, WorldPanelState().c.y, WorldPanelState().c.z);
         }
-      } else if (worldInitPending && ++framesNoHead > 60) {
+      } else if (worldInitPending && ++framesNoHead > 45) {
+        // Faster emergency seed after return (was 60 frames)
         XrPosef fake = IdentityPose();
         fake.position.y = 1.5f;
-        if (WorldPanelSeed(fake, /*force=*/false)) {
+        fake.position.z = -0.95f;
+        if (WorldPanelSeed(fake, /*force=*/true)) {
           worldInitPending = false;
           emergencySeedOnly = true;
           ui.status = "PANEL · waiting track (seamless re-anchor)";
@@ -721,7 +741,8 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
       float dy = headWorld.position.y - WorldPanelState().c.y;
       float dz = headWorld.position.z - WorldPanelState().c.z;
       float dist2 = dx * dx + dy * dy + dz * dz;
-      if (dist2 > 9.f && !farReseedDone) { // >3m
+      // Tighter: >2m re-anchor (was 3m) so return-from-GMod bad seeds recover
+      if (dist2 > 4.f && !farReseedDone) {
         if (WorldPanelSeed(headWorld, /*force=*/true)) {
           farReseedDone = true;
           ui.status = "PANEL RE-ANCHORED (seamless catch-up)";
@@ -729,7 +750,7 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
           fprintf(stderr, "[CubeUI] seamless far re-anchor dist=%.2f\n", std::sqrt(dist2));
         }
       }
-      if (dist2 < 4.f) farReseedDone = false; // allow again if they walk away later
+      if (dist2 < 2.25f) farReseedDone = false; // allow again if they walk away later
     }
 
     auto& wp = WorldPanelState();

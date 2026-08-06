@@ -44,16 +44,10 @@ if pgrep -x CubeUI >/dev/null 2>&1; then
   exit 0
 fi
 
-# Wait for GMod to release OpenXR (up to ~8s)
-for i in $(seq 1 16); do
-  if ! pgrep -x hl2_linux >/dev/null 2>&1 && ! pgrep -x gmod >/dev/null 2>&1; then
-    break
-  fi
-  # GMod may still be up (temp return) — wait for no exclusive session by probing briefly
-  # Just give runtime a moment after VR exit
-  sleep 0.5
-done
-sleep 0.5
+# Always wait a few seconds after VR exit so OpenXR is free.
+# Temp return keeps GMod (hl2) running — do NOT wait for process death.
+echo "[cube-host] waiting 3s for OpenXR drain after GMod VR exit..." >>"$LOG"
+sleep 3
 
 cd "$ROOT" || true
 # Run in foreground of this process group when launched by setsid/nohup from GMod
