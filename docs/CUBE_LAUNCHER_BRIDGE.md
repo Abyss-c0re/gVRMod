@@ -55,7 +55,8 @@ CubeUI panel live again
 | Full dual-process XR reclaim without exit | Still not “Cube never dies”; relaunch is the product default |
 | Changelevel on RESUME | Still opt-in (`vrmod_warm_changelevel`); same map only by default |
 | Quest thin path | Same Lua bridge; ensure quest module also releases XR before Cube spawns |
-| **XR race → bare passthrough** | Fixed soft: 2.5s delay + host retry loop + CubeUI `xrCreateSession` retries (~6s). If still stuck: desktop **gVRMod Cube** while GMod has no VR |
+| **XR race → bare passthrough** | Fixed soft: 2.5s delay + host retry loop + CubeUI `xrCreateSession` retries (~6s). If still stuck: desktop **gVRMod** while GMod has no VR |
+| **RESUME soft 90s no take_xr** | Fixed: resume must call `OpenXR_ForceStartWithHandoff` (write `take_xr`, wait 2.5s, start). Plain `vrmod_start force` while Cube holds XR fails until soft timeout kills Cube. `handoffSignaled` resets on every `VRMod_Exit`. |
 
 ## False “Cube crashed” after Start Game
 
