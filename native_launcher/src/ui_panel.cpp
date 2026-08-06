@@ -839,6 +839,8 @@ bool CubeUI_LoadLastPlay(CubeUIState& s) {
   body << f.rdbuf();
   LastPlaySnapshot lp;
   if (!LastPlay_Parse(body.str(), lp)) return false;
+  // Rename migration: old home hub → XR Home Passthrough
+  if (lp.map == "gm_infmap_home") lp.map = "xr_infmap_passthrough";
   // Stash onto state via fields we apply next; temporary use of lastPlayMap
   s.lastPlayMap = lp.map;
   s.hasLastPlay = true;
