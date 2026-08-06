@@ -577,6 +577,17 @@ std::vector<MapCategory> ScanGModMaps(const std::string& gmodRoot) {
   for (auto& kv : cats)
     std::sort(kv.second.maps.begin(), kv.second.maps.end());
 
+  // Pin gVRMod home hub to front of Sandbox (product default map).
+  static const char* kHomeMap = "gm_infmap_home";
+  if (cats.count("Sandbox")) {
+    auto& maps = cats["Sandbox"].maps;
+    auto it = std::find(maps.begin(), maps.end(), kHomeMap);
+    if (it != maps.end() && it != maps.begin()) {
+      maps.erase(it);
+      maps.insert(maps.begin(), kHomeMap);
+    }
+  }
+
   std::vector<MapCategory> out;
   out.reserve(cats.size());
   for (auto& kv : cats) out.push_back(std::move(kv.second));
@@ -824,6 +835,81 @@ static bool ExtractWorkshopMap(const std::string& gmodRoot, const std::string& m
   return false;
 }
 
+// InfMap base (WS 2905327911) is required for any map whose second token is "infmap".
+// Home hub gm_infmap_home ships its own BSP but still needs InfMap lua/entities.
+static bool MapNeedsInfMapBase(const std::string& mapBare) {
+  // second word == "infmap" (InfMap autorun gate)
+  size_t a = mapBare.find('_');
+  if (a == std::string::npos) return false;
+  size_t b = mapBare.find('_', a + 1);
+  std::string second =
+      (b == std::string::npos) ? mapBare.substr(a + 1) : mapBare.substr(a + 1, b - a - 1);
+  return second == "infmap";
+}
+
+static bool InfMapBasePresent(const std::string& gmodRoot) {
+  // Base ships gm_infmap.bsp + lua/autorun/!!inf_init.lua
+  if (LooseMapExists(gmodRoot, "gm_infmap")) return true;
+  std::string addons = gmodRoot + "/garrysmod/addons";
+  if (DIR* d = opendir(addons.c_str())) {
+    while (dirent* e = readdir(d)) {
+      std::string n = e->d_name;
+      if (n == "." || n == ".." || n[0] == '.') continue;
+      if (n.size() > 9 && n.compare(n.size() - 9, 9, ".disabled") == 0) continue;
+      std::string full = addons + "/" + n;
+      if (!IsDir(full)) continue;
+      if (FileExists(full + "/lua/autorun/!!inf_init.lua") ||
+          FileExists(full + "/lua/autorun/!!inf_init.LUA")) {
+        closedir(d);
+        return true;
+      }
+    }
+    closedir(d);
+  }
+  return false;
+}
+
+static bool EnsureInfMapBase(const std::string& gmodRoot, std::string& err) {
+  if (InfMapBasePresent(gmodRoot)) {
+    fprintf(stderr, "[CubeUI] InfMap base already present\n");
+    return true;
+  }
+  // Prefer extracting stock map package (pulls lua + materials + gm_infmap.bsp).
+  if (ExtractWorkshopMap(gmodRoot, "gm_infmap", err)) {
+    fprintf(stderr, "[CubeUI] InfMap base extracted via gm_infmap workshop GMA\n");
+    return true;
+  }
+  // Fallback: known workshop id folder
+  std::string ws = FindWorkshopContent4000(gmodRoot);
+  if (!ws.empty()) {
+    std::string idDir = ws + "/2905327911";
+    if (IsDir(idDir)) {
+      if (DIR* sub = opendir(idDir.c_str())) {
+        while (dirent* se = readdir(sub)) {
+          std::string n = se->d_name;
+          if (!EndsWithLower(n, ".gma")) continue;
+          std::string dest = gmodRoot + "/garrysmod/addons/cube_ws_2905327911";
+          std::string e2;
+          if (ExtractGmaToDir(idDir + "/" + n, dest, e2)) {
+            WriteFile(dest + "/addon.json",
+                      "{\n  \"title\": \"InfMap Base (Cube extract)\",\n  \"type\": \"map\",\n  "
+                      "\"tags\": [\"map\"]\n}\n");
+            closedir(sub);
+            if (InfMapBasePresent(gmodRoot)) {
+              fprintf(stderr, "[CubeUI] InfMap base extracted from WS 2905327911\n");
+              return true;
+            }
+          }
+        }
+        closedir(sub);
+      }
+    }
+  }
+  err = "InfMap base (Workshop 2905327911) not found — subscribe or place GMA under workshop/content/4000/2905327911";
+  fprintf(stderr, "[CubeUI] EnsureInfMapBase FAILED: %s\n", err.c_str());
+  return false;
+}
+
 bool EnsureMapAvailable(const std::string& gmodRoot, const std::string& mapBareIn, std::string& errOut) {
   errOut.clear();
   if (gmodRoot.empty() || mapBareIn.empty()) {
@@ -834,6 +920,16 @@ bool EnsureMapAvailable(const std::string& gmodRoot, const std::string& mapBareI
   // strip maps/ and .bsp if pasted
   if (mapBare.rfind("maps/", 0) == 0) mapBare = mapBare.substr(5);
   if (EndsWithLower(mapBare, ".bsp")) mapBare = mapBare.substr(0, mapBare.size() - 4);
+
+  // Home / any InfMap-derived map needs base API (entities, simplex, detours).
+  if (MapNeedsInfMapBase(mapBare)) {
+    std::string baseErr;
+    if (!EnsureInfMapBase(gmodRoot, baseErr)) {
+      // Continue trying the BSP itself — home map may still load but terrain will warn.
+      fprintf(stderr, "[CubeUI] WARNING: InfMap base missing for %s: %s\n", mapBare.c_str(),
+              baseErr.c_str());
+    }
+  }
 
   if (LooseMapExists(gmodRoot, mapBare)) {
     fprintf(stderr, "[CubeUI] map %s already loose on disk\n", mapBare.c_str());

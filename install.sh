@@ -34,6 +34,9 @@ MANIFEST_NAME=".vrmod_bundle_manifest.txt"
 # Client-side addon — single tree (git submodule: Workshop package layout)
 ADDON_SRC="$SCRIPT_DIR/addon/vrmod-x64"
 ADDON_INSTALL_NAME="vrmod-x64"
+# Home map (InfMap hub) — lives in monorepo, not a submodule
+HOME_ADDON_SRC="$SCRIPT_DIR/addon/cube_home"
+HOME_ADDON_INSTALL_NAME="cube_home"
 
 # Default / common Steam locations (in order of preference)
 GMOD_CANDIDATES=(
@@ -413,7 +416,8 @@ echo
 
 if [[ "$UNINSTALL" == true ]]; then
     if [[ ! -d "$LUA_BIN_DIR" && ! -d "$ENGINE_BIN_DIR" \
-        && ! -d "$ADDONS_DIR/vrmod-x64" && ! -d "$ADDONS_DIR/gvrmod" ]]; then
+        && ! -d "$ADDONS_DIR/vrmod-x64" && ! -d "$ADDONS_DIR/gvrmod" \
+        && ! -e "$ADDONS_DIR/cube_home" ]]; then
         echo "Nothing to uninstall (no module, no OpenXR libs, and no addon found)."
         exit 0
     fi
@@ -448,8 +452,9 @@ if [[ "$UNINSTALL" == true ]]; then
         rm -f "$LUA_BIN_DIR/gmcl_vrmod_xr_linux64.dll"
         rm -f "$ENGINE_BIN_DIR"/libopenxr_loader*
         rm -rf "$ADDONS_DIR/vrmod-x64" "$ADDONS_DIR/gvrmod"
+        rm -f "$ADDONS_DIR/cube_home" 2>/dev/null || rm -rf "$ADDONS_DIR/cube_home"
         echo "  removed gmcl_vrmod_xr_linux64.dll (OpenXR) + libopenxr_loader* (bin/linux64)"
-        echo "  removed addons/vrmod-x64 and legacy addons/gvrmod (if present)"
+        echo "  removed addons/vrmod-x64, cube_home, and legacy addons/gvrmod (if present)"
         echo "  left gmcl_vrmod_linux64.dll alone (OpenVR slot)"
         echo "  (no manifest was present)"
     fi
@@ -536,37 +541,83 @@ echo "=== Installing client addon (addon/vrmod-x64 submodule) ==="
 ADDONS_DIR="$GMOD_DIR/garrysmod/addons"
 mkdir -p "$ADDONS_DIR"
 
+link_addon() {
+    local src="$1"
+    local name="$2"
+    local dest="$ADDONS_DIR/$name"
+    if [[ ! -d "$src" ]]; then
+        echo "  WARNING: No addon at $src"
+        return 1
+    fi
+    if [[ -L "$dest" ]]; then
+        local cur want
+        cur="$(readlink -f "$dest" 2>/dev/null || true)"
+        want="$(readlink -f "$src")"
+        if [[ "$cur" == "$want" ]]; then
+            echo "  already linked: $dest → $want"
+        else
+            rm -f "$dest"
+            ln -sfn "$want" "$dest"
+            echo "  relinked: $dest → $want"
+        fi
+    else
+        if [[ -e "$dest" ]]; then
+            echo "  Removing existing addon tree: $dest"
+            rm -rf "$dest"
+        fi
+        local want
+        want="$(readlink -f "$src")"
+        ln -sfn "$want" "$dest"
+        echo "  linked: $dest → $want"
+    fi
+    echo "garrysmod/addons/$name" >> "$MANIFEST"
+    return 0
+}
+
 if [[ -d "$ADDON_SRC/lua" ]]; then
     # Drop legacy folder name from older gVRMod installs
     if [[ -d "$ADDONS_DIR/gvrmod" ]] || [[ -L "$ADDONS_DIR/gvrmod" ]]; then
         echo "  Removing legacy addon: $ADDONS_DIR/gvrmod"
         rm -rf "$ADDONS_DIR/gvrmod"
     fi
-    DEST="$ADDONS_DIR/$ADDON_INSTALL_NAME"
     # Prefer symlink to gVRMod submodule so GMod always loads live Dev tree
     # (no stale rsync copies). Replace real dirs / wrong links.
-    if [[ -L "$DEST" ]]; then
-        cur="$(readlink -f "$DEST" 2>/dev/null || true)"
-        want="$(readlink -f "$ADDON_SRC")"
-        if [[ "$cur" == "$want" ]]; then
-            echo "  already linked: $DEST → $want"
-        else
-            rm -f "$DEST"
-            ln -sfn "$want" "$DEST"
-            echo "  relinked: $DEST → $want"
-        fi
-    else
-        if [[ -e "$DEST" ]]; then
-            echo "  Removing existing addon tree: $DEST"
-            rm -rf "$DEST"
-        fi
-        want="$(readlink -f "$ADDON_SRC")"
-        ln -sfn "$want" "$DEST"
-        echo "  linked: $DEST → $want"
-    fi
-    echo "garrysmod/addons/$ADDON_INSTALL_NAME" >> "$MANIFEST"
+    link_addon "$ADDON_SRC" "$ADDON_INSTALL_NAME" || \
+        echo "  WARNING: No addon at $ADDON_SRC — run: git submodule update --init --recursive"
 else
     echo "  WARNING: No addon at $ADDON_SRC — run: git submodule update --init --recursive"
+fi
+
+echo
+echo "=== Installing home map addon (addon/cube_home) ==="
+if [[ -f "$HOME_ADDON_SRC/maps/gm_infmap_home.bsp" ]] || [[ -d "$HOME_ADDON_SRC/lua" ]]; then
+    link_addon "$HOME_ADDON_SRC" "$HOME_ADDON_INSTALL_NAME" || true
+    echo "  Home map: gm_infmap_home (needs InfMap base Workshop 2905327911)"
+else
+    echo "  WARNING: cube_home missing maps/gm_infmap_home.bsp — home map unavailable"
+fi
+
+# Best-effort: extract InfMap base from Steam workshop if subscribed
+WS_INFMAP=""
+for root in \
+    "$GMOD_DIR/../../workshop/content/4000/2905327911" \
+    "$HOME/.steam/steam/steamapps/workshop/content/4000/2905327911" \
+    "$HOME/.local/share/Steam/steamapps/workshop/content/4000/2905327911"; do
+    if [[ -d "$root" ]]; then
+        WS_INFMAP="$root"
+        break
+    fi
+done
+if [[ -n "$WS_INFMAP" ]] && [[ ! -d "$ADDONS_DIR/cube_ws_2905327911" ]]; then
+    GMA=$(find "$WS_INFMAP" -maxdepth 1 -name '*.gma' 2>/dev/null | head -1 || true)
+    if [[ -n "$GMA" ]] && command -v "$SCRIPT_DIR/native_launcher/build/CubeUI" >/dev/null 2>&1; then
+        : # extraction happens on Cube Start via EnsureMapAvailable
+    fi
+    if [[ -n "$GMA" ]] && [[ ! -d "$ADDONS_DIR/cube_ws_2905327911" ]]; then
+        echo "  InfMap workshop GMA present; CubeUI will extract on first Start of an InfMap map"
+    fi
+elif [[ -d "$ADDONS_DIR/cube_ws_2905327911" ]]; then
+    echo "  InfMap base extract present: addons/cube_ws_2905327911"
 fi
 
 install_desktop_entry
@@ -576,6 +627,7 @@ echo "Installation successful!"
 echo "  Module installed to:      $LUA_BIN_DIR"
 echo "  OpenXR libs installed to: $ENGINE_BIN_DIR"
 echo "  Client addon installed to: $ADDONS_DIR/$ADDON_INSTALL_NAME"
+echo "  Home map addon:           $ADDONS_DIR/$HOME_ADDON_INSTALL_NAME"
 echo "  Desktop launcher:         ~/.local/share/applications/gvrmod.desktop"
 echo
 echo "A manifest was written to:"

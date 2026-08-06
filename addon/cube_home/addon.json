@@ -1,0 +1,12 @@
+{
+    "title": "gVRMod Home (InfMap)",
+    "type": "map",
+    "tags": ["roleplay", "scenic"],
+    "ignore": [
+        ".git/*",
+        ".git*",
+        "docs/*",
+        "README.md",
+        "**/*.md"
+    ]
+}

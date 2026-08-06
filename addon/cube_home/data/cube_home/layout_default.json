@@ -1,0 +1,87 @@
+{
+  "v": 1,
+  "name": "gVRMod Home",
+  "seed": 1,
+  "plaza_radius": 2.5,
+  "hill_scale": 1.0,
+  "spawn": {
+    "pos": [0, 0, 48],
+    "ang": [0, 90, 0]
+  },
+  "zones": [
+    {
+      "id": "plaza",
+      "label": "Home Plaza",
+      "kind": "spawn",
+      "pos": [0, 0, 8],
+      "size": 512
+    },
+    {
+      "id": "sandbox",
+      "label": "Sandbox Pad",
+      "kind": "platform",
+      "pos": [800, 0, 8],
+      "size": 384,
+      "color": [80, 140, 220]
+    },
+    {
+      "id": "range",
+      "label": "Practice Range",
+      "kind": "platform",
+      "pos": [0, 800, 8],
+      "size": 384,
+      "color": [220, 140, 80]
+    },
+    {
+      "id": "build",
+      "label": "Build Yard",
+      "kind": "platform",
+      "pos": [-800, 0, 8],
+      "size": 512,
+      "color": [120, 200, 120]
+    }
+  ],
+  "props": [
+    {
+      "id": "center_pad",
+      "model": "models/hunter/plates/plate8x8.mdl",
+      "pos": [0, 0, 4],
+      "ang": [0, 0, 0],
+      "frozen": true,
+      "material": "models/debug/debugwhite",
+      "color": [40, 44, 56]
+    },
+    {
+      "id": "center_ring",
+      "model": "models/hunter/tubes/circle4x4.mdl",
+      "pos": [0, 0, 6],
+      "ang": [0, 0, 0],
+      "frozen": true,
+      "color": [90, 160, 255]
+    },
+    {
+      "id": "sandbox_pad",
+      "model": "models/hunter/plates/plate8x8.mdl",
+      "pos": [800, 0, 4],
+      "ang": [0, 0, 0],
+      "frozen": true,
+      "color": [80, 140, 220]
+    },
+    {
+      "id": "range_pad",
+      "model": "models/hunter/plates/plate8x8.mdl",
+      "pos": [0, 800, 4],
+      "ang": [0, 0, 0],
+      "frozen": true,
+      "color": [220, 140, 80]
+    },
+    {
+      "id": "build_pad",
+      "model": "models/hunter/plates/plate8x8.mdl",
+      "pos": [-800, 0, 4],
+      "ang": [0, 0, 0],
+      "frozen": true,
+      "color": [120, 200, 120]
+    }
+  ]
+}
