@@ -67,9 +67,11 @@ end
 -- Keep map magenta always; PT only toggles key punch (not map color).
 local function applyWorldForPT(on)
 	-- Never leave black: brush world off; InfMap magenta mesh is the map.
+	-- Keep r_drawskybox ON so PreDrawSkyBox runs for BOTH stereo eyes.
+	-- (With sky off, right-eye RenderView clears black and sky hooks never fire → black upper FOV.)
 	RunConsoleCommand("r_drawworld", "0")
 	RunConsoleCommand("r_3dsky", "0")
-	RunConsoleCommand("r_drawskybox", "0")
+	RunConsoleCommand("r_drawskybox", "1")
 	RunConsoleCommand("fog_override", "1")
 	RunConsoleCommand("fog_color", "255", "0", "255")
 	RunConsoleCommand("fog_start", "99999")
@@ -115,10 +117,19 @@ function CubeHome.TogglePassthrough()
 end
 
 -- Always keep clear/sky magenta on this map (no black start).
+-- Fires per eye under dual RenderView when r_drawskybox=1.
+-- Do NOT Clear() from PreDrawOpaqueRenderables — that can wipe the other stereo
+-- half if scissor/viewport is ignored.
 hook.Add("PreDrawSkyBox", "cube_home_always_magenta", function()
 	if not onHomeMap() then return end
 	render.Clear(255, 0, 255, 255, true, true)
-	return true
+	return true -- skip default sky materials (leave solid magenta)
+end)
+
+-- Per VR eye (scissor already set by vrmod): seed magenta before engine draw.
+hook.Add("VRMod_PreRender", "cube_home_eye_magenta", function(_eye)
+	if not onHomeMap() then return end
+	render.Clear(255, 0, 255, 255, true, true)
 end)
 
 hook.Add("SetupWorldFog", "cube_home_pt_fog", function()

@@ -85,8 +85,9 @@ hook.Add("Think", "cube_home_magenta_force", function()
 	end
 end)
 
--- Full magenta enclosure: floor + ceiling + 4 walls (sky was black before).
-local S = 5e7
+-- Camera-relative magenta shell (NOT world-scale 5e7 — that loses precision per-eye
+-- and left upper FOV black on the right eye). Drawn ignore-Z so void always fills.
+local S = 4096
 local function addQuad(tris, a, b, c, d)
 	tris[#tris + 1] = { pos = a, normal = Vector(0, 0, 1), u = 0, v = 0 }
 	tris[#tris + 1] = { pos = b, normal = Vector(0, 0, 1), u = 1, v = 0 }
@@ -96,10 +97,9 @@ local function addQuad(tris, a, b, c, d)
 	tris[#tris + 1] = { pos = d, normal = Vector(0, 0, 1), u = 0, v = 1 }
 end
 local boxTris = {}
--- floor / ceiling
+-- Inward-facing box around origin; translated to EyePos each frame.
 addQuad(boxTris, Vector(-S, -S, -S), Vector(S, -S, -S), Vector(S, S, -S), Vector(-S, S, -S))
 addQuad(boxTris, Vector(-S, -S, S), Vector(-S, S, S), Vector(S, S, S), Vector(S, -S, S))
--- walls
 addQuad(boxTris, Vector(-S, -S, -S), Vector(-S, -S, S), Vector(S, -S, S), Vector(S, -S, -S))
 addQuad(boxTris, Vector(S, S, -S), Vector(S, S, S), Vector(-S, S, S), Vector(-S, S, -S))
 addQuad(boxTris, Vector(-S, -S, -S), Vector(-S, S, -S), Vector(-S, S, S), Vector(-S, -S, S))
@@ -111,25 +111,36 @@ local plane_mat
 local function drawMagentaBox()
 	plane_mat = plane_mat or Material("cube_home/pt_void")
 	if plane_mat:IsError() then plane_mat = Material("vgui/white") end
+	local origin = EyePos()
+	local m = Matrix()
+	m:Translate(origin)
+	cam.PushModelMatrix(m)
+	-- Inside the shell: disable cull so both windings fill the FOV.
+	render.CullMode(MATERIAL_CULLMODE_NONE)
 	render.OverrideDepthEnable(true, false)
+	cam.IgnoreZ(true)
 	render.SetMaterial(plane_mat)
 	render.ResetModelLighting(2, 2, 2)
 	render.SetLocalModelLights()
 	render.SetColorModulation(1, 0, 1)
 	magentaBox:Draw()
 	render.SetColorModulation(1, 1, 1)
+	cam.IgnoreZ(false)
 	render.OverrideDepthEnable(false, false)
+	render.CullMode(MATERIAL_CULLMODE_CCW)
+	cam.PopModelMatrix()
 end
 
 hook.Add("PostDraw2DSkyBox", "cube_home_magenta_skybox", drawMagentaBox)
--- Also after world so upper FOV never stays black if skybox path skipped in VR
+-- Per-eye opaque pass: fills upper FOV if sky path skipped on right eye.
 hook.Add("PreDrawOpaqueRenderables", "cube_home_magenta_preopaque", function()
 	drawMagentaBox()
 end)
 
 hook.Add("InitPostEntity", "cube_home_magenta_boot", function()
 	RunConsoleCommand("r_3dsky", "0")
-	RunConsoleCommand("r_drawskybox", "0")
+	-- Keep skybox path alive so PreDrawSkyBox runs for both VR eyes.
+	RunConsoleCommand("r_drawskybox", "1")
 	RunConsoleCommand("fog_override", "1")
 	RunConsoleCommand("fog_color", "255", "0", "255")
 	RunConsoleCommand("fog_start", "99999")
