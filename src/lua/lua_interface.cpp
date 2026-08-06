@@ -103,8 +103,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v48: green-key passthrough chroma (void key RGB, not black luminance).
-    LUA->PushNumber(48);
+    // v49: void-alpha passthrough (pure sky black → alpha; no color key).
+    LUA->PushNumber(49);
     return 1;
 }
 

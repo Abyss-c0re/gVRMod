@@ -27,37 +27,36 @@
 **Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
 It is not shown on other maps, OpenVR, or outside VR.
 
-### Green-key void (not black)
+### Invisible void (no key color)
 
-Black chroma punched shadows/dark models. Instead:
+**Any visible key color flickers and ruins models.** Source writes opaque RGB every
+pixel; OpenXR only composites on **alpha**. We never draw a green/magenta plane.
 
 | Layer | Behavior |
 |-------|----------|
-| Void | Pure **green** (`cube_home/pt_void` material + sky plane) |
-| Module | Color-key chroma: distance to key RGB → alpha |
-| Models | Normal materials — stay solid (not green) |
+| World / sky | Hidden → empty pixels = pure engine black |
+| Module | Punch **only pure neutral black** → alpha 0 (thr ~0.04) |
+| Models | Normal materials (dark grey ≠ pure black → solid) |
 | OpenXR | `ALPHA_BLEND` + source alpha |
 
-| Cvar / control | Effect |
-|----------------|--------|
+| Cvar | Effect |
+|------|--------|
 | Quick menu **Passthrough** | Toggle (map+OpenXR only) |
-| `cube_home_passthrough 0/1` | Preference (archive) |
-| `cube_home_passthrough_tol 0.22` | Key softness |
-| `cube_home_draw_terrain 0` | Keep void (no flatgrass mesh) |
-
-Module API (v48+):
+| `cube_home_passthrough 0/1` | Preference |
+| `cube_home_passthrough_tol 0.04` | Sky-black threshold (use 0.02–0.08 only) |
 
 ```
-VRMOD_SetPassthroughChromaKey(0, 1, 0)  -- pure green
-VRMOD_SetPassthroughChroma(true, 0.22)
-VRMOD_SetEnvironmentBlendMode(3)       -- auto alpha
+VRMOD_SetPassthroughChroma(true, 0.04)  -- void-alpha, not a color key
+VRMOD_SetEnvironmentBlendMode(3)
 ```
 
-### Future: “true” passthrough texture
+### Why not an “invisible texture”?
 
-Ideal path is a stencil/alpha material the engine writes without a visible key color
-(or FB passthrough layer under projection). Green-key is the Source-safe PoC until
-that exists. Avoid pure green on player models while PT is on.
+Source cannot write alpha-only holes into the VR RT reliably. Options:
+
+1. **Strict sky black → alpha** (shipped now)  
+2. **Depth far-plane void** (next, if depth RT is bindable at submit)  
+3. **`XR_FB_passthrough` under projection** (true cameras; CubeUI already does this)
 
 ## Dynamic layout
 

@@ -48,7 +48,7 @@ if CLIENT then
 					.. "Passthrough (OpenXR only, this map only):\n"
 					.. "  Quick menu → Passthrough ON/OFF\n"
 					.. "  cube_home_passthrough 0/1\n"
-					.. "  Green void key material: cube_home/pt_void\n\n"
+					.. "  Invisible void: pure sky black → alpha (no green key)\n\n"
 					.. "InfMap by Meetric (GPL-3.0)\n"
 					.. "  github.com/meetric1/gmod-infinite-map\n"
 					.. "  Workshop " .. tostring(CubeHome.INFMAP_WORKSHOP)

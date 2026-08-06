@@ -128,11 +128,11 @@ void XR_MarkFrameEnded();
 int XR_SetEnvironmentBlendMode(int mode);
 int XR_GetEnvironmentBlendMode(); // 0/1/2
 bool XR_SupportsAlphaBlend();
-// Color-key chroma: pixels near key RGB become transparent (alpha 0) so room
-// shows through under ALPHA_BLEND. Prefer pure green void (0,1,0) — not black —
-// so dark model shading stays solid. tolerance = max RGB distance 0..√3.
+// Void alpha (no visible key color): pure neutral sky black → alpha 0 so
+// ALPHA_BLEND shows the room. tolerance = max RGB for "sky black" (~0.04).
+// Not a green/magenta chroma key — that caused flicker and ruined models.
 void XR_SetPassthroughChroma(bool enable, float tolerance);
-// keyR/G/B in 0..1. Default key = pure green (0,1,0).
+// Legacy no-op key (kept for Lua API stability). Prefer void-black path.
 void XR_SetPassthroughChromaKey(float keyR, float keyG, float keyB);
 bool XR_GetPassthroughChroma();
 float XR_GetPassthroughChromaThreshold();

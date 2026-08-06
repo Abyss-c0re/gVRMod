@@ -101,10 +101,11 @@ static bool g_hasAlphaBlend = false;
 static bool g_hasAdditive = false;
 static XrEnvironmentBlendMode g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 static bool g_passthroughChroma = false;
-static float g_passthroughChromaTol = 0.22f; // RGB distance from key → transparent
-// Pure green void key (not black — dark model pixels stay opaque).
+// Strict pure-sky black threshold (linear). ~0.04 ≈ 10/255 — not wide luminance key.
+static float g_passthroughChromaTol = 0.04f;
+// Legacy key RGB unused (void is achromatic black, not a chroma color).
 static float g_passthroughKeyR = 0.0f;
-static float g_passthroughKeyG = 1.0f;
+static float g_passthroughKeyG = 0.0f;
 static float g_passthroughKeyB = 0.0f;
 
 static void XR_EnumerateBlendModes() {

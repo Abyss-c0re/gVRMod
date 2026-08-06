@@ -173,7 +173,10 @@ static PFNGLGENVERTEXARRAYSPROC    glGenVertexArraysPtr = nullptr;
 static PFNGLBINDVERTEXARRAYPROC    glBindVertexArrayPtr = nullptr;
 static PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArraysPtr = nullptr;
 
-// Passthrough chroma: near-black → alpha 0 so OpenXR ALPHA_BLEND shows the room.
+// Passthrough void alpha (NO visible key color).
+// Source fills sky with pure neutral black (opaque). Real models almost never
+// land on pure black (0,0,0) — shadows are dark grey with chroma. We only open
+// alpha on achromatic near-black so ALPHA_BLEND shows the room without green/magenta.
 static GLuint g_chromaProg = 0;
 static GLuint g_chromaTempTex = 0;
 static GLuint g_chromaVao = 0;
@@ -190,18 +193,22 @@ static const char* kChromaVS =
     "  vUV = p;\n"
     "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
     "}\n";
-// Color-key (default pure green void). Distance-from-key → alpha.
-// Black/dark model pixels are far from green → stay opaque (no ugly cutouts).
+// Strict sky void: max RGB below thr AND nearly achromatic → alpha 0.
+// uTol ~ 0.02–0.06 (linear). Dark models (brown/grey shadows) keep alpha 1.
 static const char* kChromaFS =
     "#version 130\n"
     "in vec2 vUV;\n"
     "uniform sampler2D uTex;\n"
     "uniform float uTol;\n"
-    "uniform vec3 uKeyRgb;\n"
     "void main(){\n"
     "  vec4 c = texture(uTex, vUV);\n"
-    "  float d = distance(c.rgb, uKeyRgb);\n"
-    "  float a = smoothstep(uTol * 0.45, uTol, d);\n"
+    "  float mx = max(c.r, max(c.g, c.b));\n"
+    "  float mn = min(c.r, min(c.g, c.b));\n"
+    "  float achroma = mx - mn;\n"
+    "  // Sky clear is pure black; void only if dark AND neutral (not tinted shadow).\n"
+    "  float voidness = 1.0 - smoothstep(uTol * 0.35, uTol, mx);\n"
+    "  voidness *= 1.0 - smoothstep(uTol * 0.25, uTol * 0.85, achroma);\n"
+    "  float a = 1.0 - voidness;\n"
     "  gl_FragColor = vec4(c.rgb, a);\n"
     "}\n";
 
@@ -256,12 +263,10 @@ static bool EnsureChromaProgram() {
     return true;
 }
 
-// Rewrite near-black pixels in swapchain image to transparent (alpha=0).
+// Punch pure sky black → alpha 0 (no green/magenta key color).
 static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h) {
-    // Active when Lua enabled chroma OR any non-opaque blend mode (AR home map).
-    if (!XR_GetPassthroughChroma() &&
-        XR_ActiveEnvironmentBlendMode() == XR_ENVIRONMENT_BLEND_MODE_OPAQUE)
-        return;
+    // Only when Lua explicitly enables void-alpha (home map). Never auto on ALPHA_BLEND alone.
+    if (!XR_GetPassthroughChroma()) return;
     if (!EnsureChromaProgram()) return;
     if (!glBindFramebufferPtr || !glFramebufferTexture2DPtr || !glUseProgramPtr) return;
     if (w == 0 || h == 0) return;
@@ -321,13 +326,11 @@ static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h) {
     }
     if (glUniform1fPtr) {
         GLint loc = glGetUniformLocationPtr(g_chromaProg, "uTol");
-        if (loc >= 0) glUniform1fPtr(loc, XR_GetPassthroughChromaThreshold());
-    }
-    if (glUniform3fPtr) {
-        float kr = 0.f, kg = 1.f, kb = 0.f;
-        XR_GetPassthroughChromaKey(&kr, &kg, &kb);
-        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uKeyRgb");
-        if (loc >= 0) glUniform3fPtr(loc, kr, kg, kb);
+        // Default tight (~0.04); Lua may raise slightly for noisy clears.
+        float tol = XR_GetPassthroughChromaThreshold();
+        if (tol > 0.12f) tol = 0.12f; // never use old green-key wide tol
+        if (tol < 0.01f) tol = 0.04f;
+        if (loc >= 0) glUniform1fPtr(loc, tol);
     }
     if (glBindVertexArrayPtr && g_chromaVao) glBindVertexArrayPtr(g_chromaVao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -1135,14 +1138,19 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                 glReadBuffer(GL_COLOR_ATTACHMENT0);
                 glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
+                // Transparent clear first so punched void stays see-through under ALPHA_BLEND.
+                if (XR_GetPassthroughChroma()) {
+                    glClearColor(0.f, 0.f, 0.f, 0.f);
+                    glClear(GL_COLOR_BUFFER_BIT);
+                }
+
                 glBlitFramebufferPtr(
                     srcX0, srcY0, srcX1, srcY1,
                     0, dstY0, (GLint)g_xrSwapchainWidth, dstY1,
                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
-                // AR home map: punch alpha holes in near-black (void sky / r_drawworld 0).
-                if (XR_GetPassthroughChroma() ||
-                    XR_ActiveEnvironmentBlendMode() != XR_ENVIRONMENT_BLEND_MODE_OPAQUE) {
+                // Home AR: sky pure-black → alpha 0 (no visible key color).
+                if (XR_GetPassthroughChroma()) {
                     ApplyPassthroughChroma(dstTexture, g_xrSwapchainWidth, g_xrSwapchainHeight);
                 }
 
