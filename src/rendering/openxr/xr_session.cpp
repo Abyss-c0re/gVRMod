@@ -112,6 +112,8 @@ static float g_passthroughKeyB = 220.f / 255.f;
 static float g_passthroughKey2R = 1.f / 255.f;
 static float g_passthroughKey2G = 0.0f;
 static float g_passthroughKey2B = 1.f / 255.f;
+// 1=pink 2=black 4=black needs pink neighbor (error checker)
+static int g_passthroughChromaMask = 1 | 2 | 4;
 
 static void XR_EnumerateBlendModes() {
     g_hasAlphaBlend = false;
@@ -205,6 +207,15 @@ void XR_SetPassthroughChromaTol2(float tolerance) {
     if (tolerance > 0.5f) tolerance = 0.5f;
     g_passthroughChromaTol2 = tolerance;
 }
+
+void XR_SetPassthroughChromaMask(int mask) {
+    g_passthroughChromaMask = mask & 7;
+    if (g_passthroughChromaMask == 0) g_passthroughChromaMask = 1; // never fully off keys while enabled
+    VRMOD_LOG_INFO("Passthrough chroma mask=0x%x (1=pink 2=black 4=blackNeedsPinkNear)",
+                   g_passthroughChromaMask);
+}
+
+int XR_GetPassthroughChromaMask() { return g_passthroughChromaMask; }
 
 bool XR_GetPassthroughChroma() { return g_passthroughChroma; }
 float XR_GetPassthroughChromaThreshold() { return g_passthroughChromaTol; }

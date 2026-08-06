@@ -27,30 +27,32 @@
 **Quick menu:** “Passthrough: ON/OFF” appears **only** when all three are true.  
 It is not shown on other maps, OpenVR, or outside VR.
 
-### Dual chroma — Source error mosaic (real-time GPU)
+### Error-checker void + dual chroma (real-time GPU)
 
-Full missing-texture checkerboard keys (both cells), processed **in the submit
-pass** (stolen RT → alpha) — one fullscreen shader / eye, VR-rate, not lagged async.
+**Void is the Source missing-texture mosaic** (not solid pink): generated RT checker
+`#FF00DC` / `#010001`, drawn as a tiled sky plane.
 
-| Cell | Color | Hex |
-|------|-------|-----|
-| Bright | (255, 0, 220) | `#FF00DC` |
-| Dark | (1, 0, 1) | `#010001` |
+Submit pass (stolen eye RT) dual-keys both cells → alpha 0 for the room.
 
-| Rule | |
-|------|--|
-| Pink | Always → transparent |
-| Black | Transparent **only if pink is in 3×3 neighborhood** (checker), so solid black models stay |
-| Cost | ~9 texture samples/pixel — fine at 2× eye res / 90 Hz |
+| Cell | RGB | Hex |
+|------|-----|-----|
+| Bright | 255, 0, 220 | `#FF00DC` |
+| Dark | 1, 0, 1 | `#010001` |
+
+| Mask (`cube_home_passthrough_mask`) | Behavior |
+|-------------------------------------|----------|
+| **7** (default) | Pink always + black if pink nearby (full checker) |
+| **1** | Pink only |
+| **2** | Black only (independent — no pink neighbor gate) |
+| **3** | Both colors independent |
 
 ```
-VRMOD_SetPassthroughChromaKey(1, 0, 220/255)   -- pink
-VRMOD_SetPassthroughChromaKey2(1/255, 0, 1/255) -- black cell
+VRMOD_SetPassthroughChromaKey(...) / Key2(...)
+VRMOD_SetPassthroughChromaMask(7)  -- or 1 / 2 for single color
 VRMOD_SetPassthroughChroma(true, 0.18)
-VRMOD_SetEnvironmentBlendMode(3)
 ```
 
-Void fill: `cube_home/pt_void` (pink). Dual key also punches real `error` checker textures.
+GPU cost ~9 samples/px when mask has bit4; still VR-rate.
 
 ## Dynamic layout
 

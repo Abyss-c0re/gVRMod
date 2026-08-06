@@ -103,8 +103,8 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v52: dual chroma Source error mosaic (pink+black checker) for home PT.
-    LUA->PushNumber(52);
+    // v53: checker void + dual chroma mask (pink/black independent or together).
+    LUA->PushNumber(53);
     return 1;
 }
 
@@ -165,6 +165,14 @@ LUA_FUNCTION(SetPassthroughChromaTol2) {
     float t = 0.08f;
     if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) t = (float)LUA->GetNumber(1);
     XR_SetPassthroughChromaTol2(t);
+    return 0;
+}
+
+// mask: 1=pink 2=black 4=blackNeedsPinkNear. 7=full error checker (default).
+LUA_FUNCTION(SetPassthroughChromaMask) {
+    int m = 7;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER)) m = (int)LUA->GetNumber(1);
+    XR_SetPassthroughChromaMask(m);
     return 0;
 }
 
@@ -1449,6 +1457,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SetPassthroughChromaKey2");
     LUA->PushCFunction(SetPassthroughChromaTol2);
     LUA->SetField(-2, "SetPassthroughChromaTol2");
+    LUA->PushCFunction(SetPassthroughChromaMask);
+    LUA->SetField(-2, "SetPassthroughChromaMask");
     LUA->PushCFunction(GetPassthroughChroma);
     LUA->SetField(-2, "GetPassthroughChroma");
     LUA->PushCFunction(ShouldRender);

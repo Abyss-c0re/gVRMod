@@ -193,35 +193,43 @@ static const char* kChromaVS =
     "  vUV = p;\n"
     "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
     "}\n";
-// Dual Source error checker: pink always; black only with pink neighborhood.
+// Dual Source error checker. uMask: bit0 pink, bit1 black, bit2 black needs pink near.
+// Either color alone works (mask 1 or 2); both (7) for full mosaic void.
 static const char* kChromaFS =
     "#version 130\n"
     "in vec2 vUV;\n"
     "uniform sampler2D uTex;\n"
-    "uniform vec2 uTexel;\n"       // 1/width, 1/height
+    "uniform vec2 uTexel;\n"
     "uniform float uTolPink;\n"
     "uniform float uTolBlack;\n"
-    "uniform vec3 uKeyPink;\n"     // #FF00DC
-    "uniform vec3 uKeyBlack;\n"    // #010001
+    "uniform vec3 uKeyPink;\n"
+    "uniform vec3 uKeyBlack;\n"
+    "uniform float uMask;\n" // bits as float 0-7
     "float keyMask(vec3 c, vec3 key, float tol){\n"
     "  float d = distance(c, key);\n"
-    "  return 1.0 - smoothstep(tol * 0.45, tol, d);\n" // 1 = is key
+    "  return 1.0 - smoothstep(tol * 0.45, tol, d);\n"
     "}\n"
     "void main(){\n"
     "  vec4 c = texture(uTex, vUV);\n"
-    "  float mPink = keyMask(c.rgb, uKeyPink, uTolPink);\n"
-    "  float mBlack = keyMask(c.rgb, uKeyBlack, uTolBlack);\n"
-    "  // Pink presence in 3x3 (checker adjacency) — allow black cell punch only then.\n"
+    "  int m = int(uMask + 0.5);\n"
+    "  float usePink = float((m & 1) != 0);\n"
+    "  float useBlack = float((m & 2) != 0);\n"
+    "  float needNear = float((m & 4) != 0);\n"
+    "  float mPink = keyMask(c.rgb, uKeyPink, uTolPink) * usePink;\n"
+    "  float mBlack = keyMask(c.rgb, uKeyBlack, uTolBlack) * useBlack;\n"
     "  float pinkNear = mPink;\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x, 0.0)).rgb, uKeyPink, uTolPink));\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x, 0.0)).rgb, uKeyPink, uTolPink));\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(0.0,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(0.0, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
-    "  pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
-    "  float punch = max(mPink, mBlack * pinkNear);\n"
+    "  if (needNear > 0.5 && useBlack > 0.5) {\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x, 0.0)).rgb, uKeyPink, uTolPink));\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x, 0.0)).rgb, uKeyPink, uTolPink));\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(0.0,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(0.0, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x,  uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2( uTexel.x, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "    pinkNear = max(pinkNear, keyMask(texture(uTex, vUV + vec2(-uTexel.x, -uTexel.y)).rgb, uKeyPink, uTolPink));\n"
+    "    mBlack *= pinkNear;\n"
+    "  }\n"
+    "  float punch = max(mPink, mBlack);\n"
     "  float a = 1.0 - punch;\n"
     "  gl_FragColor = vec4(c.rgb, a);\n"
     "}\n";
@@ -344,8 +352,10 @@ static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h) {
         if (tolB > 0.25f) tolB = 0.25f;
         GLint lp = glGetUniformLocationPtr(g_chromaProg, "uTolPink");
         GLint lb = glGetUniformLocationPtr(g_chromaProg, "uTolBlack");
+        GLint lm = glGetUniformLocationPtr(g_chromaProg, "uMask");
         if (lp >= 0) glUniform1fPtr(lp, tolP);
         if (lb >= 0) glUniform1fPtr(lb, tolB);
+        if (lm >= 0) glUniform1fPtr(lm, (float)XR_GetPassthroughChromaMask());
     }
     if (glUniform3fPtr) {
         float pr = 1.f, pg = 0.f, pb = 220.f / 255.f;
