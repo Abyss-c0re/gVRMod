@@ -38,11 +38,14 @@ if ! ldconfig -p 2>/dev/null | grep -q "libopenxr_loader.so"; then
     echo "    Players will need a working OpenXR runtime + loader on their system."
 fi
 
-# ── Clean previous build and install artifacts ──
-# Ensures we always start from a clean state (no stale CMake caches, object files,
-# or old modules left behind in the install staging area).
-echo "[+] Cleaning build and install directories..."
-rm -rf build_release build_test install
+# ── Clean previous *module* build artifacts ──
+# Do NOT wipe install/ entirely — install/native/CubeUI is the product launcher
+# (built by native_launcher). Wiping it makes cube-host fail with "missing binary".
+echo "[+] Cleaning module build directories (preserving install/native CubeUI)..."
+rm -rf build_release build_test
+# Only clear the OpenXR module staging path under install/GarrysMod
+rm -rf install/GarrysMod
+mkdir -p install/GarrysMod
 
 # ── Build release module ──
 echo "[+] Building release module (OpenXR backend)..."
@@ -51,10 +54,24 @@ cd build_release
 cmake .. -DCMAKE_BUILD_TYPE=Release -DVRMOD_BUILD_TESTS=OFF
 make -j$(nproc) vrmod_release
 
+# Ensure CubeUI launcher still exists after module build (rebuild if wiped/missing)
+ROOT="$(cd .. && pwd)"
+CUBE_BIN="$ROOT/install/native/CubeUI"
+if [[ ! -x "$CUBE_BIN" ]]; then
+    echo "[+] CubeUI missing after module build — rebuilding native launcher..."
+    mkdir -p "$ROOT/native_launcher/build"
+    (cd "$ROOT/native_launcher/build" && cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . -j"$(nproc)" --target CubeUI)
+fi
+
 echo ""
 echo "[+] Build complete!"
 echo "    Module: install/GarrysMod/garrysmod/lua/bin/gmcl_vrmod_xr_linux64.dll"
 echo "    (OpenXR name — OpenVR keeps gmcl_vrmod_linux64.dll; both may coexist)"
+if [[ -x "$CUBE_BIN" ]]; then
+    echo "    CubeUI:  $CUBE_BIN"
+else
+    echo "    WARNING: CubeUI still missing at $CUBE_BIN — run: cmake --build native_launcher/build --target CubeUI"
+fi
 echo ""
 
 # ── Build and run tests ──
