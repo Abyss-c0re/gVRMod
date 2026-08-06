@@ -449,6 +449,12 @@ std::string CategoryForMap(const std::string& mapName) {
   if (is("d2_lostcoast") || starts("d2_lostcoast")) return "HL2 Lost Coast";
   if (starts("d1_") || starts("d2_") || starts("d3_")) return "HL2";
 
+  // gVRMod XR home / InfMap-derived hubs (xr_infmap_*, *_infmap_*) — not gm_ prefix
+  if (is("xr_infmap_passthrough") || starts("xr_infmap_") || starts("gm_infmap"))
+    return "Sandbox";
+  if (m.find("_infmap_") != std::string::npos || m.find("_infmap") == m.size() - 7)
+    return "Sandbox";
+
   if (starts("gm_") || starts("gmod_") || starts("phys_")) return "Sandbox";
   if (starts("ttt_") || starts("gm_ttt")) return "TTT";
   if (starts("rp_")) return "Roleplay";
@@ -485,6 +491,9 @@ static int OrderForCategory(const std::string& c) {
     if (c == order[i]) return i;
   return 50;
 }
+
+// Forward decl — defined below; used to inject product home map into scan.
+static bool LooseMapExists(const std::string& gmodRoot, const std::string& mapBare);
 
 std::vector<MapCategory> ScanGModMaps(const std::string& gmodRoot) {
   std::unordered_set<std::string> bare;
@@ -565,6 +574,13 @@ std::vector<MapCategory> ScanGModMaps(const std::string& gmodRoot) {
       CollectBspsInMapsDir(root + "/maps", bare);
   }
 
+  // Product home map: ensure it appears even if a scan path missed a symlink addon.
+  static const char* kHomeMap = "xr_infmap_passthrough";
+  if (!bare.count(kHomeMap) && LooseMapExists(gmodRoot, kHomeMap)) {
+    bare.insert(kHomeMap);
+    fprintf(stderr, "[CubeUI] injected home map %s (loose BSP present)\n", kHomeMap);
+  }
+
   // Classify
   std::map<std::string, MapCategory> cats;
   for (const auto& name : bare) {
@@ -577,15 +593,27 @@ std::vector<MapCategory> ScanGModMaps(const std::string& gmodRoot) {
   for (auto& kv : cats)
     std::sort(kv.second.maps.begin(), kv.second.maps.end());
 
-  // Pin gVRMod home hub to front of Sandbox (product default map).
-  static const char* kHomeMap = "xr_infmap_passthrough";
-  if (cats.count("Sandbox")) {
-    auto& maps = cats["Sandbox"].maps;
-    auto it = std::find(maps.begin(), maps.end(), kHomeMap);
-    if (it != maps.end() && it != maps.begin()) {
-      maps.erase(it);
-      maps.insert(maps.begin(), kHomeMap);
+  // Pin XR Home Passthrough to front of Sandbox (product default).
+  // Also pull it out of Other if an older binary left it mis-classified.
+  {
+    for (auto& kv : cats) {
+      if (kv.first == "Sandbox") continue;
+      auto& maps = kv.second.maps;
+      auto it = std::find(maps.begin(), maps.end(), kHomeMap);
+      if (it != maps.end()) {
+        maps.erase(it);
+        fprintf(stderr, "[CubeUI] moved %s from category %s → Sandbox\n", kHomeMap,
+                kv.first.c_str());
+      }
     }
+    auto& sandbox = cats["Sandbox"];
+    sandbox.name = "Sandbox";
+    sandbox.order = OrderForCategory("Sandbox");
+    auto it = std::find(sandbox.maps.begin(), sandbox.maps.end(), kHomeMap);
+    if (it != sandbox.maps.end())
+      sandbox.maps.erase(it);
+    if (bare.count(kHomeMap) || LooseMapExists(gmodRoot, kHomeMap))
+      sandbox.maps.insert(sandbox.maps.begin(), kHomeMap);
   }
 
   std::vector<MapCategory> out;

@@ -592,6 +592,14 @@ echo
 echo "=== Installing home map addon (addon/cube_home) ==="
 if [[ -f "$HOME_ADDON_SRC/maps/xr_infmap_passthrough.bsp" ]] || [[ -d "$HOME_ADDON_SRC/lua" ]]; then
     link_addon "$HOME_ADDON_SRC" "$HOME_ADDON_INSTALL_NAME" || true
+    # Also land BSP under garrysmod/maps so CubeUI scan + cold +map always see it
+    # (category was Sandbox-only for gm_*; xr_* lived in Other before the scan fix).
+    if [[ -f "$HOME_ADDON_SRC/maps/xr_infmap_passthrough.bsp" ]]; then
+        mkdir -p "$GMOD_DIR/garrysmod/maps"
+        cp -f "$HOME_ADDON_SRC/maps/xr_infmap_passthrough.bsp" \
+            "$GMOD_DIR/garrysmod/maps/xr_infmap_passthrough.bsp"
+        echo "  maps/xr_infmap_passthrough.bsp installed for launcher scan"
+    fi
     echo "  Home map: xr_infmap_passthrough (XR Home Passthrough; needs InfMap WS 2905327911)"
 else
     echo "  WARNING: cube_home missing maps/xr_infmap_passthrough.bsp — home map unavailable"
