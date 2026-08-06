@@ -172,7 +172,45 @@ EOF
         gtk-update-icon-cache -f -t "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor" 2>/dev/null || true
     fi
 
+    # KDE Menu Editor can pin apps into .hidden or Exclude them from Games.
+    # Unhide gvrmod and pin it next to Garry's Mod when that custom menu exists.
+    local kmenu="${XDG_CONFIG_HOME:-$HOME/.config}/menus/applications-kmenuedit.menu"
+    if [[ -f "$kmenu" ]]; then
+        python3 - "$kmenu" <<'PY' 2>/dev/null || true
+import re, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text(encoding="utf-8", errors="replace")
+orig = t
+# drop from .hidden / Exclude blocks
+t = re.sub(r"\s*<Filename>gvrmod\.desktop</Filename>\s*", "\n", t)
+t = re.sub(r"\s*<Filename>CubeUI\.desktop</Filename>\s*", "\n", t)
+# ensure Games layout lists gvrmod after Garry's Mod (or at end of Games Layout)
+g = t.find("<Name>Games</Name>")
+if g >= 0:
+    g_end = t.find("</Menu>", g)
+    chunk = t[g:g_end]
+    if "gvrmod.desktop" not in chunk:
+        needle = "<Filename>Garry's Mod.desktop</Filename>"
+        line = "   <Filename>gvrmod.desktop</Filename>"
+        if needle in chunk:
+            chunk = chunk.replace(needle, needle + "\n" + line, 1)
+        else:
+            chunk = chunk.replace("</Layout>", line + "\n  </Layout>", 1)
+        t = t[:g] + chunk + t[g_end:]
+if t != orig:
+    p.write_text(t, encoding="utf-8")
+    print("  kmenuedit: unhid gvrmod.desktop → Games")
+PY
+    fi
+    if command -v kbuildsycoca6 >/dev/null 2>&1; then
+        kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+    elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+        kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+    fi
+
     echo "  desktop: $desktop_dst"
+    echo "  name:    gVRMod Cube  (Application Launcher → Games)"
     echo "  launch:  $launcher  (Cube UI — not GMod-first)"
 }
 
