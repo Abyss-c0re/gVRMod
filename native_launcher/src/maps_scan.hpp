@@ -9,8 +9,9 @@ struct MapCategory {
   int order = 100;
 };
 
-// Scan garrysmod/maps/*.bsp and classify like lua/menu/getmaps.lua (subset).
+// Scan maps GMod can load: base + download + enabled addons (local/workshop GMA)
+// + mounted Source games from mountdepots.txt / mount.cfg. Classify like getmaps.lua.
 std::vector<MapCategory> ScanGModMaps(const std::string& gmodRoot);
 
-// Prefix → category (WebUI reverse of getmaps.lua Sandbox defaults).
+// Prefix / known campaign → category.
 std::string CategoryForMap(const std::string& mapName);
