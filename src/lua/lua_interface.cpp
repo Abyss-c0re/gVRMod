@@ -103,8 +103,46 @@ static void PushMatrixAsTable(GarrysMod::Lua::ILuaBase* LUA, float* mtx, unsigne
 // All function signatures and return values are preserved for Lua API compatibility.
 
 LUA_FUNCTION(GetVersion) {
-    // v46: VR Keyboard driver (layout + buffer + hit-test) shared launcher/in-game.
-    LUA->PushNumber(46);
+    // v47: OpenXR environment blend + passthrough chroma (AR home map).
+    LUA->PushNumber(47);
+    return 1;
+}
+
+// 0=OPAQUE 1=ALPHA_BLEND 2=ADDITIVE 3=AUTO — for WiVRn/Quest room-scale AR.
+LUA_FUNCTION(SetEnvironmentBlendMode) {
+    int mode = 0;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER))
+        mode = (int)LUA->GetNumber(1);
+    LUA->PushNumber((double)XR_SetEnvironmentBlendMode(mode));
+    return 1;
+}
+
+LUA_FUNCTION(GetEnvironmentBlendMode) {
+    LUA->PushNumber((double)XR_GetEnvironmentBlendMode());
+    return 1;
+}
+
+LUA_FUNCTION(SupportsAlphaBlend) {
+    LUA->PushBool(XR_SupportsAlphaBlend());
+    return 1;
+}
+
+// enable[, threshold 0..1] — near-black Source pixels become transparent in HMD.
+LUA_FUNCTION(SetPassthroughChroma) {
+    bool en = false;
+    float thr = 0.10f;
+    if (LUA->IsType(1, GarrysMod::Lua::Type::BOOL))
+        en = LUA->GetBool(1);
+    else if (LUA->IsType(1, GarrysMod::Lua::Type::NUMBER))
+        en = LUA->GetNumber(1) != 0.0;
+    if (LUA->IsType(2, GarrysMod::Lua::Type::NUMBER))
+        thr = (float)LUA->GetNumber(2);
+    XR_SetPassthroughChroma(en, thr);
+    return 0;
+}
+
+LUA_FUNCTION(GetPassthroughChroma) {
+    LUA->PushBool(XR_GetPassthroughChroma());
     return 1;
 }
 
@@ -1370,6 +1408,16 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "SetSubmitCropMode");
     LUA->PushCFunction(GetSubmitCropMode);
     LUA->SetField(-2, "GetSubmitCropMode");
+    LUA->PushCFunction(SetEnvironmentBlendMode);
+    LUA->SetField(-2, "SetEnvironmentBlendMode");
+    LUA->PushCFunction(GetEnvironmentBlendMode);
+    LUA->SetField(-2, "GetEnvironmentBlendMode");
+    LUA->PushCFunction(SupportsAlphaBlend);
+    LUA->SetField(-2, "SupportsAlphaBlend");
+    LUA->PushCFunction(SetPassthroughChroma);
+    LUA->SetField(-2, "SetPassthroughChroma");
+    LUA->PushCFunction(GetPassthroughChroma);
+    LUA->SetField(-2, "GetPassthroughChroma");
     LUA->PushCFunction(ShouldRender);
     LUA->SetField(-2, "ShouldRender");
     LUA->PushCFunction(CollectEyes);

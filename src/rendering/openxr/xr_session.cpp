@@ -96,6 +96,77 @@ static bool      g_xrSubmitEnabled = true;
 // True after successful xrBeginFrame until xrEndFrame (orphan-begin safety).
 static bool      g_xrFrameBegun = false;
 
+// Environment blend (passthrough / AR home map). Enumerated after GetSystem.
+static bool g_hasAlphaBlend = false;
+static bool g_hasAdditive = false;
+static XrEnvironmentBlendMode g_envBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+static bool g_passthroughChroma = false;
+static float g_passthroughChromaKey = 0.10f;
+
+static void XR_EnumerateBlendModes() {
+    g_hasAlphaBlend = false;
+    g_hasAdditive = false;
+    if (!g_xrInstance || g_xrSystemId == XR_NULL_SYSTEM_ID) return;
+    PFN_xrEnumerateEnvironmentBlendModes pfn = nullptr;
+    if (g_xrGetInstanceProcAddr)
+        g_xrGetInstanceProcAddr(g_xrInstance, "xrEnumerateEnvironmentBlendModes",
+                                (PFN_xrVoidFunction*)&pfn);
+    if (!pfn) return;
+    uint32_t n = 0;
+    pfn(g_xrInstance, g_xrSystemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &n, nullptr);
+    if (n == 0 || n > 16) return;
+    XrEnvironmentBlendMode modes[16] = {};
+    pfn(g_xrInstance, g_xrSystemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, n, &n, modes);
+    for (uint32_t i = 0; i < n; ++i) {
+        if (modes[i] == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) g_hasAlphaBlend = true;
+        if (modes[i] == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE) g_hasAdditive = true;
+    }
+    VRMOD_LOG_INFO("OpenXR blend modes: opaque=1 alpha=%d additive=%d",
+                   (int)g_hasAlphaBlend, (int)g_hasAdditive);
+}
+
+int XR_SetEnvironmentBlendMode(int mode) {
+    // 0 opaque, 1 alpha, 2 additive, 3 auto
+    XrEnvironmentBlendMode want = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    if (mode == 1) want = XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND;
+    else if (mode == 2) want = XR_ENVIRONMENT_BLEND_MODE_ADDITIVE;
+    else if (mode == 3) {
+        if (g_hasAlphaBlend) want = XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND;
+        else if (g_hasAdditive) want = XR_ENVIRONMENT_BLEND_MODE_ADDITIVE;
+        else want = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    }
+    // Request ALPHA even if not in the enumerated list — WiVRn/Quest often still
+    // composites; if EndFrame fails, caller can fall back via SetEnvironmentBlendMode(0).
+    if (want == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE && !g_hasAdditive && g_hasAlphaBlend)
+        want = XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND;
+    g_envBlendMode = want;
+    if (want == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND && !g_hasAlphaBlend)
+        VRMOD_LOG_WARN("ALPHA_BLEND not in runtime list — requesting anyway (WiVRn may accept)");
+    VRMOD_LOG_INFO("Environment blend mode set to %d (req %d)", (int)g_envBlendMode, mode);
+    return XR_GetEnvironmentBlendMode();
+}
+
+int XR_GetEnvironmentBlendMode() {
+    if (g_envBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) return 1;
+    if (g_envBlendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE) return 2;
+    return 0;
+}
+
+bool XR_SupportsAlphaBlend() { return g_hasAlphaBlend; }
+
+void XR_SetPassthroughChroma(bool enable, float threshold) {
+    g_passthroughChroma = enable;
+    if (threshold < 0.01f) threshold = 0.01f;
+    if (threshold > 0.95f) threshold = 0.95f;
+    g_passthroughChromaKey = threshold;
+    VRMOD_LOG_INFO("Passthrough chroma %s threshold=%.3f", enable ? "ON" : "OFF", g_passthroughChromaKey);
+}
+
+bool XR_GetPassthroughChroma() { return g_passthroughChroma; }
+float XR_GetPassthroughChromaThreshold() { return g_passthroughChromaKey; }
+
+XrEnvironmentBlendMode XR_ActiveEnvironmentBlendMode() { return g_envBlendMode; }
+
 #ifdef _WIN32
 static HMODULE g_loaderLib = nullptr;
 #else
@@ -395,6 +466,8 @@ bool XR_Init(char* errMsg, int errMsgLen) {
         snprintf(errMsg, errMsgLen, "VRMOD OpenXR: No HMD found (%s)", XR_ResultToString(res));
         return false;
     }
+
+    XR_EnumerateBlendModes();
 
     XrSystemProperties sysProp = {XR_TYPE_SYSTEM_PROPERTIES};
     g_xrGetSystemProperties(g_xrInstance, g_xrSystemId, &sysProp);
@@ -727,7 +800,7 @@ void XR_EndFrame() {
     // This is a no-render EndFrame (actual submission goes through xr_render.cpp)
     XrFrameEndInfo fei = {XR_TYPE_FRAME_END_INFO};
     fei.displayTime = g_xrFrameState.predictedDisplayTime;
-    fei.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    fei.environmentBlendMode = XR_ActiveEnvironmentBlendMode();
     fei.layerCount = 0;
     fei.layers = nullptr;
     g_xrEndFrame(g_xrSession, &fei);

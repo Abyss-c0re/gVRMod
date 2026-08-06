@@ -39,31 +39,26 @@ local function hillScale()
 	return math.max(0, s)
 end
 
--- Height-function units match InfMap mesh sampling (see base gm_infmap).
+-- Height-function: infinite flat void floor (collision only — visuals off by default).
+-- Product look is AR passthrough; hills optional if cube_home_draw_terrain 1.
 function InfMap.height_function(x, y)
 	local r = math.sqrt(x * x + y * y)
 	local pad = plazaRadius()
 
-	-- Flat home plaza (VR-safe, level floor).
-	if r < pad then
+	-- Level plaza under the hub platforms.
+	if r < pad + 2 then
 		return 0
 	end
 
-	-- Soft ramp out of plaza so you don't fall off a cliff.
-	if r < pad + 1.2 then
-		local t = (r - pad) / 1.2
-		return t * t * 80 * hillScale()
-	end
-
-	if not noise2d then
+	-- Beyond plaza: still flat void (no mountains — not flatgrass cosplay).
+	if hillScale() <= 0.01 or not noise2d then
 		return 0
 	end
 
-	-- Calmer hills than stock InfMap (home hub, not mountaineering).
+	-- Subtle undulation only when hill_scale > 0 in layout (still muted).
 	x = x - 1.5
-	local final = (noise2d(x / 30, y / 30 + 100000)) * 12000 * hillScale()
-	final = final / math.max((noise2d(x / 120, y / 120) * 12) ^ 2, 1)
-	return math.min(final, max * 0.01)
+	local final = (noise2d(x / 40, y / 40 + 100000)) * 800 * hillScale()
+	return math.min(final, 2000)
 end
 
 function InfMap.planet_height_function(x, y)

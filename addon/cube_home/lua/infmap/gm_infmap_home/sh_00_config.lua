@@ -23,7 +23,7 @@ function CubeHome.DefaultLayout()
 		name = "gVRMod Home",
 		seed = 1,
 		plaza_radius = 2.5,
-		hill_scale = 1.0,
+		hill_scale = 0.0,
 		spawn = { pos = { 0, 0, 48 }, ang = { 0, 90, 0 } },
 		zones = {
 			{ id = "plaza", label = "Home Plaza", kind = "spawn", pos = { 0, 0, 8 }, size = 512 },

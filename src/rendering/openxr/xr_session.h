@@ -122,6 +122,20 @@ void XR_EndFrame();
 // Clear frame-begun flag after xr_render's layered xrEndFrame (or failed end).
 void XR_MarkFrameEnded();
 
+// ── Environment blend / passthrough (home map AR) ──
+// mode: 0=OPAQUE 1=ALPHA_BLEND 2=ADDITIVE 3=AUTO (prefer alpha if runtime supports)
+// Returns the mode actually selected (may fall back to OPAQUE).
+int XR_SetEnvironmentBlendMode(int mode);
+int XR_GetEnvironmentBlendMode(); // 0/1/2
+bool XR_SupportsAlphaBlend();
+// When alpha blend is active, near-black Source pixels become transparent so
+// real-world / runtime passthrough shows through (chroma threshold 0..1).
+void XR_SetPassthroughChroma(bool enable, float threshold);
+bool XR_GetPassthroughChroma();
+float XR_GetPassthroughChromaThreshold();
+// Active XrEnvironmentBlendMode for xrEndFrame (defaults OPAQUE).
+XrEnvironmentBlendMode XR_ActiveEnvironmentBlendMode();
+
 // ── View/display info ──
 struct XrDisplayInfo {
     float projLeft[16];   // 4x4 column-major

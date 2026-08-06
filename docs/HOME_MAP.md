@@ -19,6 +19,29 @@ Home runs on **InfMap** by **Meetric** (GPL-3.0). We ship a map-local hub layout
 
 A **home hub** for Cube/VR that can be **improved live** (JSON layout + console) without remapping or forking InfMap.
 
+## Passthrough / AR void (default)
+
+The home map is **not** meant to look like flatgrass. Default product look:
+
+| Layer | Behavior |
+|-------|----------|
+| World | `r_drawworld 0` — no brush geometry |
+| Terrain mesh | Off (`cube_home_draw_terrain 0`) |
+| Sky / clear | Pure black |
+| Platforms | Layout props only (opaque) |
+| OpenXR | `ALPHA_BLEND` + **dark chroma** → black pixels transparent so the real room shows through (WiVRn/Quest when supported) |
+
+| Convar / command | Effect |
+|------------------|--------|
+| `cube_home_passthrough 1` | AR void on (default) |
+| `cube_home_passthrough_key 0.12` | Chroma threshold (higher = more transparent) |
+| `cube_home_draw_terrain 1` | Optional InfMap ground mesh (flatgrass-like) |
+| `cube_home_passthrough_toggle` | Flip AR mode |
+
+Module API (v47+): `VRMOD_SetEnvironmentBlendMode(3)`, `VRMOD_SetPassthroughChroma(true, 0.12)`.
+
+If the runtime has no alpha blend, you still get a black void with floating platforms (better than flatgrass); rebuild/install `gmcl_vrmod_xr` for full room passthrough.
+
 | Layer | Source |
 |-------|--------|
 | Infinite BSP + chunk API | InfMap base (required) |

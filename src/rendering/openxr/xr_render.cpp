@@ -155,6 +155,180 @@ static PFNGLCOPYIMAGESUBDATAPROC   glCopyImageSubDataPtr = nullptr;
 static PFNGLACTIVETEXTUREPROC      glActiveTexturePtr = nullptr;
 static PFNGLUSEPROGRAMPROC         glUseProgramPtr = nullptr;
 static PFNGLGETFRAMEBUFFERATTACHMENTPARAMETERIVPROC glGetFramebufferAttachmentParameterivPtr = nullptr;
+static PFNGLCREATESHADERPROC       glCreateShaderPtr = nullptr;
+static PFNGLSHADERSOURCEPROC       glShaderSourcePtr = nullptr;
+static PFNGLCOMPILESHADERPROC      glCompileShaderPtr = nullptr;
+static PFNGLCREATEPROGRAMPROC      glCreateProgramPtr = nullptr;
+static PFNGLATTACHSHADERPROC       glAttachShaderPtr = nullptr;
+static PFNGLLINKPROGRAMPROC        glLinkProgramPtr = nullptr;
+static PFNGLGETSHADERIVPROC        glGetShaderivPtr = nullptr;
+static PFNGLGETPROGRAMIVPROC       glGetProgramivPtr = nullptr;
+static PFNGLDELETESHADERPROC       glDeleteShaderPtr = nullptr;
+static PFNGLDELETEPROGRAMPROC      glDeleteProgramPtr = nullptr;
+static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocationPtr = nullptr;
+static PFNGLUNIFORM1IPROC          glUniform1iPtr = nullptr;
+static PFNGLUNIFORM1FPROC          glUniform1fPtr = nullptr;
+static PFNGLGENVERTEXARRAYSPROC    glGenVertexArraysPtr = nullptr;
+static PFNGLBINDVERTEXARRAYPROC    glBindVertexArrayPtr = nullptr;
+static PFNGLDELETEVERTEXARRAYSPROC glDeleteVertexArraysPtr = nullptr;
+
+// Passthrough chroma: near-black → alpha 0 so OpenXR ALPHA_BLEND shows the room.
+static GLuint g_chromaProg = 0;
+static GLuint g_chromaTempTex = 0;
+static GLuint g_chromaVao = 0;
+static uint32_t g_chromaTempW = 0;
+static uint32_t g_chromaTempH = 0;
+static bool g_chromaReady = false;
+static bool g_chromaFailed = false;
+
+static const char* kChromaVS =
+    "#version 130\n"
+    "out vec2 vUV;\n"
+    "void main(){\n"
+    "  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);\n"
+    "  vUV = p;\n"
+    "  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
+    "}\n";
+static const char* kChromaFS =
+    "#version 130\n"
+    "in vec2 vUV;\n"
+    "uniform sampler2D uTex;\n"
+    "uniform float uKey;\n"
+    "void main(){\n"
+    "  vec4 c = texture(uTex, vUV);\n"
+    "  float l = max(c.r, max(c.g, c.b));\n"
+    "  float a = smoothstep(uKey * 0.55, uKey, l);\n"
+    "  gl_FragColor = vec4(c.rgb, a);\n"
+    "}\n";
+
+static bool EnsureChromaProgram() {
+    if (g_chromaReady) return true;
+    if (g_chromaFailed) return false;
+    if (!glCreateShaderPtr || !glCreateProgramPtr || !glUseProgramPtr) {
+        g_chromaFailed = true;
+        return false;
+    }
+    auto compile = [](GLenum type, const char* src) -> GLuint {
+        GLuint s = glCreateShaderPtr(type);
+        glShaderSourcePtr(s, 1, &src, nullptr);
+        glCompileShaderPtr(s);
+        GLint ok = 0;
+        glGetShaderivPtr(s, GL_COMPILE_STATUS, &ok);
+        if (!ok) {
+            glDeleteShaderPtr(s);
+            return 0;
+        }
+        return s;
+    };
+    GLuint vs = compile(GL_VERTEX_SHADER, kChromaVS);
+    GLuint fs = compile(GL_FRAGMENT_SHADER, kChromaFS);
+    if (!vs || !fs) {
+        if (vs) glDeleteShaderPtr(vs);
+        if (fs) glDeleteShaderPtr(fs);
+        g_chromaFailed = true;
+        VRMOD_LOG_WARN("Passthrough chroma shader compile failed");
+        return false;
+    }
+    g_chromaProg = glCreateProgramPtr();
+    glAttachShaderPtr(g_chromaProg, vs);
+    glAttachShaderPtr(g_chromaProg, fs);
+    glLinkProgramPtr(g_chromaProg);
+    glDeleteShaderPtr(vs);
+    glDeleteShaderPtr(fs);
+    GLint linked = 0;
+    glGetProgramivPtr(g_chromaProg, GL_LINK_STATUS, &linked);
+    if (!linked) {
+        glDeleteProgramPtr(g_chromaProg);
+        g_chromaProg = 0;
+        g_chromaFailed = true;
+        VRMOD_LOG_WARN("Passthrough chroma shader link failed");
+        return false;
+    }
+    if (glGenVertexArraysPtr) {
+        glGenVertexArraysPtr(1, &g_chromaVao);
+    }
+    g_chromaReady = true;
+    VRMOD_LOG_INFO("Passthrough chroma shader ready");
+    return true;
+}
+
+// Rewrite near-black pixels in swapchain image to transparent (alpha=0).
+static void ApplyPassthroughChroma(GLuint dstTexture, uint32_t w, uint32_t h) {
+    // Active when Lua enabled chroma OR any non-opaque blend mode (AR home map).
+    if (!XR_GetPassthroughChroma() &&
+        XR_ActiveEnvironmentBlendMode() == XR_ENVIRONMENT_BLEND_MODE_OPAQUE)
+        return;
+    if (!EnsureChromaProgram()) return;
+    if (!glBindFramebufferPtr || !glFramebufferTexture2DPtr || !glUseProgramPtr) return;
+    if (w == 0 || h == 0) return;
+
+    if (!g_chromaTempTex || g_chromaTempW != w || g_chromaTempH != h) {
+        if (g_chromaTempTex) glDeleteTextures(1, &g_chromaTempTex);
+        glGenTextures(1, &g_chromaTempTex);
+        glBindTexture(GL_TEXTURE_2D, g_chromaTempTex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)w, (GLsizei)h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        g_chromaTempW = w;
+        g_chromaTempH = h;
+    }
+
+    // Copy swapchain color → temp
+    if (glCopyImageSubDataPtr) {
+        glCopyImageSubDataPtr(dstTexture, GL_TEXTURE_2D, 0, 0, 0, 0,
+                              g_chromaTempTex, GL_TEXTURE_2D, 0, 0, 0, 0,
+                              (GLsizei)w, (GLsizei)h, 1);
+    } else if (glBlitFramebufferPtr) {
+        glBindFramebufferPtr(GL_READ_FRAMEBUFFER, g_blitFBO);
+        glFramebufferTexture2DPtr(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dstTexture, 0);
+        glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_blitSrcFBO);
+        glFramebufferTexture2DPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_chromaTempTex, 0);
+        glBlitFramebufferPtr(0, 0, (GLint)w, (GLint)h, 0, 0, (GLint)w, (GLint)h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    } else {
+        return;
+    }
+
+    // Draw chroma pass: temp → dst
+    GLint prevProg = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prevProg);
+    GLint prevVao = 0;
+    if (glBindVertexArrayPtr) glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
+    GLint prevTex = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex);
+    GLboolean depthWas = glIsEnabled(GL_DEPTH_TEST);
+    GLboolean blendWas = glIsEnabled(GL_BLEND);
+    GLboolean cullWas = glIsEnabled(GL_CULL_FACE);
+
+    glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, g_blitFBO);
+    glFramebufferTexture2DPtr(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dstTexture, 0);
+    glViewport(0, 0, (GLsizei)w, (GLsizei)h);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+
+    glUseProgramPtr(g_chromaProg);
+    if (glActiveTexturePtr) glActiveTexturePtr(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_chromaTempTex);
+    if (glUniform1iPtr) {
+        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uTex");
+        if (loc >= 0) glUniform1iPtr(loc, 0);
+    }
+    if (glUniform1fPtr) {
+        GLint loc = glGetUniformLocationPtr(g_chromaProg, "uKey");
+        if (loc >= 0) glUniform1fPtr(loc, XR_GetPassthroughChromaThreshold());
+    }
+    if (glBindVertexArrayPtr && g_chromaVao) glBindVertexArrayPtr(g_chromaVao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    glUseProgramPtr((GLuint)prevProg);
+    if (glBindVertexArrayPtr) glBindVertexArrayPtr((GLuint)prevVao);
+    glBindTexture(GL_TEXTURE_2D, (GLuint)prevTex);
+    if (depthWas) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+    if (blendWas) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+    if (cullWas) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+}
 
 static bool LoadGLExtensions() {
     if (glGenFramebuffersPtr) return true;  // Already loaded
@@ -170,6 +344,22 @@ static bool LoadGLExtensions() {
     glUseProgramPtr = (PFNGLUSEPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glUseProgram");
     glGetFramebufferAttachmentParameterivPtr = (PFNGLGETFRAMEBUFFERATTACHMENTPARAMETERIVPROC)
         glXGetProcAddress((const GLubyte*)"glGetFramebufferAttachmentParameteriv");
+    glCreateShaderPtr = (PFNGLCREATESHADERPROC)glXGetProcAddress((const GLubyte*)"glCreateShader");
+    glShaderSourcePtr = (PFNGLSHADERSOURCEPROC)glXGetProcAddress((const GLubyte*)"glShaderSource");
+    glCompileShaderPtr = (PFNGLCOMPILESHADERPROC)glXGetProcAddress((const GLubyte*)"glCompileShader");
+    glCreateProgramPtr = (PFNGLCREATEPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glCreateProgram");
+    glAttachShaderPtr = (PFNGLATTACHSHADERPROC)glXGetProcAddress((const GLubyte*)"glAttachShader");
+    glLinkProgramPtr = (PFNGLLINKPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glLinkProgram");
+    glGetShaderivPtr = (PFNGLGETSHADERIVPROC)glXGetProcAddress((const GLubyte*)"glGetShaderiv");
+    glGetProgramivPtr = (PFNGLGETPROGRAMIVPROC)glXGetProcAddress((const GLubyte*)"glGetProgramiv");
+    glDeleteShaderPtr = (PFNGLDELETESHADERPROC)glXGetProcAddress((const GLubyte*)"glDeleteShader");
+    glDeleteProgramPtr = (PFNGLDELETEPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glDeleteProgram");
+    glGetUniformLocationPtr = (PFNGLGETUNIFORMLOCATIONPROC)glXGetProcAddress((const GLubyte*)"glGetUniformLocation");
+    glUniform1iPtr = (PFNGLUNIFORM1IPROC)glXGetProcAddress((const GLubyte*)"glUniform1i");
+    glUniform1fPtr = (PFNGLUNIFORM1FPROC)glXGetProcAddress((const GLubyte*)"glUniform1f");
+    glGenVertexArraysPtr = (PFNGLGENVERTEXARRAYSPROC)glXGetProcAddress((const GLubyte*)"glGenVertexArrays");
+    glBindVertexArrayPtr = (PFNGLBINDVERTEXARRAYPROC)glXGetProcAddress((const GLubyte*)"glBindVertexArray");
+    glDeleteVertexArraysPtr = (PFNGLDELETEVERTEXARRAYSPROC)glXGetProcAddress((const GLubyte*)"glDeleteVertexArrays");
 
     if (!glGenFramebuffersPtr || !glBindFramebufferPtr || !glFramebufferTexture2DPtr ||
         !glBlitFramebufferPtr || !glCheckFramebufferStatusPtr) {
@@ -939,10 +1129,17 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
                     0, dstY0, (GLint)g_xrSwapchainWidth, dstY1,
                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
+                // AR home map: punch alpha holes in near-black (void sky / r_drawworld 0).
+                if (XR_GetPassthroughChroma() ||
+                    XR_ActiveEnvironmentBlendMode() != XR_ENVIRONMENT_BLEND_MODE_OPAQUE) {
+                    ApplyPassthroughChroma(dstTexture, g_xrSwapchainWidth, g_xrSwapchainHeight);
+                }
+
                 if ((s_submitCallCount % 90) == 0 && eye == 0) {
-                    VRMOD_LOG_INFO("BLIT eye%d u[%.3f-%.3f] v[%.3f-%.3f] srcRect(%d,%d)-(%d,%d) -> dst %ux%u perEye=%d",
+                    VRMOD_LOG_INFO("BLIT eye%d u[%.3f-%.3f] v[%.3f-%.3f] srcRect(%d,%d)-(%d,%d) -> dst %ux%u perEye=%d chroma=%d blend=%d",
                         eye, u0, u1, v0, v1, srcX0, srcY0, srcX1, srcY1,
-                        g_xrSwapchainWidth, g_xrSwapchainHeight, (int)havePerEye);
+                        g_xrSwapchainWidth, g_xrSwapchainHeight, (int)havePerEye,
+                        (int)XR_GetPassthroughChroma(), (int)XR_ActiveEnvironmentBlendMode());
                 }
             }
 
@@ -977,6 +1174,13 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
     projLayer.space = g_xrStageSpace;
     projLayer.viewCount = 2;
     projLayer.views = projViews;
+    // Source alpha from chroma pass drives room visibility under ALPHA_BLEND.
+    if (XR_ActiveEnvironmentBlendMode() != XR_ENVIRONMENT_BLEND_MODE_OPAQUE ||
+        XR_GetPassthroughChroma()) {
+        projLayer.layerFlags =
+            XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
+            XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+    }
 
     const XrCompositionLayerBaseHeader* layers[] = {
         (XrCompositionLayerBaseHeader*)&projLayer
@@ -984,7 +1188,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
 
     XrFrameEndInfo fei = {XR_TYPE_FRAME_END_INFO};
     fei.displayTime = g_xrFrameState.predictedDisplayTime;
-    fei.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    fei.environmentBlendMode = XR_ActiveEnvironmentBlendMode();
     fei.layerCount = 1;
     fei.layers = layers;
 

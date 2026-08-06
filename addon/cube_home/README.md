@@ -21,6 +21,16 @@ This product layer sits on Meetric’s infinite-map engine. Full attribution:
 - Map name contract: second token must be `infmap` → InfMap API initializes
 - Per-map scripts live under `lua/infmap/<mapname>/` and can grow without forking the base
 
+## Passthrough (default look)
+
+Not flatgrass — **AR void**: black sky, no world mesh, neon platforms; OpenXR punches black to transparent so your room shows through (module v47+, WiVRn/Quest).
+
+```
+cube_home_passthrough 1          # default ON
+cube_home_passthrough_key 0.12   # chroma threshold
+cube_home_draw_terrain 0         # keep void (1 = optional ground mesh)
+```
+
 ## Install
 
 1. Subscribe to InfMap base (or let CubeUI extract Workshop GMA on Start).
