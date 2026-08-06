@@ -85,22 +85,30 @@ hook.Add("Think", "cube_home_magenta_force", function()
 	end
 end)
 
--- Huge magenta sky plane so empty view is never black.
-local size = 1e9
-local uvsize = 1
-local minZ = -1e5
-local big_plane = Mesh()
-big_plane:BuildFromTriangles({
-	{ pos = Vector(size, size, minZ), normal = Vector(0, 0, 1), u = uvsize, v = 0 },
-	{ pos = Vector(size, -size, minZ), normal = Vector(0, 0, 1), u = uvsize, v = uvsize },
-	{ pos = Vector(-size, -size, minZ), normal = Vector(0, 0, 1), u = 0, v = uvsize },
-	{ pos = Vector(size, size, minZ), normal = Vector(0, 0, 1), u = uvsize, v = 0 },
-	{ pos = Vector(-size, -size, minZ), normal = Vector(0, 0, 1), u = 0, v = uvsize },
-	{ pos = Vector(-size, size, minZ), normal = Vector(0, 0, 1), u = 0, v = 0 },
-})
+-- Full magenta enclosure: floor + ceiling + 4 walls (sky was black before).
+local S = 5e7
+local function addQuad(tris, a, b, c, d)
+	tris[#tris + 1] = { pos = a, normal = Vector(0, 0, 1), u = 0, v = 0 }
+	tris[#tris + 1] = { pos = b, normal = Vector(0, 0, 1), u = 1, v = 0 }
+	tris[#tris + 1] = { pos = c, normal = Vector(0, 0, 1), u = 1, v = 1 }
+	tris[#tris + 1] = { pos = a, normal = Vector(0, 0, 1), u = 0, v = 0 }
+	tris[#tris + 1] = { pos = c, normal = Vector(0, 0, 1), u = 1, v = 1 }
+	tris[#tris + 1] = { pos = d, normal = Vector(0, 0, 1), u = 0, v = 1 }
+end
+local boxTris = {}
+-- floor / ceiling
+addQuad(boxTris, Vector(-S, -S, -S), Vector(S, -S, -S), Vector(S, S, -S), Vector(-S, S, -S))
+addQuad(boxTris, Vector(-S, -S, S), Vector(-S, S, S), Vector(S, S, S), Vector(S, -S, S))
+-- walls
+addQuad(boxTris, Vector(-S, -S, -S), Vector(-S, -S, S), Vector(S, -S, S), Vector(S, -S, -S))
+addQuad(boxTris, Vector(S, S, -S), Vector(S, S, S), Vector(-S, S, S), Vector(-S, S, -S))
+addQuad(boxTris, Vector(-S, -S, -S), Vector(-S, S, -S), Vector(-S, S, S), Vector(-S, -S, S))
+addQuad(boxTris, Vector(S, -S, -S), Vector(S, -S, S), Vector(S, S, S), Vector(S, S, -S))
+local magentaBox = Mesh()
+magentaBox:BuildFromTriangles(boxTris)
 
 local plane_mat
-hook.Add("PostDraw2DSkyBox", "cube_home_magenta_skyplane", function()
+local function drawMagentaBox()
 	plane_mat = plane_mat or Material("cube_home/pt_void")
 	if plane_mat:IsError() then plane_mat = Material("vgui/white") end
 	render.OverrideDepthEnable(true, false)
@@ -108,14 +116,20 @@ hook.Add("PostDraw2DSkyBox", "cube_home_magenta_skyplane", function()
 	render.ResetModelLighting(2, 2, 2)
 	render.SetLocalModelLights()
 	render.SetColorModulation(1, 0, 1)
-	big_plane:Draw()
+	magentaBox:Draw()
 	render.SetColorModulation(1, 1, 1)
 	render.OverrideDepthEnable(false, false)
+end
+
+hook.Add("PostDraw2DSkyBox", "cube_home_magenta_skybox", drawMagentaBox)
+-- Also after world so upper FOV never stays black if skybox path skipped in VR
+hook.Add("PreDrawOpaqueRenderables", "cube_home_magenta_preopaque", function()
+	drawMagentaBox()
 end)
 
--- First paint: clear magenta (never black) on this map always.
 hook.Add("InitPostEntity", "cube_home_magenta_boot", function()
 	RunConsoleCommand("r_3dsky", "0")
+	RunConsoleCommand("r_drawskybox", "0")
 	RunConsoleCommand("fog_override", "1")
 	RunConsoleCommand("fog_color", "255", "0", "255")
 	RunConsoleCommand("fog_start", "99999")
