@@ -16,6 +16,14 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-CUBECHAIN-8B0000" alt="license" /></a>
 </p>
 
+<p align="center">
+  <a href="https://youtu.be/C5-YmWxvCPs">
+    <img src="https://img.youtube.com/vi/C5-YmWxvCPs/maxresdefault.jpg" alt="gVRMod (OpenXR) WiVRn Linux Test" width="640" />
+  </a>
+  <br/>
+  <a href="https://youtu.be/C5-YmWxvCPs"><strong>Watch: gVRMod (OpenXR) WiVRn Linux Test</strong></a>
+</p>
+
 ---
 
 ## What is this?
