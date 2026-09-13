@@ -705,6 +705,38 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua"
     ],
     [
+      "vrmod.utils.FrameBudget_AllowNestedMonitorsInFollowCam",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.FrameBudget_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.FrameBudget_DesktopSkipMs",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.FrameBudget_FollowCamAfterSubmit",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.FrameBudget_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.FrameBudget_InputAfterSubmit",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.FrameBudget_IsLateRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.FrameBudget_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua"
+    ],
+    [
       "vrmod.utils.FrameOrigin",
       "addon/vrmod-x64/lua/vrmod/utils/sh_frames.lua"
     ],

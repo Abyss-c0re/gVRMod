@@ -736,6 +736,38 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_fovz_law.lua
     tier: pure
     tests: [util.fovz_law.soft_refresh_g36]
+  - id: vrmod.utils.FrameBudget_AllowNestedMonitorsInFollowCam
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
+  - id: vrmod.utils.FrameBudget_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
+  - id: vrmod.utils.FrameBudget_DesktopSkipMs
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
+  - id: vrmod.utils.FrameBudget_FollowCamAfterSubmit
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
+  - id: vrmod.utils.FrameBudget_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
+  - id: vrmod.utils.FrameBudget_InputAfterSubmit
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
+  - id: vrmod.utils.FrameBudget_IsLateRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
+  - id: vrmod.utils.FrameBudget_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua
+    tier: pure
+    tests: [util.frame_budget_law.submit_first_g51]
   - id: vrmod.utils.FrameOrigin
     file: addon/vrmod-x64/lua/vrmod/utils/sh_frames.lua
     tier: seam

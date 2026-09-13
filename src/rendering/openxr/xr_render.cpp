@@ -929,7 +929,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
             }
         }
     }
-    if ((s_submitCallCount % 30) == 0) {
+    if ((s_submitCallCount % 300) == 0) {
         if (havePerEye) {
             VRMOD_LOG_INFO("Submit using PER-EYE textures L=%u R=%u (leftFBO=%u rightFBO=%u)", perEyeSrc[0], perEyeSrc[1], g_leftEyeFBO, g_rightEyeFBO);
         } else {

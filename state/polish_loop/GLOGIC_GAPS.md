@@ -8,6 +8,7 @@ Last updated: 2026-09-13 G50 ArcVR wrist + G48/G49
 
 | ID | Gap | Notes | Status |
 |----|-----|-------|--------|
+| G51 | Shutter / lag on WaitFrame→Submit | Follow-cam RenderView + input + collect on XR path | **partial** — submit-first budget; HMD walk open |
 | G50 | ArcVR grip twists ValveBiped wrist | AVR writes ForegripAngle onto lefthand.ang | **partial** — restore device ang; HMD walk open |
 | G48 | Avatar open freezes (sync PM validate) | List+Precache+ClientsideModel all PMs on open | **partial** — async open; HMD walk open |
 | G49 | Light sources only on right eye | PT/dlight last-view-wins under dual RenderView | **partial** — per-eye refresh; HMD walk open |

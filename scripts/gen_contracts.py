@@ -411,6 +411,15 @@ PURE_TESTED = {
     "vrmod.utils.ArcVrWristLaw_StatusLabel": "util.arcvr_wrist_law.device_g50",
     "vrmod.utils.ArcVrWristLaw_HmdExpect": "util.arcvr_wrist_law.device_g50",
     "vrmod.utils.ArcVrWristLaw_IsTwistRisk": "util.arcvr_wrist_law.device_g50",
+    # G51 Submit-first frame budget (no shutter from desktop/collect on the XR path)
+    "vrmod.utils.FrameBudget_DesktopSkipMs": "util.frame_budget_law.submit_first_g51",
+    "vrmod.utils.FrameBudget_InputAfterSubmit": "util.frame_budget_law.submit_first_g51",
+    "vrmod.utils.FrameBudget_FollowCamAfterSubmit": "util.frame_budget_law.submit_first_g51",
+    "vrmod.utils.FrameBudget_AllowNestedMonitorsInFollowCam": "util.frame_budget_law.submit_first_g51",
+    "vrmod.utils.FrameBudget_Decide": "util.frame_budget_law.submit_first_g51",
+    "vrmod.utils.FrameBudget_StatusLabel": "util.frame_budget_law.submit_first_g51",
+    "vrmod.utils.FrameBudget_HmdExpect": "util.frame_budget_law.submit_first_g51",
+    "vrmod.utils.FrameBudget_IsLateRisk": "util.frame_budget_law.submit_first_g51",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",
