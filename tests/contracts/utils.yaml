@@ -35,6 +35,50 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.calib.seated_offset]
+  - id: vrmod.utils.AvatarLoadLaw_AllowSyncListFilter
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_AllowSyncPrecacheOnOpen
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_AllowSyncValidateOnOpen
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_DeferIkOnOpen
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_DeferTwinSpawn
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_IsFreezeRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_MaxValidatePerTick
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_PlaceholderModel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
+  - id: vrmod.utils.AvatarLoadLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
+    tier: pure
+    tests: [util.avatar_load_law.async_g48]
   - id: vrmod.utils.BindingsLaw_AbortVrOnFail
     file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
     tier: pure
@@ -100,6 +144,11 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.BorderLaw_ClampLens
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.BorderLaw_ClampOffset
     file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
     tier: pure
@@ -136,6 +185,16 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
     tier: pure
     tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_EyeStep
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.BorderLaw_FovStep
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.BorderLaw_GuideBaseline
     file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
     tier: pure
@@ -156,6 +215,21 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
     tier: pure
     tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_LensMax
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.BorderLaw_LensMin
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.BorderLaw_LensStep
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.BorderLaw_OffsetMax
     file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
     tier: pure
@@ -180,6 +254,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
     tier: pure
     tests: [util.border_law.fill_g40]
+  - id: vrmod.utils.BorderLaw_ResetOnStart
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.BorderLaw_Sanitize
     file: addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua
     tier: pure
@@ -290,6 +369,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
     tier: pure
     tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.CubeReturn_NormalizeIntent
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.CubeReturn_NormalizePhase
     file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
     tier: pure
@@ -306,6 +390,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
     tier: pure
     tests: [util.cube_return.protocol_g13]
+  - id: vrmod.utils.CubeReturn_ShouldRelaunchCube
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.DesktopMirror_AllowEyeCropFromLiveRt
     file: addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua
     tier: pure
@@ -1361,6 +1450,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
     tier: pure
     tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.RefreshStereoLights
+    file: addon/vrmod-x64/lua/vrmod/utils/cl_stereo_lights.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine/model I/O — not offline-pure"
   - id: vrmod.utils.ReleasePickupEntry
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam
@@ -1477,6 +1571,38 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
     tier: pure
     tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StereoLightLaw_AllowSingleEyeUpdate
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_IsRightEyeOnlyRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_RefreshDynamicPerEye
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_SkipWhenNoStereoEye
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_UpdateProjectedPerEye
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
   - id: vrmod.utils.StereoLoadPolicy
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua
     tier: pure
@@ -1724,6 +1850,11 @@ symbols:
     tests: [pending]
     notes: "engine or state"
   - id: vrmod.utils.UpdateHandCollisions
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.UpdateHeadCollisions
     file: addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua
     tier: seam
     tests: [pending]

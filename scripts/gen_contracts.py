@@ -383,6 +383,27 @@ PURE_TESTED = {
     "vrmod.utils.FalsePerEyeLaw_StatusLabel": "util.false_per_eye_law.guard_g47",
     "vrmod.utils.FalsePerEyeLaw_HmdExpect": "util.false_per_eye_law.guard_g47",
     "vrmod.utils.FalsePerEyeLaw_IsBlackEyeRisk": "util.false_per_eye_law.guard_g47",
+    # G48 avatar open async load (no sync list-validate / precache freeze)
+    "vrmod.utils.AvatarLoadLaw_MaxValidatePerTick": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_AllowSyncListFilter": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_AllowSyncPrecacheOnOpen": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_AllowSyncValidateOnOpen": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_PlaceholderModel": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_DeferTwinSpawn": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_DeferIkOnOpen": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_Decide": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_StatusLabel": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_HmdExpect": "util.avatar_load_law.async_g48",
+    "vrmod.utils.AvatarLoadLaw_IsFreezeRisk": "util.avatar_load_law.async_g48",
+    # G49 stereo lights both eyes (ProjectedTexture / DynamicLight per eye)
+    "vrmod.utils.StereoLightLaw_UpdateProjectedPerEye": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_AllowSingleEyeUpdate": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_SkipWhenNoStereoEye": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_RefreshDynamicPerEye": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_Decide": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_StatusLabel": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_HmdExpect": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_IsRightEyeOnlyRisk": "util.stereo_light_law.per_eye_g49",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",
@@ -430,6 +451,7 @@ PURE_TESTED = {
 # Engine / model / filesystem heavy — never auto-promote to pure-pending.
 SEAM_FORCE = {
     "vrmod.utils.ComputePhysicsParams",
+    "vrmod.utils.RefreshStereoLights",
 }
 
 # Thin getters → smoke suite

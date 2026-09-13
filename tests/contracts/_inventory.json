@@ -33,6 +33,50 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.AvatarLoadLaw_AllowSyncListFilter",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_AllowSyncPrecacheOnOpen",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_AllowSyncValidateOnOpen",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_DeferIkOnOpen",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_DeferTwinSpawn",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_IsFreezeRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_MaxValidatePerTick",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_PlaceholderModel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarLoadLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
+    ],
+    [
       "vrmod.utils.BindingsLaw_AbortVrOnFail",
       "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
     ],
@@ -97,6 +141,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_system.lua"
     ],
     [
+      "vrmod.utils.BorderLaw_ClampLens",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
+    ],
+    [
       "vrmod.utils.BorderLaw_ClampOffset",
       "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
     ],
@@ -133,6 +181,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
     ],
     [
+      "vrmod.utils.BorderLaw_EyeStep",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
+    ],
+    [
+      "vrmod.utils.BorderLaw_FovStep",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
+    ],
+    [
       "vrmod.utils.BorderLaw_GuideBaseline",
       "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
     ],
@@ -150,6 +206,18 @@
     ],
     [
       "vrmod.utils.BorderLaw_IsGuidedPathOnly",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
+    ],
+    [
+      "vrmod.utils.BorderLaw_LensMax",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
+    ],
+    [
+      "vrmod.utils.BorderLaw_LensMin",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
+    ],
+    [
+      "vrmod.utils.BorderLaw_LensStep",
       "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
     ],
     [
@@ -174,6 +242,10 @@
     ],
     [
       "vrmod.utils.BorderLaw_RequireRenderOffsetOnGuide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
+    ],
+    [
+      "vrmod.utils.BorderLaw_ResetOnStart",
       "addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua"
     ],
     [
@@ -273,6 +345,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
     ],
     [
+      "vrmod.utils.CubeReturn_NormalizeIntent",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
       "vrmod.utils.CubeReturn_NormalizePhase",
       "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
     ],
@@ -286,6 +362,10 @@
     ],
     [
       "vrmod.utils.CubeReturn_ShouldNotifyCube",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
+    ],
+    [
+      "vrmod.utils.CubeReturn_ShouldRelaunchCube",
       "addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua"
     ],
     [
@@ -1309,6 +1389,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
     ],
     [
+      "vrmod.utils.RefreshStereoLights",
+      "addon/vrmod-x64/lua/vrmod/utils/cl_stereo_lights.lua"
+    ],
+    [
       "vrmod.utils.ReleasePickupEntry",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
@@ -1415,6 +1499,38 @@
     [
       "vrmod.utils.StagePack_ToastHint",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_AllowSingleEyeUpdate",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_IsRightEyeOnlyRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_RefreshDynamicPerEye",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_SkipWhenNoStereoEye",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_UpdateProjectedPerEye",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [
       "vrmod.utils.StereoLoadPolicy",
@@ -1657,6 +1773,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua"
     ],
     [
+      "vrmod.utils.UpdateHeadCollisions",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua"
+    ],
+    [
       "vrmod.utils.UpdateViewModel",
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
@@ -1863,6 +1983,10 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
+      "vrmod.ApplyMenuPixelSize",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
       "vrmod.ApplyOpenXRLaunchMarker",
       "addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua"
     ],
@@ -1880,11 +2004,7 @@
     ],
     [
       "vrmod.AutoSeatedOffset",
-      "addon/vrmod-x64/lua/vrmod/ui/cl_avatar_menu.lua"
-    ],
-    [
-      "vrmod.AutoSeatedOffset",
-      "addon/vrmod-x64/lua/vrmod/ui/cl_heightadjust.lua"
+      "addon/vrmod-x64/lua/vrmod/input/cl_seated.lua"
     ],
     [
       "vrmod.AvatarMenu_Close",
@@ -1947,6 +2067,10 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
+      "vrmod.CloseAllPauseSurfaces",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
+    ],
+    [
       "vrmod.CloseAllWindows",
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
@@ -1957,6 +2081,22 @@
     [
       "vrmod.CloseSpawnMenuVR",
       "addon/vrmod-x64/lua/vrmod/ui/cl_panel2vr.lua"
+    ],
+    [
+      "vrmod.CubeBridge_CancelRelaunch",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
+    ],
+    [
+      "vrmod.CubeBridge_RememberBin",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
+    ],
+    [
+      "vrmod.CubeBridge_ResolveBin",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
+    ],
+    [
+      "vrmod.CubeBridge_SpawnLauncher",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
     ],
     [
       "vrmod.CubeSettings_Close",
@@ -1981,6 +2121,10 @@
     [
       "vrmod.DetectBackend",
       "addon/vrmod-x64/lua/vrmod/core/cl_runtime.lua"
+    ],
+    [
+      "vrmod.DispatchUIClick",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
       "vrmod.Drop",
@@ -2021,6 +2165,10 @@
     [
       "vrmod.FindMainMenuPanel",
       "addon/vrmod-x64/lua/vrmod/ui/cl_vr_mainmenu.lua"
+    ],
+    [
+      "vrmod.ForceApplySubmitBounds",
+      "addon/vrmod-x64/lua/vrmod/core/cl_vrmod.lua"
     ],
     [
       "vrmod.GetArcVRSettingsCategory",
@@ -2479,6 +2627,10 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
+      "vrmod.GetVRUIClickableMax",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
       "vrmod.GetVRUIMaxRT",
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
@@ -2615,6 +2767,10 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
+      "vrmod.IsUIFocused",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
       "vrmod.ListInstalledModules",
       "addon/vrmod-x64/lua/vrmod/core/cl_runtime.lua"
     ],
@@ -2627,7 +2783,15 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
+      "vrmod.MeasureRawEyeHeight",
+      "addon/vrmod-x64/lua/vrmod/input/cl_seated.lua"
+    ],
+    [
       "vrmod.MenuApplyHandAnchor",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
+      "vrmod.MenuBlocksVehicleDrive",
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
@@ -2671,8 +2835,20 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_vr_pausemenu.lua"
     ],
     [
+      "vrmod.OpenSoleHub",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
+    ],
+    [
       "vrmod.OpenSpawnMenuVR",
       "addon/vrmod-x64/lua/vrmod/ui/cl_panel2vr.lua"
+    ],
+    [
+      "vrmod.OpenXR_ForceStartWithHandoff",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua"
+    ],
+    [
+      "vrmod.OpenXR_ResetHandoff",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua"
     ],
     [
       "vrmod.Pickup",
@@ -2697,6 +2873,10 @@
     [
       "vrmod.ResetMenuPose",
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
+      "vrmod.ReturnToCubeLauncher",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
     ],
     [
       "vrmod.SaveMenuLayout",
@@ -2763,6 +2943,14 @@
       "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
     ],
     [
+      "vrmod.SettingsCacheGet",
+      "addon/vrmod-x64/lua/vrmod/api/sh_api.lua"
+    ],
+    [
+      "vrmod.SettingsCacheSet",
+      "addon/vrmod-x64/lua/vrmod/api/sh_api.lua"
+    ],
+    [
       "vrmod.SettingsFormatColor",
       "addon/vrmod-x64/lua/vrmod/ui/sh_settings_catalog.lua"
     ],
@@ -2803,6 +2991,10 @@
       "addon/vrmod-x64/lua/vrmod/ui/sh_settings_catalog.lua"
     ],
     [
+      "vrmod.SoftRefreshDisplayParams",
+      "addon/vrmod-x64/lua/vrmod/core/cl_vrmod.lua"
+    ],
+    [
       "vrmod.StartLocomotion",
       "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
     ],
@@ -2825,6 +3017,10 @@
     [
       "vrmod.UnbindMainMenuFromVR",
       "addon/vrmod-x64/lua/vrmod/ui/cl_vr_mainmenu.lua"
+    ],
+    [
+      "vrmod.UpdateSeatedOffset",
+      "addon/vrmod-x64/lua/vrmod/input/cl_seated.lua"
     ],
     [
       "vrmod.UsingEmptyHands",

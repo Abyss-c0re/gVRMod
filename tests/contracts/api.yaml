@@ -40,6 +40,11 @@ symbols:
     tier: seam
     tests: [api.smoke.ApplyMenuLayout]
     notes: "thin getter / smoke"
+  - id: vrmod.ApplyMenuPixelSize
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
+    tier: seam
+    tests: [api.smoke.ApplyMenuPixelSize]
+    notes: "thin getter / smoke"
   - id: vrmod.ApplyOpenXRLaunchMarker
     file: addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua
     tier: seam
@@ -61,12 +66,7 @@ symbols:
     tests: [api.smoke.AutoScaleHeight]
     notes: "thin getter / smoke"
   - id: vrmod.AutoSeatedOffset
-    file: addon/vrmod-x64/lua/vrmod/ui/cl_avatar_menu.lua
-    tier: seam
-    tests: [api.smoke.AutoSeatedOffset]
-    notes: "thin getter / smoke"
-  - id: vrmod.AutoSeatedOffset
-    file: addon/vrmod-x64/lua/vrmod/ui/cl_heightadjust.lua
+    file: addon/vrmod-x64/lua/vrmod/input/cl_seated.lua
     tier: seam
     tests: [api.smoke.AutoSeatedOffset]
     notes: "thin getter / smoke"
@@ -145,6 +145,11 @@ symbols:
     tier: seam
     tests: [api.smoke.ClearMenuLayout]
     notes: "thin getter / smoke"
+  - id: vrmod.CloseAllPauseSurfaces
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
+    tier: seam
+    tests: [api.smoke.CloseAllPauseSurfaces]
+    notes: "thin getter / smoke"
   - id: vrmod.CloseAllWindows
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
     tier: seam
@@ -159,6 +164,26 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/ui/cl_panel2vr.lua
     tier: seam
     tests: [api.smoke.CloseSpawnMenuVR]
+    notes: "thin getter / smoke"
+  - id: vrmod.CubeBridge_CancelRelaunch
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
+    tier: seam
+    tests: [api.smoke.CubeBridge_CancelRelaunch]
+    notes: "thin getter / smoke"
+  - id: vrmod.CubeBridge_RememberBin
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
+    tier: seam
+    tests: [api.smoke.CubeBridge_RememberBin]
+    notes: "thin getter / smoke"
+  - id: vrmod.CubeBridge_ResolveBin
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
+    tier: seam
+    tests: [api.smoke.CubeBridge_ResolveBin]
+    notes: "thin getter / smoke"
+  - id: vrmod.CubeBridge_SpawnLauncher
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
+    tier: seam
+    tests: [api.smoke.CubeBridge_SpawnLauncher]
     notes: "thin getter / smoke"
   - id: vrmod.CubeSettings_Close
     file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_settings.lua
@@ -188,6 +213,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/core/cl_runtime.lua
     tier: seam
     tests: [api.smoke.DetectBackend]
+    notes: "thin getter / smoke"
+  - id: vrmod.DispatchUIClick
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
+    tier: seam
+    tests: [api.smoke.DispatchUIClick]
     notes: "thin getter / smoke"
   - id: vrmod.Drop
     file: addon/vrmod-x64/lua/vrmod/pickup/sh_pickup.lua
@@ -237,6 +267,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/ui/cl_vr_mainmenu.lua
     tier: seam
     tests: [api.smoke.FindMainMenuPanel]
+    notes: "thin getter / smoke"
+  - id: vrmod.ForceApplySubmitBounds
+    file: addon/vrmod-x64/lua/vrmod/core/cl_vrmod.lua
+    tier: seam
+    tests: [api.smoke.ForceApplySubmitBounds]
     notes: "thin getter / smoke"
   - id: vrmod.GetArcVRSettingsCategory
     file: addon/vrmod-x64/lua/vrmod/ui/sh_settings_catalog.lua
@@ -808,6 +843,11 @@ symbols:
     tier: seam
     tests: [api.smoke.GetVREyeSize]
     notes: "thin getter / smoke"
+  - id: vrmod.GetVRUIClickableMax
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
+    tier: seam
+    tests: [api.smoke.GetVRUIClickableMax]
+    notes: "thin getter / smoke"
   - id: vrmod.GetVRUIMaxRT
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
     tier: seam
@@ -977,6 +1017,11 @@ symbols:
     tier: seam
     tests: [api.smoke.IsQuickMenuFreeFloat]
     notes: "thin getter / smoke"
+  - id: vrmod.IsUIFocused
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
+    tier: seam
+    tests: [api.smoke.IsUIFocused]
+    notes: "thin getter / smoke"
   - id: vrmod.ListInstalledModules
     file: addon/vrmod-x64/lua/vrmod/core/cl_runtime.lua
     tier: seam
@@ -992,10 +1037,20 @@ symbols:
     tier: seam
     tests: [api.smoke.MarkMenuDirty]
     notes: "thin getter / smoke"
+  - id: vrmod.MeasureRawEyeHeight
+    file: addon/vrmod-x64/lua/vrmod/input/cl_seated.lua
+    tier: seam
+    tests: [api.smoke.MeasureRawEyeHeight]
+    notes: "thin getter / smoke"
   - id: vrmod.MenuApplyHandAnchor
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
     tier: seam
     tests: [api.smoke.MenuApplyHandAnchor]
+    notes: "thin getter / smoke"
+  - id: vrmod.MenuBlocksVehicleDrive
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
+    tier: seam
+    tests: [api.smoke.MenuBlocksVehicleDrive]
     notes: "thin getter / smoke"
   - id: vrmod.MenuReattach
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
@@ -1047,10 +1102,25 @@ symbols:
     tier: seam
     tests: [api.smoke.OpenPauseMenuVR]
     notes: "thin getter / smoke"
+  - id: vrmod.OpenSoleHub
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
+    tier: seam
+    tests: [api.smoke.OpenSoleHub]
+    notes: "thin getter / smoke"
   - id: vrmod.OpenSpawnMenuVR
     file: addon/vrmod-x64/lua/vrmod/ui/cl_panel2vr.lua
     tier: seam
     tests: [api.smoke.OpenSpawnMenuVR]
+    notes: "thin getter / smoke"
+  - id: vrmod.OpenXR_ForceStartWithHandoff
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua
+    tier: seam
+    tests: [api.smoke.OpenXR_ForceStartWithHandoff]
+    notes: "thin getter / smoke"
+  - id: vrmod.OpenXR_ResetHandoff
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_openxr_launch.lua
+    tier: seam
+    tests: [api.smoke.OpenXR_ResetHandoff]
     notes: "thin getter / smoke"
   - id: vrmod.Pickup
     file: addon/vrmod-x64/lua/vrmod/pickup/sh_pickup.lua
@@ -1080,6 +1150,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
     tier: seam
     tests: [api.smoke.ResetMenuPose]
+    notes: "thin getter / smoke"
+  - id: vrmod.ReturnToCubeLauncher
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
+    tier: seam
+    tests: [api.smoke.ReturnToCubeLauncher]
     notes: "thin getter / smoke"
   - id: vrmod.SaveMenuLayout
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
@@ -1161,6 +1236,16 @@ symbols:
     tier: seam
     tests: [api.smoke.SetViewModelUseWorldModel]
     notes: "thin getter / smoke"
+  - id: vrmod.SettingsCacheGet
+    file: addon/vrmod-x64/lua/vrmod/api/sh_api.lua
+    tier: seam
+    tests: [api.smoke.SettingsCacheGet]
+    notes: "thin getter / smoke"
+  - id: vrmod.SettingsCacheSet
+    file: addon/vrmod-x64/lua/vrmod/api/sh_api.lua
+    tier: seam
+    tests: [api.smoke.SettingsCacheSet]
+    notes: "thin getter / smoke"
   - id: vrmod.SettingsFormatColor
     file: addon/vrmod-x64/lua/vrmod/ui/sh_settings_catalog.lua
     tier: seam
@@ -1211,6 +1296,11 @@ symbols:
     tier: seam
     tests: [api.smoke.Settings_Open]
     notes: "thin getter / smoke"
+  - id: vrmod.SoftRefreshDisplayParams
+    file: addon/vrmod-x64/lua/vrmod/core/cl_vrmod.lua
+    tier: seam
+    tests: [api.smoke.SoftRefreshDisplayParams]
+    notes: "thin getter / smoke"
   - id: vrmod.StartLocomotion
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
     tier: seam
@@ -1240,6 +1330,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/ui/cl_vr_mainmenu.lua
     tier: seam
     tests: [api.smoke.UnbindMainMenuFromVR]
+    notes: "thin getter / smoke"
+  - id: vrmod.UpdateSeatedOffset
+    file: addon/vrmod-x64/lua/vrmod/input/cl_seated.lua
+    tier: seam
+    tests: [api.smoke.UpdateSeatedOffset]
     notes: "thin getter / smoke"
   - id: vrmod.UsingEmptyHands
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua

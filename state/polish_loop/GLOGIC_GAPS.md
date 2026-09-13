@@ -2,12 +2,14 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-08-05 cycle 63
+Last updated: 2026-09-13 G48/G49 avatar async + stereo lights
 
 ## P0 — seamless / feel broken
 
 | ID | Gap | Notes | Status |
 |----|-----|-------|--------|
+| G48 | Avatar open freezes (sync PM validate) | List+Precache+ClientsideModel all PMs on open | **partial** — async open; HMD walk open |
+| G49 | Light sources only on right eye | PT/dlight last-view-wins under dual RenderView | **partial** — per-eye refresh; HMD walk open |
 | G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |
 | G02 | No coordinated fade on take_xr | Panel + eye-buffer fade cycle14; Cube shell done | **done** cycle14 |
 | G03 | Cal / STAGE not packed into handoff | HmdExpect+§0.4 cycle35; default still off | **partial** cycle35 |
