@@ -1792,6 +1792,9 @@ return function(H, env)
 		H.assert_true(not u.StereoLightLaw_AllowSingleEyeUpdate())
 		H.assert_true(u.StereoLightLaw_SkipWhenNoStereoEye())
 		H.assert_true(u.StereoLightLaw_RefreshDynamicPerEye())
+		H.assert_true(not u.StereoLightLaw_AllowSkipGlideIfNotSeated())
+		H.assert_true(u.StereoLightLaw_UpdateAllGlideVehicles())
+		H.assert_true(u.StereoLightLaw_KeepSpriteBufferAcrossEyes())
 		local left = u.StereoLightLaw_Decide({ eye = "left", vr_active = true })
 		H.assert_true(left.path_ok)
 		H.assert_true(left.refresh)
@@ -1818,6 +1821,18 @@ return function(H, env)
 		})
 		H.assert_eq(pre.risk, "right_eye_only")
 		H.assert_eq(u.StereoLightLaw_HmdExpect(pre).verdict, "expect_right_only")
+		local glideDark = u.StereoLightLaw_Decide({
+			eye = "left", vr_active = true, glide_skip_if_not_seated = true,
+		})
+		H.assert_true(not glideDark.path_ok)
+		H.assert_eq(glideDark.risk, "glide_dark")
+		H.assert_true(u.StereoLightLaw_IsGlideDarkRisk(glideDark))
+		H.assert_eq(u.StereoLightLaw_StatusLabel(glideDark), "LIGHT · GLIDE DARK")
+		H.assert_eq(u.StereoLightLaw_HmdExpect(glideDark).verdict, "expect_glide_dark")
+		local emptyLock = u.StereoLightLaw_Decide({
+			eye = "left", vr_active = true, glide_lock_empty_inject = true,
+		})
+		H.assert_eq(emptyLock.risk, "glide_dark")
 	end)
 
 	-- G50 ArcVR grip must not use ForegripAngle as ValveBiped wrist

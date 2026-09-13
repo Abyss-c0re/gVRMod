@@ -1668,6 +1668,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_AllowSkipGlideIfNotSeated
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
   - id: vrmod.utils.StereoLightLaw_Decide
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
@@ -1676,7 +1680,15 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_IsGlideDarkRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
   - id: vrmod.utils.StereoLightLaw_IsRightEyeOnlyRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_KeepSpriteBufferAcrossEyes
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
@@ -1689,6 +1701,10 @@ symbols:
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
   - id: vrmod.utils.StereoLightLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_UpdateAllGlideVehicles
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
@@ -1939,6 +1955,11 @@ symbols:
     notes: "engine or state"
   - id: vrmod.utils.UnpatchOwnerCollision
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.UpdateGlideHeadlights
+    file: addon/vrmod-x64/lua/vrmod/utils/cl_glide_lights.lua
     tier: seam
     tests: [pending]
     notes: "engine or state"

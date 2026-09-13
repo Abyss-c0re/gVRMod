@@ -1597,6 +1597,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [
+      "vrmod.utils.StereoLightLaw_AllowSkipGlideIfNotSeated",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
       "vrmod.utils.StereoLightLaw_Decide",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
@@ -1605,7 +1609,15 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [
+      "vrmod.utils.StereoLightLaw_IsGlideDarkRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
       "vrmod.utils.StereoLightLaw_IsRightEyeOnlyRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_KeepSpriteBufferAcrossEyes",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [
@@ -1618,6 +1630,10 @@
     ],
     [
       "vrmod.utils.StereoLightLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_UpdateAllGlideVehicles",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [
@@ -1859,6 +1875,10 @@
     [
       "vrmod.utils.UnpatchOwnerCollision",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
+    ],
+    [
+      "vrmod.utils.UpdateGlideHeadlights",
+      "addon/vrmod-x64/lua/vrmod/utils/cl_glide_lights.lua"
     ],
     [
       "vrmod.utils.UpdateHandCollisions",

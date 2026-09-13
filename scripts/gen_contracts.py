@@ -413,6 +413,10 @@ PURE_TESTED = {
     "vrmod.utils.StereoLightLaw_StatusLabel": "util.stereo_light_law.per_eye_g49",
     "vrmod.utils.StereoLightLaw_HmdExpect": "util.stereo_light_law.per_eye_g49",
     "vrmod.utils.StereoLightLaw_IsRightEyeOnlyRisk": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_AllowSkipGlideIfNotSeated": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_UpdateAllGlideVehicles": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_KeepSpriteBufferAcrossEyes": "util.stereo_light_law.per_eye_g49",
+    "vrmod.utils.StereoLightLaw_IsGlideDarkRisk": "util.stereo_light_law.per_eye_g49",
     # G50 ArcVR grip wrist: keep device angle, never ForegripAngle as ValveBiped
     "vrmod.utils.ArcVrWristLaw_KeepDeviceAngleOnGrip": "util.arcvr_wrist_law.device_g50",
     "vrmod.utils.ArcVrWristLaw_AllowForegripAngleAsWrist": "util.arcvr_wrist_law.device_g50",
