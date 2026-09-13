@@ -1593,6 +1593,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua"
     ],
     [
+      "vrmod.utils.StereoLightLaw_AllowDropSpriteWhenNoEye",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
       "vrmod.utils.StereoLightLaw_AllowSingleEyeUpdate",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
@@ -1617,11 +1621,19 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [
+      "vrmod.utils.StereoLightLaw_IsSpriteOffRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
       "vrmod.utils.StereoLightLaw_KeepSpriteBufferAcrossEyes",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [
       "vrmod.utils.StereoLightLaw_RefreshDynamicPerEye",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
+    ],
+    [
+      "vrmod.utils.StereoLightLaw_RefreshLampSpriteAfterPT",
       "addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua"
     ],
     [

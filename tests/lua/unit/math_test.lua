@@ -1795,6 +1795,8 @@ return function(H, env)
 		H.assert_true(not u.StereoLightLaw_AllowSkipGlideIfNotSeated())
 		H.assert_true(u.StereoLightLaw_UpdateAllGlideVehicles())
 		H.assert_true(u.StereoLightLaw_KeepSpriteBufferAcrossEyes())
+		H.assert_true(not u.StereoLightLaw_AllowDropSpriteWhenNoEye())
+		H.assert_true(u.StereoLightLaw_RefreshLampSpriteAfterPT())
 		local left = u.StereoLightLaw_Decide({ eye = "left", vr_active = true })
 		H.assert_true(left.path_ok)
 		H.assert_true(left.refresh)
@@ -1833,6 +1835,18 @@ return function(H, env)
 			eye = "left", vr_active = true, glide_lock_empty_inject = true,
 		})
 		H.assert_eq(emptyLock.risk, "glide_dark")
+		local spriteOff = u.StereoLightLaw_Decide({
+			eye = "left", vr_active = true, drop_sprite_when_no_eye = true,
+		})
+		H.assert_true(not spriteOff.path_ok)
+		H.assert_eq(spriteOff.risk, "sprite_off")
+		H.assert_true(u.StereoLightLaw_IsSpriteOffRisk(spriteOff))
+		H.assert_eq(u.StereoLightLaw_StatusLabel(spriteOff), "LIGHT · SPRITE OFF")
+		H.assert_eq(u.StereoLightLaw_HmdExpect(spriteOff).verdict, "expect_sprite_off")
+		local lampSkip = u.StereoLightLaw_Decide({
+			eye = "right", vr_active = true, skip_lamp_sprite = true,
+		})
+		H.assert_eq(lampSkip.risk, "sprite_off")
 	end)
 
 	-- G50 ArcVR grip must not use ForegripAngle as ValveBiped wrist

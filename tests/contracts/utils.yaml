@@ -1664,6 +1664,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua
     tier: pure
     tests: [util.stage_pack.parse_and_hint]
+  - id: vrmod.utils.StereoLightLaw_AllowDropSpriteWhenNoEye
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
   - id: vrmod.utils.StereoLightLaw_AllowSingleEyeUpdate
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
@@ -1688,11 +1692,19 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_IsSpriteOffRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
   - id: vrmod.utils.StereoLightLaw_KeepSpriteBufferAcrossEyes
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
   - id: vrmod.utils.StereoLightLaw_RefreshDynamicPerEye
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
+    tier: pure
+    tests: [util.stereo_light_law.per_eye_g49]
+  - id: vrmod.utils.StereoLightLaw_RefreshLampSpriteAfterPT
     file: addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua
     tier: pure
     tests: [util.stereo_light_law.per_eye_g49]
