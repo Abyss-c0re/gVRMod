@@ -64,6 +64,34 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.calib.seated_offset]
+  - id: vrmod.utils.AvatarApplyLaw_AllowProbeFalseCache
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
+  - id: vrmod.utils.AvatarApplyLaw_AllowRevertOnPending
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
+  - id: vrmod.utils.AvatarApplyLaw_ApplyWindowSeconds
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
+  - id: vrmod.utils.AvatarApplyLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
+  - id: vrmod.utils.AvatarApplyLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
+  - id: vrmod.utils.AvatarApplyLaw_IsRevertRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
+  - id: vrmod.utils.AvatarApplyLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
   - id: vrmod.utils.AvatarLoadLaw_AllowSyncListFilter
     file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua
     tier: pure

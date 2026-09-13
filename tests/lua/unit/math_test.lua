@@ -1689,6 +1689,78 @@ return function(H, env)
 		H.assert_eq(u.AvatarLoadLaw_HmdExpect(freezeList).verdict, "expect_freeze")
 	end)
 
+	-- G52 avatar apply must not revert a twin-validated PM to lastGood
+	H.TEST("util.avatar_apply_law.hold_g52", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.AvatarApplyLaw_ApplyWindowSeconds(), 2.5)
+		H.assert_true(not u.AvatarApplyLaw_AllowProbeFalseCache())
+		H.assert_true(not u.AvatarApplyLaw_AllowRevertOnPending())
+		local apply = u.AvatarApplyLaw_Decide({ phase = "apply", twin_ok = true })
+		H.assert_true(apply.path_ok)
+		H.assert_true(apply.update_last_good)
+		H.assert_true(apply.pin_apply_path)
+		H.assert_eq(u.AvatarApplyLaw_StatusLabel(apply), "APPLY · HOLD PATH")
+		local he = u.AvatarApplyLaw_HmdExpect(apply)
+		H.assert_eq(he.verdict, "expect_applied")
+		H.assert_true(string.find(he.checklist, "G52", 1, true))
+		H.assert_true(not u.AvatarApplyLaw_IsRevertRisk(apply))
+		local probe = u.AvatarApplyLaw_Decide({
+			phase = "validate_probe", probe_ok = false, live_path = "models/player/alyx.mdl",
+		})
+		H.assert_true(probe.treat_pending)
+		H.assert_true(not probe.cache_false)
+		H.assert_eq(u.AvatarApplyLaw_StatusLabel(probe), "APPLY · PENDING")
+		H.assert_true(not u.AvatarApplyLaw_IsRevertRisk(probe))
+		local win = u.AvatarApplyLaw_Decide({
+			phase = "reload_local",
+			trusted = true,
+			probe_ok = false,
+			live_path = "models/player/alyx.mdl",
+			last_good = "models/player/kleiner.mdl",
+			from_net = true,
+		})
+		H.assert_true(not win.revert)
+		H.assert_true(win.keep_live)
+		H.assert_true(win.skip_reload)
+		H.assert_eq(u.AvatarApplyLaw_StatusLabel(win), "APPLY · HOLD PATH")
+		local pending = u.AvatarApplyLaw_Decide({
+			phase = "reload_local",
+			probe_ok = nil,
+			live_path = "models/player/alyx.mdl",
+			last_good = "models/player/kleiner.mdl",
+		})
+		H.assert_true(not pending.revert)
+		H.assert_true(pending.treat_pending)
+		local sync = u.AvatarApplyLaw_Decide({
+			phase = "sync_all",
+			trusted = true,
+			probe_ok = false,
+			live_path = "models/player/alyx.mdl",
+			last_good = "models/player/kleiner.mdl",
+		})
+		H.assert_true(not sync.revert)
+		H.assert_true(sync.keep_live)
+		local init = u.AvatarApplyLaw_Decide({
+			phase = "character_init",
+			trusted = true,
+			probe_ok = false,
+			live_path = "models/player/alyx.mdl",
+		})
+		H.assert_true(not init.mark_incompatible)
+		H.assert_true(init.treat_pending)
+		-- Untrusted confirmed-false may revert (safety for truly broken PMs)
+		local bad = u.AvatarApplyLaw_Decide({
+			phase = "reload_local",
+			trusted = false,
+			probe_ok = false,
+			live_path = "models/player/broken.mdl",
+			last_good = "models/player/kleiner.mdl",
+		})
+		H.assert_true(bad.revert)
+		H.assert_true(u.AvatarApplyLaw_IsRevertRisk(bad))
+		H.assert_eq(u.AvatarApplyLaw_HmdExpect(bad).verdict, "expect_old_no_bones")
+	end)
+
 	-- G49 stereo lights must refresh on both eyes (never last-view only)
 	H.TEST("util.stereo_light_law.per_eye_g49", function()
 		local u = env.vrmod.utils

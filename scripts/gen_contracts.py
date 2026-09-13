@@ -395,6 +395,14 @@ PURE_TESTED = {
     "vrmod.utils.AvatarLoadLaw_StatusLabel": "util.avatar_load_law.async_g48",
     "vrmod.utils.AvatarLoadLaw_HmdExpect": "util.avatar_load_law.async_g48",
     "vrmod.utils.AvatarLoadLaw_IsFreezeRisk": "util.avatar_load_law.async_g48",
+    # G52 avatar apply: never probe-false-cache / revert a twin-validated PM
+    "vrmod.utils.AvatarApplyLaw_ApplyWindowSeconds": "util.avatar_apply_law.hold_g52",
+    "vrmod.utils.AvatarApplyLaw_AllowProbeFalseCache": "util.avatar_apply_law.hold_g52",
+    "vrmod.utils.AvatarApplyLaw_AllowRevertOnPending": "util.avatar_apply_law.hold_g52",
+    "vrmod.utils.AvatarApplyLaw_Decide": "util.avatar_apply_law.hold_g52",
+    "vrmod.utils.AvatarApplyLaw_StatusLabel": "util.avatar_apply_law.hold_g52",
+    "vrmod.utils.AvatarApplyLaw_HmdExpect": "util.avatar_apply_law.hold_g52",
+    "vrmod.utils.AvatarApplyLaw_IsRevertRisk": "util.avatar_apply_law.hold_g52",
     # G49 stereo lights both eyes (ProjectedTexture / DynamicLight per eye)
     "vrmod.utils.StereoLightLaw_UpdateProjectedPerEye": "util.stereo_light_law.per_eye_g49",
     "vrmod.utils.StereoLightLaw_AllowSingleEyeUpdate": "util.stereo_light_law.per_eye_g49",

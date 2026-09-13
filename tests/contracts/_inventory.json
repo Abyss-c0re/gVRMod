@@ -61,6 +61,34 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.AvatarApplyLaw_AllowProbeFalseCache",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarApplyLaw_AllowRevertOnPending",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarApplyLaw_ApplyWindowSeconds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarApplyLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarApplyLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarApplyLaw_IsRevertRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
+      "vrmod.utils.AvatarApplyLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
       "vrmod.utils.AvatarLoadLaw_AllowSyncListFilter",
       "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_load_law.lua"
     ],
