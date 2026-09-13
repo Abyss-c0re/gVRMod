@@ -22,6 +22,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.fingers.apply_curl]
+  - id: vrmod.utils.ApplyViewModelMuzzleOffset
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine/model I/O — not offline-pure"
   - id: vrmod.utils.AttachPhysicsToController
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

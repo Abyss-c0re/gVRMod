@@ -452,6 +452,7 @@ PURE_TESTED = {
 SEAM_FORCE = {
     "vrmod.utils.ComputePhysicsParams",
     "vrmod.utils.RefreshStereoLights",
+    "vrmod.utils.ApplyViewModelMuzzleOffset",
 }
 
 # Thin getters → smoke suite

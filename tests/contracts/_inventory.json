@@ -21,6 +21,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.ApplyViewModelMuzzleOffset",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
+    ],
+    [
       "vrmod.utils.AttachPhysicsToController",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
@@ -2928,6 +2932,10 @@
     ],
     [
       "vrmod.SetViewModelFixMuzzle",
+      "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
+    ],
+    [
+      "vrmod.SetViewModelMuzzleOffsetForWeaponClass",
       "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
     ],
     [

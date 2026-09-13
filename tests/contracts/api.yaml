@@ -1221,6 +1221,11 @@ symbols:
     tier: seam
     tests: [api.smoke.SetViewModelFixMuzzle]
     notes: "thin getter / smoke"
+  - id: vrmod.SetViewModelMuzzleOffsetForWeaponClass
+    file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
+    tier: seam
+    tests: [api.smoke.SetViewModelMuzzleOffsetForWeaponClass]
+    notes: "thin getter / smoke"
   - id: vrmod.SetViewModelNoLaser
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
     tier: seam
