@@ -2,12 +2,13 @@
 
 Living backlog. Agents **promote / demote / mark done** each cycle. Newest insights at top of each section.
 
-Last updated: 2026-09-13 G48/G49 avatar async + stereo lights
+Last updated: 2026-09-13 G50 ArcVR wrist + G48/G49
 
 ## P0 — seamless / feel broken
 
 | ID | Gap | Notes | Status |
 |----|-----|-------|--------|
+| G50 | ArcVR grip twists ValveBiped wrist | AVR writes ForegripAngle onto lefthand.ang | **partial** — restore device ang; HMD walk open |
 | G48 | Avatar open freezes (sync PM validate) | List+Precache+ClientsideModel all PMs on open | **partial** — async open; HMD walk open |
 | G49 | Light sources only on right eye | PT/dlight last-view-wins under dual RenderView | **partial** — per-eye refresh; HMD walk open |
 | G01 | Handoff progress opaque | Cube panel says holding XR; no map/engine phases | **done** cycle1 |

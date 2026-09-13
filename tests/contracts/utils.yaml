@@ -27,6 +27,30 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine/model I/O — not offline-pure"
+  - id: vrmod.utils.ArcVrWristLaw_AllowForegripAngleAsWrist
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua
+    tier: pure
+    tests: [util.arcvr_wrist_law.device_g50]
+  - id: vrmod.utils.ArcVrWristLaw_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua
+    tier: pure
+    tests: [util.arcvr_wrist_law.device_g50]
+  - id: vrmod.utils.ArcVrWristLaw_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua
+    tier: pure
+    tests: [util.arcvr_wrist_law.device_g50]
+  - id: vrmod.utils.ArcVrWristLaw_IsTwistRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua
+    tier: pure
+    tests: [util.arcvr_wrist_law.device_g50]
+  - id: vrmod.utils.ArcVrWristLaw_KeepDeviceAngleOnGrip
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua
+    tier: pure
+    tests: [util.arcvr_wrist_law.device_g50]
+  - id: vrmod.utils.ArcVrWristLaw_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua
+    tier: pure
+    tests: [util.arcvr_wrist_law.device_g50]
   - id: vrmod.utils.AttachPhysicsToController
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam

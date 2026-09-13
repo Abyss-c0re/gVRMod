@@ -404,6 +404,13 @@ PURE_TESTED = {
     "vrmod.utils.StereoLightLaw_StatusLabel": "util.stereo_light_law.per_eye_g49",
     "vrmod.utils.StereoLightLaw_HmdExpect": "util.stereo_light_law.per_eye_g49",
     "vrmod.utils.StereoLightLaw_IsRightEyeOnlyRisk": "util.stereo_light_law.per_eye_g49",
+    # G50 ArcVR grip wrist: keep device angle, never ForegripAngle as ValveBiped
+    "vrmod.utils.ArcVrWristLaw_KeepDeviceAngleOnGrip": "util.arcvr_wrist_law.device_g50",
+    "vrmod.utils.ArcVrWristLaw_AllowForegripAngleAsWrist": "util.arcvr_wrist_law.device_g50",
+    "vrmod.utils.ArcVrWristLaw_Decide": "util.arcvr_wrist_law.device_g50",
+    "vrmod.utils.ArcVrWristLaw_StatusLabel": "util.arcvr_wrist_law.device_g50",
+    "vrmod.utils.ArcVrWristLaw_HmdExpect": "util.arcvr_wrist_law.device_g50",
+    "vrmod.utils.ArcVrWristLaw_IsTwistRisk": "util.arcvr_wrist_law.device_g50",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",

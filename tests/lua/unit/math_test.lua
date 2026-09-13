@@ -1723,4 +1723,26 @@ return function(H, env)
 		H.assert_eq(pre.risk, "right_eye_only")
 		H.assert_eq(u.StereoLightLaw_HmdExpect(pre).verdict, "expect_right_only")
 	end)
+
+	-- G50 ArcVR grip must not use ForegripAngle as ValveBiped wrist
+	H.TEST("util.arcvr_wrist_law.device_g50", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.ArcVrWristLaw_KeepDeviceAngleOnGrip())
+		H.assert_true(not u.ArcVrWristLaw_AllowForegripAngleAsWrist())
+		local idle = u.ArcVrWristLaw_Decide({ vr_active = true, arcvr = true })
+		H.assert_true(not idle.restore_device_ang)
+		H.assert_eq(u.ArcVrWristLaw_StatusLabel(idle), "WRIST · IDLE")
+		local grip = u.ArcVrWristLaw_Decide({
+			vr_active = true, arcvr = true, foregrip_grabbed = true,
+		})
+		H.assert_true(grip.path_ok)
+		H.assert_true(grip.restore_device_ang)
+		H.assert_true(grip.keep_grip_pos)
+		H.assert_eq(u.ArcVrWristLaw_StatusLabel(grip), "WRIST · DEVICE")
+		local he = u.ArcVrWristLaw_HmdExpect(grip)
+		H.assert_eq(he.verdict, "expect_device_wrist")
+		H.assert_true(string.find(he.checklist, "G50", 1, true))
+		local stock = u.ArcVrWristLaw_Decide({ vr_active = true, arcvr = false, foregrip_grabbed = true })
+		H.assert_true(not stock.restore_device_ang)
+	end)
 end

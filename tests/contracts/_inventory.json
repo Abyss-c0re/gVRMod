@@ -25,6 +25,30 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
     [
+      "vrmod.utils.ArcVrWristLaw_AllowForegripAngleAsWrist",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrWristLaw_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrWristLaw_HmdExpect",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrWristLaw_IsTwistRisk",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrWristLaw_KeepDeviceAngleOnGrip",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrWristLaw_StatusLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua"
+    ],
+    [
       "vrmod.utils.AttachPhysicsToController",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
