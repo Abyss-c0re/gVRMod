@@ -72,6 +72,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
     tier: pure
     tests: [util.avatar_apply_law.hold_g52]
+  - id: vrmod.utils.AvatarApplyLaw_AllowSkipReloadOnSpawn
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
+    tier: pure
+    tests: [util.avatar_apply_law.hold_g52]
   - id: vrmod.utils.AvatarApplyLaw_ApplyWindowSeconds
     file: addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua
     tier: pure

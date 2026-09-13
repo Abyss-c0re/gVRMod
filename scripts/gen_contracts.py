@@ -397,6 +397,7 @@ PURE_TESTED = {
     "vrmod.utils.AvatarLoadLaw_IsFreezeRisk": "util.avatar_load_law.async_g48",
     # G52 avatar apply: never probe-false-cache / revert a twin-validated PM
     "vrmod.utils.AvatarApplyLaw_ApplyWindowSeconds": "util.avatar_apply_law.hold_g52",
+    "vrmod.utils.AvatarApplyLaw_AllowSkipReloadOnSpawn": "util.avatar_apply_law.hold_g52",
     "vrmod.utils.AvatarApplyLaw_AllowProbeFalseCache": "util.avatar_apply_law.hold_g52",
     "vrmod.utils.AvatarApplyLaw_AllowRevertOnPending": "util.avatar_apply_law.hold_g52",
     "vrmod.utils.AvatarApplyLaw_Decide": "util.avatar_apply_law.hold_g52",

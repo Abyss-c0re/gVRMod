@@ -1695,9 +1695,10 @@ return function(H, env)
 		H.assert_eq(u.AvatarApplyLaw_ApplyWindowSeconds(), 2.5)
 		H.assert_true(not u.AvatarApplyLaw_AllowProbeFalseCache())
 		H.assert_true(not u.AvatarApplyLaw_AllowRevertOnPending())
+		H.assert_true(not u.AvatarApplyLaw_AllowSkipReloadOnSpawn())
 		local apply = u.AvatarApplyLaw_Decide({ phase = "apply", twin_ok = true })
 		H.assert_true(apply.path_ok)
-		H.assert_true(apply.update_last_good)
+		H.assert_true(not apply.update_last_good)
 		H.assert_true(apply.pin_apply_path)
 		H.assert_eq(u.AvatarApplyLaw_StatusLabel(apply), "APPLY · HOLD PATH")
 		local he = u.AvatarApplyLaw_HmdExpect(apply)
@@ -1714,6 +1715,7 @@ return function(H, env)
 		local win = u.AvatarApplyLaw_Decide({
 			phase = "reload_local",
 			trusted = true,
+			in_apply_window = true,
 			probe_ok = false,
 			live_path = "models/player/alyx.mdl",
 			last_good = "models/player/kleiner.mdl",
@@ -1723,6 +1725,28 @@ return function(H, env)
 		H.assert_true(win.keep_live)
 		H.assert_true(win.skip_reload)
 		H.assert_eq(u.AvatarApplyLaw_StatusLabel(win), "APPLY · HOLD PATH")
+		-- After the window / on spawn: must rebuild, even if still "trusted"
+		local spawn = u.AvatarApplyLaw_Decide({
+			phase = "reload_local",
+			trusted = true,
+			in_apply_window = false,
+			from_net = true,
+			from_spawn = true,
+			live_path = "models/player/alyx.mdl",
+			last_good = "models/player/kleiner.mdl",
+		})
+		H.assert_true(not spawn.skip_reload)
+		H.assert_true(not spawn.revert)
+		H.assert_eq(spawn.reason, "spawn_rebuild")
+		local later = u.AvatarApplyLaw_Decide({
+			phase = "reload_local",
+			trusted = true,
+			in_apply_window = false,
+			from_net = true,
+			live_path = "models/player/alyx.mdl",
+		})
+		H.assert_true(not later.skip_reload)
+		H.assert_eq(later.reason, "net_rebuild")
 		local pending = u.AvatarApplyLaw_Decide({
 			phase = "reload_local",
 			probe_ok = nil,

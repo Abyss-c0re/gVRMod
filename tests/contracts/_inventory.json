@@ -69,6 +69,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
     ],
     [
+      "vrmod.utils.AvatarApplyLaw_AllowSkipReloadOnSpawn",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
+    ],
+    [
       "vrmod.utils.AvatarApplyLaw_ApplyWindowSeconds",
       "addon/vrmod-x64/lua/vrmod/utils/sh_avatar_apply_law.lua"
     ],
