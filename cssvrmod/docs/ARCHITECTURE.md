@@ -39,7 +39,7 @@ Fallback when togl will not start: -vulkan + vkQueuePresentKHR
 - `ClientCmd` digital move/fire is P0; analog `CUserCmd` is P2.
 - Offline `cssvrmod_tests` ≠ headset-proven.
 - **OpenGL is the default launch** (`CSSVR` / `--gl` → `-dx9` + `SDL_VIDEODRIVER=x11`).
-- Live 64-bit CSS on RADV GFX1201: `libtogl.so` `GetAdapterCount` **SEGV** (even with no hook, even in sniper). That is a togl/adapter bug, not the capture hook. `--vk` is the proven present path on this GPU.
+- Live 64-bit CSS on RADV GFX1201: stock `libtogl.so` `GetAdapterCount` **SEGV** (no hook). `togl_adapter.cpp` stubs adapter queries so `shaderapidx9` reaches `CreateDevice`. That prints `OpenGL: … Mesa 4.6` then **launcher.so SEGV inside `IDirect3DDevice9::Create`** — still no first `Present`, so no GL swap to steal yet. `--vk` remains the proven present dump on this GPU.
 - Original vrmod DX9 path is `shaderapidx9` `CreateTexture` (`src/rendering/d3d/d3d_hooks.cpp` on Windows; `hook_d3d9.cpp` on Linux togl).
 
 ## P1 / P2

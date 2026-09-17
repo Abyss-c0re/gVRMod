@@ -145,6 +145,7 @@ bool ReadFbRgba(GLint fbo, int w, int h, std::vector<unsigned char>& out) {
   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDraw);
   glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+  if (fbo == 0) glReadBuffer(GL_FRONT);
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, out.data());
   const GLenum err = glGetError();
@@ -313,9 +314,9 @@ void HookOnUnload() {
 
 void HookOnSwap() {
   EnsureReals();
-  Once();
   g_swaps++;
-  CaptureBackbuffer();
+  CaptureBackbuffer(); // dump before engine probe — Once() can block
+  Once();
   XrSample xr{};
   const bool got = g_xr_ok && XrHostPollInput(&xr);
   if (g_xr_ok) XrHostBeginFrame();
@@ -347,14 +348,14 @@ const char* HookStatus() { return g_status; }
 
 void HookCallSdlSwap(void* window) {
   EnsureReals();
-  HookOnSwap();
   if (g_realSdlSwap) g_realSdlSwap(window);
+  HookOnSwap();
 }
 
-void HookCallGlxSwap(Display* dpy, GLXDrawable drawable) {
+void HookCallGlxSwap(void* dpy, unsigned long drawable) {
   EnsureReals();
+  if (g_realGlxSwap) g_realGlxSwap((Display*)dpy, (GLXDrawable)drawable);
   HookOnSwap();
-  if (g_realGlxSwap) g_realGlxSwap(dpy, drawable);
 }
 
 } // namespace cssvr
@@ -364,7 +365,7 @@ extern "C" {
 void SDL_GL_SwapWindow(void* window) { cssvr::HookCallSdlSwap(window); }
 
 void glXSwapBuffers(Display* dpy, GLXDrawable drawable) {
-  cssvr::HookCallGlxSwap(dpy, drawable);
+  cssvr::HookCallGlxSwap((void*)dpy, (unsigned long)drawable);
 }
 
 } // extern "C"

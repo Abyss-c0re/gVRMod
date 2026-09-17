@@ -70,6 +70,7 @@ if(CSSVR_BUILD_HOOK AND NOT WIN32)
       src/hook_gl.cpp
       src/hook_d3d9.cpp
       src/hook_vk.cpp
+      src/togl_adapter.cpp
       src/xr_host.cpp
     )
     target_include_directories(cssvrmod_hook PRIVATE
