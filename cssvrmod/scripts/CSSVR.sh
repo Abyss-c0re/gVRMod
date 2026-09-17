@@ -12,6 +12,10 @@ unset STEAM_RUNTIME
 unset STEAM_RUNTIME_LIBRARY_PATH
 export DISPLAY="${DISPLAY:-:0}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# togl is GLX. Host sdl2-compat + Wayland is what killed -dx9 here.
+export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}"
+FAKE="$ROOT/.scratch/cssvrmod/fakelibs"
+if [[ -d "$FAKE" ]]; then export CSSVR_LIBDIR="${CSSVR_LIBDIR:-$FAKE}"; fi
 if [[ -z "${XR_RUNTIME_JSON:-}" ]]; then
   for c in /usr/share/openxr/1/openxr_wivrn.json /usr/local/share/openxr/1/openxr_wivrn.json \
            /usr/share/openxr/1/openxr_monado.json; do

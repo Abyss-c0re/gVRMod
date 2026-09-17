@@ -135,6 +135,10 @@ SpawnPlan PlanSpawn(const CssInstall& inst, const LaunchOpts& opts) {
   p.cwd = inst.root;
   p.exe = inst.launcher;
   p.argv.push_back(inst.launcher);
+  const BackendLaunch be = BackendPlan(opts.backend);
+  p.backend = BackendName(opts.backend);
+  if (be.engine_flag && be.engine_flag[0]) p.argv.push_back(be.engine_flag);
+  if (be.sdl_video) p.sdl_videodriver = be.sdl_video;
   if (opts.novid) p.argv.push_back("-novid");
   if (opts.windowed) p.argv.push_back("-windowed");
   if (opts.noborder) p.argv.push_back("-noborder");
@@ -159,6 +163,9 @@ SpawnPlan PlanSpawn(const CssInstall& inst, const LaunchOpts& opts) {
   const std::string plat = inst.linux64 ? "linux64" : "";
   p.ld_library_path = inst.root + "/bin";
   if (inst.linux64) p.ld_library_path = inst.root + "/bin/linux64:" + p.ld_library_path;
+  if (const char* extra = std::getenv("CSSVR_LIBDIR")) {
+    if (extra[0]) p.ld_library_path = std::string(extra) + ":" + p.ld_library_path;
+  }
 
   p.ld_preload = opts.hook_so;
   if (const char* old = std::getenv("LD_PRELOAD")) {

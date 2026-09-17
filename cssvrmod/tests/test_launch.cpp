@@ -1,3 +1,4 @@
+#include "cssvrmod/backend.hpp"
 #include "cssvrmod/launch.hpp"
 #include "cssvrmod/source_if.hpp"
 #include "test_framework.h"
@@ -27,6 +28,49 @@ TEST(launch_inspect_and_find) {
   } else {
     ASSERT_TRUE(inst.reason != nullptr);
   }
+}
+
+TEST(backend_gl_priority_dx9_original) {
+  ASSERT_EQ(static_cast<int>(BackendFromName(nullptr)), static_cast<int>(Backend::Gl));
+  ASSERT_STREQ(BackendName(Backend::Gl), "gl");
+  auto gl = BackendPlan(Backend::Gl);
+  ASSERT_STREQ(gl.engine_flag, "-dx9");
+  ASSERT_STREQ(gl.sdl_video, "x11");
+  ASSERT_STREQ(gl.hook, "gl");
+  ASSERT_TRUE(BackendUsesTogl(Backend::Gl));
+  auto dx = BackendPlan(Backend::Dx9);
+  ASSERT_STREQ(dx.engine_flag, "-dx9");
+  ASSERT_STREQ(dx.hook, "d3d9");
+  ASSERT_STREQ(dx.reason, "original_vrmod_createtexture");
+  auto vk = BackendPlan(Backend::Vk);
+  ASSERT_STREQ(vk.engine_flag, "-vulkan");
+  ASSERT_STREQ(vk.hook, "vk");
+  ASSERT_FALSE(BackendUsesTogl(Backend::Vk));
+}
+
+TEST(launch_plan_default_gl_flag) {
+  CssInstall inst;
+  inst.found = true;
+  inst.root = "/tmp";
+  inst.launcher = "/tmp/cstrike.sh";
+  inst.linux64 = true;
+  LaunchOpts o;
+  o.hook_so.clear();
+  o.backend = Backend::Gl;
+  auto plan = PlanSpawn(inst, o);
+  ASSERT_TRUE(plan.ok);
+  ASSERT_STREQ(plan.backend, "gl");
+  ASSERT_STREQ(plan.sdl_videodriver.c_str(), "x11");
+  bool has_dx9 = false;
+  for (const auto& a : plan.argv)
+    if (a == "-dx9") has_dx9 = true;
+  ASSERT_TRUE(has_dx9);
+  o.backend = Backend::Vk;
+  auto pvk = PlanSpawn(inst, o);
+  bool has_vk = false;
+  for (const auto& a : pvk.argv)
+    if (a == "-vulkan") has_vk = true;
+  ASSERT_TRUE(has_vk);
 }
 
 TEST(launch_hook_required_when_set) {

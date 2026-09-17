@@ -15,6 +15,9 @@ static void Usage() {
                "  --print    print spawn plan and exit\n"
                "  --map MAP  +map after launch\n"
                "  --hook SO  LD_PRELOAD hook (default: sibling libcssvrmod_hook.so)\n"
+               "  --gl       OpenGL/togl (default, gVRMod Linux)\n"
+               "  --dx9      original vrmod CreateTexture path (shaderapidx9)\n"
+               "  --vk       shaderapivk present (64-bit CSS fallback)\n"
                "  --no-hook  spawn CSS without VR hook (debug)\n");
 }
 
@@ -44,6 +47,8 @@ static int Spawn(const cssvr::SpawnPlan& p) {
   }
   if (!p.ld_preload.empty()) setenv("LD_PRELOAD", p.ld_preload.c_str(), 1);
   if (!p.xr_runtime_json.empty()) setenv("XR_RUNTIME_JSON", p.xr_runtime_json.c_str(), 1);
+  if (!p.sdl_videodriver.empty()) setenv("SDL_VIDEODRIVER", p.sdl_videodriver.c_str(), 1);
+  setenv("CSSVR_BACKEND", p.backend ? p.backend : "gl", 1);
   if (chdir(p.cwd.c_str()) != 0) {
     std::fprintf(stderr, "cssvr: chdir %s failed\n", p.cwd.c_str());
     return 2;
@@ -72,6 +77,9 @@ int main(int argc, char** argv) {
     else if (std::strcmp(argv[i], "--no-hook") == 0) no_hook = true;
     else if (std::strcmp(argv[i], "--map") == 0 && i + 1 < argc) opts.map = argv[++i];
     else if (std::strcmp(argv[i], "--hook") == 0 && i + 1 < argc) opts.hook_so = argv[++i];
+    else if (std::strcmp(argv[i], "--gl") == 0) opts.backend = cssvr::Backend::Gl;
+    else if (std::strcmp(argv[i], "--dx9") == 0) opts.backend = cssvr::Backend::Dx9;
+    else if (std::strcmp(argv[i], "--vk") == 0) opts.backend = cssvr::Backend::Vk;
     else {
       std::fprintf(stderr, "cssvr: unknown arg %s\n", argv[i]);
       Usage();
@@ -87,8 +95,9 @@ int main(int argc, char** argv) {
   if (find_only) return inst.found ? 0 : 1;
 
   cssvr::SpawnPlan plan = cssvr::PlanSpawn(inst, opts);
-  std::fprintf(stdout, "cssvr: spawn ok=%d reason=%s exe=%s preload=%s xr=%s\n", plan.ok ? 1 : 0,
-               plan.reason, plan.exe.c_str(), plan.ld_preload.c_str(),
+  std::fprintf(stdout, "cssvr: spawn ok=%d backend=%s reason=%s exe=%s preload=%s sdl=%s xr=%s\n",
+               plan.ok ? 1 : 0, plan.backend, plan.reason, plan.exe.c_str(),
+               plan.ld_preload.c_str(), plan.sdl_videodriver.c_str(),
                plan.xr_runtime_json.c_str());
   if (print_only || !plan.ok) return plan.ok ? 0 : 1;
   return Spawn(plan);

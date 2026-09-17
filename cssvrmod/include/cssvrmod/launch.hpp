@@ -1,5 +1,6 @@
 #pragma once
 // Find Counter-Strike: Source and build an honest spawn plan (no Steam theater).
+#include "backend.hpp"
 #include <string>
 #include <vector>
 
@@ -24,6 +25,8 @@ struct SpawnPlan {
   std::string ld_library_path;
   std::string ld_preload;
   std::string xr_runtime_json;
+  std::string sdl_videodriver;
+  const char* backend = "gl";
   const char* reason = "idle";
 };
 
@@ -36,6 +39,7 @@ struct LaunchOpts {
   bool noborder = true;
   bool novid = true;
   bool sv_lan = true;
+  Backend backend = Backend::Gl; // OpenGL/togl first
   std::string extra_args;
 };
 
