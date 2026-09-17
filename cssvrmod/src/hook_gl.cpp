@@ -10,10 +10,14 @@
 #include <GL/gl.h>
 #include <GL/glx.h>
 #include <X11/Xlib.h>
+#include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
 #include <string>
+#include <sys/stat.h>
+#include <vector>
 
 namespace cssvr {
 namespace {
@@ -23,6 +27,10 @@ bool g_inited = false;
 bool g_xr_ok = false;
 GLuint g_cap = 0;
 int g_capW = 0, g_capH = 0;
+int g_swaps = 0;
+int g_dumps = 0;
+bool g_want_xr = false;
+std::string g_dump_dir;
 WallState g_leftWall, g_rightWall;
 float g_nextMelee = 0.f;
 float g_now = 0.f;
@@ -57,21 +65,131 @@ void EnsureReals() {
     g_sdlPush = reinterpret_cast<SdlPushEventFn>(dlsym(RTLD_DEFAULT, "SDL_PushEvent"));
 }
 
-void CaptureBackbuffer() {
+bool EnvOn(const char* k, bool def = false) {
+  const char* e = std::getenv(k);
+  if (!e || !e[0]) return def;
+  return !(e[0] == '0' && e[1] == 0);
+}
+
+void Logf(const char* fmt, ...) {
+  FILE* f = std::fopen("/tmp/cssvrmod.log", "a");
+  if (!f) return;
+  va_list ap;
+  va_start(ap, fmt);
+  std::vfprintf(f, fmt, ap);
+  va_end(ap);
+  std::fputc('\n', f);
+  std::fclose(f);
+}
+
+void EnsureDumpDir() {
+  if (!g_dump_dir.empty()) return;
+  if (const char* e = std::getenv("CSSVR_DUMP_DIR")) g_dump_dir = e;
+  else g_dump_dir = "/home/voldemar/Dev/GMod/gVRMod/.scratch/cssvrmod";
+  mkdir(g_dump_dir.c_str(), 0755);
+}
+
+bool QueryDrawableSize(unsigned* w, unsigned* h) {
+  *w = *h = 0;
   Display* dpy = glXGetCurrentDisplay();
   GLXDrawable draw = glXGetCurrentDrawable();
-  unsigned int w = 0, h = 0;
   if (dpy && draw) {
-    glXQueryDrawable(dpy, draw, GLX_WIDTH, &w);
-    glXQueryDrawable(dpy, draw, GLX_HEIGHT, &h);
+    glXQueryDrawable(dpy, draw, GLX_WIDTH, w);
+    glXQueryDrawable(dpy, draw, GLX_HEIGHT, h);
   }
-  if (w == 0 || h == 0) {
+  if (*w == 0 || *h == 0) {
     GLint vp[4] = {0, 0, 0, 0};
     glGetIntegerv(GL_VIEWPORT, vp);
-    w = (unsigned)vp[2];
-    h = (unsigned)vp[3];
+    *w = (unsigned)vp[2];
+    *h = (unsigned)vp[3];
   }
-  if (w == 0 || h == 0) return;
+  return *w > 0 && *h > 0;
+}
+
+// Sample uniqueness: not a solid clear color (loading black / magenta).
+bool PixelsLookLikeScene(const unsigned char* rgba, int w, int h, int* out_nonzero, int* out_unique) {
+  const int n = w * h;
+  int nonzero = 0;
+  unsigned seen[64] = {};
+  int unique = 0;
+  const int step = n > 4000 ? n / 4000 : 1;
+  for (int i = 0; i < n; i += step) {
+    const unsigned char* p = rgba + (size_t)i * 4;
+    if (p[0] | p[1] | p[2]) nonzero++;
+    unsigned key = ((unsigned)p[0] << 16) | ((unsigned)p[1] << 8) | p[2];
+    unsigned bucket = key % 64;
+    bool have = false;
+    for (int b = 0; b < 64; ++b) {
+      unsigned s = seen[(bucket + b) % 64];
+      if (s == 0) {
+        seen[(bucket + b) % 64] = key ? key : 1;
+        unique++;
+        have = true;
+        break;
+      }
+      if (s == (key ? key : 1)) {
+        have = true;
+        break;
+      }
+    }
+    (void)have;
+  }
+  if (out_nonzero) *out_nonzero = nonzero;
+  if (out_unique) *out_unique = unique;
+  return unique >= 12 && nonzero > 40;
+}
+
+bool ReadFbRgba(GLint fbo, int w, int h, std::vector<unsigned char>& out) {
+  out.assign((size_t)w * (size_t)h * 4, 0);
+  GLint prevRead = 0, prevDraw = 0;
+  glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
+  glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDraw);
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, out.data());
+  const GLenum err = glGetError();
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, prevRead);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDraw);
+  return err == GL_NO_ERROR;
+}
+
+void WritePpm(const std::string& path, int w, int h, const unsigned char* rgba) {
+  FILE* f = std::fopen(path.c_str(), "wb");
+  if (!f) return;
+  std::fprintf(f, "P6\n%d %d\n255\n", w, h);
+  // OpenGL origin is bottom-left; write top-down.
+  std::vector<unsigned char> row((size_t)w * 3);
+  for (int y = h - 1; y >= 0; --y) {
+    const unsigned char* src = rgba + (size_t)y * (size_t)w * 4;
+    for (int x = 0; x < w; ++x) {
+      row[(size_t)x * 3 + 0] = src[(size_t)x * 4 + 0];
+      row[(size_t)x * 3 + 1] = src[(size_t)x * 4 + 1];
+      row[(size_t)x * 3 + 2] = src[(size_t)x * 4 + 2];
+    }
+    std::fwrite(row.data(), 1, row.size(), f);
+  }
+  std::fclose(f);
+}
+
+void MaybeDump(const std::vector<unsigned char>& rgba, int w, int h, GLint fbo, bool scene) {
+  if (g_dumps >= 8) return;
+  const bool periodic = (g_swaps == 15 || g_swaps == 60 || g_swaps == 180 || (g_swaps % 240) == 0);
+  if (!scene && !periodic) return;
+  EnsureDumpDir();
+  char name[256];
+  std::snprintf(name, sizeof(name), "%s/cap_%03d_fbo%d_%dx%d_%s.ppm", g_dump_dir.c_str(), g_dumps,
+                (int)fbo, w, h, scene ? "scene" : "raw");
+  WritePpm(name, w, h, rgba.data());
+  g_dumps++;
+  Logf("dump %s scene=%d", name, scene ? 1 : 0);
+}
+
+void CaptureBackbuffer() {
+  unsigned w = 0, h = 0;
+  if (!QueryDrawableSize(&w, &h)) {
+    if (g_swaps < 5 || (g_swaps % 120) == 0) Logf("capture skip: no size swap=%d", g_swaps);
+    return;
+  }
   if (!g_cap || g_capW != (int)w || g_capH != (int)h) {
     if (g_cap) glDeleteTextures(1, &g_cap);
     glGenTextures(1, &g_cap);
@@ -82,13 +200,44 @@ void CaptureBackbuffer() {
                  nullptr);
     g_capW = (int)w;
     g_capH = (int)h;
+    Logf("capture tex %u %dx%d", (unsigned)g_cap, g_capW, g_capH);
   }
-  GLint prev = 0;
-  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prev);
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  glBindTexture(GL_TEXTURE_2D, g_cap);
-  glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, g_capW, g_capH);
-  glBindFramebuffer(GL_FRAMEBUFFER, prev);
+
+  GLint drawFbo = 0;
+  glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFbo);
+
+  std::vector<unsigned char> pix;
+  bool ok = ReadFbRgba(drawFbo, (int)w, (int)h, pix);
+  int nz = 0, uniq = 0;
+  bool scene = ok && PixelsLookLikeScene(pix.data(), (int)w, (int)h, &nz, &uniq);
+  if (!scene && drawFbo != 0) {
+    std::vector<unsigned char> pix0;
+    if (ReadFbRgba(0, (int)w, (int)h, pix0)) {
+      int nz0 = 0, u0 = 0;
+      if (PixelsLookLikeScene(pix0.data(), (int)w, (int)h, &nz0, &u0) || nz0 > nz) {
+        pix.swap(pix0);
+        nz = nz0;
+        uniq = u0;
+        scene = u0 >= 12 && nz0 > 40;
+        drawFbo = 0;
+        ok = true;
+      }
+    }
+  }
+
+  if (ok) {
+    glBindTexture(GL_TEXTURE_2D, g_cap);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (GLsizei)w, (GLsizei)h, GL_RGBA, GL_UNSIGNED_BYTE,
+                    pix.data());
+    MaybeDump(pix, (int)w, (int)h, drawFbo, scene);
+    if (scene) g_status = "captured";
+    if (g_swaps < 8 || scene || (g_swaps % 120) == 0)
+      Logf("capture swap=%d fbo=%d %dx%d ok=%d nz=%d uniq=%d scene=%d", g_swaps, (int)drawFbo,
+           (int)w, (int)h, ok ? 1 : 0, nz, uniq, scene ? 1 : 0);
+  } else if (g_swaps < 8) {
+    Logf("capture read fail swap=%d fbo=%d %dx%d", g_swaps, (int)drawFbo, (int)w, (int)h);
+  }
 }
 
 // Minimal SDL_Event mouse/key injection (SDL2 layout: type at 0, common padding).
@@ -134,11 +283,20 @@ void Once() {
   g_inited = true;
   g_status = "init";
   Log("cssvr hook init");
+  EnsureDumpDir();
+  g_want_xr = EnvOn("CSSVR_XR", false);
+  Logf("dump_dir=%s xr=%d", g_dump_dir.c_str(), g_want_xr ? 1 : 0);
   ProbeLiveEngine(g_eng);
   g_wep = FindWeapon("weapon_knife");
-  g_xr_ok = XrHostInit();
-  g_status = g_xr_ok ? "xr_ok" : XrHostStatus().reason;
-  Log(g_status);
+  if (g_want_xr) {
+    g_xr_ok = XrHostInit();
+    g_status = g_xr_ok ? "xr_ok" : XrHostStatus().reason;
+    Log(g_status);
+  } else {
+    g_xr_ok = false;
+    g_status = "capture_only";
+    Log("capture_only (set CSSVR_XR=1 for OpenXR)");
+  }
 }
 
 } // namespace
@@ -156,6 +314,7 @@ void HookOnUnload() {
 void HookOnSwap() {
   EnsureReals();
   Once();
+  g_swaps++;
   CaptureBackbuffer();
   XrSample xr{};
   const bool got = g_xr_ok && XrHostPollInput(&xr);
