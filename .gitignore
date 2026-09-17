@@ -11,6 +11,7 @@ build/
 build_release/
 build_debug/
 native_launcher/build/
+cssvrmod/build/
 
 # Local scratch (screenshots, temp dumps) — not product
 .scratch/

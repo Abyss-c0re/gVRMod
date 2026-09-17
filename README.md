@@ -35,6 +35,7 @@
 | **OpenXR module** | `src/` · CMake · `install.sh` | `gmcl_vrmod_xr_*` binary |
 | **Lua addon** | submodule [`addon/vrmod-x64`](https://github.com/Abyss-c0re/vrmod-x64) | Gameplay, UI, bindings, experience |
 | **OpenVR module** | sibling repo [vrmod-module-master](https://github.com/Abyss-c0re/vrmod-module-master) | Classic SteamVR path (optional) |
+| **CSSVRMod** | [`cssvrmod/`](cssvrmod/README.md) | Counter-Strike: Source VR (same hook + OpenXR + C++ combat laws) |
 
 The Workshop / Lua tree is **not** a second product — it’s the client half of this stack. Development SoT for Lua is the submodule here; release modules ship from **this** repo’s CI/install.
 

@@ -64,6 +64,16 @@ if [[ $FAST -eq 0 ]]; then
   make -j"$(nproc)" cube_launcher_tests
   popd >/dev/null
   run "cpp.launcher" ./native_launcher/build_tests/cube_launcher_tests
+
+  # CSSVRMod (combat laws + launch; hook built when OpenXR/GL present)
+  mkdir -p cssvrmod/build
+  pushd cssvrmod/build >/dev/null
+  if [[ $NO_CLEAN -eq 0 ]] || [[ ! -f CMakeCache.txt ]]; then
+    cmake .. >/dev/null
+  fi
+  make -j"$(nproc)" cssvrmod_tests CSSVR
+  popd >/dev/null
+  run "cpp.cssvrmod" ./cssvrmod/build/cssvrmod_tests
 else
   echo "[i] --fast: skipped C++ rebuilds"
 fi
