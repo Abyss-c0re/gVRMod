@@ -7,6 +7,7 @@
 #include "cube_return.hpp"
 #include "warm_reuse.hpp"
 #include "window_chrome.hpp"
+#include "cssvr_spawn.hpp"
 #include "matrix_rain.hpp"
 #include <algorithm>
 #include <cstdlib>
@@ -710,6 +711,21 @@ TEST(launcher_window_chrome_hmd_expect) {
     ASSERT_TRUE(!missing.noborder); // invent-forbidden
     ASSERT_EQ(WindowChrome_StatusLabel(missing), std::string("WIN · FRAMED"));
     ASSERT_TRUE(!WindowChrome_IsForceRisk(framed));
+}
+
+TEST(launcher_cssvrmod_target_and_cmd) {
+    ASSERT_TRUE(CubeTarget_IsCSSVRMod("CSSVRMod"));
+    ASSERT_TRUE(!CubeTarget_IsCSSVRMod("cssvrmod"));
+    ASSERT_TRUE(!CubeTarget_IsCSSVRMod("Sandbox"));
+    auto maps = CSSVRModDefaultMaps();
+    ASSERT_TRUE(!maps.empty());
+    ASSERT_EQ(maps[0], std::string("de_dust2"));
+    std::string cmd = CSSVRLaunchCmd("/opt/CSSVRMod/install/CSSVR", "de_dust2", false);
+    ASSERT_TRUE(cmd.find("'/opt/CSSVRMod/install/CSSVR'") != std::string::npos);
+    ASSERT_TRUE(cmd.find("--map de_dust2") != std::string::npos);
+    ASSERT_TRUE(cmd.find("--noborder") == std::string::npos);
+    std::string nb = CSSVRLaunchCmd("/opt/CSSVR/CSSVR", "de_inferno", true);
+    ASSERT_TRUE(nb.find("--noborder") != std::string::npos);
 }
 
 int main() {

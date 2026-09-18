@@ -1,5 +1,6 @@
 #include "ui_panel.hpp"
 #include "gmod_spawn.hpp"
+#include "cssvr_spawn.hpp"
 #include "last_play.hpp"
 #include <algorithm>
 #include <cmath>
@@ -715,6 +716,13 @@ void CubeUI_Init(CubeUIState& s, const std::string& gmodRoot) {
   // Soft reticle at ray hit so tip-on-button == click pixel is visible (1:1 verify).
   s.paintSoftCursor = true;
   s.categories = ScanGModMaps(gmodRoot);
+  {
+    MapCategory css;
+    css.name = "CSSVRMod";
+    css.maps = CSSVRModDefaultMaps();
+    css.order = -1;
+    s.categories.insert(s.categories.begin(), css);
+  }
   if (s.categories.empty()) {
     MapCategory c;
     c.name = "Sandbox";

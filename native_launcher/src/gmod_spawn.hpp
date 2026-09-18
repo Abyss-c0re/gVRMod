@@ -63,6 +63,9 @@ struct LaunchRequest {
 // Returns 0 on spawn success. Does not take OpenXR — caller keeps session until handoff.
 int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut);
 
+/// Cube Start on category CSSVRMod — exec sibling CSSVRMod launcher. CSS owns XR.
+int SpawnCSSVRMod(const std::string& map, bool noborder, std::string& errOut);
+
 bool GModProcessRunning();
 std::string ReadCubeHandoffPhase(const std::string& gmodRoot);
 void ClearCubeHandoffMarkers(const std::string& gmodRoot);

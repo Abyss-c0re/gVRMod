@@ -10,6 +10,7 @@
 #include "host_cmd.hpp"
 #include "launch_fill.hpp"
 #include "gmod_spawn.hpp"
+#include "cssvr_spawn.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
 #include "ambient_backend.hpp"
@@ -337,9 +338,29 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
       break;
     }
 
-    // StartGame → keep XR until take_xr handoff
+    // StartGame → keep XR until take_xr handoff (GMod) or release XR (CSSVRMod)
     if (ui.wantStart && !ui.handoff) {
       CubeUI_SaveBindingsIfDirty(ui);
+      const std::string cat = (!ui.categories.empty() && ui.catIndex >= 0 &&
+                               ui.catIndex < (int)ui.categories.size())
+                                  ? ui.categories[ui.catIndex].name
+                                  : std::string();
+      if (CubeTarget_IsCSSVRMod(cat)) {
+        std::string err;
+        const std::string map = CubeUI_SelectedMap(ui);
+        int rc = SpawnCSSVRMod(map, ui.gfx.noborder, err);
+        fprintf(stderr, "[CubeUI] Start CSSVRMod map=%s rc=%d %s\n", map.c_str(), rc,
+                err.c_str());
+        ui.wantStart = false;
+        if (rc == 0) {
+          CubeUI_SaveLastPlay(ui);
+          ui.status = "CSSVRMod spawned — releasing Cube XR";
+          if (sessionRunning) xrRequestExitSession(session);
+        } else {
+          ui.status = "CSSVRMod FAIL: " + err;
+        }
+        continue;
+      }
       LaunchRequest lr = LaunchRequestFromUI(ui, gmodRoot);
       ClearCubeHandoffMarkers(gmodRoot);
       // G04 / G13 soft resume: if GMod is still running (temp return to launcher),

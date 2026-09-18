@@ -1,82 +1,9 @@
-# CSSVRMod
+# Moved
 
-<p align="center"><strong>A VR mod for Counter-Strike: Source</strong><br/>
-OpenXR · texture hook · C++ combat laws (from gVRMod Lua)</p>
+**CSSVRMod** is its own repo (that letter case):
 
-CSSVRMod is a **sibling product** of [gVRMod](../README.md). It reuses the same foundations:
+https://github.com/Abyss-c0re/CSSVRMod
 
-- **Texture hook (OpenGL first)** — togl `SDL_GL_SwapWindow` (gVRMod Linux). **DX9** is the original vrmod `CreateTexture` path. **Vulkan** present is the 64-bit CSS fallback when togl will not start.
-- **OpenXR** — session + same-frame slight-IPD stereo (gmod synthetic) + shared controller paths (`shared/openxr`)
-- **App** — Cube-style launcher that finds CSS and starts it with the hook
-- **Combat** — melee, hand-bullet filter, wall collision, gun-aim — ported from `addon/vrmod-x64` Lua to **pure C++** (CSS has no GLua)
+Checkout sibling: `../CSSVRMod`
 
-## What you get
-
-| Piece | Path | Offline? |
-|-------|------|----------|
-| Combat / aim / collision laws | `include/cssvrmod/` | **yes** (`cssvrmod_tests`) |
-| CSS weapon catalog | `src/weapons.cpp` | **yes** |
-| Launcher | `install/cssvrmod/CSSVR` | find/print without HMD |
-| Hook | `install/cssvrmod/libcssvrmod_hook.so` | needs live CSS + HMD |
-
-## Quick start
-
-```bash
-# build (from gVRMod root)
-cmake -S cssvrmod -B cssvrmod/build
-cmake --build cssvrmod/build -j"$(nproc)"
-./cssvrmod/build/cssvrmod_tests
-
-# locate CSS (Steam app 240)
-./cssvrmod/scripts/CSSVR.sh --find
-
-# play (WiVRn / Monado / SteamVR OpenXR)
-./cssvrmod/scripts/CSSVR.sh --map de_dust2          # default: Vulkan + OpenXR + bordered window
-./cssvrmod/scripts/CSSVR.sh --gl --map de_dust2     # togl (CreateDevice still dies here)
-./cssvrmod/scripts/CSSVR.sh --noborder --map de_dust2
-```
-
-Headset + CSS walk is **manual**. Offline green is not an HMD claim.
-
-## Video calibration (vrmod Vision knobs)
-
-Edit `~/.config/gvrmod/cssvr_calib.cfg` while CSS is running — the hook reloads it in under a second.
-
-| Key | vrmod twin | What it does |
-|-----|------------|----------------|
-| `eyescale` | `vrmod_eyescale` | IPD / eye distance. **Right eye too far → lower** (0.15–0.25). Too flat → raise toward 0.5 |
-| `horizontaloffset` | `vrmod_horizontaloffset` | Pan both eyes L/R (−1..1) |
-| `verticaloffset` | `vrmod_verticaloffset` | Pan both eyes U/D (−1..1) |
-| `scalefactor` | `vrmod_scalefactor` | Zoom crop (1.05–1.2 fills black bars) |
-| `lens_bend` | `vrmod_lens_bend` | Pull UV toward lens center |
-| `swap_eyes` | `vrmod_swap_eyes` | 1 = swap L/R content |
-
-Dial order (same as `vrmod_border_calibrate`): **scale → V → H → eye**.
-
-## Controls (Quest / Index-style)
-
-| Input | CSS |
-|-------|-----|
-| Left stick | move |
-| Right stick | snap / smooth turn |
-| Primary trigger | `+attack` (view snaps to **gun**) |
-| Off-hand trigger / grip | knife / `+attack2` (velocity melee) |
-| A | jump |
-| B | reload |
-| X | use |
-| Menu | scoreboard |
-
-Aim is the **gun pose**, not the HMD crosshair. Look is HMD until you fire.
-
-## Layout
-
-```
-cssvrmod/
-  include/cssvrmod/   laws (header)
-  src/                catalog, launch, hook, XR
-  tests/              offline gate
-  scripts/CSSVR.sh
-  docs/ARCHITECTURE.md
-```
-
-License: **CUBECHAIN** (same as gVRMod).
+Start from **CubeUI** → New Game → category **CSSVRMod** → Start Game.

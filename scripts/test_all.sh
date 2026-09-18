@@ -65,15 +65,21 @@ if [[ $FAST -eq 0 ]]; then
   popd >/dev/null
   run "cpp.launcher" ./native_launcher/build_tests/cube_launcher_tests
 
-  # CSSVRMod (combat laws + launch; hook built when OpenXR/GL present)
-  mkdir -p cssvrmod/build
-  pushd cssvrmod/build >/dev/null
-  if [[ $NO_CLEAN -eq 0 ]] || [[ ! -f CMakeCache.txt ]]; then
-    cmake .. >/dev/null
+  # CSSVRMod (sibling repo, exact case) — combat laws + launch
+  CSSVR_DIR="${CSSVR_ROOT:-$ROOT/../CSSVRMod}"
+  if [[ ! -d "$CSSVR_DIR" && -d "$ROOT/CSSVRMod" ]]; then CSSVR_DIR="$ROOT/CSSVRMod"; fi
+  if [[ -d "$CSSVR_DIR" ]]; then
+    mkdir -p "$CSSVR_DIR/build"
+    pushd "$CSSVR_DIR/build" >/dev/null
+    if [[ $NO_CLEAN -eq 0 ]] || [[ ! -f CMakeCache.txt ]]; then
+      cmake .. >/dev/null
+    fi
+    make -j"$(nproc)" cssvrmod_tests CSSVR
+    popd >/dev/null
+    run "cpp.CSSVRMod" "$CSSVR_DIR/build/cssvrmod_tests"
+  else
+    echo "[i] CSSVRMod sibling missing — skipped"
   fi
-  make -j"$(nproc)" cssvrmod_tests CSSVR
-  popd >/dev/null
-  run "cpp.cssvrmod" ./cssvrmod/build/cssvrmod_tests
 else
   echo "[i] --fast: skipped C++ rebuilds"
 fi

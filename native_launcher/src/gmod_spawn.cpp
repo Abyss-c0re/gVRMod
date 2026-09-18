@@ -1,4 +1,5 @@
 #include "gmod_spawn.hpp"
+#include "cssvr_spawn.hpp"
 #include "panel_config.hpp"
 #include "stage_pack.hpp"
 #include "ambient_clip.hpp"
@@ -235,6 +236,31 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
   int rc = system(cmd.str().c_str());
   if (rc != 0) {
     errOut = "spawn returned " + std::to_string(rc);
+    return 4;
+  }
+  return 0;
+}
+
+int SpawnCSSVRMod(const std::string& map, bool noborder, std::string& errOut) {
+  char self[4096];
+  std::string exeDir;
+  ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);
+  if (n > 0) {
+    self[n] = '\0';
+    exeDir = self;
+    auto slash = exeDir.find_last_of('/');
+    if (slash != std::string::npos) exeDir.resize(slash);
+  }
+  const std::string bin = FindCSSVRBin(exeDir);
+  if (bin.empty()) {
+    errOut = "CSSVRMod launcher not found (build sibling CSSVRMod or set CSSVR_BIN)";
+    return 3;
+  }
+  const std::string cmd = CSSVRLaunchCmd(bin, map, noborder);
+  fprintf(stderr, "[CubeUI] Start CSSVRMod → %s\n", cmd.c_str());
+  int rc = system(cmd.c_str());
+  if (rc != 0) {
+    errOut = "CSSVRMod spawn returned " + std::to_string(rc);
     return 4;
   }
   return 0;
