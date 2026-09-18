@@ -44,11 +44,38 @@ if pgrep -x CubeUI >/dev/null 2>&1; then
   exit 0
 fi
 
-# Always wait a few seconds after VR exit so OpenXR is free.
-# Temp return keeps GMod (hl2) running — do NOT wait for process death.
-echo "[cube-host] waiting 3s for OpenXR drain after GMod VR exit..." >>"$LOG"
-sleep 3
+# Single-instance lock (desktop + GMod bridge both call this)
+LOCK="/tmp/CubeUI_host.lock"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK"
+  if ! flock -n 9; then
+    echo "[cube-host] another host launch in progress — skip" >>"$LOG"
+    exit 0
+  fi
+fi
+
+# Clean orphan ambient from prior CubeUI exits (gain-restart left zombies)
+pkill -f 'ffplay.*cube_hold\.ogg' 2>/dev/null || true
+
+# Wait only when returning from GMod (handoff / return markers present)
+GMOD_DATA="${HOME}/.steam/steam/steamapps/common/GarrysMod/garrysmod/data/vrmod"
+need_drain=0
+if [[ -f "$GMOD_DATA/cube_handoff.txt" ]] || [[ -f "$GMOD_DATA/cube_return.txt" ]] \
+  || [[ -f "$GMOD_DATA/openxr_launch.txt" ]]; then
+  need_drain=1
+fi
+if [[ "$need_drain" -eq 1 ]]; then
+  echo "[cube-host] waiting 3s for OpenXR drain after GMod VR exit..." >>"$LOG"
+  sleep 3
+else
+  echo "[cube-host] desktop launch — no drain wait" >>"$LOG"
+fi
 
 cd "$ROOT" || true
 # Run in foreground of this process group when launched by setsid/nohup from GMod
-exec "$BIN" >>"$LOG" 2>&1
+# On exit, kill ambient orphans again
+"$BIN" >>"$LOG" 2>&1
+rc=$?
+pkill -f 'ffplay.*cube_hold\.ogg' 2>/dev/null || true
+echo "[cube-host] CubeUI exited rc=$rc — cleaned ambient" >>"$LOG"
+exit 0
