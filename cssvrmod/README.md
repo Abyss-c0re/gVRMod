@@ -1,9 +1,7 @@
 # Moved
 
-**CSSVRMod** is its own repo (that letter case):
+CSSVRMod lives here: https://github.com/Abyss-c0re/CSSVRMod
 
-https://github.com/Abyss-c0re/CSSVRMod
+Local sibling: `../CSSVRMod`
 
-Checkout sibling: `../CSSVRMod`
-
-Start from **CubeUI** → New Game → category **CSSVRMod** → Start Game.
+Start from Cube → New Game → CSSVRMod, or `../CSSVRMod/scripts/CSSVR.sh`.
