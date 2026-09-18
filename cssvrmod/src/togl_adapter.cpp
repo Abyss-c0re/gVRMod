@@ -1,6 +1,9 @@
 // libtogl GetAdapterCount → launcher display-DB vtable SEGV on this GPU/SDL
 // before any GL context exists. Patch adapter queries so shaderapidx9 can
 // reach CreateDevice / SDL_GL_SwapWindow. CreateDevice stays in real togl.
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include "cssvrmod/hook_api.hpp"
 #include <cstdint>
 #include <cstdio>
@@ -15,6 +18,12 @@
 #include <GL/gl.h>
 #include <GL/glx.h>
 #include <X11/Xlib.h>
+#ifndef GLX_CONTEXT_MAJOR_VERSION_ARB
+#define GLX_CONTEXT_MAJOR_VERSION_ARB 0x2091
+#define GLX_CONTEXT_MINOR_VERSION_ARB 0x2092
+#define GLX_CONTEXT_PROFILE_MASK_ARB 0x9126
+#define GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+#endif
 
 namespace {
 
@@ -171,14 +180,58 @@ void* DummyGlx() {
     Log("no GLX");
     return nullptr;
   }
-  static int attrs[] = {GLX_RGBA, GLX_DOUBLEBUFFER, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8,
-                        GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 16, None};
-  XVisualInfo* vi = glXChooseVisual(g_dummy_dpy, DefaultScreen(g_dummy_dpy), attrs);
+  static int fb_attrs[] = {GLX_X_RENDERABLE,
+                           True,
+                           GLX_DRAWABLE_TYPE,
+                           GLX_WINDOW_BIT,
+                           GLX_RENDER_TYPE,
+                           GLX_RGBA_BIT,
+                           GLX_X_VISUAL_TYPE,
+                           GLX_TRUE_COLOR,
+                           GLX_RED_SIZE,
+                           8,
+                           GLX_GREEN_SIZE,
+                           8,
+                           GLX_BLUE_SIZE,
+                           8,
+                           GLX_ALPHA_SIZE,
+                           8,
+                           GLX_DEPTH_SIZE,
+                           24,
+                           GLX_DOUBLEBUFFER,
+                           True,
+                           None};
+  int ncfg = 0;
+  GLXFBConfig* cfgs = glXChooseFBConfig(g_dummy_dpy, DefaultScreen(g_dummy_dpy), fb_attrs, &ncfg);
+  XVisualInfo* vi = nullptr;
+  GLXFBConfig cfg = nullptr;
+  if (cfgs && ncfg > 0) {
+    cfg = cfgs[0];
+    vi = glXGetVisualFromFBConfig(g_dummy_dpy, cfg);
+    XFree(cfgs);
+  }
   if (!vi) {
-    Log("glXChooseVisual failed");
+    static int attrs[] = {GLX_RGBA, GLX_DOUBLEBUFFER, GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8,
+                          GLX_BLUE_SIZE, 8, GLX_DEPTH_SIZE, 16, None};
+    vi = glXChooseVisual(g_dummy_dpy, DefaultScreen(g_dummy_dpy), attrs);
+  }
+  if (!vi) {
+    Log("no GLX visual");
     return nullptr;
   }
-  g_dummy_ctx = glXCreateContext(g_dummy_dpy, vi, nullptr, True);
+  using Create33 = GLXContext (*)(Display*, GLXFBConfig, GLXContext, Bool, const int*);
+  auto create33 = (Create33)glXGetProcAddressARB((const GLubyte*)"glXCreateContextAttribsARB");
+  if (create33 && cfg) {
+    int ctx_attrs[] = {GLX_CONTEXT_MAJOR_VERSION_ARB,
+                       3,
+                       GLX_CONTEXT_MINOR_VERSION_ARB,
+                       3,
+                       GLX_CONTEXT_PROFILE_MASK_ARB,
+                       GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+                       None};
+    g_dummy_ctx = create33(g_dummy_dpy, cfg, nullptr, True, ctx_attrs);
+  }
+  if (!g_dummy_ctx) g_dummy_ctx = glXCreateContext(g_dummy_dpy, vi, nullptr, True);
   Window root = RootWindow(g_dummy_dpy, vi->screen);
   Colormap cmap = XCreateColormap(g_dummy_dpy, root, vi->visual, AllocNone);
   XSetWindowAttributes swa{};
@@ -190,7 +243,7 @@ void* DummyGlx() {
     Log("dummy GLX make current failed");
     return nullptr;
   }
-  Log("dummy GLX context ok");
+  Log("dummy GLX 3.3 context ok");
   return g_dummy_ctx;
 }
 
@@ -222,6 +275,8 @@ extern "C" void* CssvrToglGetProc(void* a, void* b, void* c, void* d) {
       if (gl) p = dlsym(gl, name);
     }
   }
+  // Second arg is okay (starts 1). Helper treats *okay==0 as missing.
+  if (b && (uintptr_t)b > 0x10000) *static_cast<bool*>(b) = (p != nullptr);
   if (nlog <= 4) {
     FILE* lf = std::fopen("/tmp/cssvrmod_glproc.log", "a");
     if (lf) {
@@ -265,12 +320,117 @@ void** GlTableSlot() {
   return reinterpret_cast<void**>(p + 15 + rel);
 }
 
+// launcher.so BSS: COpenGLEntryPoints* used by the GL_NVX extension dump
+// inside CreateDevice. If this is null, cmpb 0x6f8(%rax) SIGSEGVs.
+constexpr uintptr_t kLauncherGGL = 0x58b98;
+
+void* LauncherBase() {
+  void* h = dlopen("launcher.so", RTLD_NOW | RTLD_NOLOAD);
+  if (!h) return nullptr;
+  void* sym = dlsym(h, "LauncherMain");
+  if (!sym) return nullptr;
+  Dl_info in{};
+  if (!dladdr(sym, &in) || !in.dli_fbase) return nullptr;
+  return in.dli_fbase;
+}
+
+void SeedLauncherGGL(void* table) {
+  if (!table) return;
+  void* base = LauncherBase();
+  if (!base) {
+    Log("launcher base missing");
+    return;
+  }
+  *reinterpret_cast<void**>(static_cast<char*>(base) + kLauncherGGL) = table;
+}
+
+bool g_seeded = false;
+void HookLauncherGetDisplayDB();
+
+void PopulateAndSeed() {
+  if (g_seeded || !g_get_gl_entries) return;
+  HookLauncherGetDisplayDB();
+  if (!glXGetCurrentContext()) DummyGlx();
+  void* table = g_get_gl_entries((void*)CssvrToglGetProc);
+  if (!table) {
+    Log("GetOpenGLEntryPoints returned null");
+    return;
+  }
+  SeedLauncherGGL(table);
+  // Constructor stores glGetString at +0x220. Force it if lookup left NULL.
+  auto* getstr = reinterpret_cast<void**>(static_cast<char*>(table) + 0x220);
+  if (!*getstr) *getstr = (void*)glGetString;
+  HookSwapInTable(table);
+  g_seeded = true;
+  Log("PopulateAndSeed ok");
+}
+
+void* g_db_slots[16];
+struct FakeDisplayDB {
+  void** vptr;
+} g_fake_db{};
+
+int DbRet1(void*) { return 1; }
+void DbDtor(void*) {}
+int DbFill(void*, long a, long b, void* c, void* d, void* e) {
+  (void)a;
+  (void)b;
+  auto fill = [](void* p) {
+    if (!p) return;
+    std::memset(p, 0, 128);
+    auto* u = static_cast<unsigned*>(p);
+    u[0] = 1280;
+    u[1] = 720;
+    u[2] = 60;
+  };
+  fill(c);
+  fill(d);
+  fill(e);
+  return 1;
+}
+
+void* GetDisplayDB_Hook(void*) {
+  if (!g_fake_db.vptr) {
+    for (int i = 0; i < 16; ++i) g_db_slots[i] = (void*)DbFill;
+    g_db_slots[0] = (void*)DbDtor;
+    g_db_slots[1] = (void*)DbDtor;
+    g_db_slots[2] = (void*)DbRet1;
+    g_db_slots[4] = (void*)DbRet1;
+    g_db_slots[5] = (void*)DbRet1;
+    g_db_slots[7] = (void*)DbRet1;
+    g_db_slots[9] = (void*)DbRet1;
+    g_db_slots[11] = (void*)DbRet1;
+    g_fake_db.vptr = g_db_slots;
+  }
+  return &g_fake_db;
+}
+
+void HookLauncherGetDisplayDB() {
+  static bool done = false;
+  if (done) return;
+  void** table_slot = GlTableSlot();
+  if (!table_slot) return;
+  void** mgr_slot = table_slot + 1; // togl b4aa0 = g_pLauncherMgr
+  void* mgr = *mgr_slot;
+  if (!mgr) return;
+  void** orig_vt = *reinterpret_cast<void***>(mgr);
+  if (!orig_vt) return;
+  static void* vtcopy[64];
+  std::memcpy(vtcopy, orig_vt, sizeof(vtcopy));
+  vtcopy[0xd8 / 8] = (void*)GetDisplayDB_Hook;
+  if (!Unprotect(mgr, 8)) return;
+  *reinterpret_cast<void***>(mgr) = vtcopy;
+  done = true;
+  Log("hooked ILauncherMgr::GetDisplayDB");
+}
+
 void CallToglGlInit() {
+  HookLauncherGetDisplayDB();
   if (g_gl_entries_ok) return;
   void** slot = GlTableSlot();
   if (slot && *slot) {
+    SeedLauncherGGL(*slot);
     HookSwapInTable(*slot);
-    return;
   }
 }
 
@@ -283,7 +443,10 @@ void ReleaseDummyGlx() {
 }
 
 // thiscall-as-SysV: this in rdi. Runs on the shaderapi thread.
-extern "C" unsigned Stub_GetAdapterCount(void* /*self*/) { return 1; }
+extern "C" unsigned Stub_GetAdapterCount(void* /*self*/) {
+  HookLauncherGetDisplayDB();
+  return 1;
+}
 
 extern "C" int Stub_GetAdapterIdentifier(void* /*self*/, unsigned /*adapter*/, unsigned /*flags*/,
                                          void* ident) {
@@ -324,9 +487,25 @@ struct Patch {
 
 bool g_patched = false;
 
+void PatchCreateDeviceAssert(void* handle) {
+  // Create() calls gGL+0x3a8 and raise()s unless the result is 0x8cd5.
+  auto* create = static_cast<uint8_t*>(
+      dlsym(handle, "_ZN16IDirect3DDevice96CreateEP22IDirect3DDevice9Params"));
+  if (!create) return;
+  // Known file offset: raise check at Create+0x169a1 relative? Use 0x424d8-0x2b530.
+  auto* p = create + (0x424d8 - 0x2b530);
+  if (p[0] == 0x74 && p[1] == 0x0c) {
+    if (Unprotect(p, 2)) {
+      p[0] = 0xeb; // je -> jmp (skip raise)
+      Log("patched CreateDevice raise() assert");
+    }
+  }
+}
+
 void PatchTogl(void* handle) {
   if (g_patched || !handle) return;
   g_get_gl_entries = (GetOpenGLEntryPointsFn)dlsym(handle, "GetOpenGLEntryPoints");
+  PatchCreateDeviceAssert(handle);
   const Patch k[] = {
       {"_ZN10IDirect3D915GetAdapterCountEv", (void*)Stub_GetAdapterCount},
       {"_ZN10IDirect3D920GetAdapterIdentifierEjjP23_D3DADAPTER_IDENTIFIER9",
@@ -507,19 +686,28 @@ void* WatcherSdl(void*) {
 }
 
 void* WatcherTogl(void*) {
-  bool tried_gl = false;
   for (int i = 0; i < 40000; ++i) {
     TryPatch();
-    if (g_patched && !tried_gl) {
-      tried_gl = true;
-      DummyGlx();
-      if (g_get_gl_entries) g_get_gl_entries((void*)CssvrToglGetProc);
+    if (g_patched) {
+      CallToglGlInit();
+      if (!g_seeded) PopulateAndSeed();
     }
-    if (g_patched) CallToglGlInit();
-    if (g_gl_entries_ok) break;
+    if (g_seeded) break;
     usleep(500);
   }
   return nullptr;
+}
+
+extern "C" void* SDL_GL_CreateContext(void* win) {
+  using Fn = void* (*)(void*);
+  static Fn real = nullptr;
+  if (!real) real = (Fn)dlsym(RTLD_NEXT, "SDL_GL_CreateContext");
+  void* ctx = real ? real(win) : nullptr;
+  if (ctx) {
+    Log("SDL_GL_CreateContext");
+    PopulateAndSeed();
+  }
+  return ctx;
 }
 
 } // namespace
