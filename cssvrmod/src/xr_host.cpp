@@ -1,4 +1,5 @@
 #include "xr_host.hpp"
+#include "cssvrmod/calib.hpp"
 #include "cssvrmod/input.hpp"
 #include "openxr_paths.hpp"
 
@@ -405,13 +406,16 @@ void BlitToSwapchain(unsigned int src, int srcW, int srcH, int eye, bool vflip) 
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, src, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, df);
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dst, 0);
-    const GLint srcY0 = vflip ? srcH : 0;
-    const GLint srcY1 = vflip ? 0 : srcH;
-    // Same frame, slight horizontal crop — gmod-style synthetic IPD, not a cinema plane.
-    const int shift = srcW > 40 ? srcW / 40 : 1;
-    const GLint sx0 = (eye == 0) ? shift : 0;
-    const GLint sx1 = (eye == 0) ? srcW : srcW - shift;
-    glBlitFramebuffer(sx0, srcY0, sx1, srcY1, 0, 0, (GLint)g_scW, (GLint)g_scH, GL_COLOR_BUFFER_BIT,
+    const EyeBlit crop = CalibEye(CalibLive(), eye);
+    const GLint sx0 = (GLint)(crop.u0 * (float)srcW);
+    const GLint sx1 = (GLint)(crop.u1 * (float)srcW);
+    GLint sy0 = (GLint)(crop.v0 * (float)srcH);
+    GLint sy1 = (GLint)(crop.v1 * (float)srcH);
+    if (vflip) {
+      sy0 = srcH - (GLint)(crop.v0 * (float)srcH);
+      sy1 = srcH - (GLint)(crop.v1 * (float)srcH);
+    }
+    glBlitFramebuffer(sx0, sy0, sx1, sy1, 0, 0, (GLint)g_scW, (GLint)g_scH, GL_COLOR_BUFFER_BIT,
                       GL_LINEAR);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, prevRead);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDraw);
@@ -432,7 +436,11 @@ bool XrHostInit() {
   if (!g_inst && !CreateInst()) return false;
   if (!g_sess && !CreateSess()) return false;
   SetupInput();
-  Log("cssvr xr init %s stereo-offset %ux%u", g_info.reason, g_info.width, g_info.height);
+  {
+    const Calib c = CalibLive();
+    Log("cssvr xr init %s stereo-offset %ux%u calib=%s eye=%.2f", g_info.reason, g_info.width,
+        g_info.height, CalibPath(), c.eyescale);
+  }
   return g_info.session;
 }
 
@@ -487,11 +495,13 @@ bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vfli
   }
   XrFovf fallback{-0.85f, 0.85f, 0.85f, -0.85f};
 
+  const Calib cal = CalibLive();
   XrCompositionLayerProjectionView pv[2]{};
   for (int e = 0; e < 2; ++e) {
+    const EyeBlit crop = CalibEye(cal, e);
     pv[e].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
     pv[e].pose.orientation.w = 1.f;
-    pv[e].pose.position.x = (e == 0 ? -1.f : 1.f) * 0.016f;
+    pv[e].pose.position.x = crop.pose_x;
     pv[e].fov = (nloc >= 2) ? located[e].fov : fallback;
     pv[e].subImage.swapchain = g_sc[e];
     pv[e].subImage.imageRect.offset = {0, 0};
@@ -513,7 +523,8 @@ bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vfli
   static int ends = 0;
   ends++;
   if (ends <= 3 || (ends % 300) == 0)
-    Log("cssvr xr endframe #%d rc=%d stereo-offset %ux%u", ends, (int)rc, g_scW, g_scH);
+    Log("cssvr xr endframe #%d rc=%d stereo-offset %ux%u eye=%.2f h=%.2f v=%.2f sc=%.2f", ends,
+        (int)rc, g_scW, g_scH, cal.eyescale, cal.hoffset, cal.voffset, cal.scalefactor);
   return rc == XR_SUCCESS;
 }
 

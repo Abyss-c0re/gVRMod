@@ -14,6 +14,7 @@ add_library(cssvrmod_core STATIC
   src/weapons.cpp
   src/launch.cpp
   src/source_if.cpp
+  src/calib.cpp
 )
 target_include_directories(cssvrmod_core PUBLIC
   ${CSSVR_ROOT}/include
@@ -31,6 +32,7 @@ add_executable(cssvrmod_tests
   tests/test_input.cpp
   tests/test_launch.cpp
   tests/test_tick.cpp
+  tests/test_calib.cpp
 )
 target_include_directories(cssvrmod_tests PRIVATE
   ${CSSVR_ROOT}/include
@@ -52,6 +54,8 @@ add_custom_command(TARGET CSSVR POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E make_directory "${CSSVR_INSTALL}"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${CSSVR_ROOT}/cfg/cssvrmod.cfg" "${CSSVR_INSTALL}/cssvrmod.cfg"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CSSVR_ROOT}/cfg/cssvr_calib.cfg" "${CSSVR_INSTALL}/cssvr_calib.cfg"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${CSSVR_ROOT}/scripts/CSSVR.sh" "${CSSVR_INSTALL}/CSSVR.sh"
   COMMENT "Install cssvrmod.cfg + CSSVR.sh next to launcher"

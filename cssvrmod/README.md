@@ -38,6 +38,21 @@ cmake --build cssvrmod/build -j"$(nproc)"
 
 Headset + CSS walk is **manual**. Offline green is not an HMD claim.
 
+## Video calibration (vrmod Vision knobs)
+
+Edit `~/.config/gvrmod/cssvr_calib.cfg` while CSS is running — the hook reloads it in under a second.
+
+| Key | vrmod twin | What it does |
+|-----|------------|----------------|
+| `eyescale` | `vrmod_eyescale` | IPD / eye distance. **Right eye too far → lower** (0.15–0.25). Too flat → raise toward 0.5 |
+| `horizontaloffset` | `vrmod_horizontaloffset` | Pan both eyes L/R (−1..1) |
+| `verticaloffset` | `vrmod_verticaloffset` | Pan both eyes U/D (−1..1) |
+| `scalefactor` | `vrmod_scalefactor` | Zoom crop (1.05–1.2 fills black bars) |
+| `lens_bend` | `vrmod_lens_bend` | Pull UV toward lens center |
+| `swap_eyes` | `vrmod_swap_eyes` | 1 = swap L/R content |
+
+Dial order (same as `vrmod_border_calibrate`): **scale → V → H → eye**.
+
 ## Controls (Quest / Index-style)
 
 | Input | CSS |
