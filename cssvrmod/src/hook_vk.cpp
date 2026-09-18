@@ -1,5 +1,9 @@
 // CSS 64-bit defaults to shaderapivk / DXVK. GL swap never runs.
 // Intercept vkQueuePresentKHR and dump the presented swapchain image.
+#include "xr_host.hpp"
+#include "cssvrmod/input.hpp"
+#include "cssvrmod/source_if.hpp"
+#include "cssvrmod/weapons.hpp"
 #include <vulkan/vulkan.h>
 
 #include <cstdarg>
@@ -7,13 +11,18 @@
 #include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <mutex>
+#include <pthread.h>
 #include <string>
 #include <sys/stat.h>
 #include <unordered_map>
 #include <vector>
 
 namespace {
+using namespace cssvr;
 
 void Log(const char* fmt, ...) {
   FILE* f = std::fopen("/tmp/cssvrmod.log", "a");
@@ -92,6 +101,15 @@ struct DeviceState {
   uint32_t gfx_family = 0;
   VkQueue queue = VK_NULL_HANDLE;
   DevFns fn;
+  VkBuffer stage = VK_NULL_HANDLE;
+  VkDeviceMemory stage_mem = VK_NULL_HANDLE;
+  VkDeviceSize stage_bytes = 0;
+  VkCommandPool pool = VK_NULL_HANDLE;
+  VkCommandBuffer cmd = VK_NULL_HANDLE;
+  VkFence fence = VK_NULL_HANDLE;
+  bool copy_inflight = false;
+  uint32_t copy_w = 0, copy_h = 0;
+  VkFormat copy_fmt = VK_FORMAT_UNDEFINED;
 };
 
 std::mutex g_mu;
@@ -99,6 +117,110 @@ std::unordered_map<VkDevice, DeviceState> g_devs;
 std::unordered_map<VkSwapchainKHR, SwapState> g_scs;
 int g_presents = 0;
 int g_dumps = 0;
+int g_xr_ok = 0;
+int g_xr_fail = 0;
+EngineIf g_eng{};
+UserCmdOverlay g_prev_cmd{};
+
+bool XrWanted() {
+  const char* e = std::getenv("CSSVR_XR");
+  if (!e || !e[0]) return true;
+  return !(e[0] == '0' && e[1] == 0);
+}
+
+struct XrMailbox {
+  std::mutex mu;
+  std::condition_variable cv;
+  std::vector<unsigned char> rgba;
+  int w = 0, h = 0;
+  bool bgra = false;
+  bool have = false;
+  bool stop = false;
+};
+XrMailbox g_mb;
+std::atomic<bool> g_xr_thread{false};
+
+void PushXrFrame(const unsigned char* rgba, int w, int h, bool bgra) {
+  if (!rgba || w < 2 || h < 2) return;
+  std::lock_guard<std::mutex> lk(g_mb.mu);
+  // Latest-wins. Never queue — a backlog is what made the game hitch.
+  g_mb.rgba.assign(rgba, rgba + (size_t)w * (size_t)h * 4);
+  g_mb.w = w;
+  g_mb.h = h;
+  g_mb.bgra = bgra;
+  g_mb.have = true;
+  g_mb.cv.notify_one();
+}
+
+bool MailboxFull() {
+  std::lock_guard<std::mutex> lk(g_mb.mu);
+  return g_mb.have;
+}
+
+void* XrWorker(void*) {
+  Log("xr worker start");
+  while (true) {
+    std::vector<unsigned char> frame;
+    int w = 0, h = 0;
+    bool bgra = false;
+    {
+      std::unique_lock<std::mutex> lk(g_mb.mu);
+      g_mb.cv.wait_for(lk, std::chrono::milliseconds(50),
+                       [] { return g_mb.have || g_mb.stop; });
+      if (g_mb.stop) break;
+      if (!g_mb.have) continue;
+      frame.swap(g_mb.rgba);
+      w = g_mb.w;
+      h = g_mb.h;
+      bgra = g_mb.bgra;
+      g_mb.have = false;
+    }
+    if (XrHostSubmitPixels(frame.data(), w, h, bgra)) {
+      g_xr_ok++;
+      if (g_xr_ok == 1 || (g_xr_ok % 300) == 0)
+        Log("xr submit #%d %ux%u %s", g_xr_ok, w, h, XrHostStatus().reason);
+      XrSample xr{};
+      if (XrHostPollInput(&xr)) {
+        GunPose gun = GunFromHand(xr.right, WeaponOffset{});
+        UserCmdOverlay cmd = InputMap(xr, gun, InputConfig{}, 0.011f);
+        if (g_eng.screen_ok || ProbeLiveEngine(g_eng)) {
+          auto edge = [&](int bit, const char* plus, const char* minus) {
+            const bool now = (cmd.buttons & bit) != 0;
+            const bool was = (g_prev_cmd.buttons & bit) != 0;
+            if (now && !was) EngineClientCmd(g_eng, plus);
+            if (!now && was) EngineClientCmd(g_eng, minus);
+          };
+          edge(kInAttack, "+attack", "-attack");
+          edge(kInJump, "+jump", "-jump");
+          edge(kInForward, "+forward", "-forward");
+          edge(kInBack, "+back", "-back");
+          edge(kInMoveLeft, "+moveleft", "-moveleft");
+          edge(kInMoveRight, "+moveright", "-moveright");
+          edge(kInReload, "+reload", "-reload");
+        }
+        g_prev_cmd = cmd;
+      }
+    } else {
+      g_xr_fail++;
+      if (g_xr_fail == 1 || (g_xr_fail % 120) == 0)
+        Log("xr submit fail #%d %s", g_xr_fail, XrHostStatus().reason);
+    }
+  }
+  Log("xr worker stop");
+  return nullptr;
+}
+
+void EnsureXrWorker() {
+  bool expected = false;
+  if (!g_xr_thread.compare_exchange_strong(expected, true)) return;
+  pthread_t th;
+  if (pthread_create(&th, nullptr, XrWorker, nullptr) != 0) {
+    g_xr_thread = false;
+    Log("xr worker create failed");
+    return;
+  }
+  pthread_detach(th);
+}
 
 PFN_vkGetInstanceProcAddr g_gipa = nullptr;
 PFN_vkGetDeviceProcAddr g_gdpa = nullptr;
@@ -166,7 +288,87 @@ void FillDevFns(VkDevice dev, DeviceState& ds) {
   }
 }
 
-void DumpSwapchain(VkQueue queue, VkSwapchainKHR sc, uint32_t idx) {
+bool EnsureStage(DeviceState* ds, VkDevice dev, VkDeviceSize bytes) {
+  if (ds->stage && ds->stage_bytes >= bytes && ds->cmd && ds->fence) return true;
+  if (!ds->fn.createFence) return false;
+  if (ds->stage) { ds->fn.destroyBuf(dev, ds->stage, nullptr); ds->stage = VK_NULL_HANDLE; }
+  if (ds->stage_mem) { ds->fn.freeMem(dev, ds->stage_mem, nullptr); ds->stage_mem = VK_NULL_HANDLE; }
+  VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+  bi.size = bytes;
+  bi.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  if (ds->fn.createBuf(dev, &bi, nullptr, &ds->stage) != VK_SUCCESS) return false;
+  VkMemoryRequirements req{};
+  ds->fn.bufReq(dev, ds->stage, &req);
+  uint32_t memIdx = FindHostMem(ds->phys, ds->fn.memProps, req.memoryTypeBits);
+  if (memIdx == UINT32_MAX) return false;
+  VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+  ai.allocationSize = req.size;
+  ai.memoryTypeIndex = memIdx;
+  if (ds->fn.allocMem(dev, &ai, nullptr, &ds->stage_mem) != VK_SUCCESS) return false;
+  ds->fn.bindBuf(dev, ds->stage, ds->stage_mem, 0);
+  ds->stage_bytes = bytes;
+  if (!ds->pool) {
+    VkCommandPoolCreateInfo pci{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    pci.queueFamilyIndex = ds->gfx_family;
+    pci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    if (ds->fn.createPool(dev, &pci, nullptr, &ds->pool) != VK_SUCCESS) return false;
+    VkCommandBufferAllocateInfo cai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    cai.commandPool = ds->pool;
+    cai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cai.commandBufferCount = 1;
+    ds->fn.allocCmd(dev, &cai, &ds->cmd);
+  }
+  if (!ds->fence) {
+    VkFenceCreateInfo fi{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    ds->fn.createFence(dev, &fi, nullptr, &ds->fence);
+  }
+  return ds->stage && ds->cmd && ds->fence;
+}
+
+bool FormatIsBgra(VkFormat fmt) {
+  return fmt == VK_FORMAT_B8G8R8A8_UNORM || fmt == VK_FORMAT_B8G8R8A8_SRGB;
+}
+
+void HarvestCopy(DeviceState* ds, VkDevice dev, bool want_ppm) {
+  if (!ds->copy_inflight || !ds->fn.waitFences) return;
+  if (ds->fn.waitFences(dev, 1, &ds->fence, VK_TRUE, 0) != VK_SUCCESS) return;
+  ds->copy_inflight = false;
+  ds->fn.resetFences(dev, 1, &ds->fence);
+  const uint32_t w = ds->copy_w, h = ds->copy_h;
+  if (w < 2 || h < 2 || !ds->stage_mem) return;
+  const VkDeviceSize bytes = (VkDeviceSize)w * h * 4;
+  const bool take_xr = XrWanted() && !MailboxFull();
+  if (!take_xr && !want_ppm) return;
+  void* mapped = nullptr;
+  if (ds->fn.map(dev, ds->stage_mem, 0, bytes, 0, &mapped) != VK_SUCCESS || !mapped) return;
+  const auto* srcp = static_cast<const unsigned char*>(mapped);
+  if (take_xr) {
+    EnsureXrWorker();
+    PushXrFrame(srcp, (int)w, (int)h, FormatIsBgra(ds->copy_fmt));
+  }
+  if (want_ppm && g_dumps < 2) {
+    std::vector<unsigned char> rgba((size_t)bytes);
+    if (FormatIsBgra(ds->copy_fmt)) {
+      for (size_t i = 0; i < (size_t)w * h; ++i) {
+        rgba[i * 4 + 0] = srcp[i * 4 + 2];
+        rgba[i * 4 + 1] = srcp[i * 4 + 1];
+        rgba[i * 4 + 2] = srcp[i * 4 + 0];
+        rgba[i * 4 + 3] = srcp[i * 4 + 3];
+      }
+    } else {
+      std::memcpy(rgba.data(), srcp, (size_t)bytes);
+    }
+    mkdir(DumpDir().c_str(), 0755);
+    char path[512];
+    std::snprintf(path, sizeof(path), "%s/vk_%03d_%ux%u_scene.ppm", DumpDir().c_str(), g_dumps, w, h);
+    WritePpm(path, (int)w, (int)h, rgba.data());
+    g_dumps++;
+    Log("dump %s", path);
+  }
+  ds->fn.unmap(dev, ds->stage_mem);
+}
+
+void DumpSwapchain(VkQueue queue, VkSwapchainKHR sc, uint32_t idx, bool want_ppm) {
   DeviceState* ds = nullptr;
   SwapState* ss = nullptr;
   {
@@ -178,54 +380,17 @@ void DumpSwapchain(VkQueue queue, VkSwapchainKHR sc, uint32_t idx) {
     if (dit == g_devs.end()) return;
     ds = &dit->second;
   }
-  if (!ds->fn.copy || !ds->fn.createBuf || idx >= ss->images.size() || ss->w == 0 || ss->h == 0)
-    return;
-  if (!ds->fn.memProps) return;
-
+  if (!ds->fn.copy || idx >= ss->images.size() || ss->w == 0 || ss->h == 0 || !ds->fn.memProps) return;
   VkDevice dev = ss->device;
+  HarvestCopy(ds, dev, want_ppm);
+  const bool want_xr = XrWanted() && !MailboxFull();
+  if (!want_xr && !want_ppm) return;
+  if (ds->copy_inflight) return; // previous GPU copy still running — never stall present
   const VkDeviceSize bytes = (VkDeviceSize)ss->w * ss->h * 4;
-  VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  bi.size = bytes;
-  bi.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  VkBuffer buf = VK_NULL_HANDLE;
-  if (ds->fn.createBuf(dev, &bi, nullptr, &buf) != VK_SUCCESS) return;
-  VkMemoryRequirements req{};
-  ds->fn.bufReq(dev, buf, &req);
-  uint32_t memIdx = FindHostMem(ss->phys, ds->fn.memProps, req.memoryTypeBits);
-  if (memIdx == UINT32_MAX) {
-    ds->fn.destroyBuf(dev, buf, nullptr);
-    return;
-  }
-  VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-  ai.allocationSize = req.size;
-  ai.memoryTypeIndex = memIdx;
-  VkDeviceMemory mem = VK_NULL_HANDLE;
-  if (ds->fn.allocMem(dev, &ai, nullptr, &mem) != VK_SUCCESS) {
-    ds->fn.destroyBuf(dev, buf, nullptr);
-    return;
-  }
-  ds->fn.bindBuf(dev, buf, mem, 0);
-
-  VkCommandPoolCreateInfo pci{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-  pci.queueFamilyIndex = ds->gfx_family;
-  pci.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-  VkCommandPool pool = VK_NULL_HANDLE;
-  if (ds->fn.createPool(dev, &pci, nullptr, &pool) != VK_SUCCESS) {
-    ds->fn.freeMem(dev, mem, nullptr);
-    ds->fn.destroyBuf(dev, buf, nullptr);
-    return;
-  }
-  VkCommandBufferAllocateInfo cai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-  cai.commandPool = pool;
-  cai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cai.commandBufferCount = 1;
-  VkCommandBuffer cmd = VK_NULL_HANDLE;
-  ds->fn.allocCmd(dev, &cai, &cmd);
+  if (!EnsureStage(ds, dev, bytes)) return;
   VkCommandBufferBeginInfo cbi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   cbi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  ds->fn.beginCmd(cmd, &cbi);
-
+  ds->fn.beginCmd(ds->cmd, &cbi);
   VkImageMemoryBarrier bar{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
   bar.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
   bar.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -233,71 +398,27 @@ void DumpSwapchain(VkQueue queue, VkSwapchainKHR sc, uint32_t idx) {
   bar.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   bar.image = ss->images[idx];
   bar.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  ds->fn.barrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
-                 0, nullptr, 1, &bar);
-
+  ds->fn.barrier(ds->cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                 nullptr, 0, nullptr, 1, &bar);
   VkBufferImageCopy copy{};
   copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
   copy.imageExtent = {ss->w, ss->h, 1};
-  ds->fn.copy(cmd, ss->images[idx], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buf, 1, &copy);
-
+  ds->fn.copy(ds->cmd, ss->images[idx], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, ds->stage, 1, &copy);
   bar.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
   bar.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
   bar.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   bar.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  ds->fn.barrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+  ds->fn.barrier(ds->cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
                  nullptr, 0, nullptr, 1, &bar);
-  ds->fn.endCmd(cmd);
-
+  ds->fn.endCmd(ds->cmd);
   VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};
   si.commandBufferCount = 1;
-  si.pCommandBuffers = &cmd;
-  if (ds->fn.submit(queue, 1, &si, VK_NULL_HANDLE) == VK_SUCCESS)
-    ds->fn.waitIdle(queue);
-
-  void* mapped = nullptr;
-  if (ds->fn.map(dev, mem, 0, bytes, 0, &mapped) == VK_SUCCESS && mapped) {
-    std::vector<unsigned char> rgba((size_t)bytes);
-    // Convert common present formats to RGBA8.
-    const auto* src = static_cast<const unsigned char*>(mapped);
-    if (ss->format == VK_FORMAT_B8G8R8A8_UNORM || ss->format == VK_FORMAT_B8G8R8A8_SRGB) {
-      for (size_t i = 0; i < (size_t)ss->w * ss->h; ++i) {
-        rgba[i * 4 + 0] = src[i * 4 + 2];
-        rgba[i * 4 + 1] = src[i * 4 + 1];
-        rgba[i * 4 + 2] = src[i * 4 + 0];
-        rgba[i * 4 + 3] = src[i * 4 + 3];
-      }
-    } else {
-      std::memcpy(rgba.data(), src, (size_t)bytes);
-    }
-    ds->fn.unmap(dev, mem);
-    int nz = 0, uniq = 0;
-    const int n = (int)ss->w * (int)ss->h;
-    const int step = n > 4000 ? n / 4000 : 1;
-    unsigned seen[32] = {};
-    for (int i = 0; i < n; i += step) {
-      if (rgba[(size_t)i * 4] | rgba[(size_t)i * 4 + 1] | rgba[(size_t)i * 4 + 2]) nz++;
-      unsigned k = ((unsigned)rgba[(size_t)i * 4] << 16) | ((unsigned)rgba[(size_t)i * 4 + 1] << 8) |
-                   rgba[(size_t)i * 4 + 2];
-      seen[k % 32] = k ? k : 1;
-    }
-    for (unsigned s : seen)
-      if (s) uniq++;
-    const bool scene = uniq >= 8 && nz > 30;
-    if (scene || g_dumps < 3) {
-      mkdir(DumpDir().c_str(), 0755);
-      char path[512];
-      std::snprintf(path, sizeof(path), "%s/vk_%03d_%ux%u_%s.ppm", DumpDir().c_str(), g_dumps,
-                    ss->w, ss->h, scene ? "scene" : "raw");
-      WritePpm(path, (int)ss->w, (int)ss->h, rgba.data());
-      g_dumps++;
-      Log("dump %s nz=%d uniq=%d fmt=%d", path, nz, uniq, (int)ss->format);
-    }
-  }
-
-  ds->fn.destroyPool(dev, pool, nullptr);
-  ds->fn.freeMem(dev, mem, nullptr);
-  ds->fn.destroyBuf(dev, buf, nullptr);
+  si.pCommandBuffers = &ds->cmd;
+  if (ds->fn.submit(queue, 1, &si, ds->fence) != VK_SUCCESS) return;
+  ds->copy_inflight = true;
+  ds->copy_w = ss->w;
+  ds->copy_h = ss->h;
+  ds->copy_fmt = ss->format;
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL WrapPresent(VkQueue queue, const VkPresentInfoKHR* info) {
@@ -313,16 +434,16 @@ VKAPI_ATTR VkResult VKAPI_CALL WrapPresent(VkQueue queue, const VkPresentInfoKHR
       }
     }
   }
-  // Capture the image about to be shown (still in presentable layout).
-  if (info && g_dumps < 8) {
-    const int p = g_presents;
-    if (p == 8 || p == 40 || p == 120 || (p % 180) == 0) {
-      for (uint32_t i = 0; i < info->swapchainCount; ++i)
-        DumpSwapchain(queue, info->pSwapchains[i], info->pImageIndices[i]);
-    }
-  }
   if (!real) return VK_ERROR_UNKNOWN;
-  return real(queue, info);
+  const VkResult pr = real(queue, info);
+  // After present: never wait. Harvest a finished GPU copy, kick the next if XR is hungry.
+  if (info && info->swapchainCount) {
+    const bool want_ppm = g_dumps < 2;
+    DumpSwapchain(queue, info->pSwapchains[0], info->pImageIndices[0], want_ppm);
+  }
+  if ((g_presents % 300) == 0)
+    Log("present=%d xr_ok=%d xr_fail=%d dumps=%d", g_presents, g_xr_ok, g_xr_fail, g_dumps);
+  return pr;
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL WrapCreateSwapchain(VkDevice device,

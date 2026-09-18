@@ -68,6 +68,7 @@ if(CSSVR_BUILD_HOOK AND NOT WIN32)
     add_library(cssvrmod_hook SHARED
       src/hook_ctor.cpp
       src/hook_gl.cpp
+      src/hook_window.cpp
       src/hook_d3d9.cpp
       src/hook_vk.cpp
       src/togl_adapter.cpp

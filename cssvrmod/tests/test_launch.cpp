@@ -1,6 +1,7 @@
 #include "cssvrmod/backend.hpp"
 #include "cssvrmod/launch.hpp"
 #include "cssvrmod/source_if.hpp"
+#include "cssvrmod/window_chrome.hpp"
 #include "test_framework.h"
 #include <cstring>
 #include <string>
@@ -46,6 +47,46 @@ TEST(backend_gl_priority_dx9_original) {
   ASSERT_STREQ(vk.engine_flag, "-vulkan");
   ASSERT_STREQ(vk.hook, "vk");
   ASSERT_FALSE(BackendUsesTogl(Backend::Vk));
+}
+
+TEST(launch_default_vk_bordered) {
+  LaunchOpts o;
+  ASSERT_FALSE(o.noborder);
+  ASSERT_EQ(static_cast<int>(o.backend), static_cast<int>(Backend::Vk));
+  CssInstall inst;
+  inst.found = true;
+  inst.root = "/tmp";
+  inst.launcher = "/tmp/cstrike.sh";
+  inst.linux64 = true;
+  o.hook_so.clear();
+  auto plan = PlanSpawn(inst, o);
+  ASSERT_TRUE(plan.ok);
+  ASSERT_STREQ(plan.backend, "vk");
+  bool has_vk = false, has_noborder = false;
+  for (const auto& a : plan.argv) {
+    if (a == "-vulkan") has_vk = true;
+    if (a == "-noborder") has_noborder = true;
+  }
+  ASSERT_TRUE(has_vk);
+  ASSERT_FALSE(has_noborder);
+  bool has_windowed = false, has_videomode = false;
+  for (const auto& a : plan.argv) {
+    if (a == "-windowed") has_windowed = true;
+    if (a == "+mat_setvideomode") has_videomode = true;
+  }
+  ASSERT_TRUE(has_windowed);
+  ASSERT_TRUE(has_videomode);
+}
+
+TEST(sdl_window_flags_force_decorated) {
+  using namespace cssvr;
+  const uint32_t raw = kSdlWindowFullscreen | kSdlWindowBorderless | kSdlWindowFullscreenDesktopBit;
+  const uint32_t got = SanitizeSdlWindowFlags(raw, false);
+  ASSERT_EQ(got & kSdlWindowBorderless, 0u);
+  ASSERT_EQ(got & kSdlWindowFullscreen, 0u);
+  ASSERT_EQ(got & kSdlWindowFullscreenDesktopBit, 0u);
+  ASSERT_EQ(got & kSdlWindowResizable, kSdlWindowResizable);
+  ASSERT_EQ(SanitizeSdlWindowFlags(raw, true), raw);
 }
 
 TEST(launch_plan_default_gl_flag) {

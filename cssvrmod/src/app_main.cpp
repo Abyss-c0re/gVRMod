@@ -15,9 +15,10 @@ static void Usage() {
                "  --print    print spawn plan and exit\n"
                "  --map MAP  +map after launch\n"
                "  --hook SO  LD_PRELOAD hook (default: sibling libcssvrmod_hook.so)\n"
-               "  --gl       OpenGL/togl (default, gVRMod Linux)\n"
+               "  --vk       shaderapivk present + OpenXR submit (default)\n"
+               "  --gl       OpenGL/togl (CreateDevice still broken on this GPU)\n"
                "  --dx9      original vrmod CreateTexture path (shaderapidx9)\n"
-               "  --vk       shaderapivk present (64-bit CSS fallback)\n"
+               "  --noborder borderless window (default is decorated)\n"
                "  --no-hook  spawn CSS without VR hook (debug)\n");
 }
 
@@ -48,7 +49,8 @@ static int Spawn(const cssvr::SpawnPlan& p) {
   if (!p.ld_preload.empty()) setenv("LD_PRELOAD", p.ld_preload.c_str(), 1);
   if (!p.xr_runtime_json.empty()) setenv("XR_RUNTIME_JSON", p.xr_runtime_json.c_str(), 1);
   if (!p.sdl_videodriver.empty()) setenv("SDL_VIDEODRIVER", p.sdl_videodriver.c_str(), 1);
-  setenv("CSSVR_BACKEND", p.backend ? p.backend : "gl", 1);
+  setenv("CSSVR_BACKEND", p.backend ? p.backend : "vk", 1);
+  if (!std::getenv("CSSVR_XR")) setenv("CSSVR_XR", "1", 0);
   if (chdir(p.cwd.c_str()) != 0) {
     std::fprintf(stderr, "cssvr: chdir %s failed\n", p.cwd.c_str());
     return 2;
@@ -80,6 +82,7 @@ int main(int argc, char** argv) {
     else if (std::strcmp(argv[i], "--gl") == 0) opts.backend = cssvr::Backend::Gl;
     else if (std::strcmp(argv[i], "--dx9") == 0) opts.backend = cssvr::Backend::Dx9;
     else if (std::strcmp(argv[i], "--vk") == 0) opts.backend = cssvr::Backend::Vk;
+    else if (std::strcmp(argv[i], "--noborder") == 0) opts.noborder = true;
     else {
       std::fprintf(stderr, "cssvr: unknown arg %s\n", argv[i]);
       Usage();
@@ -100,5 +103,6 @@ int main(int argc, char** argv) {
                plan.ld_preload.c_str(), plan.sdl_videodriver.c_str(),
                plan.xr_runtime_json.c_str());
   if (print_only || !plan.ok) return plan.ok ? 0 : 1;
+  setenv("CSSVR_NOBORDER", opts.noborder ? "1" : "0", 1);
   return Spawn(plan);
 }

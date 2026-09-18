@@ -15,6 +15,9 @@
 #include <X11/Xlib.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
+#ifndef GL_BGRA
+#define GL_BGRA 0x80E1
+#endif
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
@@ -66,6 +69,7 @@ XrInstance g_inst = XR_NULL_HANDLE;
 XrSystemId g_sys = XR_NULL_SYSTEM_ID;
 XrSession g_sess = XR_NULL_HANDLE;
 XrSpace g_stage = XR_NULL_HANDLE;
+XrSpace g_view = XR_NULL_HANDLE;
 XrSwapchain g_sc[2] = {XR_NULL_HANDLE, XR_NULL_HANDLE};
 uint32_t g_scW = 0, g_scH = 0;
 struct ScImg {
@@ -198,9 +202,17 @@ void PollEvents() {
 bool CreateSess() {
   XrSystemGetInfo gi{XR_TYPE_SYSTEM_GET_INFO};
   gi.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-  if (xrGetSystem(g_inst, &gi, &g_sys) != XR_SUCCESS) {
+  XrResult sys_rc = xrGetSystem(g_inst, &gi, &g_sys);
+  if (sys_rc != XR_SUCCESS) {
     g_info.reason = "no_hmd";
+    Log("cssvr xrGetSystem %d", (int)sys_rc);
     return false;
+  }
+  if (xrGetOpenGLGraphicsRequirementsKHR) {
+    XrGraphicsRequirementsOpenGLKHR req{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
+    xrGetOpenGLGraphicsRequirementsKHR(g_inst, g_sys, &req);
+    Log("cssvr xr GL req min=%llu max=%llu", (unsigned long long)req.minApiVersionSupported,
+        (unsigned long long)req.maxApiVersionSupported);
   }
   Display* dpy = glXGetCurrentDisplay();
   GLXContext ctx = glXGetCurrentContext();
@@ -209,18 +221,34 @@ bool CreateSess() {
     g_info.reason = "no_glx";
     return false;
   }
+  int fbConfigId = 0;
+  glXQueryContext(dpy, ctx, GLX_FBCONFIG_ID, &fbConfigId);
+  int attribs[] = {GLX_FBCONFIG_ID, fbConfigId, None};
+  int ncfg = 0;
+  GLXFBConfig* cfgs = glXChooseFBConfig(dpy, DefaultScreen(dpy), attribs, &ncfg);
+  XVisualInfo* vi = nullptr;
+  GLXFBConfig fb = nullptr;
+  if (cfgs && ncfg > 0) {
+    fb = cfgs[0];
+    vi = glXGetVisualFromFBConfig(dpy, fb);
+  }
   XrGraphicsBindingOpenGLXlibKHR bind{XR_TYPE_GRAPHICS_BINDING_OPENGL_XLIB_KHR};
   bind.xDisplay = dpy;
-  bind.glxContext = ctx;
+  bind.visualid = vi ? (uint32_t)vi->visualid : 0;
+  bind.glxFBConfig = fb;
   bind.glxDrawable = draw;
-  XVisualInfo* vi = nullptr;
-  bind.visualid = 0;
-  bind.glxFBConfig = nullptr;
+  bind.glxContext = ctx;
+  if (vi) XFree(vi);
+  if (cfgs) XFree(cfgs);
+  Log("cssvr xr bind dpy=%p ctx=%p draw=%lu vis=%u fb=%p", (void*)dpy, (void*)ctx,
+      (unsigned long)draw, bind.visualid, (void*)fb);
   XrSessionCreateInfo si{XR_TYPE_SESSION_CREATE_INFO};
   si.next = &bind;
   si.systemId = g_sys;
-  if (xrCreateSession(g_inst, &si, &g_sess) != XR_SUCCESS) {
+  XrResult sess_rc = xrCreateSession(g_inst, &si, &g_sess);
+  if (sess_rc != XR_SUCCESS) {
     g_info.reason = "create_session";
+    Log("cssvr xrCreateSession failed %d", (int)sess_rc);
     return false;
   }
   (void)vi;
@@ -234,21 +262,21 @@ bool CreateSess() {
       return false;
     }
   }
-  uint32_t vc = 0;
-  xrEnumerateViewConfigurationViews(g_inst, g_sys, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0,
-                                    &vc, nullptr);
-  XrViewConfigurationView views[2]{};
-  views[0].type = views[1].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
-  if (vc > 2) vc = 2;
-  xrEnumerateViewConfigurationViews(g_inst, g_sys, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, vc,
-                                    &vc, views);
-  g_scW = views[0].recommendedImageRectWidth ? views[0].recommendedImageRectWidth : 1440;
-  g_scH = views[0].recommendedImageRectHeight ? views[0].recommendedImageRectHeight : 1600;
+  rci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+  rci.poseInReferenceSpace = {};
+  rci.poseInReferenceSpace.orientation.w = 1.f;
+  if (xrCreateReferenceSpace(g_sess, &rci, &g_view) != XR_SUCCESS) {
+    Log("cssvr xr VIEW space failed — cinema will be world-locked");
+    g_view = g_stage;
+  }
+  // One 16:9 cinema swapchain — not two IPD-offset square eye buffers.
+  g_scW = 1280;
+  g_scH = 720;
   g_info.width = g_scW;
   g_info.height = g_scH;
 
   int64_t fmt = GL_SRGB8_ALPHA8;
-  for (int eye = 0; eye < 2; ++eye) {
+  for (int eye = 0; eye < 1; ++eye) {
     XrSwapchainCreateInfo sci{XR_TYPE_SWAPCHAIN_CREATE_INFO};
     sci.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
     sci.format = fmt;
@@ -379,11 +407,12 @@ void BlitToSwapchain(unsigned int src, int srcW, int srcH, int eye, bool vflip) 
 
 bool XrHostInit() {
   if (g_info.session) return true;
+  Log("cssvr xr init begin");
   if (!LoadLoader()) return false;
   if (!g_inst && !CreateInst()) return false;
   if (!g_sess && !CreateSess()) return false;
   SetupInput();
-  Log("cssvr xr init %s %ux%u", g_info.reason, g_info.width, g_info.height);
+  Log("cssvr xr init %s cinema %ux%u", g_info.reason, g_info.width, g_info.height);
   return g_info.session;
 }
 
@@ -420,31 +449,21 @@ bool XrHostBeginFrame() {
 bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vflip) {
   if (!g_begun || !g_fs.shouldRender) return false;
   BlitToSwapchain(gl_tex, src_w, src_h, 0, vflip);
-  BlitToSwapchain(gl_tex, src_w, src_h, 1, vflip);
-  XrCompositionLayerProjectionView pv[2]{};
-  XrView views[2]{};
-  views[0].type = views[1].type = XR_TYPE_VIEW;
-  XrViewState vs{XR_TYPE_VIEW_STATE};
-  XrViewLocateInfo li{XR_TYPE_VIEW_LOCATE_INFO};
-  li.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-  li.displayTime = g_fs.predictedDisplayTime;
-  li.space = g_stage;
-  uint32_t nv = 2;
-  xrLocateViews(g_sess, &li, &vs, 2, &nv, views);
-  for (int e = 0; e < 2; ++e) {
-    pv[e].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
-    pv[e].pose = views[e].pose;
-    pv[e].fov = views[e].fov;
-    pv[e].subImage.swapchain = g_sc[e];
-    pv[e].subImage.imageRect.extent.width = (int32_t)g_scW;
-    pv[e].subImage.imageRect.extent.height = (int32_t)g_scH;
-  }
-  XrCompositionLayerProjection layer{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
-  layer.space = g_stage;
-  layer.viewCount = 2;
-  layer.views = pv;
+  // Head-locked 16:9 cinema panel. Stereo projection of this same 2D frame
+  // with real IPD is what showed two squares floating far apart.
+  XrCompositionLayerQuad quad{XR_TYPE_COMPOSITION_LAYER_QUAD};
+  quad.layerFlags = 0;
+  quad.space = g_view ? g_view : g_stage;
+  quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+  quad.subImage.swapchain = g_sc[0];
+  quad.subImage.imageRect.offset = {0, 0};
+  quad.subImage.imageRect.extent = {(int32_t)g_scW, (int32_t)g_scH};
+  quad.pose.orientation.w = 1.f;
+  quad.pose.position.z = -1.20f;
+  quad.size.width = 2.56f;
+  quad.size.height = 1.44f;
   const XrCompositionLayerBaseHeader* layers[] = {
-      reinterpret_cast<const XrCompositionLayerBaseHeader*>(&layer)};
+      reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad)};
   XrFrameEndInfo ei{XR_TYPE_FRAME_END_INFO};
   ei.displayTime = g_fs.predictedDisplayTime;
   ei.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
@@ -452,6 +471,10 @@ bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vfli
   ei.layers = layers;
   const XrResult rc = xrEndFrame(g_sess, &ei);
   g_begun = false;
+  static int ends = 0;
+  ends++;
+  if (ends <= 3 || (ends % 300) == 0)
+    Log("cssvr xr endframe #%d rc=%d cinema-quad %ux%u", ends, (int)rc, g_scW, g_scH);
   return rc == XR_SUCCESS;
 }
 
@@ -535,5 +558,122 @@ bool XrHostPollInput(XrSample* out) {
 }
 
 const XrHostInfo& XrHostStatus() { return g_info; }
+
+namespace {
+Display* g_xr_dpy = nullptr;
+GLXContext g_xr_ctx = nullptr;
+GLXPbuffer g_xr_pbuf = 0;
+GLuint g_upload = 0;
+int g_upload_w = 0, g_upload_h = 0;
+int g_upload_bgra = -1;
+bool g_xr_fail_logged = false;
+
+Window g_xr_win = 0;
+
+bool EnsureXrGl() {
+  if (glXGetCurrentContext() && glXGetCurrentDrawable()) return true;
+  if (!g_xr_dpy) g_xr_dpy = XOpenDisplay(nullptr);
+  if (!g_xr_dpy) {
+    g_info.reason = "no_x_display";
+    return false;
+  }
+  int dummy = 0;
+  if (!glXQueryExtension(g_xr_dpy, &dummy, &dummy)) {
+    g_info.reason = "no_glx";
+    return false;
+  }
+  int fb_attrs[] = {GLX_X_RENDERABLE,
+                    True,
+                    GLX_DRAWABLE_TYPE,
+                    GLX_WINDOW_BIT,
+                    GLX_RENDER_TYPE,
+                    GLX_RGBA_BIT,
+                    GLX_RED_SIZE,
+                    8,
+                    GLX_GREEN_SIZE,
+                    8,
+                    GLX_BLUE_SIZE,
+                    8,
+                    GLX_DOUBLEBUFFER,
+                    True,
+                    None};
+  int ncfg = 0;
+  int screen = DefaultScreen(g_xr_dpy);
+  GLXFBConfig* cfgs = glXChooseFBConfig(g_xr_dpy, screen, fb_attrs, &ncfg);
+  if (!cfgs || ncfg < 1) {
+    g_info.reason = "no_fbconfig";
+    return false;
+  }
+  GLXFBConfig cfg = cfgs[0];
+  XVisualInfo* vi = glXGetVisualFromFBConfig(g_xr_dpy, cfg);
+  XFree(cfgs);
+  if (!vi) {
+    g_info.reason = "no_visual";
+    return false;
+  }
+  Window root = RootWindow(g_xr_dpy, vi->screen);
+  XSetWindowAttributes swa{};
+  swa.colormap = XCreateColormap(g_xr_dpy, root, vi->visual, AllocNone);
+  swa.override_redirect = True;
+  g_xr_win = XCreateWindow(g_xr_dpy, root, 0, 0, 256, 256, 0, vi->depth, InputOutput, vi->visual,
+                           CWColormap | CWOverrideRedirect, &swa);
+  XMapWindow(g_xr_dpy, g_xr_win);
+  XFlush(g_xr_dpy);
+  g_xr_ctx = glXCreateNewContext(g_xr_dpy, cfg, GLX_RGBA_TYPE, nullptr, True);
+  XFree(vi);
+  if (!g_xr_ctx || !g_xr_win ||
+      !glXMakeContextCurrent(g_xr_dpy, g_xr_win, g_xr_win, g_xr_ctx)) {
+    g_info.reason = "glx_make_current";
+    return false;
+  }
+  Log("cssvr xr hidden GLX window ctx ok");
+  return true;
+}
+} // namespace
+
+bool XrHostSubmitPixels(const unsigned char* px, int w, int h, bool bgra) {
+  if (!px || w < 2 || h < 2) return false;
+  if (!EnsureXrGl()) {
+    if (!g_xr_fail_logged) {
+      Log("cssvr xr gl fail %s", g_info.reason);
+      g_xr_fail_logged = true;
+    }
+    return false;
+  }
+  static int init_fails = 0;
+  if (!g_info.session) {
+    if (init_fails > 3) return false; // do not hammer create_session
+    if (!XrHostInit()) {
+      init_fails++;
+      Log("cssvr xr init fail %s (n=%d)", g_info.reason, init_fails);
+      return false;
+    }
+  }
+  const GLenum ext = bgra ? GL_BGRA : GL_RGBA;
+  if (!g_upload || g_upload_w != w || g_upload_h != h || g_upload_bgra != (int)bgra) {
+    if (g_upload) glDeleteTextures(1, &g_upload);
+    glGenTextures(1, &g_upload);
+    glBindTexture(GL_TEXTURE_2D, g_upload);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, ext, GL_UNSIGNED_BYTE, nullptr);
+    g_upload_w = w;
+    g_upload_h = h;
+    g_upload_bgra = bgra ? 1 : 0;
+  }
+  glBindTexture(GL_TEXTURE_2D, g_upload);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, ext, GL_UNSIGNED_BYTE, px);
+  if (!XrHostBeginFrame()) {
+    XrHostEndFrame();
+    return false;
+  }
+  // Vulkan copy is top-left; GL/XR blit wants a flip.
+  return XrHostSubmitBackbuffer(g_upload, w, h, true);
+}
+
+bool XrHostSubmitRgba(const unsigned char* rgba, int w, int h) {
+  return XrHostSubmitPixels(rgba, w, h, false);
+}
 
 } // namespace cssvr

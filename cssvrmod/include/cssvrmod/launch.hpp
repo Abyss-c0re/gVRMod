@@ -36,10 +36,10 @@ struct LaunchOpts {
   int win_w = 1280;
   int win_h = 720;
   bool windowed = true;
-  bool noborder = true;
+  bool noborder = false; // bordered window — user-visible desktop monitor
   bool novid = true;
   bool sv_lan = true;
-  Backend backend = Backend::Gl; // OpenGL/togl first
+  Backend backend = Backend::Vk; // working present path (togl CreateDevice still dies)
   std::string extra_args;
 };
 

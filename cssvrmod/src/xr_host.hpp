@@ -17,8 +17,11 @@ struct XrHostInfo {
 bool XrHostInit();
 void XrHostShutdown();
 bool XrHostBeginFrame();
-// Submit current GL backbuffer (or tex) to both eyes. Mono capture until dual RenderView.
+// Submit current GL backbuffer as a head-locked 16:9 cinema quad (not stereo IPD).
 bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vflip);
+// Upload CPU 8-bit pixels (top-left origin). bgra=true skips a CPU swizzle from DXVK.
+bool XrHostSubmitRgba(const unsigned char* rgba, int w, int h);
+bool XrHostSubmitPixels(const unsigned char* px, int w, int h, bool bgra);
 void XrHostEndFrame();
 bool XrHostPollInput(struct XrSample* out);
 const XrHostInfo& XrHostStatus();

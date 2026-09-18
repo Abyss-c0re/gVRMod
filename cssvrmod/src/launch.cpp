@@ -138,7 +138,8 @@ SpawnPlan PlanSpawn(const CssInstall& inst, const LaunchOpts& opts) {
   const BackendLaunch be = BackendPlan(opts.backend);
   p.backend = BackendName(opts.backend);
   if (be.engine_flag && be.engine_flag[0]) p.argv.push_back(be.engine_flag);
-  if (be.sdl_video) p.sdl_videodriver = be.sdl_video;
+  // X11 so the Motif/SDL decoration hook can actually show a title bar.
+  p.sdl_videodriver = be.sdl_video ? be.sdl_video : "x11";
   if (opts.novid) p.argv.push_back("-novid");
   if (opts.windowed) p.argv.push_back("-windowed");
   if (opts.noborder) p.argv.push_back("-noborder");
@@ -146,6 +147,11 @@ SpawnPlan PlanSpawn(const CssInstall& inst, const LaunchOpts& opts) {
   p.argv.push_back(std::to_string(opts.win_w));
   p.argv.push_back("-h");
   p.argv.push_back(std::to_string(opts.win_h));
+  // Command-line videomode wins over last-run fullscreen/noborder saved in cfg.
+  p.argv.push_back("+mat_setvideomode");
+  p.argv.push_back(std::to_string(opts.win_w));
+  p.argv.push_back(std::to_string(opts.win_h));
+  p.argv.push_back(opts.windowed ? "1" : "0");
   if (opts.sv_lan) {
     p.argv.push_back("+sv_lan");
     p.argv.push_back("1");

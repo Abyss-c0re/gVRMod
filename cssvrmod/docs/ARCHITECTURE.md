@@ -9,7 +9,10 @@ Priority: OpenGL/togl (gVRMod Linux)     Also: DX9 CreateTexture (original modul
    -dx9 + SDL_VIDEODRIVER=x11              IDirect3DDevice9::CreateTexture
    SDL_GL_SwapWindow / glXSwap             Windows shaderapidx9.dll
                                            Linux libtogl.so (same D3D9 ABI)
-Fallback when togl will not start: -vulkan + vkQueuePresentKHR
+Default launch: `-vulkan` + decorated window. Each `vkQueuePresentKHR` copies
+the swapchain off-thread and submits one head-locked 16:9 OpenXR quad (mono
+until dual RenderView). Stereo projection of that same 2D frame is what looked
+like two squares floating far apart. `CSSVR_XR=0` skips submit.
 ```
 
 ## Layers
@@ -20,9 +23,10 @@ Fallback when togl will not start: -vulkan + vkQueuePresentKHR
 | Catalog | `src/weapons.cpp` | CSS `weapon_*` damage / muzzle / knife |
 | Launch | `src/launch.cpp` + `CSSVR` | Find Steam CSS, `LD_PRELOAD` hook |
 | Hook GL | `src/hook_gl.cpp` | **priority** — `SDL_GL_SwapWindow` + `glXSwapBuffers` |
+| Hook window | `src/hook_window.cpp` | strip `SDL_WINDOW_BORDERLESS` / Motif no-decor |
 | Hook DX9 | `src/hook_d3d9.cpp` | original vrmod `CreateTexture` / `Present` (togl) |
 | Hook VK | `src/hook_vk.cpp` | 64-bit CSS `shaderapivk` present (fallback) |
-| XR | `src/xr_host.cpp` | Session + stereo swapchains + shell input |
+| XR | `src/xr_host.cpp` | Session + one VIEW-space cinema quad + shell input |
 | Engine | `src/source_if.cpp` | `CreateInterface` probe; `ClientCmd` only after GetScreenSize self-test |
 
 ## Combat (from Lua)
@@ -34,7 +38,7 @@ Fallback when togl will not start: -vulkan + vkQueuePresentKHR
 
 ## Honest limits (do not claim HMD smoke from offline green)
 
-- Submit is **mono capture → both eyes** until a dual `RenderView` hook exists (P1).
+- Submit is **mono capture → one VIEW-space 16:9 quad** until dual `RenderView` exists (P1).
 - World traces in-game need `IEngineTrace` wired (P2). Offline tests inject a `TraceFn`.
 - `ClientCmd` digital move/fire is P0; analog `CUserCmd` is P2.
 - Offline `cssvrmod_tests` ≠ headset-proven.
