@@ -6,7 +6,7 @@ OpenXR · texture hook · C++ combat laws (from gVRMod Lua)</p>
 CSSVRMod is a **sibling product** of [gVRMod](../README.md). It reuses the same foundations:
 
 - **Texture hook (OpenGL first)** — togl `SDL_GL_SwapWindow` (gVRMod Linux). **DX9** is the original vrmod `CreateTexture` path. **Vulkan** present is the 64-bit CSS fallback when togl will not start.
-- **OpenXR** — session + one head-locked cinema quad + shared controller paths (`shared/openxr`)
+- **OpenXR** — session + same-frame slight-IPD stereo (gmod synthetic) + shared controller paths (`shared/openxr`)
 - **App** — Cube-style launcher that finds CSS and starts it with the hook
 - **Combat** — melee, hand-bullet filter, wall collision, gun-aim — ported from `addon/vrmod-x64` Lua to **pure C++** (CSS has no GLua)
 

@@ -17,7 +17,7 @@ struct XrHostInfo {
 bool XrHostInit();
 void XrHostShutdown();
 bool XrHostBeginFrame();
-// Submit current GL backbuffer as a head-locked 16:9 cinema quad (not stereo IPD).
+// Submit the same CSS frame to both eyes with a slight IPD offset (gmod synthetic).
 bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vflip);
 // Upload CPU 8-bit pixels (top-left origin). bgra=true skips a CPU swizzle from DXVK.
 bool XrHostSubmitRgba(const unsigned char* rgba, int w, int h);

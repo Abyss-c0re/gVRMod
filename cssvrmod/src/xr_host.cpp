@@ -266,17 +266,33 @@ bool CreateSess() {
   rci.poseInReferenceSpace = {};
   rci.poseInReferenceSpace.orientation.w = 1.f;
   if (xrCreateReferenceSpace(g_sess, &rci, &g_view) != XR_SUCCESS) {
-    Log("cssvr xr VIEW space failed — cinema will be world-locked");
+    Log("cssvr xr VIEW space failed — falling back to stage");
     g_view = g_stage;
   }
-  // One 16:9 cinema swapchain — not two IPD-offset square eye buffers.
+  // Dual eye swapchains at HMD recommended size. Same CSS frame is blitted
+  // into both with a slight horizontal offset (gmod synthetic stereo).
   g_scW = 1280;
   g_scH = 720;
+  if (xrEnumerateViewConfigurationViews) {
+    uint32_t nv = 0;
+    xrEnumerateViewConfigurationViews(g_inst, g_sys, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0,
+                                      &nv, nullptr);
+    XrViewConfigurationView vc[2]{};
+    vc[0].type = vc[1].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+    if (nv > 2) nv = 2;
+    if (nv >= 1 &&
+        xrEnumerateViewConfigurationViews(g_inst, g_sys, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+                                          nv, &nv, vc) == XR_SUCCESS &&
+        vc[0].recommendedImageRectWidth > 0) {
+      g_scW = vc[0].recommendedImageRectWidth;
+      g_scH = vc[0].recommendedImageRectHeight;
+    }
+  }
   g_info.width = g_scW;
   g_info.height = g_scH;
 
   int64_t fmt = GL_SRGB8_ALPHA8;
-  for (int eye = 0; eye < 1; ++eye) {
+  for (int eye = 0; eye < 2; ++eye) {
     XrSwapchainCreateInfo sci{XR_TYPE_SWAPCHAIN_CREATE_INFO};
     sci.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
     sci.format = fmt;
@@ -391,7 +407,11 @@ void BlitToSwapchain(unsigned int src, int srcW, int srcH, int eye, bool vflip) 
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dst, 0);
     const GLint srcY0 = vflip ? srcH : 0;
     const GLint srcY1 = vflip ? 0 : srcH;
-    glBlitFramebuffer(0, srcY0, srcW, srcY1, 0, 0, (GLint)g_scW, (GLint)g_scH, GL_COLOR_BUFFER_BIT,
+    // Same frame, slight horizontal crop — gmod-style synthetic IPD, not a cinema plane.
+    const int shift = srcW > 40 ? srcW / 40 : 1;
+    const GLint sx0 = (eye == 0) ? shift : 0;
+    const GLint sx1 = (eye == 0) ? srcW : srcW - shift;
+    glBlitFramebuffer(sx0, srcY0, sx1, srcY1, 0, 0, (GLint)g_scW, (GLint)g_scH, GL_COLOR_BUFFER_BIT,
                       GL_LINEAR);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, prevRead);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDraw);
@@ -412,7 +432,7 @@ bool XrHostInit() {
   if (!g_inst && !CreateInst()) return false;
   if (!g_sess && !CreateSess()) return false;
   SetupInput();
-  Log("cssvr xr init %s cinema %ux%u", g_info.reason, g_info.width, g_info.height);
+  Log("cssvr xr init %s stereo-offset %ux%u", g_info.reason, g_info.width, g_info.height);
   return g_info.session;
 }
 
@@ -448,22 +468,41 @@ bool XrHostBeginFrame() {
 
 bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vflip) {
   if (!g_begun || !g_fs.shouldRender) return false;
+  if (!g_sc[0] || !g_sc[1]) return false;
   BlitToSwapchain(gl_tex, src_w, src_h, 0, vflip);
-  // Head-locked 16:9 cinema panel. Stereo projection of this same 2D frame
-  // with real IPD is what showed two squares floating far apart.
-  XrCompositionLayerQuad quad{XR_TYPE_COMPOSITION_LAYER_QUAD};
-  quad.layerFlags = 0;
-  quad.space = g_view ? g_view : g_stage;
-  quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-  quad.subImage.swapchain = g_sc[0];
-  quad.subImage.imageRect.offset = {0, 0};
-  quad.subImage.imageRect.extent = {(int32_t)g_scW, (int32_t)g_scH};
-  quad.pose.orientation.w = 1.f;
-  quad.pose.position.z = -1.20f;
-  quad.size.width = 2.56f;
-  quad.size.height = 1.44f;
+  BlitToSwapchain(gl_tex, src_w, src_h, 1, vflip);
+
+  // Map the same CSS frame onto each eye (projection + HMD FOV). Slight VIEW-space
+  // IPD only — same angles, same frame, gmod synthetic stereo. Full world-space
+  // eye poses on this 2D present is what made two squares float apart.
+  XrView located[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+  uint32_t nloc = 0;
+  if (xrLocateViews && g_view) {
+    XrViewLocateInfo vli{XR_TYPE_VIEW_LOCATE_INFO};
+    vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    vli.displayTime = g_fs.predictedDisplayTime;
+    vli.space = g_view;
+    XrViewState vst{XR_TYPE_VIEW_STATE};
+    xrLocateViews(g_sess, &vli, &vst, 2, &nloc, located);
+  }
+  XrFovf fallback{-0.85f, 0.85f, 0.85f, -0.85f};
+
+  XrCompositionLayerProjectionView pv[2]{};
+  for (int e = 0; e < 2; ++e) {
+    pv[e].type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW;
+    pv[e].pose.orientation.w = 1.f;
+    pv[e].pose.position.x = (e == 0 ? -1.f : 1.f) * 0.016f;
+    pv[e].fov = (nloc >= 2) ? located[e].fov : fallback;
+    pv[e].subImage.swapchain = g_sc[e];
+    pv[e].subImage.imageRect.offset = {0, 0};
+    pv[e].subImage.imageRect.extent = {(int32_t)g_scW, (int32_t)g_scH};
+  }
+  XrCompositionLayerProjection proj{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
+  proj.space = g_view ? g_view : g_stage;
+  proj.viewCount = 2;
+  proj.views = pv;
   const XrCompositionLayerBaseHeader* layers[] = {
-      reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad)};
+      reinterpret_cast<const XrCompositionLayerBaseHeader*>(&proj)};
   XrFrameEndInfo ei{XR_TYPE_FRAME_END_INFO};
   ei.displayTime = g_fs.predictedDisplayTime;
   ei.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
@@ -474,7 +513,7 @@ bool XrHostSubmitBackbuffer(unsigned int gl_tex, int src_w, int src_h, bool vfli
   static int ends = 0;
   ends++;
   if (ends <= 3 || (ends % 300) == 0)
-    Log("cssvr xr endframe #%d rc=%d cinema-quad %ux%u", ends, (int)rc, g_scW, g_scH);
+    Log("cssvr xr endframe #%d rc=%d stereo-offset %ux%u", ends, (int)rc, g_scW, g_scH);
   return rc == XR_SUCCESS;
 }
 

@@ -10,9 +10,10 @@ Priority: OpenGL/togl (gVRMod Linux)     Also: DX9 CreateTexture (original modul
    SDL_GL_SwapWindow / glXSwap             Windows shaderapidx9.dll
                                            Linux libtogl.so (same D3D9 ABI)
 Default launch: `-vulkan` + decorated window. Each `vkQueuePresentKHR` copies
-the swapchain off-thread and submits one head-locked 16:9 OpenXR quad (mono
-until dual RenderView). Stereo projection of that same 2D frame is what looked
-like two squares floating far apart. `CSSVR_XR=0` skips submit.
+the swapchain off-thread. Submit is gmod-style synthetic stereo: the same CSS
+frame is blitted into both eye swapchains with a slight horizontal / IPD offset
+and projected onto each eye FOV (not a cinema quad, not full world-space IPD).
+`CSSVR_XR=0` skips submit.
 ```
 
 ## Layers
@@ -26,7 +27,7 @@ like two squares floating far apart. `CSSVR_XR=0` skips submit.
 | Hook window | `src/hook_window.cpp` | strip `SDL_WINDOW_BORDERLESS` / Motif no-decor |
 | Hook DX9 | `src/hook_d3d9.cpp` | original vrmod `CreateTexture` / `Present` (togl) |
 | Hook VK | `src/hook_vk.cpp` | 64-bit CSS `shaderapivk` present (fallback) |
-| XR | `src/xr_host.cpp` | Session + one VIEW-space cinema quad + shell input |
+| XR | `src/xr_host.cpp` | Session + dual-eye projection, same frame + slight IPD |
 | Engine | `src/source_if.cpp` | `CreateInterface` probe; `ClientCmd` only after GetScreenSize self-test |
 
 ## Combat (from Lua)
@@ -38,7 +39,7 @@ like two squares floating far apart. `CSSVR_XR=0` skips submit.
 
 ## Honest limits (do not claim HMD smoke from offline green)
 
-- Submit is **mono capture → one VIEW-space 16:9 quad** until dual `RenderView` exists (P1).
+- Submit is **mono capture → both eyes, slight IPD offset** (gmod synthetic) until dual `RenderView` exists (P1).
 - World traces in-game need `IEngineTrace` wired (P2). Offline tests inject a `TraceFn`.
 - `ClientCmd` digital move/fire is P0; analog `CUserCmd` is P2.
 - Offline `cssvrmod_tests` ≠ headset-proven.
