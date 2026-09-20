@@ -2999,6 +2999,10 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
+      "vrmod.RestoreDefaultHandAngles",
+      "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
+    ],
+    [
       "vrmod.ReturnToCubeLauncher",
       "addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua"
     ],

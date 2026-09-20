@@ -1151,6 +1151,11 @@ symbols:
     tier: seam
     tests: [api.smoke.ResetMenuPose]
     notes: "thin getter / smoke"
+  - id: vrmod.RestoreDefaultHandAngles
+    file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
+    tier: seam
+    tests: [api.smoke.RestoreDefaultHandAngles]
+    notes: "thin getter / smoke"
   - id: vrmod.ReturnToCubeLauncher
     file: addon/vrmod-x64/lua/vrmod/ui/cl_cube_bridge.lua
     tier: seam
