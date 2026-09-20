@@ -909,6 +909,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
     [
+      "vrmod.utils.HandBulletLaw_AllowProximityCone",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
       "vrmod.utils.HandBulletLaw_Decide",
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
@@ -918,6 +922,10 @@
     ],
     [
       "vrmod.utils.HandBulletLaw_HeadDamageScale",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_HeadSphereRadius",
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
     [
@@ -937,6 +945,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
     [
+      "vrmod.utils.HandBulletLaw_MuzzleAlong",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
       "vrmod.utils.HandBulletLaw_NormalizePart",
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
@@ -949,7 +961,19 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
     [
+      "vrmod.utils.HandBulletLaw_RayHitsSphere",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
       "vrmod.utils.HandBulletLaw_RedirectScale",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_SelfHeadMaxT",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
+    ],
+    [
+      "vrmod.utils.HandBulletLaw_SelfHeadshotHits",
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
     [

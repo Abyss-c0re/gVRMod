@@ -950,6 +950,58 @@ return function(H, env)
 		H.assert_eq(u.HandBulletLaw_StatusLabel(absorb), "HAND · ABSORB")
 	end)
 
+	-- Self-headshot is a ray–sphere from the VR muzzle, not dist<45 ∧ dot>0.3.
+	H.TEST("util.hand_bullet_law.self_head_ray", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.HandBulletLaw_HeadSphereRadius(), 3.25)
+		H.assert_eq(u.HandBulletLaw_SelfHeadMaxT(), 16)
+		H.assert_eq(u.HandBulletLaw_MuzzleAlong(), 10)
+		H.assert_true(not u.HandBulletLaw_AllowProximityCone())
+		local r = 3.25
+		-- Aim into the skull: O=(10,0,0), D=(-1,0,0), C=0, t = 10-3.25 = 6.75
+		local hit, t = u.HandBulletLaw_RayHitsSphere(10, 0, 0, -1, 0, 0, 0, 0, 0, r)
+		H.assert_true(hit)
+		H.assert_near(t, 6.75, 1e-6)
+		-- Same shot via SelfHeadshotHits
+		local yes, t2 = u.HandBulletLaw_SelfHeadshotHits({
+			muzzle = { x = 10, y = 0, z = 0 },
+			dir = { x = -1, y = 0, z = 0 },
+			head = { x = 0, y = 0, z = 0 },
+		})
+		H.assert_true(yes)
+		H.assert_near(t2, 6.75, 1e-6)
+		-- Aim away: t both negative
+		local missFwd = u.HandBulletLaw_RayHitsSphere(10, 0, 0, 1, 0, 0, 0, 0, 0, r)
+		H.assert_true(not missFwd)
+		-- Tangent: impact parameter = R
+		local tanHit, tanT = u.HandBulletLaw_RayHitsSphere(10, 3.25, 0, -1, 0, 0, 0, 0, 0, r)
+		H.assert_true(tanHit)
+		H.assert_near(tanT, 10, 1e-4)
+		-- Just outside tangent
+		local graze = u.HandBulletLaw_RayHitsSphere(10, 3.26, 0, -1, 0, 0, 0, 0, 0, r)
+		H.assert_true(not graze)
+		-- Zero dir
+		H.assert_true(not u.HandBulletLaw_RayHitsSphere(0, 0, 0, 0, 0, 0, 0, 0, 0, r))
+		-- Beyond max_t=16: from 20u, t=20-3.25=16.75
+		local far = u.HandBulletLaw_SelfHeadshotHits({
+			muzzle = { x = 20, y = 0, z = 0 },
+			dir = { x = -1, y = 0, z = 0 },
+			head = { x = 0, y = 0, z = 0 },
+		})
+		H.assert_true(not far)
+		-- Legacy cone false-positive: 40u away, 20° off-axis. Old code (dist<45, dot>0.3) would fire.
+		local legacy = u.HandBulletLaw_SelfHeadshotHits({
+			muzzle = { x = 40, y = 0, z = 0 },
+			dir = { x = -0.94, y = 0.342, z = 0 }, -- ~20° off
+			head = { x = 0, y = 0, z = 0 },
+		})
+		H.assert_true(not legacy)
+		-- Unnormalized dir still hits (function unitizes)
+		local unorm, tu = u.HandBulletLaw_RayHitsSphere(10, 0, 0, -4, 0, 0, 0, 0, 0, r)
+		H.assert_true(unorm)
+		H.assert_near(tu, 6.75, 1e-6)
+	end)
+
 	-- G36 pure FOV/Z soft-refresh law (W5; no mid-frame UV fight)
 	H.TEST("util.fovz_law.soft_refresh_g36", function()
 		local u = env.vrmod.utils

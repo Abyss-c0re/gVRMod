@@ -209,6 +209,12 @@ PURE_TESTED = {
     "vrmod.utils.HandBulletLaw_StatusLabel": "util.hand_bullet_law.filter_g37",
     "vrmod.utils.HandBulletLaw_HmdExpect": "util.hand_bullet_law.filter_g37",
     "vrmod.utils.HandBulletLaw_IsBlockRisk": "util.hand_bullet_law.filter_g37",
+    "vrmod.utils.HandBulletLaw_HeadSphereRadius": "util.hand_bullet_law.self_head_ray",
+    "vrmod.utils.HandBulletLaw_SelfHeadMaxT": "util.hand_bullet_law.self_head_ray",
+    "vrmod.utils.HandBulletLaw_MuzzleAlong": "util.hand_bullet_law.self_head_ray",
+    "vrmod.utils.HandBulletLaw_AllowProximityCone": "util.hand_bullet_law.self_head_ray",
+    "vrmod.utils.HandBulletLaw_RayHitsSphere": "util.hand_bullet_law.self_head_ray",
+    "vrmod.utils.HandBulletLaw_SelfHeadshotHits": "util.hand_bullet_law.self_head_ray",
     # G38 pure worldmodel single-path law (W10; no dual ghost)
     "vrmod.utils.WorldModelLaw_CubePreferFloatingHands": "util.worldmodel_law.single_path_g38",
     "vrmod.utils.WorldModelLaw_AllowDualGhost": "util.worldmodel_law.single_path_g38",

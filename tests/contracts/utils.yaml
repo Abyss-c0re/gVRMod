@@ -953,6 +953,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
     tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_AllowProximityCone
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.self_head_ray]
   - id: vrmod.utils.HandBulletLaw_Decide
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
@@ -965,6 +969,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
     tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_HeadSphereRadius
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.self_head_ray]
   - id: vrmod.utils.HandBulletLaw_HmdExpect
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
@@ -981,6 +989,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
     tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_MuzzleAlong
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.self_head_ray]
   - id: vrmod.utils.HandBulletLaw_NormalizePart
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
@@ -993,10 +1005,22 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
     tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_RayHitsSphere
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.self_head_ray]
   - id: vrmod.utils.HandBulletLaw_RedirectScale
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
     tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandBulletLaw_SelfHeadMaxT
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.self_head_ray]
+  - id: vrmod.utils.HandBulletLaw_SelfHeadshotHits
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
+    tier: pure
+    tests: [util.hand_bullet_law.self_head_ray]
   - id: vrmod.utils.HandBulletLaw_ShouldAbsorbOnProxy
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
