@@ -145,6 +145,11 @@ function A:Right()
 	return M.Vector(right.x, right.y, right.z)
 end
 
+function A:Left()
+	local right = self:Right()
+	return M.Vector(-right.x, -right.y, -right.z)
+end
+
 function A:Up()
 	local _, _, up = angles.angle_vectors(self.p, self.y, self.r)
 	return M.Vector(up.x, up.y, up.z)
@@ -228,6 +233,8 @@ function M.new_hook()
 		end
 		return copy
 	end
+	-- Garry's Mod calls hook.Call. It is the same runner as hook.Run.
+	hook.Call = hook.Run
 	return hook
 end
 
@@ -281,6 +288,11 @@ function M.make_env(realm)
 	end
 	env.istable = function(v)
 		return type(v) == "table"
+	end
+	-- GMod's IsColor is true for Color(r,g,b). Ours is a plain table, not a class.
+	-- A Vector has x,y,z, so it does not pass.
+	env.IsColor = function(v)
+		return type(v) == "table" and type(v.r) == "number" and type(v.g) == "number" and type(v.b) == "number"
 	end
 	env.isfunction = function(v)
 		return type(v) == "function"
@@ -355,48 +367,20 @@ function M.make_env(realm)
 	return env
 end
 
-function M.load_file(path, env)
-	local chunk, err = loadfile(path)
-	if not chunk then
-		return false, err
-	end
-	setfenv(chunk, env)
-	local ok, runerr = pcall(chunk)
-	if not ok then
-		return false, runerr
-	end
-	return true
-end
-
--- GMod's LuaJIT accepts `continue`. Stock LuaJIT does not.
--- Scanner skips strings and comments, then turns each continue into a goto
--- whose label sits immediately before the end/until that closes that loop.
-function M.rewrite_continue(src)
-	if not src:find("continue", 1, true) then
-		return src, false
-	end
+-- Garry's Mod compiles a small dialect: !=, &&, ||, unary !, // comments,
+-- /* */ comments, and DEFINE_BASECLASS. Strings and -- comments are copied
+-- through. continue is rewritten afterwards by rewrite_continue.
+function M.gmod_preprocess(src)
 	local n = #src
 	local i = 1
 	local out = {}
-	local stack = {}
-	local loop_n = 0
 	local function emit(s)
 		out[#out + 1] = s
 	end
-	local function peek(k)
-		return src:sub(i, i + k - 1)
-	end
-	local function is_word(s)
-		local a = src:byte(i - 1)
-		local b = src:byte(i + #s)
-		local function ident(c)
-			return c and ((c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95)
-		end
-		return not ident(a) and not ident(b)
-	end
 	while i <= n do
 		local c = src:sub(i, i)
-		if c == "-" and src:sub(i + 1, i + 1) == "-" then
+		local two = src:sub(i, i + 1)
+		if two == "--" then
 			if src:sub(i + 2, i + 3) == "[[" then
 				local close = src:find("]]", i + 4, true)
 				if not close then
@@ -410,6 +394,18 @@ function M.rewrite_continue(src)
 				emit(src:sub(i, nl))
 				i = nl + 1
 			end
+		elseif two == "//" then
+			local nl = src:find("\n", i, true) or (n + 1)
+			emit(" ")
+			i = nl
+		elseif two == "/*" then
+			local close = src:find("*/", i + 2, true)
+			if not close then
+				emit(" ")
+				break
+			end
+			emit(" ")
+			i = close + 2
 		elseif c == "[" and src:sub(i + 1, i + 1) == "[" then
 			local close = src:find("]]", i + 2, true)
 			if not close then
@@ -433,15 +429,129 @@ function M.rewrite_continue(src)
 			end
 			emit(src:sub(i, j - 1))
 			i = j
+		elseif two == "!=" then
+			emit("~=")
+			i = i + 2
+		elseif two == "&&" then
+			emit(" and ")
+			i = i + 2
+		elseif two == "||" then
+			emit(" or ")
+			i = i + 2
+		elseif c == "!" then
+			emit(" not ")
+			i = i + 1
+		elseif c:match("[%a_]") then
+			local j = i + 1
+			while j <= n and src:sub(j, j):match("[%w_]") do
+				j = j + 1
+			end
+			local word = src:sub(i, j - 1)
+			if word == "DEFINE_BASECLASS" then
+				emit("local BaseClass = baseclass.Get")
+			else
+				emit(word)
+			end
+			i = j
 		else
-			local word
-			if c:match("[%a_]") then
+			emit(c)
+			i = i + 1
+		end
+	end
+	return table.concat(out)
+end
+
+function M.load_file(path, env)
+	local fh = io.open(path, "rb")
+	if not fh then
+		return false, "open failed " .. path
+	end
+	local src = fh:read("*a")
+	fh:close()
+	return M.load_source(path, src, env)
+end
+
+-- GMod's LuaJIT accepts `continue`. Stock LuaJIT does not.
+-- Each continue becomes a goto. The label sits immediately before the
+-- end/until that closes that loop. A label cannot follow a bare `break`
+-- in the same block, so a real break inside a continue-loop is wrapped
+-- as `do break end`. The break still leaves the loop; the label can follow.
+function M.rewrite_continue(src)
+	if not src:find("continue", 1, true) then
+		return src, false
+	end
+	local n = #src
+	local needs = {}
+
+	local function walk(emit)
+		local i = 1
+		local stack = {}
+		local loop_n = 0
+		local function ident(c)
+			return c and ((c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95)
+		end
+		local function is_word_at(pos, len)
+			local a = src:byte(pos - 1)
+			-- `obj.continue` and `obj:continue` are field names, not the keyword.
+			if a == 46 or a == 58 then
+				return false
+			end
+			local b = src:byte(pos + len)
+			return not ident(a) and not ident(b)
+		end
+		local function innermost_loop()
+			for s = #stack, 1, -1 do
+				if stack[s].loop then
+					return stack[s]
+				end
+			end
+		end
+		while i <= n do
+			local c = src:sub(i, i)
+			if c == "-" and src:sub(i + 1, i + 1) == "-" then
+				if src:sub(i + 2, i + 3) == "[[" then
+					local close = src:find("]]", i + 4, true)
+					if not close then
+						emit(src:sub(i))
+						break
+					end
+					emit(src:sub(i, close + 1))
+					i = close + 2
+				else
+					local nl = src:find("\n", i, true) or (n + 1)
+					emit(src:sub(i, nl))
+					i = nl + 1
+				end
+			elseif c == "[" and src:sub(i + 1, i + 1) == "[" then
+				local close = src:find("]]", i + 2, true)
+				if not close then
+					emit(src:sub(i))
+					break
+				end
+				emit(src:sub(i, close + 1))
+				i = close + 2
+			elseif c == '"' or c == "'" then
+				local j = i + 1
+				while j <= n do
+					local d = src:sub(j, j)
+					if d == "\\" then
+						j = j + 2
+					elseif d == c then
+						j = j + 1
+						break
+					else
+						j = j + 1
+					end
+				end
+				emit(src:sub(i, j - 1))
+				i = j
+			elseif c:match("[%a_]") then
 				local j = i + 1
 				while j <= n and src:sub(j, j):match("[%w_]") do
 					j = j + 1
 				end
-				word = src:sub(i, j - 1)
-				if is_word(word) then
+				local word = src:sub(i, j - 1)
+				if is_word_at(i, #word) then
 					if word == "for" or word == "while" then
 						loop_n = loop_n + 1
 						-- The following `do` belongs to this loop; it is not its own block.
@@ -464,22 +574,24 @@ function M.rewrite_continue(src)
 						stack[#stack + 1] = { loop = false }
 						emit(word)
 					elseif word == "continue" then
-						local id
-						for s = #stack, 1, -1 do
-							if stack[s].loop then
-								id = stack[s].id
-								break
-							end
+						local top = innermost_loop()
+						if top then
+							needs[top.id] = true
+							emit("goto __engine_c" .. top.id)
+						else
+							emit(word)
 						end
-						if id then
-							emit("goto __engine_c" .. id)
+					elseif word == "break" then
+						local top = innermost_loop()
+						if top and needs[top.id] then
+							emit("do break end")
 						else
 							emit(word)
 						end
 					elseif word == "end" or word == "until" then
 						local top = stack[#stack]
 						stack[#stack] = nil
-						if top and top.loop then
+						if top and top.loop and needs[top.id] then
 							emit("::__engine_c" .. top.id .. ":: ")
 						end
 						emit(word)
@@ -497,22 +609,40 @@ function M.rewrite_continue(src)
 			end
 		end
 	end
+
+	walk(function() end)
+	local out = {}
+	walk(function(s)
+		out[#out + 1] = s
+	end)
 	return table.concat(out), true
 end
 
-function M.load_source(path, src, env)
-	local body = src
-	local rewritten = false
-	if src:find("continue", 1, true) then
-		body, rewritten = M.rewrite_continue(src)
+-- Compile only. The script host runs the chunk itself so a budget hook
+-- does not count the preprocessor.
+function M.compile(path, src, env)
+	local body = M.gmod_preprocess(src)
+	local rewritten = body ~= src
+	if body:find("continue", 1, true) then
+		local next_body, did = M.rewrite_continue(body)
+		body = next_body
+		rewritten = rewritten or did
 	end
 	local chunk, err = loadstring(body, "@" .. path)
 	if not chunk then
 		return false, err, rewritten
 	end
 	setfenv(chunk, env)
-	local ok, runerr = pcall(chunk)
+	return true, chunk, rewritten
+end
+
+function M.load_source(path, src, env)
+	local ok, chunk, rewritten = M.compile(path, src, env)
 	if not ok then
+		return false, chunk, rewritten
+	end
+	local ran, runerr = pcall(chunk)
+	if not ran then
 		return false, runerr, rewritten
 	end
 	return true, nil, rewritten

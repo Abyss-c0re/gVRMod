@@ -5,8 +5,33 @@ local vpk = require("pure.vpk")
 local vmt = require("pure.vmt")
 local vtf = require("pure.vtf")
 local zipread = require("pure.zipread")
+local gma = require("pure.gma")
 
 local M = {}
+
+-- garrysmod/ → GarrysMod → common → steamapps. Workshop lives beside common.
+function M.workshop_dir(gmod)
+	return gmod .. "/../../../workshop/content/4000"
+end
+
+function M.gma_paths(root)
+	local out = {}
+	if not root or root == "" or root == false then
+		return out
+	end
+	local p = io.popen("find " .. string.format("%q", root) .. " -maxdepth 2 -type f -name '*.gma' 2>/dev/null")
+	if not p then
+		return out
+	end
+	for line in p:lines() do
+		if line ~= "" then
+			out[#out + 1] = line
+		end
+	end
+	p:close()
+	table.sort(out)
+	return out
+end
 
 local MISSING = string.rep(string.char(255, 0, 255, 255), 16)
 
@@ -17,6 +42,21 @@ local function add_vpk(list, path)
 	end
 	f:close()
 	list[#list + 1] = vpk.open(path)
+end
+
+local function ls(path)
+	local p = io.popen("ls -1 " .. string.format("%q", path) .. " 2>/dev/null")
+	if not p then
+		return {}
+	end
+	local out = {}
+	for line in p:lines() do
+		if line ~= "" then
+			out[#out + 1] = line
+		end
+	end
+	p:close()
+	return out
 end
 
 local function vmt_path(name)
@@ -49,16 +89,49 @@ function M.mount(opts)
 	add_vpk(packs, gmod .. "/fallbacks_dir.vpk")
 	add_vpk(packs, gmod .. "/../sourceengine/hl2_misc_dir.vpk")
 	add_vpk(packs, gmod .. "/../sourceengine/hl2_textures_dir.vpk")
+	-- Episodic models (hunter, magnusson, zombine) and Counter-Strike props.
+	add_vpk(packs, gmod .. "/../sourceengine/content_hl2_dir.vpk")
+	add_vpk(packs, gmod .. "/../sourceengine/content_cstrike_dir.vpk")
+	local loose = { gmod }
+	for _, name in ipairs(ls(gmod .. "/addons")) do
+		loose[#loose + 1] = gmod .. "/addons/" .. name
+	end
+	local gmas = {}
+	local function add_gma_tree(root)
+		local paths = M.gma_paths(root)
+		for i = 1, #paths do
+			local ok, pack = pcall(gma.open, paths[i])
+			if ok and pack then
+				gmas[#gmas + 1] = pack
+			end
+		end
+	end
+	add_gma_tree(gmod .. "/addons")
+	local workshop = opts.workshop
+	if workshop == nil then
+		workshop = M.workshop_dir(gmod)
+	end
+	if workshop ~= false and workshop ~= "" then
+		add_gma_tree(workshop)
+	end
 	local pak = nil
 	if opts.bsp and opts.pak_len and opts.pak_len > 22 then
 		pak = zipread.open(opts.bsp, opts.pak_ofs or 0, opts.pak_len)
 	end
 
+	local neg = {}
 	local function blob(key)
 		if not key then
 			return nil
 		end
 		key = key:lower():gsub("\\", "/")
+		if neg[key] then
+			return nil
+		end
+		if key:find("%.%.", 1, true) then
+			neg[key] = true
+			return nil
+		end
 		if pak then
 			local b = pak:read(key)
 			if b then
@@ -71,6 +144,23 @@ function M.mount(opts)
 				return b
 			end
 		end
+		for i = 1, #loose do
+			local f = io.open(loose[i] .. "/" .. key, "rb")
+			if f then
+				local b = f:read("*a")
+				f:close()
+				if b and #b > 0 then
+					return b
+				end
+			end
+		end
+		for i = 1, #gmas do
+			local b = gmas[i]:read(key)
+			if b then
+				return b
+			end
+		end
+		neg[key] = true
 		return nil
 	end
 
@@ -118,7 +208,7 @@ function M.mount(opts)
 		return base
 	end
 
-	local mount = { packs = packs, pak = pak }
+	local mount = { packs = packs, pak = pak, gma_count = #gmas }
 	local decoded = {}
 
 	local TRANSPARENT = {
@@ -232,11 +322,11 @@ function M.mount(opts)
 		end
 		local bytes = blob(key)
 		if not bytes then
-			return nil
+			return nil, "missing"
 		end
 		local w, h, rgba = vtf.decode(bytes, max_edge)
 		if not w then
-			return nil
+			return nil, rgba or "decode"
 		end
 		hit = { w = w, h = h, rgba = rgba }
 		decoded[key] = hit
@@ -285,9 +375,10 @@ function M.mount(opts)
 				local rgba = string.rep(string.char(tonumber(tint_r), tonumber(tint_g), tonumber(tint_b), 255), 16)
 				hit = { w = 4, h = 4, rgba = rgba }
 			else
-				hit = decode_key(key, max_edge)
+				local decoded_hit, derr = decode_key(key, max_edge)
+				hit = decoded_hit
 				if not hit then
-					return nil, "missing " .. key
+					return nil, (derr or "missing") .. " " .. key
 				end
 			end
 			decoded[key] = hit

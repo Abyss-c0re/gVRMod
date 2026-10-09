@@ -30,6 +30,7 @@ local props = require("pure.props")
 local mdl = require("pure.mdl")
 local angles = require("pure.angles")
 local skybox = require("pure.skybox")
+local glua = require("pure.glua")
 
 local MODE = os.getenv("ENGINE_MODE") or "flat"
 local STEREO = MODE == "stereo" or MODE == "simulator"
@@ -48,6 +49,7 @@ local CAP_FOV_Y = 90
 local CAP_DEPTH = 2
 
 local player
+local actor_line = ""
 local world
 local crate
 local acc = 0
@@ -627,6 +629,180 @@ local function upload_albedo(bound)
 	return parts
 end
 
+-- Reference-pose weapon and NPC meshes from the game's own Lua.
+-- A loaded script is not a thinking NPC and not a firing weapon.
+local function bake_actors(mount, bound, max_edge)
+	local title = (map_name or ""):match("([^/]+)%.bsp$") or "gm_construct"
+	local session = glua.boot({ gmod = gmod_dir(), map = title })
+	print(session.summary)
+	for i = 1, #session.failure_lines do
+		print("fail " .. session.failure_lines[i])
+	end
+	local items, skipped = glua.collect(session, mount)
+	local cache = {}
+	local function load_model(model)
+		local key = tostring(model):lower():gsub("\\", "/")
+		if cache[key] ~= nil then
+			return cache[key] or nil
+		end
+		local base = key:gsub("%.mdl$", "")
+		local a = mount:read(base .. ".mdl")
+		local b = mount:read(base .. ".vvd")
+		local c = mount:read(base .. ".dx90.vtx") or mount:read(base .. ".vtx")
+		local loaded = nil
+		if a and b and c then
+			local ok, mesh = pcall(mdl.load, a, b, c)
+			if ok then
+				loaded = mesh
+			end
+		end
+		cache[key] = loaded or false
+		return loaded
+	end
+	local function alphatest_name(name)
+		local n = name:lower():gsub("\\", "/"):gsub("^materials/", ""):gsub("%.vmt$", "")
+		local text = mount:read("materials/" .. n .. ".vmt")
+		return vmt.alphatest(vmt.pairs(text))
+	end
+	local kept = {}
+	local missing_model = 0
+	for i = 1, #items do
+		local it = items[i]
+		local loaded = load_model(it.model)
+		if (not loaded or not loaded.meshes or #loaded.meshes == 0) and it.view and it.view ~= it.model then
+			local alt = load_model(it.view)
+			if alt and alt.meshes and #alt.meshes > 0 then
+				print("actor view fallback " .. tostring(it.class) .. " " .. tostring(it.model) .. " -> " .. tostring(it.view))
+				it.model = it.view
+				loaded = alt
+			end
+		end
+		if not loaded or not loaded.meshes or #loaded.meshes == 0 then
+			missing_model = missing_model + 1
+			print("actor skip " .. tostring(it.kind) .. " " .. tostring(it.class) .. " " .. tostring(it.model))
+		else
+			local hmin = loaded.hull_min or {}
+			local hmax = loaded.hull_max or {}
+			local hz = (hmax.z or 0) - (hmin.z or 0)
+			if hz > 1 and hz < 10000 and math.abs(hmin.z or 0) < 10000 then
+				it.height = hz
+				it.z_off = -(hmin.z or 0)
+			else
+				it.height = 72
+				it.z_off = 0
+			end
+			local x0, x1 = hmin.x or 0, hmax.x or 0
+			local y0, y1 = hmin.y or 0, hmax.y or 0
+			local reach = 16
+			local corners = { x0 * x0 + y0 * y0, x0 * x0 + y1 * y1, x1 * x1 + y0 * y0, x1 * x1 + y1 * y1 }
+			for c = 1, 4 do
+				local d = math.sqrt(corners[c])
+				if d > reach then
+					reach = d
+				end
+			end
+			if reach ~= reach or reach > 4000 then
+				reach = 256
+			end
+			it.span = reach
+			it.loaded = loaded
+			kept[#kept + 1] = it
+		end
+	end
+	glua.layout(kept, player.pos, player.yaw)
+	local groups = {}
+	local tris = 0
+	for i = 1, #kept do
+		local it = kept[i]
+		local model = it.loaded
+		local oz = it.z + (it.z_off or 0)
+		if i <= 8 then
+			print(string.format(
+				"actor %s %s at %.0f %.0f %.0f yaw %.0f model %s",
+				it.kind, it.class, it.x, it.y, oz, it.yaw or 0, it.model
+			))
+		end
+		for m = 1, #model.meshes do
+			local mesh = model.meshes[m]
+			local g = groups[mesh.material]
+			if not g then
+				g = { verts = {}, alphatest = alphatest_name(mesh.material) }
+				groups[mesh.material] = g
+			end
+			local src = mesh.verts
+			local n = math.floor(#src / 5)
+			for v = 0, n - 1 do
+				local o = v * 5
+				local x, y, z = src[o + 1], src[o + 2], src[o + 3]
+				x, y, z = angles.rotate(it.pitch or 0, it.yaw or 0, it.roll or 0, x, y, z)
+				local gv = g.verts
+				gv[#gv + 1] = it.x + x
+				gv[#gv + 1] = it.y + y
+				gv[#gv + 1] = oz + z
+				gv[#gv + 1] = src[o + 4]
+				gv[#gv + 1] = src[o + 5]
+				gv[#gv + 1] = 1
+				gv[#gv + 1] = 1
+				gv[#gv + 1] = 1
+				gv[#gv + 1] = 0
+			end
+		end
+		tris = tris + (model.tris or 0)
+		it.loaded = nil
+	end
+	local added = 0
+	for name, g in pairs(groups) do
+		if #g.verts > 0 then
+			local mat, err = mount:material(name, max_edge)
+			if mat then
+				bound[#bound + 1] = {
+					key = mat.key,
+					w = mat.w,
+					h = mat.h,
+					rgba = mat.rgba,
+					transform = mat.transform,
+					verts = g.verts,
+					name = name,
+					alphatest = g.alphatest,
+				}
+				added = added + 1
+			else
+				print("actor material " .. name .. " (" .. tostring(err) .. ")")
+			end
+		end
+	end
+	local weapons, npcs = 0, 0
+	local near_d, far_d = 1e9, 0
+	for i = 1, #kept do
+		if kept[i].kind == "weapon" then
+			weapons = weapons + 1
+		elseif kept[i].kind == "npc" then
+			npcs = npcs + 1
+		end
+		local dx = kept[i].x - player.pos.x
+		local dy = kept[i].y - player.pos.y
+		local dist = math.sqrt(dx * dx + dy * dy)
+		if dist < near_d then
+			near_d = dist
+		end
+		if dist > far_d then
+			far_d = dist
+		end
+	end
+	if #kept == 0 then
+		near_d, far_d = 0, 0
+	end
+	actor_line = string.format(
+		"\nactors draw %d weapons %d npcs %d missing %d tris %d materials %d skipped %d near %.0f far %.0f\n%s\n",
+		#kept, weapons, npcs, missing_model, tris, added, #skipped, near_d, far_d, session.summary
+	)
+	print(actor_line)
+	for i = 1, math.min(8, #skipped) do
+		print("skip " .. skipped[i])
+	end
+	collectgarbage("collect")
+end
+
 local function builtin_world()
 	world = { brushes = { trace.box_brush(-2048, -2048, -16, 2048, 2048, 0) } }
 	player = move.new_player(os.getenv("ENGINE_PROFILE") or "gmod")
@@ -699,6 +875,7 @@ local function try_map()
 		pak_ofs = loaded.pak_ofs,
 		pak_len = loaded.pak_len,
 	})
+	print("workshop gmas " .. tostring(mount.gma_count or 0))
 	local bound, stats = mount:bind(surfaces, max_edge)
 	local skyname
 	for i = 1, #loaded.entities do
@@ -710,6 +887,11 @@ local function try_map()
 	end
 	upload_skybox(mount, skyname, max_edge)
 	static_prop_parts(mount, path, loaded.sky, bound, max_edge)
+	local aok, aerr = pcall(bake_actors, mount, bound, max_edge)
+	if not aok then
+		actor_line = "\nactors failed " .. tostring(aerr):gsub("%s+", " ") .. "\n"
+		print(actor_line)
+	end
 	for i = 1, #stats.missing do
 		print("missing material " .. stats.missing[i])
 	end
@@ -985,6 +1167,9 @@ local function write_shot()
 			tostring(map_name), player.pos.x, player.pos.y, player.pos.z,
 			player.yaw, player.pitch or 0, line
 		)
+	end
+	if actor_line ~= "" then
+		line = line .. actor_line
 	end
 	local meta = assert(io.open(dir .. "/map.txt", "w"))
 	meta:write(line)

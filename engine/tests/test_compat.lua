@@ -44,6 +44,44 @@ HOOK_N = n
 	chunk()
 	T.eq(env.HOOK_N, 8, "continue skips 2 (1+3+4)")
 
+	-- The shape that failed in stools/camera.lua: break is the last
+	-- statement of the loop, so a label cannot follow it.
+	local src_break = [[
+local found = false
+local seen = 0
+for i = 1, 5 do
+  if i == 2 then continue end
+  seen = seen + 1
+  found = true
+  break
+end
+BREAK_N = found and seen or -1
+]]
+	body = compat.rewrite_continue(src_break)
+	T.ok(body:find("do break end", 1, true) ~= nil, "break wrapped")
+	env = compat.make_env("client")
+	chunk = assert(loadstring(body))
+	setfenv(chunk, env)
+	chunk()
+	T.eq(env.BREAK_N, 1, "break leaves after first kept step")
+
+	local src_until = [[
+local i = 0
+local s = 0
+repeat
+  i = i + 1
+  if i == 2 then continue end
+  s = s + i
+until i >= 4
+UNTIL_N = s
+]]
+	body = compat.rewrite_continue(src_until)
+	env = compat.make_env("client")
+	chunk = assert(loadstring(body))
+	setfenv(chunk, env)
+	chunk()
+	T.eq(env.UNTIL_N, 8, "repeat continue still sees until")
+
 	-- Fixture addon: only the compatibility surface, so it must run.
 	local root = debug.getinfo(1, "S").source
 	if root:sub(1, 1) == "@" then

@@ -243,19 +243,30 @@ function M.decode(data, max_edge)
 	end
 	local start0 = header_size
 	if major > 7 or (major == 7 and minor >= 3) then
+		-- 7.3 stores a resource dictionary as the last nres*8 bytes of headerSize.
+		-- Citizen sheets pad 8 bytes after numResources, so the dictionary is not at byte 72.
+		-- Tag 0x30 is the high-res image. Flag 0x02 means the offset field is not a file offset.
 		if #data < 72 then
 			return nil, "short v7.3 header"
 		end
 		local nres = bin.u32(data, 69)
+		if nres < 1 or nres > 32 or header_size < 72 or header_size > #data then
+			return nil, "bad resource header"
+		end
+		local dict = header_size - nres * 8
+		if dict < 72 then
+			return nil, "bad resource header"
+		end
 		local found = nil
-		local p = 73
+		local p = dict + 1
 		for _ = 1, nres do
 			if p + 7 > #data then
 				break
 			end
 			local tag = data:byte(p)
+			local flags = data:byte(p + 3) or 0
 			local ofs = bin.u32(data, p + 4)
-			if tag == 0x30 then
+			if tag == 0x30 and math.floor(flags / 2) % 2 == 0 and ofs and ofs > 0 and ofs < #data then
 				found = ofs
 			end
 			p = p + 8

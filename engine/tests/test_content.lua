@@ -84,6 +84,43 @@ return function(T)
 	T.eq(rgba:byte(1), 255, "dxt5 r")
 	T.eq(rgba:byte(4), 255, "dxt5 a")
 
+	-- VTF 7.3 puts the resource dictionary at the end of headerSize.
+	-- Eight pad bytes sit between numResources and the entries (citizen_sheet).
+	local function z(n)
+		return string.rep("\0", n)
+	end
+	local sheet73 = "VTF\0" .. le32(7) .. le32(3) .. le32(96)
+		.. le16(4) .. le16(4) .. le32(0) .. le16(1) .. le16(0)
+		.. z(4) .. z(12) .. z(4)
+		.. le32(0) .. le32(13) .. string.char(1) .. le32(0) .. string.char(0, 0)
+		.. le16(1) .. z(3) .. le32(2) .. z(8)
+		.. string.char(0x01, 0, 0, 0) .. le32(96)
+		.. string.char(0x30, 0, 0, 0) .. le32(96)
+		.. red
+	T.eq(#sheet73, 96 + 8, "vtf 7.3 fixture size " .. tostring(#sheet73))
+	w, h, rgba = vtf.decode(sheet73, 4)
+	T.eq(w, 4, "vtf 7.3 w " .. tostring(h))
+	T.eq(h, 4, "vtf 7.3 h")
+	T.eq(rgba and rgba:byte(1), 255, "vtf 7.3 r")
+
+	local gma_mod = require("pure.gma")
+	local function le64(n)
+		return le32(n) .. le32(0)
+	end
+	local gma_body = "IDST-unit"
+	local gma_bin = "GMAD" .. string.char(3) .. le64(0) .. le64(0) .. "\0"
+		.. "Test\0" .. "desc\0" .. "author\0" .. le32(1)
+		.. le32(1) .. "models/unit.mdl\0" .. le64(#gma_body) .. le32(1)
+		.. le32(0) .. gma_body
+	local gma_path = os.tmpname()
+	local gf = assert(io.open(gma_path, "wb"))
+	gf:write(gma_bin)
+	gf:close()
+	local gpack = gma_mod.open(gma_path)
+	T.eq(gpack and gpack:read("models/unit.mdl"), gma_body, "gma model bytes")
+	T.ok(gpack and gpack:read("models/missing.mdl") == nil, "gma miss")
+	os.remove(gma_path)
+
 	local xf = vmt.transform("center .5 .5 scale 2 2 rotate 0 translate 0 0")
 	local u, v = vmt.apply_uv(0, 0, xf)
 	T.near(u, -0.5, 1e-6, "uv scale u")
@@ -127,6 +164,23 @@ return function(T)
 	var = var / n
 	T.ok(var > 1, "concrete mip is not flat (" .. tostring(var) .. ")")
 	T.ok(mean > 40 and mean < 230, "concrete mip has albedo (" .. tostring(mean) .. ")")
+
+	local arcvr = content.workshop_dir(gmod) .. "/3442302438/vrmod_arcvr.gma"
+	local af = io.open(arcvr, "rb")
+	if af then
+		af:close()
+		local apack = gma_mod.open(arcvr)
+		local amdl = apack and apack:read("models/weapons/arcticvr/lmg_akbren.mdl")
+		T.eq(amdl and amdl:sub(1, 4), "IDST", "arctic viewmodel is a studio model")
+		T.ok(#content.gma_paths(content.workshop_dir(gmod)) > 100, "workshop folder has the subscribed gmas")
+	end
+
+	local citizen = real:read("materials/models/humans/male/group03/citizen_sheet.vtf")
+	T.ok(citizen and #citizen > 1000, "citizen sheet bytes")
+	w, h, rgba = vtf.decode(citizen, 512)
+	T.eq(w, 512, "citizen sheet w " .. tostring(w) .. " " .. tostring(h))
+	T.eq(h, 512, "citizen sheet h")
+	T.eq(#rgba, 512 * 512 * 4, "citizen sheet rgba")
 
 	local world = bsp.load(construct, { uv = true })
 	T.ok(world.surfaces and #world.surfaces > 5, "construct surfaces " .. tostring(world.surfaces and #world.surfaces))
@@ -246,6 +300,11 @@ return function(T)
 		pak_ofs = world.pak_ofs,
 		pak_len = world.pak_len,
 	})
+	local ws_probe = io.open(content.workshop_dir(gmod) .. "/3442302438/vrmod_arcvr.gma", "rb")
+	if ws_probe then
+		ws_probe:close()
+		T.ok(mount.gma_count > 100, "mounted workshop gmas " .. tostring(mount.gma_count))
+	end
 	local key, txf = mount:describe("GM_CONSTRUCT/CONSTRUCT_CONCRETE_GROUND")
 	T.eq(key, "materials/gm_construct/construct_concrete_ground.vtf", "concrete basetexture")
 	T.ok(txf and math.abs(txf.sx - 1.25) < 1e-4, "concrete texture scale")
