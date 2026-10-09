@@ -22,3 +22,7 @@ native_launcher/build/
 state/cubalc_mirror/
 .scratch/
 **/cubalc_pull.log
+
+# engine local runtime (LÖVR binary, captures). Not source.
+engine/.cache/
+engine/qa/out/
