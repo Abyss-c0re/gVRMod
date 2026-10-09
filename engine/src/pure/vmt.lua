@@ -52,6 +52,18 @@ function M.alphatest(keys)
 	return a == "1" or a == "1.0"
 end
 
+-- WorldVertexTransition draws $basetexture at blend 0 and $basetexture2 at blend 1.
+function M.transition(keys)
+	if not keys then
+		return false
+	end
+	if keys.__shader == "worldvertextransition" then
+		return true
+	end
+	local b2 = keys["$basetexture2"]
+	return b2 ~= nil and b2 ~= ""
+end
+
 function M.apply_uv(u, v, xf)
 	if not xf then
 		return u, v

@@ -229,4 +229,43 @@ return function(T)
 	local cards = mount:read("materials/models/props_foliage/tree_springers_cards_01.vmt")
 	T.ok(vmt.alphatest(vmt.pairs(cards)), "springer cards are alphatest")
 	T.ok(not vmt.alphatest(vmt.pairs('"LightmappedGeneric" { "$basetexture" "brick/brick" }')), "opaque is not alphatest")
+	T.ok(vmt.transition({ __shader = "worldvertextransition", ["$basetexture2"] = "grass2" }), "wvt is a transition")
+	T.ok(not vmt.transition({ __shader = "lightmappedgeneric", ["$basetexture"] = "brick" }), "lightmapped is not a transition")
+	T.near(bsp.disp_blend(0), 0, 1e-6, "blend 0")
+	T.near(bsp.disp_blend(255), 1, 1e-6, "blend 255")
+	T.near(bsp.disp_blend(255.003), 1, 1e-6, "blend clamp")
+	T.near(bsp.disp_blend(127.5), 0.5, 1e-4, "blend mid")
+
+	local lo, hi, nblend = 1, 0, 0
+	for i = 1, #world.surfaces do
+		local sn = world.surfaces[i].name:lower()
+		if sn:find("grass_13", 1, true) and not sn:find("grass-sand", 1, true) then
+			local stride = bsp.VERT_STRIDE
+			local count = #world.surfaces[i].verts / stride
+			for v = 0, count - 1 do
+				local b = world.surfaces[i].verts[v * stride + 9]
+				nblend = nblend + 1
+				if b < lo then lo = b end
+				if b > hi then hi = b end
+			end
+		end
+	end
+	T.ok(nblend > 100, "grass_13 verts " .. tostring(nblend))
+	T.ok(hi - lo > 0.5, "grass_13 blend spans both textures " .. tostring(lo) .. ".." .. tostring(hi))
+
+	local grass = mount:material("gm_construct/grass_13", 32)
+	T.ok(grass and grass.blend, "grass_13 blends")
+	if grass then
+		T.eq(grass.key, "materials/gm_construct/grass1.vtf", "grass basetexture")
+		T.eq(grass.key2, "materials/gm_construct/grass2.vtf", "grass basetexture2")
+		T.ok(grass.mask_key == nil, "grass_13 has no blend mask")
+		T.near(grass.detail_scale, 0.12, 1e-4, "grass detail scale")
+		T.near(grass.detail_blend, 0.5, 1e-4, "grass detail blend")
+	end
+	local sand = mount:material("gm_construct/grass-sand_13", 32)
+	T.ok(sand and sand.blend and sand.mask_key ~= nil, "grass-sand uses the blend mask")
+	if sand and sand.transform2 then
+		T.near(sand.transform2.rot, 30, 1e-3, "sand texture rotate")
+		T.eq(sand.key2, "materials/gm_construct/construct_sand.vtf", "sand basetexture2")
+	end
 end

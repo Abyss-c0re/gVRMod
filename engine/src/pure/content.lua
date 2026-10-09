@@ -222,6 +222,57 @@ function M.mount(opts)
 		return nil, xf or "missing"
 	end
 
+	local function decode_key(key, max_edge)
+		if not key or key == "" then
+			return nil
+		end
+		local hit = decoded[key]
+		if hit then
+			return hit
+		end
+		local bytes = blob(key)
+		if not bytes then
+			return nil
+		end
+		local w, h, rgba = vtf.decode(bytes, max_edge)
+		if not w then
+			return nil
+		end
+		hit = { w = w, h = h, rgba = rgba }
+		decoded[key] = hit
+		return hit
+	end
+
+	-- Resolved VMT keys, including patch includes. Nil when the name has no albedo.
+	local function material_keys(mat_name)
+		if not mat_name or mat_name == "" or tool_skip(mat_name) then
+			return nil
+		end
+		local function try_name(raw)
+			local vm = vmt_path(raw)
+			if not blob(vm) then
+				return nil
+			end
+			return keys_with_albedo(vm, 0, { [vm] = true })
+		end
+		local function usable(keys)
+			return keys and keys["$basetexture"] and keys["$basetexture"] ~= ""
+		end
+		local keys = try_name(mat_name)
+		if usable(keys) then
+			return keys
+		end
+		local stripped = mat_name:lower():gsub("\\", "/"):gsub("^maps/[^/]+/", "")
+		stripped = stripped:gsub("_-?%d+_-?%d+_-?%d+$", "")
+		if stripped ~= mat_name:lower() then
+			local alt = try_name(stripped)
+			if usable(alt) then
+				return alt
+			end
+		end
+		return keys
+	end
+
 	function mount:material(mat_name, max_edge)
 		local key, xf_or_err = self:describe(mat_name)
 		if not key then
@@ -234,25 +285,63 @@ function M.mount(opts)
 				local rgba = string.rep(string.char(tonumber(tint_r), tonumber(tint_g), tonumber(tint_b), 255), 16)
 				hit = { w = 4, h = 4, rgba = rgba }
 			else
-				local bytes = blob(key)
-				if not bytes then
+				hit = decode_key(key, max_edge)
+				if not hit then
 					return nil, "missing " .. key
 				end
-				local w, h, rgba = vtf.decode(bytes, max_edge)
-				if not w then
-					return nil, h
-				end
-				hit = { w = w, h = h, rgba = rgba }
 			end
 			decoded[key] = hit
 		end
-		return {
+		local out = {
 			key = key,
 			w = hit.w,
 			h = hit.h,
 			rgba = hit.rgba,
 			transform = xf_or_err,
 		}
+		if key:sub(1, 7) == "__tint/" then
+			return out
+		end
+		local keys = material_keys(mat_name)
+		if not keys or not vmt.transition(keys) then
+			return out
+		end
+		local key2 = vmt.vtf_key(keys["$basetexture2"])
+		local hit2 = decode_key(key2, max_edge)
+		if not hit2 then
+			return out
+		end
+		out.blend = true
+		out.key2 = key2
+		out.w2 = hit2.w
+		out.h2 = hit2.h
+		out.rgba2 = hit2.rgba
+		out.transform2 = vmt.transform(keys["$basetexturetransform2"])
+		local mask_name = keys["$blendmodulatetexture"]
+		if mask_name and mask_name ~= "" then
+			local mask_key = vmt.vtf_key(mask_name)
+			local mask = decode_key(mask_key, max_edge)
+			if mask then
+				out.mask_key = mask_key
+				out.mask_w = mask.w
+				out.mask_h = mask.h
+				out.mask_rgba = mask.rgba
+			end
+		end
+		local detail_name = keys["$detail"]
+		if detail_name and detail_name ~= "" then
+			local detail_key = vmt.vtf_key(detail_name)
+			local detail = decode_key(detail_key, max_edge)
+			if detail then
+				out.detail_key = detail_key
+				out.detail_w = detail.w
+				out.detail_h = detail.h
+				out.detail_rgba = detail.rgba
+				out.detail_scale = tonumber(keys["$detailscale"]) or 1
+				out.detail_blend = tonumber(keys["$detailblendfactor"]) or 1
+			end
+		end
+		return out
 	end
 
 	-- One draw group per surface. Shared albedos keep the same key.
@@ -296,7 +385,27 @@ function M.mount(opts)
 					transform = mat.transform,
 					verts = s.verts,
 					name = s.name,
+					blend = mat.blend,
+					key2 = mat.key2,
+					w2 = mat.w2,
+					h2 = mat.h2,
+					rgba2 = mat.rgba2,
+					transform2 = mat.transform2,
+					mask_key = mat.mask_key,
+					mask_w = mat.mask_w,
+					mask_h = mat.mask_h,
+					mask_rgba = mat.mask_rgba,
+					detail_key = mat.detail_key,
+					detail_w = mat.detail_w,
+					detail_h = mat.detail_h,
+					detail_rgba = mat.detail_rgba,
+					detail_scale = mat.detail_scale,
+					detail_blend = mat.detail_blend,
 				}
+				if mat.blend then
+					io.write(string.format("blend %s + %s%s\n", s.name, mat.key2, mat.mask_key and " mask" or ""))
+					io.flush()
+				end
 			end
 			if group then
 				out[#out + 1] = group

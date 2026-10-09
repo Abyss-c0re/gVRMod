@@ -172,8 +172,24 @@ local function shade(n, salt)
 	return 0.28 + 0.22 * math.abs(n.x) + wobble, 0.32 + 0.40 * nz, 0.30 + 0.18 * math.abs(n.y)
 end
 
--- x,y,z,u,v then display light. Light is a sample of the face lightmap, not a color room vertex paint.
-M.VERT_STRIDE = 8
+-- x,y,z,u,v, light rgb, then the displacement blend (0 = $basetexture, 1 = $basetexture2).
+-- Light is a sample of the face lightmap, not a color room vertex paint.
+M.VERT_STRIDE = 9
+
+-- CDispVert.m_flAlpha is the Hammer blend paint, 0 through 255.
+function M.disp_blend(alpha)
+	if not alpha then
+		return 0
+	end
+	local k = alpha / 255
+	if k < 0 then
+		return 0
+	end
+	if k > 1 then
+		return 1
+	end
+	return k
+end
 
 -- ColorRGBExp32. linear = byte * 2^exp / 255, then a 2.2 display gamma so outdoor luxels stay visible.
 function M.display_light(r, g, b, exp)
@@ -618,10 +634,13 @@ function M.load(path, opts)
 			local dx, dy, dz = p.x - sky.x, p.y - sky.y, p.z - sky.z
 			return dx * dx + dy * dy + dz * dz < 6000 * 6000
 		end
-		local function push_uv(buf, p, mat, fi, sky_face, place)
+		local function push_uv(buf, p, mat, fi, sky_face, place, sample, blend)
 			-- UVs and luxels stay in the vertex space VBSP wrote (local for a bmodel).
-			local u, v = M.tex_uv(p.x, p.y, p.z, mat.vecs, mat.tw, mat.th)
-			local lr, lg, lb = light_at(fi, p.x, p.y, p.z, mat)
+			-- A displacement samples the base quad. The lightmap is parameterized on that
+			-- quad; the displaced point projects into the wrong luxel.
+			local q = sample or p
+			local u, v = M.tex_uv(q.x, q.y, q.z, mat.vecs, mat.tw, mat.th)
+			local lr, lg, lb = light_at(fi, q.x, q.y, q.z, mat)
 			local x, y, z = M.bmodel_point(p.x, p.y, p.z, place)
 			if sky_face then
 				x, y, z = M.sky_place(x, y, z, sky)
@@ -634,6 +653,7 @@ function M.load(path, opts)
 			buf[#buf + 1] = lr
 			buf[#buf + 1] = lg
 			buf[#buf + 1] = lb
+			buf[#buf + 1] = blend or 0
 		end
 		local nfaces = #face_s / 56
 		local disp_by_face = {}
@@ -702,6 +722,10 @@ function M.load(path, opts)
 								x = basep.x + vx * dist,
 								y = basep.y + vy * dist,
 								z = basep.z + vz * dist,
+								bx = basep.x,
+								by = basep.y,
+								bz = basep.z,
+								blend = M.disp_blend(bin.f32(dvert_s, vo + 16)),
 							}
 						end
 					end
@@ -723,12 +747,17 @@ function M.load(path, opts)
 								push_tri(mesh, draw_pt(p00), draw_pt(p11), draw_pt(p01), r, g, b)
 							end
 							if uvbuf then
-								push_uv(uvbuf, p00, mat, fi, sky_face, place)
-								push_uv(uvbuf, p10, mat, fi, sky_face, place)
-								push_uv(uvbuf, p11, mat, fi, sky_face, place)
-								push_uv(uvbuf, p00, mat, fi, sky_face, place)
-								push_uv(uvbuf, p11, mat, fi, sky_face, place)
-								push_uv(uvbuf, p01, mat, fi, sky_face, place)
+								local function push_disp(p)
+									push_uv(uvbuf, p, mat, fi, sky_face, place, {
+										x = p.bx, y = p.by, z = p.bz,
+									}, p.blend)
+								end
+								push_disp(p00)
+								push_disp(p10)
+								push_disp(p11)
+								push_disp(p00)
+								push_disp(p11)
+								push_disp(p01)
 							end
 							tri_count = tri_count + 2
 						end

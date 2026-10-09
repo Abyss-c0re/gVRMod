@@ -53,6 +53,9 @@ local crate
 local acc = 0
 local shader
 local alpha_shader
+local blend_shader
+local white_tex
+local send_uv
 local solid
 local left_tex, right_tex
 local eye_pass = {}
@@ -114,10 +117,24 @@ local function draw_world(pass)
 		pass:setColor(1, 1, 1)
 		for i = 1, #map_parts do
 			local part = map_parts[i]
-			-- Alphatest cards (the springer trees) discard the empty texels.
-			-- Drawn solid, the same quads are green slabs.
-			pass:setShader(part.alphatest and alpha_shader or shader)
-			pass:setMaterial(part.tex)
+			if part.tex2 then
+				-- Vertex alpha is the displacement blend. 0 keeps $basetexture.
+				pass:setShader(blend_shader)
+				pass:setMaterial(part.tex)
+				pass:send("BlendTexture", part.tex2)
+				pass:send("BlendMask", part.mask or white_tex)
+				pass:send("DetailTexture", part.detail or white_tex)
+				pass:send("UseMask", part.mask and 1 or 0)
+				pass:send("DetailScale", part.detail_scale or 1)
+				pass:send("DetailBlend", part.detail and (part.detail_blend or 1) or 0)
+				send_uv(pass, "Uv1", part.transform)
+				send_uv(pass, "Uv2", part.transform2)
+			else
+				-- Alphatest cards (the springer trees) discard the empty texels.
+				-- Drawn solid, the same quads are green slabs.
+				pass:setShader(part.alphatest and alpha_shader or shader)
+				pass:setMaterial(part.tex)
+			end
 			pass:draw(part.mesh)
 		end
 		pass:setMaterial()
@@ -355,18 +372,36 @@ local function make_texture(rgba, w, h)
 	return lovr.graphics.newTexture(image, { mipmaps = false })
 end
 
-local function upload_uv_mesh(src, xf)
+-- Identity is center 0.5, scale 1, rotate 0. Blend materials apply this in the shader
+-- so $basetexture and $basetexture2 can use different transforms of the same BSP uv.
+function send_uv(pass, name, xf)
+	if not xf then
+		pass:send(name, { 0.5, 0.5, 1, 1 })
+		pass:send(name .. "B", { 1, 0, 0, 0 })
+	else
+		local rad = math.rad(xf.rot)
+		pass:send(name, { xf.cx, xf.cy, xf.sx, xf.sy })
+		pass:send(name .. "B", { math.cos(rad), math.sin(rad), xf.tx, xf.ty })
+	end
+end
+
+local function upload_uv_mesh(src, xf, use_blend)
 	local stride = bsp.VERT_STRIDE
 	local n = math.floor(#src / stride)
 	local verts = {}
 	for i = 0, n - 1 do
 		local o = i * stride
 		local u, v = src[o + 4], src[o + 5]
-		if xf then
+		-- WorldVertexTransition transforms both textures in the shader from the raw uv.
+		if xf and not use_blend then
 			u, v = vmt.apply_uv(u, v, xf)
 		end
 		local x, y, z = coords.source_to_lovr(src[o + 1], src[o + 2], src[o + 3], SCALE)
-		verts[i + 1] = { x, y, z, u, v, src[o + 6], src[o + 7], src[o + 8], 1 }
+		local a = 1
+		if use_blend then
+			a = src[o + 9] or 0
+		end
+		verts[i + 1] = { x, y, z, u, v, src[o + 6], src[o + 7], src[o + 8], a }
 	end
 	return lovr.graphics.newMesh({
 		{ name = "VertexPosition", type = "vec3" },
@@ -441,6 +476,7 @@ local function static_prop_parts(mount, path, sky, bound, max_edge)
 					gv[#gv + 1] = 1
 					gv[#gv + 1] = 1
 					gv[#gv + 1] = 1
+					gv[#gv + 1] = 0
 				end
 			end
 			drawn = drawn + 1
@@ -541,21 +577,38 @@ end
 
 local function upload_albedo(bound)
 	local gpu = {}
+	local function gpu_tex(key, rgba, w, h)
+		if not key or not rgba then
+			return nil
+		end
+		local tex = gpu[key]
+		if not tex then
+			tex = make_texture(rgba, w, h)
+			gpu[key] = tex
+		end
+		return tex
+	end
 	local parts = {}
 	for i = 1, #bound do
 		local s = bound[i]
-		local tex = gpu[s.key]
-		if not tex then
-			tex = make_texture(s.rgba, s.w, s.h)
-			gpu[s.key] = tex
-		end
+		local tex = gpu_tex(s.key, s.rgba, s.w, s.h)
 		parts[#parts + 1] = {
 			tex = tex,
-			mesh = upload_uv_mesh(s.verts, s.transform),
+			tex2 = gpu_tex(s.key2, s.rgba2, s.w2, s.h2),
+			mask = gpu_tex(s.mask_key, s.mask_rgba, s.mask_w, s.mask_h),
+			detail = gpu_tex(s.detail_key, s.detail_rgba, s.detail_w, s.detail_h),
+			detail_scale = s.detail_scale,
+			detail_blend = s.detail_blend,
+			transform = s.blend and s.transform or nil,
+			transform2 = s.transform2,
+			mesh = upload_uv_mesh(s.verts, s.transform, s.blend),
 			name = s.name,
 			alphatest = s.alphatest,
 		}
 		s.rgba = nil
+		s.rgba2 = nil
+		s.mask_rgba = nil
+		s.detail_rgba = nil
 	end
 	return parts
 end
@@ -668,6 +721,50 @@ function lovr.load()
 			return Color * vec4(tex.rgb, 1.0);
 		}
 	]])
+	-- lightmappedgeneric_ps2_3_x.h: lerp(base, base2, vertexAlpha).
+	-- $blendmodulatetexture remaps that alpha. $detail mode 0 is base * lerp(1, detail*2, factor).
+	blend_shader = lovr.graphics.newShader([[
+		vec4 lovrmain() {
+			Color = VertexColor;
+			return DefaultPosition;
+		}
+	]], [[
+		uniform texture2D BlendTexture;
+		uniform texture2D BlendMask;
+		uniform texture2D DetailTexture;
+		uniform vec4 Uv1;
+		uniform vec4 Uv1B;
+		uniform vec4 Uv2;
+		uniform vec4 Uv2B;
+		uniform float UseMask;
+		uniform float DetailScale;
+		uniform float DetailBlend;
+
+		vec2 apply_uv(vec2 uv, vec4 a, vec4 b) {
+			vec2 d = (uv - a.xy) * a.zw;
+			vec2 r = vec2(b.x * d.x - b.y * d.y, b.y * d.x + b.x * d.y);
+			return r + a.xy + b.zw;
+		}
+
+		vec4 lovrmain() {
+			vec4 base = getPixel(ColorTexture, apply_uv(UV, Uv1, Uv1B));
+			vec4 base2 = getPixel(BlendTexture, apply_uv(UV, Uv2, Uv2B));
+			float k = clamp(Color.a, 0.0, 1.0);
+			if (UseMask > 0.5) {
+				vec4 modt = getPixel(BlendMask, UV);
+				float minb = clamp(modt.g - modt.r, 0.0, 1.0);
+				float maxb = clamp(modt.g + modt.r, 0.0, 1.0);
+				k = smoothstep(minb, max(maxb, minb + 0.0001), k);
+			}
+			vec3 albedo = mix(base.rgb, base2.rgb, k);
+			if (DetailBlend > 0.0) {
+				vec3 detail = getPixel(DetailTexture, UV * DetailScale).rgb;
+				albedo *= mix(vec3(1.0), detail * 2.0, DetailBlend);
+			}
+			return vec4(Color.rgb * albedo, 1.0);
+		}
+	]])
+	white_tex = make_texture(string.char(255, 255, 255, 255), 1, 1)
 	sampler = lovr.graphics.newSampler({ wrap = "repeat", filter = "linear" })
 	local function eye_tex(w, h)
 		return lovr.graphics.newTexture(w, h, {
