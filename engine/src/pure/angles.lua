@@ -55,4 +55,13 @@ function M.wish_basis(yaw_deg)
 	return forward, right
 end
 
+-- Studio vertex → world. Model +X is forward, +Y is left, +Z is up.
+-- AngleVectors' right is model -Y, so the left axis is -right.
+function M.rotate(pitch, yaw, roll, x, y, z)
+	local forward, right, up = M.angle_vectors(pitch, yaw, roll)
+	return forward.x * x - right.x * y + up.x * z,
+		forward.y * x - right.y * y + up.y * z,
+		forward.z * x - right.z * y + up.z * z
+end
+
 return M

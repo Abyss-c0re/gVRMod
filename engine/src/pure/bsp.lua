@@ -2,8 +2,10 @@
 -- Brushes: dbrush_t 12 bytes, dbrushside_t 8 bytes, dplane_t 20 bytes.
 -- Faces: 56 bytes. Displacements: ddispinfo_t 176 bytes, CDispVert 20 bytes.
 -- Halfspace convention n·p <= d was checked against gm_flatgrass spawn.
+-- Submodel faces and brushes are relative to the entity origin (func_brush and the like).
 local bin = require("pure.bin")
 local trace = require("pure.trace")
+local angles = require("pure.angles")
 
 local M = {}
 
@@ -44,6 +46,11 @@ local function parse_entities(s)
 		if e.origin then
 			local x, y, z = e.origin:match("([%-%d%.]+)%s+([%-%d%.]+)%s+([%-%d%.]+)")
 			e.ox, e.oy, e.oz = tonumber(x), tonumber(y), tonumber(z)
+		end
+		-- Source angles are pitch, yaw, roll. Yaw 0 looks along +X.
+		if e.angles then
+			local p, y, r = e.angles:match("([%-%d%.]+)%s+([%-%d%.]+)%s+([%-%d%.]+)")
+			e.apitch, e.ayaw, e.aroll = tonumber(p), tonumber(y), tonumber(r)
 		end
 		local cn = e.classname or "?"
 		counts[cn] = (counts[cn] or 0) + 1
@@ -165,6 +172,105 @@ local function shade(n, salt)
 	return 0.28 + 0.22 * math.abs(n.x) + wobble, 0.32 + 0.40 * nz, 0.30 + 0.18 * math.abs(n.y)
 end
 
+-- x,y,z,u,v then display light. Light is a sample of the face lightmap, not a color room vertex paint.
+M.VERT_STRIDE = 8
+
+-- ColorRGBExp32. linear = byte * 2^exp / 255, then a 2.2 display gamma so outdoor luxels stay visible.
+function M.display_light(r, g, b, exp)
+	if not r then
+		return 1, 1, 1
+	end
+	if exp >= 128 then
+		exp = exp - 256
+	end
+	local scale = 2 ^ exp / 255
+	local function curve(c)
+		c = c * scale
+		if c <= 0 then
+			return 0
+		end
+		local out = c ^ (1 / 2.2)
+		if out > 1 then
+			return 1
+		end
+		return out
+	end
+	return curve(r), curve(g), curve(b)
+end
+
+-- Move a plane n·p = d by a translation. n stays; d picks up n·origin.
+function M.shift_plane(nx, ny, nz, d, ox, oy, oz)
+	return d + nx * ox + ny * oy + nz * oz
+end
+
+-- Brush-entity vertex. VBSP subtracts the entity origin at compile time.
+-- AngleMatrix then puts it back: rotate, then add origin. Nil org is identity.
+function M.bmodel_point(x, y, z, org)
+	if not org then
+		return x, y, z
+	end
+	local pitch, yaw, roll = org.pitch or 0, org.yaw or 0, org.roll or 0
+	if pitch ~= 0 or yaw ~= 0 or roll ~= 0 then
+		x, y, z = angles.rotate(pitch, yaw, roll, x, y, z)
+	end
+	return x + (org.x or 0), y + (org.y or 0), z + (org.z or 0)
+end
+
+local function hidden_brush_entity(class)
+	if class == "func_vehicleclip" or class == "func_areaportal" or class == "func_areaportalwindow" then
+		return true
+	end
+	if class == "func_occluder" or class == "func_viscluster" then
+		return true
+	end
+	if class and class:sub(1, 8) == "trigger_" then
+		return true
+	end
+	return false
+end
+
+-- 3D skybox vertex into world space. sky_camera use_angles is left to the caller.
+-- Source places the sky camera at sky_origin + eye/scale, which bakes to (p - origin) * scale.
+function M.sky_place(x, y, z, cam)
+	local s = cam.scale
+	if not s or s == 0 then
+		s = 16
+	end
+	return (x - cam.x) * s, (y - cam.y) * s, (z - cam.z) * s
+end
+
+-- textureVecs are two rows of xyz + offset. u = s/width, v = t/height, Source top-left v.
+function M.tex_uv(x, y, z, vecs, tw, th)
+	local s = x * vecs[1] + y * vecs[2] + z * vecs[3] + vecs[4]
+	local t = x * vecs[5] + y * vecs[6] + z * vecs[7] + vecs[8]
+	return s / tw, t / th
+end
+
+local SURF_SKIP = bit.bor(0x2, 0x4, 0x40, 0x80, 0x100, 0x200)
+
+local function skip_surface(name, flags)
+	if bit.band(flags, SURF_SKIP) ~= 0 then
+		return true
+	end
+	local n = name:lower()
+	if n:find("tools/", 1, true) then
+		return true
+	end
+	return false
+end
+
+local function cstr_from(s, zero_off)
+	local i = zero_off + 1
+	if i < 1 or i > #s then
+		return ""
+	end
+	local z = s:find("\0", i, true)
+	if not z then
+		return s:sub(i)
+	end
+	return s:sub(i, z - 1)
+end
+
 local function tri_normal(a, b, c)
 	local ux, uy, uz = b.x - a.x, b.y - a.y, b.z - a.z
 	local vx, vy, vz = c.x - a.x, c.y - a.y, c.z - a.z
@@ -196,7 +302,8 @@ function M.load(path, opts)
 	local ent_s = grab(0)
 	local plane_s = grab(1)
 	local vert_s, edge_s, surf_s, face_s, brush_s, side_s, disp_s, dvert_s
-	if opts.mesh then
+	local texinfo_s, texdata_s, sdata, stable
+	if opts.mesh or opts.uv then
 		vert_s = grab(3)
 		edge_s = grab(12)
 		surf_s = grab(13)
@@ -204,11 +311,57 @@ function M.load(path, opts)
 		disp_s = grab(26)
 		dvert_s = grab(33)
 	end
+	local lighting = ""
+	if opts.uv then
+		texinfo_s = grab(6)
+		texdata_s = grab(2)
+		sdata = grab(43)
+		stable = grab(44)
+		lighting = grab(8)
+	end
 	brush_s = grab(18)
 	side_s = grab(19)
+	local model_s = grab(14)
+	local node_s = grab(5)
+	local leaf_s = grab(10)
+	local leafbrush_s = grab(17)
+	local pak_ofs, pak_len = lump_info(header, 40)
 	f:close()
 
 	local entities, class_counts = parse_entities(ent_s)
+	local sky = nil
+	for i = 1, #entities do
+		local e = entities[i]
+		if e.classname == "sky_camera" and e.ox then
+			sky = {
+				x = e.ox,
+				y = e.oy,
+				z = e.oz,
+				scale = tonumber(e.scale) or 16,
+				yaw = e.ayaw or 0,
+				use_angles = e.use_angles == "1",
+			}
+			break
+		end
+	end
+	local by_model = {}
+	for i = 1, #entities do
+		local e = entities[i]
+		local n = e.model and e.model:match("^%*(%d+)$")
+		n = n and tonumber(n)
+		if n and not by_model[n] then
+			by_model[n] = {
+				x = e.ox or 0,
+				y = e.oy or 0,
+				z = e.oz or 0,
+				pitch = e.apitch or 0,
+				yaw = e.ayaw or 0,
+				roll = e.aroll or 0,
+				skip = hidden_brush_entity(e.classname),
+			}
+		end
+	end
+
 	local brushes = {}
 	local nbrush = #brush_s / 12
 	for i = 0, nbrush - 1 do
@@ -237,11 +390,251 @@ function M.load(path, opts)
 		}
 	end
 
+	-- dmodel_t is 48 bytes, dnode_t and this file's dleaf_t are 32.
+	-- Submodel headnodes own the brushes VBSP stored in entity-local space.
+	local face_place = {}
+	local leaf_ok = #leaf_s % 32 == 0 and #node_s % 32 == 0 and #model_s % 48 == 0
+	if leaf_ok and #model_s >= 48 then
+		local function claim_brushes(head, into)
+			if head < 0 then
+				return
+			end
+			local seen = {}
+			local stack = { head }
+			local steps = 0
+			while #stack > 0 and steps < 100000 do
+				steps = steps + 1
+				local n = table.remove(stack)
+				if n < 0 then
+					local leaf = -n - 1
+					if leaf >= 0 and (leaf + 1) * 32 <= #leaf_s then
+						local base = leaf * 32
+						local firstb = bin.u16(leaf_s, base + 25)
+						local numb = bin.u16(leaf_s, base + 27)
+						for i = 0, numb - 1 do
+							local lb = (firstb + i) * 2 + 1
+							if lb + 1 <= #leafbrush_s then
+								local b = bin.u16(leafbrush_s, lb)
+								if b >= 0 and b < nbrush and into[b] == nil then
+									into[b] = true
+								end
+							end
+						end
+					end
+				elseif not seen[n] and (n + 1) * 32 <= #node_s then
+					seen[n] = true
+					local base = n * 32
+					stack[#stack + 1] = bin.i32(node_s, base + 5)
+					stack[#stack + 1] = bin.i32(node_s, base + 9)
+				end
+			end
+		end
+		local world_head = bin.i32(model_s, 37)
+		local world_brushes = {}
+		claim_brushes(world_head, world_brushes)
+		local nmodels = #model_s / 48
+		for m = 1, nmodels - 1 do
+			local org = by_model[m]
+			local o = m * 48 + 1
+			local firstf = bin.i32(model_s, o + 40)
+			local numf = bin.i32(model_s, o + 44)
+			if org and numf > 0 and firstf >= 0 then
+				for fi = firstf, firstf + numf - 1 do
+					face_place[fi] = org
+				end
+			end
+			if org then
+				local owned = {}
+				claim_brushes(bin.i32(model_s, o + 36), owned)
+				for b in pairs(owned) do
+					if not world_brushes[b] then
+						local brush = brushes[b + 1]
+						local src = brush.p
+						local moved = {}
+						for i = 1, #src, 4 do
+							local nx, ny, nz, d = src[i], src[i + 1], src[i + 2], src[i + 3]
+							local len2 = nx * nx + ny * ny + nz * nz
+							if len2 < 1e-12 then
+								moved[#moved + 1] = nx
+								moved[#moved + 1] = ny
+								moved[#moved + 1] = nz
+								moved[#moved + 1] = d
+							else
+								local s = d / len2
+								local px, py, pz = M.bmodel_point(nx * s, ny * s, nz * s, org)
+								nx, ny, nz = M.bmodel_point(nx, ny, nz, {
+									pitch = org.pitch,
+									yaw = org.yaw,
+									roll = org.roll,
+								})
+								moved[#moved + 1] = nx
+								moved[#moved + 1] = ny
+								moved[#moved + 1] = nz
+								moved[#moved + 1] = nx * px + ny * py + nz * pz
+							end
+						end
+						local mins, maxs = brush_aabb(moved)
+						if mins then
+							brush.p = moved
+							brush.mins = mins
+							brush.maxs = maxs
+						end
+					end
+				end
+			end
+		end
+	end
+
 	local mesh = nil
+	local surfaces = nil
 	local tri_count = 0
 	local disp_count = 0
-	if opts.mesh and face_s ~= "" then
-		mesh = {}
+	if (opts.mesh or opts.uv) and face_s ~= "" then
+		if opts.mesh then
+			mesh = {}
+		end
+		local groups = {}
+		if opts.uv then
+			surfaces = {}
+		end
+		local td_cache = {}
+		local info_cache = {}
+		local function texdata_info(td)
+			local hit = td_cache[td]
+			if hit ~= nil then
+				return hit or nil
+			end
+			if not texdata_s or td < 0 or (td + 1) * 32 > #texdata_s then
+				td_cache[td] = false
+				return nil
+			end
+			local o = td * 32 + 1
+			local sid = bin.i32(texdata_s, o + 12)
+			local tw = bin.i32(texdata_s, o + 16)
+			local th = bin.i32(texdata_s, o + 20)
+			if not stable or sid < 0 or (sid + 1) * 4 > #stable then
+				td_cache[td] = false
+				return nil
+			end
+			local name = cstr_from(sdata, bin.i32(stable, sid * 4 + 1))
+			hit = { name = name, tw = tw, th = th }
+			td_cache[td] = hit
+			return hit
+		end
+		local function face_mat(fi)
+			local hit = info_cache[fi]
+			if hit ~= nil then
+				return hit or nil
+			end
+			local ti = bin.i16(face_s, fi * 56 + 11)
+			if ti < 0 or not texinfo_s or (ti + 1) * 72 > #texinfo_s then
+				info_cache[fi] = false
+				return nil
+			end
+			local o = ti * 72 + 1
+			local flags = bin.i32(texinfo_s, o + 64)
+			local td = bin.i32(texinfo_s, o + 68)
+			local info = texdata_info(td)
+			if not info or info.tw <= 0 or info.th <= 0 or skip_surface(info.name, flags) then
+				info_cache[fi] = false
+				return nil
+			end
+			local vecs = {}
+			local lvecs = {}
+			for k = 0, 7 do
+				vecs[k + 1] = bin.f32(texinfo_s, o + k * 4)
+				lvecs[k + 1] = bin.f32(texinfo_s, o + 32 + k * 4)
+			end
+			hit = { name = info.name, vecs = vecs, lvecs = lvecs, tw = info.tw, th = info.th, flags = flags }
+			info_cache[fi] = hit
+			return hit
+		end
+		local light_cache = {}
+		local function light_at(fi, x, y, z, mat)
+			local L = light_cache[fi]
+			if L == nil then
+				local base = fi * 56
+				local style0 = face_s:byte(base + 17)
+				local lightofs = bin.i32(face_s, base + 21)
+				local sx = bin.i32(face_s, base + 37)
+				local sy = bin.i32(face_s, base + 41)
+				if not style0 or style0 == 255 or lightofs < 0 or sx < 0 or sy < 0 or lighting == "" then
+					L = false
+				else
+					L = {
+						ofs = lightofs,
+						minx = bin.i32(face_s, base + 29),
+						miny = bin.i32(face_s, base + 33),
+						sx = sx,
+						sy = sy,
+						bump = bit.band(mat.flags or 0, 0x800) ~= 0,
+					}
+				end
+				light_cache[fi] = L
+			end
+			if not L then
+				return 1, 1, 1
+			end
+			local lv = mat.lvecs
+			local s = x * lv[1] + y * lv[2] + z * lv[3] + lv[4] - L.minx
+			local t = x * lv[5] + y * lv[6] + z * lv[7] + lv[8] - L.miny
+			if s < 0 then
+				s = 0
+			elseif s > L.sx then
+				s = L.sx
+			end
+			if t < 0 then
+				t = 0
+			elseif t > L.sy then
+				t = L.sy
+			end
+			local iu = math.floor(s)
+			local iv = math.floor(t)
+			local row = L.sx + 1
+			local lux = row * (L.sy + 1)
+			-- Bumped faces store 3 directional pages, then the flat page used when bump is off.
+			local slice = L.bump and 3 or 0
+			local idx = slice * lux + iv * row + iu
+			local o = L.ofs + idx * 4
+			if o < 0 or o + 4 > #lighting then
+				return 1, 1, 1
+			end
+			local r, g, b, e = lighting:byte(o + 1, o + 4)
+			return M.display_light(r, g, b, e)
+		end
+		local function surface_buf(mat)
+			local g = groups[mat.name]
+			if not g then
+				g = { name = mat.name, verts = {} }
+				groups[mat.name] = g
+				surfaces[#surfaces + 1] = g
+			end
+			return g.verts
+		end
+		local function near_sky(p)
+			if not sky then
+				return false
+			end
+			local dx, dy, dz = p.x - sky.x, p.y - sky.y, p.z - sky.z
+			return dx * dx + dy * dy + dz * dz < 6000 * 6000
+		end
+		local function push_uv(buf, p, mat, fi, sky_face, place)
+			-- UVs and luxels stay in the vertex space VBSP wrote (local for a bmodel).
+			local u, v = M.tex_uv(p.x, p.y, p.z, mat.vecs, mat.tw, mat.th)
+			local lr, lg, lb = light_at(fi, p.x, p.y, p.z, mat)
+			local x, y, z = M.bmodel_point(p.x, p.y, p.z, place)
+			if sky_face then
+				x, y, z = M.sky_place(x, y, z, sky)
+			end
+			buf[#buf + 1] = x
+			buf[#buf + 1] = y
+			buf[#buf + 1] = z
+			buf[#buf + 1] = u
+			buf[#buf + 1] = v
+			buf[#buf + 1] = lr
+			buf[#buf + 1] = lg
+			buf[#buf + 1] = lb
+		end
 		local nfaces = #face_s / 56
 		local disp_by_face = {}
 		if disp_s ~= "" then
@@ -253,6 +646,10 @@ function M.load(path, opts)
 			end
 		end
 		for fi = 0, nfaces - 1 do
+			local place = face_place[fi]
+			local hidden = place and place.skip
+			local mat = (not hidden) and opts.uv and face_mat(fi) or nil
+			if (opts.mesh and not hidden) or mat then
 			local di = disp_by_face[fi]
 			if di then
 				local rec = di * 176 + 1
@@ -308,14 +705,31 @@ function M.load(path, opts)
 							}
 						end
 					end
+					local uvbuf = mat and surface_buf(mat) or nil
+					local sx0, sy0, sz0 = M.bmodel_point(pts[1].x, pts[1].y, pts[1].z, place)
+					local sky_face = near_sky({ x = sx0, y = sy0, z = sz0 })
+					local function draw_pt(p)
+						local x, y, z = M.bmodel_point(p.x, p.y, p.z, place)
+						return { x = x, y = y, z = z }
+					end
 					for y = 0, size - 1 do
 						for x = 0, size - 1 do
 							local p00, p10 = grid[y][x], grid[y][x + 1]
 							local p01, p11 = grid[y + 1][x], grid[y + 1][x + 1]
-							local nrm = tri_normal(p00, p10, p11)
-							local r, g, b = shade(nrm, fi)
-							push_tri(mesh, p00, p10, p11, r, g, b)
-							push_tri(mesh, p00, p11, p01, r, g, b)
+							if mesh then
+								local nrm = tri_normal(p00, p10, p11)
+								local r, g, b = shade(nrm, fi)
+								push_tri(mesh, draw_pt(p00), draw_pt(p10), draw_pt(p11), r, g, b)
+								push_tri(mesh, draw_pt(p00), draw_pt(p11), draw_pt(p01), r, g, b)
+							end
+							if uvbuf then
+								push_uv(uvbuf, p00, mat, fi, sky_face, place)
+								push_uv(uvbuf, p10, mat, fi, sky_face, place)
+								push_uv(uvbuf, p11, mat, fi, sky_face, place)
+								push_uv(uvbuf, p00, mat, fi, sky_face, place)
+								push_uv(uvbuf, p11, mat, fi, sky_face, place)
+								push_uv(uvbuf, p01, mat, fi, sky_face, place)
+							end
 							tri_count = tri_count + 2
 						end
 					end
@@ -323,13 +737,31 @@ function M.load(path, opts)
 			else
 				local pts = face_points(face_s, edge_s, surf_s, vert_s, fi)
 				if #pts >= 3 then
-					local nrm = tri_normal(pts[1], pts[2], pts[3])
-					local r, g, b = shade(nrm, fi)
+					local uvbuf = mat and surface_buf(mat) or nil
+					local sx0, sy0, sz0 = M.bmodel_point(pts[1].x, pts[1].y, pts[1].z, place)
+					local sky_face = near_sky({ x = sx0, y = sy0, z = sz0 })
+					local function draw_pt(p)
+						local x, y, z = M.bmodel_point(p.x, p.y, p.z, place)
+						return { x = x, y = y, z = z }
+					end
+					local r, g, b
+					if mesh then
+						local nrm = tri_normal(pts[1], pts[2], pts[3])
+						r, g, b = shade(nrm, fi)
+					end
 					for i = 2, #pts - 1 do
-						push_tri(mesh, pts[1], pts[i], pts[i + 1], r, g, b)
+						if mesh then
+							push_tri(mesh, draw_pt(pts[1]), draw_pt(pts[i]), draw_pt(pts[i + 1]), r, g, b)
+						end
+						if uvbuf then
+							push_uv(uvbuf, pts[1], mat, fi, sky_face, place)
+							push_uv(uvbuf, pts[i], mat, fi, sky_face, place)
+							push_uv(uvbuf, pts[i + 1], mat, fi, sky_face, place)
+						end
 						tri_count = tri_count + 1
 					end
 				end
+			end
 			end
 		end
 	elseif disp_s == nil then
@@ -357,8 +789,12 @@ function M.load(path, opts)
 		brush_count = #brushes,
 		spawns = spawns,
 		mesh = mesh,
+		surfaces = surfaces,
 		tri_count = tri_count,
 		disp_count = disp_count,
+		pak_ofs = pak_ofs,
+		pak_len = pak_len,
+		sky = sky,
 	}
 end
 

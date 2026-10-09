@@ -24,11 +24,17 @@ local move = require("pure.move")
 local trace = require("pure.trace")
 local vphysics = require("pure.vphysics")
 local bsp = require("pure.bsp")
+local content = require("pure.content")
+local vmt = require("pure.vmt")
+local props = require("pure.props")
+local mdl = require("pure.mdl")
+local angles = require("pure.angles")
 
 local MODE = os.getenv("ENGINE_MODE") or "flat"
 local STEREO = MODE == "stereo" or MODE == "simulator"
 local CAPTURE = os.getenv("ENGINE_CAPTURE") == "1"
 local FRAME = os.getenv("ENGINE_FRAME") == "1"
+local SHOT = os.getenv("ENGINE_SHOT") == "1"
 local SCALE = tonumber(os.getenv("ENGINE_VIEW_SCALE")) or units.VRMOD_VIEW_SCALE
 local IPD = coords.DEFAULT_IPD_METERS
 local EYE_H = 64
@@ -43,10 +49,18 @@ local world
 local crate
 local acc = 0
 local shader
+local solid
 local left_tex, right_tex
 local eye_pass = {}
 local map_mesh
+local map_parts
 local map_name
+-- Fallback until the map's env_skypaint topcolor is read. Offscreen passes
+-- ignore the window background and clear black unless this is applied.
+local sky_rgb = { 0.45, 0.62, 0.78 }
+local sampler
+local shot_tex
+local shot_tex_r
 
 local function key_down(k)
 	local ok, down = pcall(lovr.system.isKeyDown, k)
@@ -74,36 +88,54 @@ local function draw_source_box(pass, cx, cy, cz, hx, hy, hz, r, g, b)
 end
 
 local function draw_world(pass)
-	pass:setShader(shader)
-	if map_mesh then
+	if sampler then
+		pass:setSampler(sampler)
+	end
+	if map_parts then
+		pass:setShader(shader)
 		pass:setColor(1, 1, 1)
-		pass:mesh(map_mesh)
+		for i = 1, #map_parts do
+			pass:setMaterial(map_parts[i].tex)
+			pass:draw(map_parts[i].mesh)
+		end
+		pass:setMaterial()
+	elseif map_mesh then
+		pass:setShader(shader)
+		pass:setColor(1, 1, 1)
+		pass:draw(map_mesh)
 	else
+		pass:setShader(solid)
 		-- Visual floor is smaller than the collision brush. A 125 m box
 		-- blows LÖVR's GPU buffer pool when drawn into extra passes.
 		draw_source_box(pass, 0, 0, -8, 512, 512, 8, 0.25, 0.42, 0.28)
 		draw_source_box(pass, 200, 80, 64, 8, 8, 64, 0.25, 0.35, 0.7)
 	end
 	if crate then
+		pass:setShader(solid)
 		local p, h = crate.pos, crate.half
 		draw_source_box(pass, p.x, p.y, p.z, h.x, h.y, h.z, 0.85, 0.45, 0.12)
 	end
 end
 
 local function draw_marker(pass)
-	pass:setShader(shader)
+	pass:setShader(solid)
 	pass:setColor(1, 0, 0)
 	pass:sphere(0, 0, -CAP_DEPTH, 0.12)
 end
 
 local function render_target(slot, tex, x, y, z, q, fov, draw)
-	lovr.graphics.setBackgroundColor(0.02, 0.02, 0.05)
 	local pass = eye_pass[slot]
 	if not pass then
 		pass = lovr.graphics.newPass(tex)
 		eye_pass[slot] = pass
 	else
 		pass:reset()
+	end
+	if draw == draw_world then
+		pass:setClear(sky_rgb[1], sky_rgb[2], sky_rgb[3], 1)
+		lovr.graphics.setBackgroundColor(sky_rgb[1], sky_rgb[2], sky_rgb[3])
+	else
+		pass:setClear(0.02, 0.02, 0.05, 1)
 	end
 	if q then
 		pass:setViewPose(1, x, y, z, q)
@@ -152,7 +184,7 @@ local function write_frame()
 	local pass = lovr.graphics.newPass(left_tex)
 	pass:setViewPose(1, x, y, z, q)
 	set_proj(pass, 1, CAP_FOV_Y, CAP_W, CAP_H)
-	pass:setShader(shader)
+	pass:setShader(solid)
 	draw_source_box(pass, 150, 0, EYE_H, 6, 6, 6, 1, 0, 0)
 	draw_source_box(pass, 150, 60, EYE_H, 6, 6, 6, 0, 1, 0)
 	lovr.graphics.submit(pass)
@@ -261,9 +293,179 @@ local function upload_map(src)
 		verts[i + 1] = { x, y, z, src[o + 4], src[o + 5], src[o + 6], 1 }
 	end
 	return lovr.graphics.newMesh({
-		{ name = "lovrPosition", type = "vec3" },
-		{ name = "lovrVertexColor", type = "vec4" },
+		{ name = "VertexPosition", type = "vec3" },
+		{ name = "VertexColor", type = "vec4" },
 	}, verts)
+end
+
+local function gmod_dir()
+	return os.getenv("ENGINE_GMOD")
+		or "/home/voldemar/.local/share/Steam/steamapps/common/GarrysMod/garrysmod"
+end
+
+-- Capture and the axis frame stay on the builtin scene. Play and ENGINE_SHOT
+-- open gm_construct from the Steam install unless ENGINE_MAP says otherwise.
+local function map_path()
+	local env = os.getenv("ENGINE_MAP")
+	if env == "none" or env == "0" then
+		return nil
+	end
+	if env and env ~= "" then
+		return env
+	end
+	if CAPTURE or FRAME then
+		return nil
+	end
+	local path = gmod_dir() .. "/maps/gm_construct.bsp"
+	local f = io.open(path, "rb")
+	if not f then
+		print("gm_construct.bsp not found; builtin room")
+		return nil
+	end
+	f:close()
+	return path
+end
+
+local function make_texture(rgba, w, h)
+	local blob = lovr.data.newBlob(rgba)
+	local image = lovr.data.newImage(w, h, "rgba8", blob)
+	return lovr.graphics.newTexture(image, { mipmaps = false })
+end
+
+local function upload_uv_mesh(src, xf)
+	local stride = bsp.VERT_STRIDE
+	local n = math.floor(#src / stride)
+	local verts = {}
+	for i = 0, n - 1 do
+		local o = i * stride
+		local u, v = src[o + 4], src[o + 5]
+		if xf then
+			u, v = vmt.apply_uv(u, v, xf)
+		end
+		local x, y, z = coords.source_to_lovr(src[o + 1], src[o + 2], src[o + 3], SCALE)
+		verts[i + 1] = { x, y, z, u, v, src[o + 6], src[o + 7], src[o + 8], 1 }
+	end
+	return lovr.graphics.newMesh({
+		{ name = "VertexPosition", type = "vec3" },
+		{ name = "VertexUV", type = "vec2" },
+		{ name = "VertexColor", type = "vec4" },
+	}, verts)
+end
+
+local function static_prop_parts(mount, path, sky, bound, max_edge)
+	local list = props.read(path)
+	local cache = {}
+	local function load_model(model)
+		if cache[model] ~= nil then
+			return cache[model] or nil
+		end
+		local base = model:lower():gsub("\\", "/"):gsub("%.mdl$", "")
+		local a = mount:read(base .. ".mdl")
+		local b = mount:read(base .. ".vvd")
+		local c = mount:read(base .. ".dx90.vtx") or mount:read(base .. ".vtx")
+		local loaded = nil
+		if a and b and c then
+			loaded = mdl.load(a, b, c)
+		end
+		cache[model] = loaded or false
+		return loaded
+	end
+	local groups = {}
+	local drawn, skipped, tris = 0, 0, 0
+	for i = 1, #list do
+		local p = list[i]
+		local lname = p.model:lower()
+		-- Foliage cards are alphatest quads. Drawn solid, they become green slabs.
+		if lname:find("foliage", 1, true) or lname:find("tree_", 1, true) then
+			skipped = skipped + 1
+		else
+			local model = load_model(p.model)
+			if not model or not model.meshes then
+				skipped = skipped + 1
+			else
+				local sky_prop = false
+				local scale = 1
+				local ox, oy, oz = p.x, p.y, p.z
+				if sky then
+					local dx, dy, dz = p.x - sky.x, p.y - sky.y, p.z - sky.z
+					if dx * dx + dy * dy + dz * dz < 6000 * 6000 then
+						sky_prop = true
+						scale = sky.scale
+						ox, oy, oz = bsp.sky_place(p.x, p.y, p.z, sky)
+					end
+				end
+				for m = 1, #model.meshes do
+					local mesh = model.meshes[m]
+					local g = groups[mesh.material]
+					if not g then
+						g = {}
+						groups[mesh.material] = g
+					end
+					local src = mesh.verts
+					local n = math.floor(#src / 5)
+					for v = 0, n - 1 do
+						local o = v * 5
+						local x = src[o + 1] * scale
+						local y = src[o + 2] * scale
+						local z = src[o + 3] * scale
+						x, y, z = angles.rotate(p.pitch, p.yaw, p.roll, x, y, z)
+						g[#g + 1] = ox + x
+						g[#g + 1] = oy + y
+						g[#g + 1] = oz + z
+						g[#g + 1] = src[o + 4]
+						g[#g + 1] = src[o + 5]
+						g[#g + 1] = 1
+						g[#g + 1] = 1
+						g[#g + 1] = 1
+					end
+				end
+				drawn = drawn + 1
+				tris = tris + (model.tris or 0)
+			end
+		end
+	end
+	local added = 0
+	for name, verts in pairs(groups) do
+		local mat, err = mount:material(name, max_edge)
+		if mat then
+			bound[#bound + 1] = {
+				key = mat.key,
+				w = mat.w,
+				h = mat.h,
+				rgba = mat.rgba,
+				transform = mat.transform,
+				verts = verts,
+				name = name,
+			}
+			added = added + 1
+		else
+			print("prop material " .. name .. " (" .. tostring(err) .. ")")
+		end
+	end
+	print(string.format(
+		"props %d drawn %d skipped %d tris %d materials %d",
+		#list, drawn, skipped, tris, added
+	))
+end
+
+local function upload_albedo(bound)
+	local gpu = {}
+	local parts = {}
+	for i = 1, #bound do
+		local s = bound[i]
+		local tex = gpu[s.key]
+		if not tex then
+			tex = make_texture(s.rgba, s.w, s.h)
+			gpu[s.key] = tex
+		end
+		parts[#parts + 1] = {
+			tex = tex,
+			mesh = upload_uv_mesh(s.verts, s.transform),
+			name = s.name,
+		}
+		s.rgba = nil
+	end
+	return parts
 end
 
 local function builtin_world()
@@ -277,11 +479,12 @@ local function builtin_world()
 end
 
 local function try_map()
-	local path = os.getenv("ENGINE_MAP")
-	if not path or path == "" then
+	local path = map_path()
+	if not path then
 		return false
 	end
-	local ok, loaded = pcall(bsp.load, path, { mesh = true })
+	print("loading " .. path)
+	local ok, loaded = pcall(bsp.load, path, { uv = true })
 	if not ok then
 		print("map load failed: " .. tostring(loaded))
 		return false
@@ -296,50 +499,93 @@ local function try_map()
 		local pos = { x = s.ox, y = s.oy, z = s.oz }
 		local nudged = trace.nudge_up(world, pos)
 		player.pos = nudged
-		print(string.format("spawn %.1f %.1f %.1f", nudged.x, nudged.y, nudged.z))
+		player.yaw = s.ayaw or 0
+		player.pitch = s.apitch or 0
+		print(string.format("spawn %.1f %.1f %.1f yaw %.1f", nudged.x, nudged.y, nudged.z, player.yaw))
 	end
-	player.on_ground = false
-	if loaded.mesh and #loaded.mesh > 0 then
-		local mok, mesh = pcall(upload_map, loaded.mesh)
-		if mok then
-			map_mesh = mesh
-			map_name = path
-			print(string.format("map tris %d", loaded.tri_count))
-		else
-			print("map mesh upload failed: " .. tostring(mesh))
+	player.on_ground = true
+	map_name = path
+	for i = 1, #loaded.entities do
+		local e = loaded.entities[i]
+		if e.classname == "env_skypaint" and e.topcolor then
+			local r, g, b = e.topcolor:match("([%d%.%-]+)%s+([%d%.%-]+)%s+([%d%.%-]+)")
+			r, g, b = tonumber(r), tonumber(g), tonumber(b)
+			if r and g and b then
+				sky_rgb[1], sky_rgb[2], sky_rgb[3] = r, g, b
+			end
+			break
 		end
+	end
+	local surfaces = loaded.surfaces or {}
+	local max_edge = tonumber(os.getenv("ENGINE_TEX_SIZE")) or 512
+	local mount = content.mount({
+		gmod = gmod_dir(),
+		bsp = path,
+		pak_ofs = loaded.pak_ofs,
+		pak_len = loaded.pak_len,
+	})
+	local bound, stats = mount:bind(surfaces, max_edge)
+	static_prop_parts(mount, path, loaded.sky, bound, max_edge)
+	for i = 1, #stats.missing do
+		print("missing material " .. stats.missing[i])
+	end
+	print(string.format("surfaces %d textures %d tris %d", #bound, stats.textures, loaded.tri_count))
+	local uok, parts = pcall(upload_albedo, bound)
+	if uok then
+		map_parts = parts
+		collectgarbage("collect")
+	else
+		print("albedo upload failed: " .. tostring(parts))
 	end
 	return true
 end
 
 function lovr.load()
-	shader = lovr.graphics.newShader([[
+	solid = lovr.graphics.newShader([[
 		vec4 lovrmain() { return DefaultPosition; }
+	]], [[
+		vec4 lovrmain() { return Color; }
+	]])
+	shader = lovr.graphics.newShader([[
+		vec4 lovrmain() {
+			Color = VertexColor;
+			return DefaultPosition;
+		}
 	]], [[
 		vec4 lovrmain() { return Color * getPixel(ColorTexture, UV); }
 	]])
+	sampler = lovr.graphics.newSampler({ wrap = "repeat", filter = "linear" })
+	local function eye_tex(w, h)
+		return lovr.graphics.newTexture(w, h, {
+			usage = { "render", "transfer", "sample" },
+			mipmaps = false,
+		})
+	end
 	if CAPTURE or FRAME or STEREO then
-		local function eye_tex(w, h)
-			return lovr.graphics.newTexture(w, h, {
-				usage = { "render", "transfer", "sample" },
-				mipmaps = false,
-			})
-		end
 		left_tex = eye_tex(CAP_W, CAP_H)
 		right_tex = eye_tex(CAP_W, CAP_H)
 	end
+	if SHOT then
+		shot_tex = eye_tex(1280, 720)
+		if STEREO then
+			shot_tex_r = eye_tex(1280, 720)
+		end
+	end
 	if not try_map() then
+		if SHOT then
+			error("shot has no map")
+		end
 		builtin_world()
 	end
 	print(string.format(
-		"engine mode=%s stereo=%s capture=%s frame=%s views=%s scale=%.3f",
-		MODE, tostring(STEREO), tostring(CAPTURE), tostring(FRAME),
+		"engine mode=%s stereo=%s capture=%s frame=%s shot=%s views=%s scale=%.3f",
+		MODE, tostring(STEREO), tostring(CAPTURE), tostring(FRAME), tostring(SHOT),
 		tostring(lovr.headset.getViewCount()), SCALE
 	))
 end
 
 function lovr.update(dt)
-	if CAPTURE or not player then
+	if CAPTURE or SHOT or not player then
 		return
 	end
 	read_input()
@@ -370,6 +616,123 @@ function lovr.mousemoved(x, y, dx, dy)
 	player.pitch = math.max(-80, math.min(80, (player.pitch or 0) - dy * 0.12))
 end
 
+local function shot_stats(img)
+	local w, h = img:getWidth(), img:getHeight()
+	local buckets = {}
+	local n, content = 0, 0
+	local mag_n, white_n = 0, 0
+	local sr, sg, sb = 0, 0, 0
+	local sl, sl2 = 0, 0
+	for y = 0, h - 1, 2 do
+		for x = 0, w - 1, 2 do
+			local r, g, b = img:getPixel(x, y)
+			n = n + 1
+			local sky = math.abs(r - 0.45) < 0.07 and math.abs(g - 0.62) < 0.07 and math.abs(b - 0.78) < 0.07
+			local magenta = r > 0.75 and b > 0.75 and g < 0.3
+			local white = r > 0.97 and g > 0.97 and b > 0.97
+			local black = r < 0.04 and g < 0.04 and b < 0.05
+			if magenta then
+				mag_n = mag_n + 1
+			end
+			if white then
+				white_n = white_n + 1
+			end
+			if not sky and not magenta and not black then
+				content = content + 1
+				sr, sg, sb = sr + r, sg + g, sb + b
+				local luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+				sl = sl + luma
+				sl2 = sl2 + luma * luma
+				local q = math.floor(r * 7.99) * 64 + math.floor(g * 7.99) * 8 + math.floor(b * 7.99)
+				buckets[q] = true
+			end
+		end
+	end
+	local nb = 0
+	for _ in pairs(buckets) do
+		nb = nb + 1
+	end
+	local mean_l = content > 0 and (sl / content) or 0
+	local var = content > 0 and (sl2 / content - mean_l * mean_l) or 0
+	if var < 0 then
+		var = 0
+	end
+	local std = math.sqrt(var)
+	local frac = n > 0 and (content / n) or 0
+	local mag_frac = n > 0 and (mag_n / n) or 0
+	local white_frac = n > 0 and (white_n / n) or 0
+	-- Magenta is a missing texture, not a map. White can be the unlit color room.
+	local ok = frac > 0.2 and nb >= 8 and std > 0.015 and mag_frac < 0.02
+	local line = string.format(
+		"samples %d content %.3f buckets %d luma_std %.4f mean %.3f %.3f %.3f magenta %.3f white %.3f ok %s\n",
+		n, frac, nb, std,
+		content > 0 and sr / content or 0,
+		content > 0 and sg / content or 0,
+		content > 0 and sb / content or 0,
+		mag_frac, white_frac, tostring(ok)
+	)
+	return ok, line
+end
+
+local function mean_abs_diff(a, b)
+	local w, h = a:getWidth(), a:getHeight()
+	local s, n = 0, 0
+	for y = 0, h - 1, 3 do
+		for x = 0, w - 1, 3 do
+			local r1, g1, b1 = a:getPixel(x, y)
+			local r2, g2, b2 = b:getPixel(x, y)
+			s = s + math.abs(r1 - r2) + math.abs(g1 - g2) + math.abs(b1 - b2)
+			n = n + 3
+		end
+	end
+	if n == 0 then
+		return 0
+	end
+	return s / n
+end
+
+local function write_shot()
+	local dir = ROOT .. "/qa/out"
+	os.execute('mkdir -p "' .. dir .. '"')
+	local function eye(sign, tex, name)
+		local x, y, z = eye_xyz(sign)
+		local q = view_quat(player.yaw, player.pitch)
+		render_target(name, tex, x, y, z, q, 74, draw_world)
+		lovr.graphics.wait()
+		return tex:getPixels()
+	end
+	local img = eye(0, shot_tex, "S")
+	save_png(shot_tex, dir .. "/map.png")
+	local ok, line = shot_stats(img)
+	local extra = ""
+	if STEREO and shot_tex_r then
+		local left = eye(-1, shot_tex, "L")
+		local right = eye(1, shot_tex_r, "R")
+		save_png(shot_tex, dir .. "/map_left.png")
+		save_png(shot_tex_r, dir .. "/map_right.png")
+		local diff = mean_abs_diff(left, right)
+		extra = string.format("eye_diff %.5f\n", diff)
+		if diff < 0.005 then
+			ok = false
+		end
+		line = line .. extra
+	end
+	if player then
+		line = string.format(
+			"map %s\nspawn %.2f %.2f %.2f yaw %.2f pitch %.2f\n%s",
+			tostring(map_name), player.pos.x, player.pos.y, player.pos.z,
+			player.yaw, player.pitch or 0, line
+		)
+	end
+	local meta = assert(io.open(dir .. "/map.txt", "w"))
+	meta:write(line)
+	meta:close()
+	print(line)
+	if not ok then
+		error("map shot failed: " .. line)
+	end
+end
+
 function lovr.draw(pass)
 	if CAPTURE then
 		write_capture()
@@ -379,6 +742,18 @@ function lovr.draw(pass)
 	end
 	if FRAME then
 		write_frame()
+		lovr.event.quit(0)
+		return
+	end
+	if SHOT then
+		write_shot()
+		pass:setShader(shader)
+		pass:setViewPose(1, 0, 0, 0, 0, 0, 1, 0)
+		set_proj(pass, 1, 50, pass:getWidth(), pass:getHeight())
+		pass:setColor(1, 1, 1)
+		pass:setMaterial(shot_tex)
+		pass:plane(0, 0, -1, 1.6, 0.9)
+		pass:setMaterial()
 		lovr.event.quit(0)
 		return
 	end
@@ -392,7 +767,7 @@ function lovr.draw(pass)
 		draw_sbs(pass)
 		return
 	end
-	lovr.graphics.setBackgroundColor(0.45, 0.62, 0.78)
+	lovr.graphics.setBackgroundColor(sky_rgb[1], sky_rgb[2], sky_rgb[3])
 	local x, y, z = eye_xyz(0)
 	pass:setViewPose(1, x, y, z, view_quat(player.yaw, player.pitch))
 	set_proj(pass, 1, 74, pass:getWidth(), pass:getHeight())

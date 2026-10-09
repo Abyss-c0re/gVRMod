@@ -5,10 +5,12 @@ LÖVR 0.18 window on the Source-unit proof core. This is not Garry's Mod and not
 ## Run
 
 ```sh
-engine/run.sh                         # flat, one camera, builtin room
-ENGINE_MODE=stereo engine/run.sh      # two eye renders, side by side
+engine/run.sh                         # flat window, gm_construct if the Steam install is present
+ENGINE_MODE=stereo engine/run.sh      # two eye renders of that map, side by side
 ENGINE_MAP=/path/to/map.bsp engine/run.sh
-engine/qa/capture.sh                  # headless-ish eye pair + OpenCV check
+ENGINE_MAP=none engine/run.sh         # builtin colored room
+ENGINE_SHOT=1 engine/run.sh           # one frame of the default map, qa/out/map.png
+engine/qa/capture.sh                  # red-sphere eye pair + OpenCV check
 luajit engine/tests/run.lua           # offline proofs, no window
 ```
 
@@ -22,4 +24,6 @@ WASD moves. Hold the left mouse button to look. Space jumps. The player tick is 
 
 ## What is not here
 
-Addon execution is a sandbox with an honest failure log (`qa/out/addon_matrix.tsv` after the Lua suite). A file that loads is not a working addon. Map brushes collide. Displacement collision does not. Water, ladders, and ducking are absent. Materials and models are absent.
+Addon execution is a sandbox with an honest failure log (`qa/out/addon_matrix.tsv` after the Lua suite). A file that loads is not a working addon. Map brushes collide. Displacement collision does not. Water, ladders, and ducking are absent.
+
+`gm_construct` is drawn from the local GarrysMod VPKs and the map pak. Those files are not copied into this repo. Brush faces sample the BSP lightmap (style 0, the flat page on bumped faces) into the vertex color. Brush entities (`func_brush`, glass, the color room) are stored around their entity origin and drawn there. Vehicle clips, triggers, and areaportals are not drawn. Static props are the reference pose of the MDL, placed with `sky_camera` scale when they sit in the 3D skybox. Foliage cards are skipped. Glass and refract shaders with no albedo are omitted instead of drawn magenta. There is no lightmap atlas, no bone animation, no weapons, and no sandbox gamemode. A lit map with prop meshes is not Garry's Mod. Sky, nodraw, and clip faces are omitted. Detail, bump, and `$basetexture2` blends are not applied. The color room stays white: its material is unlit `color/white` and the BSP has no vertex colors for it.

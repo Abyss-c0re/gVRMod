@@ -70,6 +70,12 @@ return function(T)
 				T.ok(path:find("postal", 1, true) ~= nil, "only postal has no spawn")
 			else
 				local s = world.spawns[1]
+				if path:find("gm_construct.bsp", 1, true) then
+					T.eq(s.ayaw, 180, "construct spawn yaw")
+					-- The color-room func_brush is a slab in entity-local space.
+					-- Left at the origin it seals the air over this spawn.
+					T.ok(not trace.startsolid(world, { x = s.ox, y = s.oy, z = 0 }), "construct air above spawn is open")
+				end
 				local pos = { x = s.ox, y = s.oy, z = s.oz }
 				if expect_ground then
 					local down = trace.hull(world, pos, { x = pos.x, y = pos.y, z = pos.z - 64 })

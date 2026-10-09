@@ -42,6 +42,8 @@ dofile(root .. "tests/test_move.lua")(T)
 dofile(root .. "tests/test_vphysics.lua")(T)
 dofile(root .. "tests/test_trace_bsp.lua")(T)
 dofile(root .. "tests/test_compat.lua")(T)
+dofile(root .. "tests/test_content.lua")(T)
+dofile(root .. "tests/test_mdl.lua")(T)
 
 io.write(string.format("engine proofs: %d checks, %d failed\n", checks, fails))
 if fails > 0 then

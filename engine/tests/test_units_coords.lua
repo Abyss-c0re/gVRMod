@@ -80,6 +80,14 @@ return function(T)
 	p, yaw = angles.vector_angles(1, 0, 0)
 	T.near(p, 0, 1e-6, "fwd pitch")
 	T.near(yaw, 0, 1e-6, "fwd yaw")
+	local rx, ry, rz = angles.rotate(0, 90, 0, 1, 0, 0)
+	T.near(rx, 0, 1e-6, "yaw 90 model x")
+	T.near(ry, 1, 1e-6, "yaw 90 model y")
+	T.near(rz, 0, 1e-6, "yaw 90 model z")
+	rx, ry, rz = angles.rotate(0, 0, 0, 0, 1, 0)
+	T.near(rx, 0, 1e-6, "model +Y x")
+	T.near(ry, 1, 1e-6, "model +Y stays left")
+	T.near(rz, 0, 1e-6, "model +Y z")
 
 	-- Stereo disparity. 90° vertical FOV, height 480, IPD 0.064, depth 2 m.
 	-- f = 240 / tan(45°) = 240. disparity = 240 * 0.064 / 2 = 7.68 px.
