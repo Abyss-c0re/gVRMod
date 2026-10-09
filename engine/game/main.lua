@@ -770,9 +770,14 @@ local function bake_actors(mount, bound, max_edge)
 	for i = 1, math.min(8, #ranked) do
 		print(string.format("exercise miss %d %s", ranked[i].n, ranked[i].text))
 	end
-	-- Entities Spawn created during that pass. One pose at the position the
-	-- script set. No physics step. A stored velocity becomes one 160-unit streak.
+	-- Entities Spawn created during that pass. A box from PhysicsInitBox
+	-- takes one engine tick of the open solver. Entity velocity with no body
+	-- stays where Spawn left it. A stored velocity is also one 160-unit streak.
 	-- Moving entities are kept first so a still attachment cannot crowd them out.
+	local tick = 1 / 66
+	if session.env and session.env.engine and type(session.env.engine.TickInterval) == "function" then
+		tick = session.env.engine.TickInterval()
+	end
 	local proj_drawn = 0
 	local proj_moving = 0
 	local proj_list = exercised.projectiles or {}
@@ -824,6 +829,9 @@ local function bake_actors(mount, bound, max_edge)
 		local ent = proj_list[i]
 		local bullet = glua.velocity_bullet(ent)
 		if bullet then
+			-- The streak and the mesh share the position after this tick.
+			glua.integrate_body(ent, tick)
+			bullet = glua.velocity_bullet(ent) or bullet
 			local loaded, model = projectile_mesh(ent)
 			keep_projectile(ent, loaded, model, bullet)
 			seen[ent] = true

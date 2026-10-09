@@ -2934,6 +2934,32 @@ function M.velocity_bullet(ent)
 	}
 end
 
+-- One step of pure.vphysics on a box from PhysicsInitBox.
+-- An entity with only SetVelocity has no body and is not moved.
+-- The floor stays unset, so this step does not hit the map.
+function M.integrate_body(ent, dt)
+	if type(ent) ~= "table" or type(dt) ~= "number" or not (dt > 0) then
+		return false
+	end
+	if type(ent.GetPhysicsObject) ~= "function" then
+		return false
+	end
+	local phys = ent:GetPhysicsObject()
+	if type(phys) ~= "table" or type(phys.IsValid) ~= "function" or not phys:IsValid() then
+		return false
+	end
+	local body = phys.__body
+	if type(body) ~= "table" or type(body.pos) ~= "table" or type(body.vel) ~= "table" then
+		return false
+	end
+	vphysics.step(body, dt)
+	if type(ent.SetPos) == "function" then
+		local p = body.pos
+		ent:SetPos({ x = p.x, y = p.y, z = p.z })
+	end
+	return true
+end
+
 -- Runs Initialize, Think, and one PrimaryAttack on the items about to be drawn.
 -- A weapon that records no bullet and defines VR_Shoot is asked once, with the
 -- owner's shoot position and angles. VR_Melee runs only when VR_Shoot is absent.

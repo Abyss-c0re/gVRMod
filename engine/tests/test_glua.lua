@@ -422,6 +422,13 @@ end
 	local prefer = glua.velocity_bullet(boxent)
 	T.near(prefer and prefer.dy, -100, 1e-6, "phys velocity wins over the entity")
 	T.near(prefer and prefer.dz, 0, 1e-6, "entity velocity does not leak into the phys streak")
+	local before_y = boxent:GetPos().y
+	phys:EnableGravity(false)
+	phys:SetVelocityInstantaneous(session.env.Vector(0, -66, 0))
+	T.eq(glua.integrate_body(boxent, session.env.engine.TickInterval()), true, "box takes one tick")
+	T.near(boxent:GetPos().y, before_y - 1, 1e-6, "one tick at 66 u/s moves 1 unit")
+	T.near(boxent:GetPos().z, 30, 1e-6, "gravity off does not drop the box")
+
 	local resting = session.env.ents.Create("prop_physics")
 	resting:PhysicsInitBox(session.env.Vector(-1, -1, -1), session.env.Vector(1, 1, 1))
 	T.eq(glua.velocity_bullet(resting), nil, "a resting box has no streak")
@@ -434,6 +441,8 @@ end
 	T.eq(bb and bb.x, 1, "bolt streak x")
 	T.eq(bb and bb.z, 3, "bolt streak z")
 	T.near(bb and bb.dy, -3000, 1e-6, "bolt streak uses entity velocity")
+	T.eq(glua.integrate_body(bolt, session.env.engine.TickInterval()), false, "entity velocity is not a box step")
+	T.eq(bolt:GetPos().y, 2, "bolt stays where Spawn left it")
 	local ribbon = glua.streak_verts(bb, fwd.x, fwd.y, fwd.z)
 	T.eq(ribbon and #ribbon, 18, "bolt velocity is a streak")
 
