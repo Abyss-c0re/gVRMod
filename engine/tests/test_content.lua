@@ -130,6 +130,31 @@ return function(T)
 
 	local world = bsp.load(construct, { uv = true })
 	T.ok(world.surfaces and #world.surfaces > 5, "construct surfaces " .. tostring(world.surfaces and #world.surfaces))
+	T.ok(world.tri_count > 20000 and world.tri_count < 80000, "construct tris stay a brush mesh " .. tostring(world.tri_count))
+	T.ok(world.lightmap ~= nil, "lightmap atlas")
+	if world.lightmap then
+		T.eq(world.lightmap.w, bsp.LIGHTMAP_SIZE, "atlas width")
+		T.eq(world.lightmap.h, bsp.LIGHTMAP_SIZE, "atlas height")
+		T.eq(world.lightmap.dropped, 0, "every lit face fits")
+		T.ok(world.lightmap.faces > 100, "packed faces " .. tostring(world.lightmap.faces))
+		local rgba = world.lightmap.rgba
+		local dark, lit = 0, 0
+		local step = 64
+		local pixels = world.lightmap.w * world.lightmap.h
+		for i = 0, pixels - 1, step do
+			local o = i * 4
+			local r, g, b = rgba:byte(o + 1, o + 3)
+			local y = r + g + b
+			if y < 40 then
+				dark = dark + 1
+			elseif y > 300 and y < 750 then
+				lit = lit + 1
+			end
+		end
+		T.ok(dark > 10, "atlas has shadow luxels " .. tostring(dark))
+		T.ok(lit > 10, "atlas has lit luxels " .. tostring(lit))
+		world.lightmap.rgba = nil
+	end
 	local sky, concrete = false, nil
 	for i = 1, #world.surfaces do
 		local sn = world.surfaces[i].name:lower()
@@ -146,24 +171,28 @@ return function(T)
 		local umin, umax = math.huge, -math.huge
 		local vmin, vmax = math.huge, -math.huge
 		local count = #concrete.verts / bsp.VERT_STRIDE
-		local lsum, lsum2 = 0, 0
+		local lumin, lumax = math.huge, -math.huge
+		local lvmin, lvmax = math.huge, -math.huge
 		for i = 0, count - 1 do
 			local uu = concrete.verts[i * bsp.VERT_STRIDE + 4]
 			local vv = concrete.verts[i * bsp.VERT_STRIDE + 5]
-			local lr = concrete.verts[i * bsp.VERT_STRIDE + 6]
-			lsum = lsum + lr
-			lsum2 = lsum2 + lr * lr
+			local lu = concrete.verts[i * bsp.VERT_STRIDE + 6]
+			local lv = concrete.verts[i * bsp.VERT_STRIDE + 7]
 			if uu < umin then umin = uu end
 			if uu > umax then umax = uu end
 			if vv < vmin then vmin = vv end
 			if vv > vmax then vmax = vv end
+			if lu < lumin then lumin = lu end
+			if lu > lumax then lumax = lu end
+			if lv < lvmin then lvmin = lv end
+			if lv > lvmax then lvmax = lv end
 		end
 		T.ok(umax - umin > 0.05, "concrete u span " .. tostring(umax - umin))
 		T.ok(vmax - vmin > 0.05, "concrete v span " .. tostring(vmax - vmin))
-		local lmean = lsum / count
-		local lvar = lsum2 / count - lmean * lmean
-		T.ok(lmean > 0.05 and lmean < 0.95, "concrete light mean " .. tostring(lmean))
-		T.ok(lvar > 1e-6, "concrete light varies " .. tostring(lvar))
+		T.ok(lumin > 0 and lumax < 1, "concrete light u inside atlas " .. tostring(lumin) .. ".." .. tostring(lumax))
+		T.ok(lvmin > 0 and lvmax < 1, "concrete light v inside atlas " .. tostring(lvmin) .. ".." .. tostring(lvmax))
+		T.ok(lumax - lumin > 1e-4, "concrete light u varies " .. tostring(lumax - lumin))
+		T.ok(lvmax - lvmin > 1e-4, "concrete light v varies " .. tostring(lvmax - lvmin))
 	end
 	local lr, lg, lb = bsp.display_light(128, 128, 128, 0)
 	local expect = (128 / 255) ^ (1 / 2.2)

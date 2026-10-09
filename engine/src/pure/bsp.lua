@@ -3,6 +3,7 @@
 -- Faces: 56 bytes. Displacements: ddispinfo_t 176 bytes, CDispVert 20 bytes.
 -- Halfspace convention n·p <= d was checked against gm_flatgrass spawn.
 -- Submodel faces and brushes are relative to the entity origin (func_brush and the like).
+local ffi = require("ffi")
 local bin = require("pure.bin")
 local trace = require("pure.trace")
 local angles = require("pure.angles")
@@ -172,9 +173,13 @@ local function shade(n, salt)
 	return 0.28 + 0.22 * math.abs(n.x) + wobble, 0.32 + 0.40 * nz, 0.30 + 0.18 * math.abs(n.y)
 end
 
--- x,y,z,u,v, light rgb, then the displacement blend (0 = $basetexture, 1 = $basetexture2).
--- Light is a sample of the face lightmap, not a color room vertex paint.
+-- x, y, z, albedo u, v, lightmap u, v, unused, displacement blend.
+-- Blend 0 is $basetexture and 1 is $basetexture2. With a lighting lump the
+-- lightmap slots are atlas coordinates. Without one they stay 1, 1, 1.
 M.VERT_STRIDE = 9
+
+-- One square atlas. gm_construct's flat pages are under a million luxels.
+M.LIGHTMAP_SIZE = 4096
 
 -- CDispVert.m_flAlpha is the Hammer blend paint, 0 through 255.
 function M.disp_blend(alpha)
@@ -505,6 +510,7 @@ function M.load(path, opts)
 	local surfaces = nil
 	local tri_count = 0
 	local disp_count = 0
+	local lightmap = nil
 	if (opts.mesh or opts.uv) and face_s ~= "" then
 		if opts.mesh then
 			mesh = {}
@@ -561,35 +567,136 @@ function M.load(path, opts)
 				vecs[k + 1] = bin.f32(texinfo_s, o + k * 4)
 				lvecs[k + 1] = bin.f32(texinfo_s, o + 32 + k * 4)
 			end
-			hit = { name = info.name, vecs = vecs, lvecs = lvecs, tw = info.tw, th = info.th, flags = flags }
+			hit = {
+				name = info.name, vecs = vecs, lvecs = lvecs,
+				tw = info.tw, th = info.th, flags = flags,
+			}
 			info_cache[fi] = hit
 			return hit
 		end
+		-- Shelf-pack each face's flat lightmap page. Pixel (0,0) stays white
+		-- for unlit faces. Packing starts at (2,2) so a 1px extrusion cannot
+		-- cover that texel, and two pad pixels keep neighbors from blending.
+		local AW = M.LIGHTMAP_SIZE
+		local AH = AW
+		local white_u, white_v = 0.5 / AW, 0.5 / AH
+		local atlas, lptr
+		local pen_x, pen_y, row_h = 2, 2, 0
+		local packed_n, dropped_n = 0, 0
+		local use_atlas = false
+		if lighting ~= "" then
+			local ok, buf = pcall(ffi.new, "uint8_t[?]", AW * AH * 4)
+			if ok then
+				atlas = buf
+				ffi.fill(atlas, AW * AH * 4, 255)
+				lptr = ffi.cast("const uint8_t*", lighting)
+				use_atlas = true
+			end
+		end
 		local light_cache = {}
-		local function light_at(fi, x, y, z, mat)
+		local function blit_page(L)
+			local rx, ry, w, h = L.rx, L.ry, L.row, L.height
+			local base = L.base
+			for y = 0, h - 1 do
+				local row_o = base + y * w * 4
+				local dst = ((ry + y) * AW + rx) * 4
+				for x = 0, w - 1 do
+					local o = row_o + x * 4
+					local r, g, b = M.display_light(lptr[o], lptr[o + 1], lptr[o + 2], lptr[o + 3])
+					local p = dst + x * 4
+					atlas[p] = math.floor(r * 255 + 0.5)
+					atlas[p + 1] = math.floor(g * 255 + 0.5)
+					atlas[p + 2] = math.floor(b * 255 + 0.5)
+					atlas[p + 3] = 255
+				end
+			end
+			for y = 0, h - 1 do
+				local src = ((ry + y) * AW + rx) * 4
+				local left = ((ry + y) * AW + (rx - 1)) * 4
+				local src_r = ((ry + y) * AW + (rx + w - 1)) * 4
+				local right = ((ry + y) * AW + (rx + w)) * 4
+				atlas[left], atlas[left + 1], atlas[left + 2], atlas[left + 3] = atlas[src], atlas[src + 1], atlas[src + 2], 255
+				atlas[right], atlas[right + 1], atlas[right + 2], atlas[right + 3] = atlas[src_r], atlas[src_r + 1], atlas[src_r + 2], 255
+			end
+			for x = -1, w do
+				local top_s = (ry * AW + (rx + x)) * 4
+				local top_d = ((ry - 1) * AW + (rx + x)) * 4
+				local bot_s = ((ry + h - 1) * AW + (rx + x)) * 4
+				local bot_d = ((ry + h) * AW + (rx + x)) * 4
+				atlas[top_d], atlas[top_d + 1], atlas[top_d + 2], atlas[top_d + 3] = atlas[top_s], atlas[top_s + 1], atlas[top_s + 2], 255
+				atlas[bot_d], atlas[bot_d + 1], atlas[bot_d + 2], atlas[bot_d + 3] = atlas[bot_s], atlas[bot_s + 1], atlas[bot_s + 2], 255
+			end
+		end
+		local function face_light(fi, mat)
 			local L = light_cache[fi]
-			if L == nil then
-				local base = fi * 56
-				local style0 = face_s:byte(base + 17)
-				local lightofs = bin.i32(face_s, base + 21)
-				local sx = bin.i32(face_s, base + 37)
-				local sy = bin.i32(face_s, base + 41)
-				if not style0 or style0 == 255 or lightofs < 0 or sx < 0 or sy < 0 or lighting == "" then
+			if L ~= nil then
+				return L or nil
+			end
+			local base = fi * 56
+			local style0 = face_s:byte(base + 17)
+			local lightofs = bin.i32(face_s, base + 21)
+			local sx = bin.i32(face_s, base + 37)
+			local sy = bin.i32(face_s, base + 41)
+			if not style0 or style0 == 255 or lightofs < 0 or sx < 0 or sy < 0 then
+				L = false
+			else
+				local row = sx + 1
+				local height = sy + 1
+				-- Bumped faces store 3 directional pages, then the flat page.
+				local slice = bit.band(mat.flags or 0, 0x800) ~= 0 and 3 or 0
+				local bytes = row * height * 4
+				local page = lightofs + slice * bytes
+				if page < 0 or page + bytes > #lighting then
 					L = false
 				else
 					L = {
-						ofs = lightofs,
 						minx = bin.i32(face_s, base + 29),
 						miny = bin.i32(face_s, base + 33),
 						sx = sx,
 						sy = sy,
-						bump = bit.band(mat.flags or 0, 0x800) ~= 0,
+						row = row,
+						height = height,
+						base = page,
 					}
 				end
-				light_cache[fi] = L
 			end
-			if not L then
-				return 1, 1, 1
+			light_cache[fi] = L
+			return L or nil
+		end
+		local function pack_light(L)
+			if L.placed then
+				return L.ok
+			end
+			L.placed = true
+			local w, h = L.row, L.height
+			if w < 1 or h < 1 or w + 3 > AW then
+				L.ok = false
+				dropped_n = dropped_n + 1
+				return false
+			end
+			if pen_x + w + 1 > AW then
+				pen_x = 2
+				pen_y = pen_y + row_h + 2
+				row_h = 0
+			end
+			if pen_y + h + 1 > AH then
+				L.ok = false
+				dropped_n = dropped_n + 1
+				return false
+			end
+			L.rx, L.ry, L.ok = pen_x, pen_y, true
+			pen_x = pen_x + w + 2
+			if h > row_h then
+				row_h = h
+			end
+			packed_n = packed_n + 1
+			blit_page(L)
+			return true
+		end
+		local function light_uv(fi, x, y, z, mat)
+			local L = face_light(fi, mat)
+			if not L or not pack_light(L) then
+				return white_u, white_v
 			end
 			local lv = mat.lvecs
 			local s = x * lv[1] + y * lv[2] + z * lv[3] + lv[4] - L.minx
@@ -604,24 +711,12 @@ function M.load(path, opts)
 			elseif t > L.sy then
 				t = L.sy
 			end
-			local iu = math.floor(s)
-			local iv = math.floor(t)
-			local row = L.sx + 1
-			local lux = row * (L.sy + 1)
-			-- Bumped faces store 3 directional pages, then the flat page used when bump is off.
-			local slice = L.bump and 3 or 0
-			local idx = slice * lux + iv * row + iu
-			local o = L.ofs + idx * 4
-			if o < 0 or o + 4 > #lighting then
-				return 1, 1, 1
-			end
-			local r, g, b, e = lighting:byte(o + 1, o + 4)
-			return M.display_light(r, g, b, e)
+			return (L.rx + s + 0.5) / AW, (L.ry + t + 0.5) / AH
 		end
 		local function surface_buf(mat)
 			local g = groups[mat.name]
 			if not g then
-				g = { name = mat.name, verts = {} }
+				g = { name = mat.name, verts = {}, lit = use_atlas }
 				groups[mat.name] = g
 				surfaces[#surfaces + 1] = g
 			end
@@ -640,7 +735,11 @@ function M.load(path, opts)
 			-- quad; the displaced point projects into the wrong luxel.
 			local q = sample or p
 			local u, v = M.tex_uv(q.x, q.y, q.z, mat.vecs, mat.tw, mat.th)
-			local lr, lg, lb = light_at(fi, q.x, q.y, q.z, mat)
+			local lu, lv, extra = 1, 1, 1
+			if use_atlas then
+				lu, lv = light_uv(fi, q.x, q.y, q.z, mat)
+				extra = 0
+			end
 			local x, y, z = M.bmodel_point(p.x, p.y, p.z, place)
 			if sky_face then
 				x, y, z = M.sky_place(x, y, z, sky)
@@ -650,9 +749,9 @@ function M.load(path, opts)
 			buf[#buf + 1] = z
 			buf[#buf + 1] = u
 			buf[#buf + 1] = v
-			buf[#buf + 1] = lr
-			buf[#buf + 1] = lg
-			buf[#buf + 1] = lb
+			buf[#buf + 1] = lu
+			buf[#buf + 1] = lv
+			buf[#buf + 1] = extra
 			buf[#buf + 1] = blend or 0
 		end
 		local nfaces = #face_s / 56
@@ -793,6 +892,17 @@ function M.load(path, opts)
 			end
 			end
 		end
+		if use_atlas then
+			lightmap = {
+				w = AW,
+				h = AH,
+				rgba = ffi.string(atlas, AW * AH * 4),
+				faces = packed_n,
+				dropped = dropped_n,
+			}
+			atlas = nil
+			lptr = nil
+		end
 	elseif disp_s == nil then
 		-- count disps without building a mesh
 		local ofs, len = lump_info(header, 26)
@@ -824,6 +934,7 @@ function M.load(path, opts)
 		pak_ofs = pak_ofs,
 		pak_len = pak_len,
 		sky = sky,
+		lightmap = lightmap,
 	}
 end
 

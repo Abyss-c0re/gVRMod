@@ -54,7 +54,10 @@ local acc = 0
 local shader
 local alpha_shader
 local blend_shader
+local light_shader
 local white_tex
+local lightmap_tex
+local light_sampler
 local send_uv
 local solid
 local left_tex, right_tex
@@ -119,6 +122,7 @@ local function draw_world(pass)
 			local part = map_parts[i]
 			if part.tex2 then
 				-- Vertex alpha is the displacement blend. 0 keeps $basetexture.
+				-- Color.rg is the lightmap coordinate, not a vertex light.
 				pass:setShader(blend_shader)
 				pass:setMaterial(part.tex)
 				pass:send("BlendTexture", part.tex2)
@@ -129,10 +133,19 @@ local function draw_world(pass)
 				pass:send("DetailBlend", part.detail and (part.detail_blend or 1) or 0)
 				send_uv(pass, "Uv1", part.transform)
 				send_uv(pass, "Uv2", part.transform2)
+				pass:send("Lightmap", lightmap_tex or white_tex)
+				pass:send("LightSampler", light_sampler)
+			elseif part.alphatest then
+				-- Springer cards stay fullbright. Detail and sway are not applied.
+				pass:setShader(alpha_shader)
+				pass:setMaterial(part.tex)
+			elseif part.lit then
+				pass:setShader(light_shader)
+				pass:setMaterial(part.tex)
+				pass:send("Lightmap", lightmap_tex or white_tex)
+				pass:send("LightSampler", light_sampler)
 			else
-				-- Alphatest cards (the springer trees) discard the empty texels.
-				-- Drawn solid, the same quads are green slabs.
-				pass:setShader(part.alphatest and alpha_shader or shader)
+				pass:setShader(shader)
 				pass:setMaterial(part.tex)
 			end
 			pass:draw(part.mesh)
@@ -599,6 +612,7 @@ local function upload_albedo(bound)
 			detail = gpu_tex(s.detail_key, s.detail_rgba, s.detail_w, s.detail_h),
 			detail_scale = s.detail_scale,
 			detail_blend = s.detail_blend,
+			lit = s.lit,
 			transform = s.blend and s.transform or nil,
 			transform2 = s.transform2,
 			mesh = upload_uv_mesh(s.verts, s.transform, s.blend),
@@ -661,6 +675,22 @@ local function try_map()
 			break
 		end
 	end
+	lightmap_tex = nil
+	if loaded.lightmap and loaded.lightmap.rgba then
+		local lm = loaded.lightmap
+		local lok, tex = pcall(make_texture, lm.rgba, lm.w, lm.h)
+		local faces, dropped = lm.faces or 0, lm.dropped or 0
+		local lw, lh = lm.w, lm.h
+		lm.rgba = nil
+		loaded.lightmap = nil
+		if lok then
+			lightmap_tex = tex
+			print(string.format("lightmap %dx%d packed %d dropped %d", lw, lh, faces, dropped))
+		else
+			print("lightmap upload failed: " .. tostring(tex))
+		end
+		collectgarbage("collect")
+	end
 	local surfaces = loaded.surfaces or {}
 	local max_edge = tonumber(os.getenv("ENGINE_TEX_SIZE")) or 512
 	local mount = content.mount({
@@ -708,6 +738,22 @@ function lovr.load()
 	]], [[
 		vec4 lovrmain() { return Color * getPixel(ColorTexture, UV); }
 	]])
+	-- World brushes store a lightmap atlas coordinate in Color.rg.
+	-- Props keep the shader above and a white vertex color.
+	light_shader = lovr.graphics.newShader([[
+		vec4 lovrmain() {
+			Color = VertexColor;
+			return DefaultPosition;
+		}
+	]], [[
+		uniform texture2D Lightmap;
+		uniform sampler LightSampler;
+		vec4 lovrmain() {
+			vec3 light = texture(sampler2D(Lightmap, LightSampler), Color.rg).rgb;
+			vec3 albedo = getPixel(ColorTexture, UV).rgb;
+			return vec4(light * albedo, 1.0);
+		}
+	]])
 	-- Source $alphatestreference default is 0.7. Below that the card is a hole.
 	alpha_shader = lovr.graphics.newShader([[
 		vec4 lovrmain() {
@@ -739,6 +785,8 @@ function lovr.load()
 		uniform float UseMask;
 		uniform float DetailScale;
 		uniform float DetailBlend;
+		uniform texture2D Lightmap;
+		uniform sampler LightSampler;
 
 		vec2 apply_uv(vec2 uv, vec4 a, vec4 b) {
 			vec2 d = (uv - a.xy) * a.zw;
@@ -761,11 +809,13 @@ function lovr.load()
 				vec3 detail = getPixel(DetailTexture, UV * DetailScale).rgb;
 				albedo *= mix(vec3(1.0), detail * 2.0, DetailBlend);
 			}
-			return vec4(Color.rgb * albedo, 1.0);
+			vec3 light = texture(sampler2D(Lightmap, LightSampler), Color.rg).rgb;
+			return vec4(light * albedo, 1.0);
 		}
 	]])
 	white_tex = make_texture(string.char(255, 255, 255, 255), 1, 1)
 	sampler = lovr.graphics.newSampler({ wrap = "repeat", filter = "linear" })
+	light_sampler = lovr.graphics.newSampler({ wrap = "clamp", filter = "linear" })
 	local function eye_tex(w, h)
 		return lovr.graphics.newTexture(w, h, {
 			usage = { "render", "transfer", "sample" },

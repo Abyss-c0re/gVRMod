@@ -369,6 +369,7 @@ function M.mount(opts)
 					transform = nil,
 					verts = s.verts,
 					name = s.name,
+					lit = s.lit,
 				}
 			else
 				if not images[mat.key] then
@@ -401,6 +402,7 @@ function M.mount(opts)
 					detail_rgba = mat.detail_rgba,
 					detail_scale = mat.detail_scale,
 					detail_blend = mat.detail_blend,
+					lit = s.lit,
 				}
 				if mat.blend then
 					io.write(string.format("blend %s + %s%s\n", s.name, mat.key2, mat.mask_key and " mask" or ""))
