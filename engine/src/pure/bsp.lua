@@ -181,6 +181,12 @@ M.VERT_STRIDE = 9
 -- One square atlas. gm_construct's flat pages are under a million luxels.
 M.LIGHTMAP_SIZE = 4096
 
+-- CCoreDispInfo::GenerateCollisionSurface. ndx = y * (2^power + 1) + x.
+-- Odd cells run the diagonal from top-left to bottom-right.
+function M.disp_odd(ndx)
+	return ndx % 2 == 1
+end
+
 -- CDispVert.m_flAlpha is the Hammer blend paint, 0 through 255.
 function M.disp_blend(alpha)
 	if not alpha then
@@ -839,26 +845,32 @@ function M.load(path, opts)
 						for x = 0, size - 1 do
 							local p00, p10 = grid[y][x], grid[y][x + 1]
 							local p01, p11 = grid[y + 1][x], grid[y + 1][x + 1]
-							if mesh then
-								local nrm = tri_normal(p00, p10, p11)
-								local r, g, b = shade(nrm, fi)
-								push_tri(mesh, draw_pt(p00), draw_pt(p10), draw_pt(p11), r, g, b)
-								push_tri(mesh, draw_pt(p00), draw_pt(p11), draw_pt(p01), r, g, b)
+							local function push_disp(p)
+								push_uv(uvbuf, p, mat, fi, sky_face, place, {
+									x = p.bx, y = p.by, z = p.bz,
+								}, p.blend)
 							end
-							if uvbuf then
-								local function push_disp(p)
-									push_uv(uvbuf, p, mat, fi, sky_face, place, {
-										x = p.bx, y = p.by, z = p.bz,
-									}, p.blend)
+							local function emit_disp(a, b, c)
+								if mesh then
+									local nrm = tri_normal(a, b, c)
+									local r, g, bcol = shade(nrm, fi)
+									push_tri(mesh, draw_pt(a), draw_pt(b), draw_pt(c), r, g, bcol)
 								end
-								push_disp(p00)
-								push_disp(p10)
-								push_disp(p11)
-								push_disp(p00)
-								push_disp(p11)
-								push_disp(p01)
+								if uvbuf then
+									push_disp(a)
+									push_disp(b)
+									push_disp(c)
+								end
+								tri_count = tri_count + 1
 							end
-							tri_count = tri_count + 2
+							-- Same two diagonals as BuildTriTLtoBR / BuildTriBLtoTR.
+							if M.disp_odd(y * n + x) then
+								emit_disp(p00, p01, p10)
+								emit_disp(p10, p01, p11)
+							else
+								emit_disp(p00, p01, p11)
+								emit_disp(p00, p11, p10)
+							end
 						end
 					end
 				end
