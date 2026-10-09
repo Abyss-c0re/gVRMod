@@ -771,42 +771,77 @@ local function bake_actors(mount, bound, max_edge)
 		print(string.format("exercise miss %d %s", ranked[i].n, ranked[i].text))
 	end
 	-- Entities Spawn created during that pass. One pose at the position the
-	-- script set. No physics step. Cap so a spammy Think cannot fill the frame.
+	-- script set. No physics step. A stored velocity becomes one 160-unit streak.
+	-- Moving entities are kept first so a still attachment cannot crowd them out.
 	local proj_drawn = 0
+	local proj_moving = 0
 	local proj_list = exercised.projectiles or {}
+	local function projectile_mesh(ent)
+		if type(ent) ~= "table" or not ent.__spawned or type(ent.GetModel) ~= "function" then
+			return nil, nil
+		end
+		local model = ent:GetModel()
+		if type(model) ~= "string" or model == "" then
+			return nil, nil
+		end
+		local loaded = load_model(model, false)
+		if loaded and loaded.meshes and #loaded.meshes > 0 then
+			return loaded, model
+		end
+		print("projectile skip " .. tostring(ent.GetClass and ent:GetClass() or "") .. " " .. model)
+		return nil, model
+	end
+	local function keep_projectile(ent, loaded, model, bullet)
+		local pos = ent.GetPos and ent:GetPos() or {}
+		local ang = ent.GetAngles and ent:GetAngles() or {}
+		local item = {
+			kind = "projectile",
+			class = type(ent.GetClass) == "function" and ent:GetClass() or "",
+			model = model or "",
+			x = pos.x or 0,
+			y = pos.y or 0,
+			z = pos.z or 0,
+			z_off = 0,
+			yaw = ang.y or ang.yaw or 0,
+			pitch = ang.p or ang.pitch or 0,
+			roll = ang.r or ang.roll or 0,
+		}
+		if loaded then
+			item.loaded = loaded
+		end
+		if bullet then
+			item.bullets = { bullet }
+			proj_moving = proj_moving + 1
+		end
+		kept[#kept + 1] = item
+		proj_drawn = proj_drawn + 1
+	end
+	local seen = {}
 	for i = 1, #proj_list do
 		if proj_drawn >= 48 then
 			break
 		end
 		local ent = proj_list[i]
-		if type(ent) == "table" and ent.__spawned and type(ent.GetModel) == "function" then
-			local model = ent:GetModel()
-			if type(model) == "string" and model ~= "" then
-				local loaded = load_model(model, false)
-				if loaded and loaded.meshes and #loaded.meshes > 0 then
-					local pos = ent.GetPos and ent:GetPos() or {}
-					local ang = ent.GetAngles and ent:GetAngles() or {}
-					kept[#kept + 1] = {
-						kind = "projectile",
-						class = type(ent.GetClass) == "function" and ent:GetClass() or "",
-						model = model,
-						loaded = loaded,
-						x = pos.x or 0,
-						y = pos.y or 0,
-						z = pos.z or 0,
-						z_off = 0,
-						yaw = ang.y or ang.yaw or 0,
-						pitch = ang.p or ang.pitch or 0,
-						roll = ang.r or ang.roll or 0,
-					}
-					proj_drawn = proj_drawn + 1
-				else
-					print("projectile skip " .. tostring(ent:GetClass()) .. " " .. model)
-				end
+		local bullet = glua.velocity_bullet(ent)
+		if bullet then
+			local loaded, model = projectile_mesh(ent)
+			keep_projectile(ent, loaded, model, bullet)
+			seen[ent] = true
+		end
+	end
+	for i = 1, #proj_list do
+		if proj_drawn >= 48 then
+			break
+		end
+		local ent = proj_list[i]
+		if type(ent) == "table" and not seen[ent] then
+			local loaded, model = projectile_mesh(ent)
+			if loaded then
+				keep_projectile(ent, loaded, model, nil)
 			end
 		end
 	end
-	print(string.format("projectiles made %d drawn %d", #proj_list, proj_drawn))
+	print(string.format("projectiles made %d drawn %d moving %d", #proj_list, proj_drawn, proj_moving))
 	local view_fwd = angles.angle_vectors(player.pitch or 0, player.yaw or 0, 0)
 	local streak_name = "models/debug/debugwhite"
 	local groups = {}
@@ -820,9 +855,11 @@ local function bake_actors(mount, bound, max_edge)
 		if i <= 8 then
 			print(string.format(
 				"actor %s %s at %.0f %.0f %.0f yaw %.0f seq %s model %s",
-				it.kind, it.class, it.x, it.y, oz, it.yaw or 0, tostring(model.sequence), it.model
+				it.kind, it.class, it.x, it.y, oz, it.yaw or 0,
+				tostring(model and model.sequence), it.model
 			))
 		end
+		if model and model.meshes then
 		for m = 1, #model.meshes do
 			local mesh = model.meshes[m]
 			local g = groups[mesh.material]
@@ -851,6 +888,8 @@ local function bake_actors(mount, bound, max_edge)
 		if model.sequence then
 			posed = posed + 1
 		end
+		tris = tris + (model.tris or 0)
+		end
 		local streak = glua.streak_verts(it.bullets and it.bullets[1], view_fwd.x, view_fwd.y, view_fwd.z)
 		if streak then
 			local g = groups[streak_name]
@@ -874,7 +913,6 @@ local function bake_actors(mount, bound, max_edge)
 			end
 			streaks = streaks + 1
 		end
-		tris = tris + (model.tris or 0)
 		it.loaded = nil
 	end
 	local added = 0

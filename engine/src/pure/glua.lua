@@ -7,6 +7,7 @@ local activities = require("pure.activities")
 local content = require("pure.content")
 local gma_mod = require("pure.gma")
 local trace = require("pure.trace")
+local vphysics = require("pure.vphysics")
 
 local M = {}
 
@@ -1204,16 +1205,94 @@ function M.boot(opts)
 	function entity_meta:IsWorld()
 		return false
 	end
-	-- No vphysics body is built. __invalid makes the global IsValid agree with :IsValid.
+	-- PhysicsInit does not cook a model collide. __invalid makes the global
+	-- IsValid agree with :IsValid. PhysicsInitBox replaces this with a box.
 	local invalid_phys = { __invalid = true }
 	function invalid_phys:IsValid()
 		return false
 	end
 	function entity_meta:GetPhysicsObject()
-		return invalid_phys
+		return self.__phys or invalid_phys
 	end
 	function entity_meta:GetPhysicsObjectNum()
-		return invalid_phys
+		return self:GetPhysicsObject()
+	end
+	function entity_meta:SetVelocity(v)
+		if type(v) ~= "table" then
+			return
+		end
+		self.__vel = env.Vector(tonumber(v.x) or 0, tonumber(v.y) or 0, tonumber(v.z) or 0)
+	end
+	function entity_meta:GetVelocity()
+		return self.__vel or env.Vector()
+	end
+	function entity_meta:GetAbsVelocity()
+		return self:GetVelocity()
+	end
+	-- Records the solid. It does not cook a model collide. PhysicsInitBox builds the box.
+	function entity_meta:PhysicsInit(solid)
+		self.__solid = solid
+	end
+	function entity_meta:SetSolid(solid)
+		self.__solid = solid
+	end
+	function entity_meta:SetMoveType(kind)
+		self.__movetype = kind
+	end
+	function entity_meta:PhysicsInitBox(mins, maxs)
+		if type(mins) ~= "table" or type(maxs) ~= "table" then
+			return
+		end
+		local function half(a, b)
+			local h = math.abs((tonumber(b) or 0) - (tonumber(a) or 0)) * 0.5
+			if h < 0.5 then
+				h = 0.5
+			end
+			return h
+		end
+		local pos = self:GetPos()
+		local body = vphysics.new_box(
+			pos.x, pos.y, pos.z,
+			half(mins.x, maxs.x), half(mins.y, maxs.y), half(mins.z, maxs.z)
+		)
+		local phys = { __body = body }
+		function phys:IsValid()
+			return true
+		end
+		function phys:Wake()
+			self.__awake = true
+		end
+		function phys:SetBuoyancyRatio(n)
+			self.__buoy = tonumber(n) or 0
+		end
+		function phys:SetMass(n)
+			local mass = tonumber(n)
+			if mass and mass > 0 then
+				body.mass = mass
+			end
+		end
+		function phys:EnableGravity(on)
+			body.gravity = on and vphysics.GRAVITY or 0
+		end
+		function phys:EnableDrag(on)
+			self.__drag = on and true or false
+		end
+		function phys:SetVelocity(v)
+			if type(v) ~= "table" then
+				return
+			end
+			body.vel.x = tonumber(v.x) or 0
+			body.vel.y = tonumber(v.y) or 0
+			body.vel.z = tonumber(v.z) or 0
+		end
+		function phys:SetVelocityInstantaneous(v)
+			self:SetVelocity(v)
+		end
+		function phys:GetVelocity()
+			return env.Vector(body.vel.x, body.vel.y, body.vel.z)
+		end
+		self.__phys = phys
+		return phys
 	end
 	function entity_meta:Activate()
 		self.__active = true
@@ -2661,6 +2740,49 @@ function M.streak_verts(bullet, fx, fy, fz)
 		bx, by, bz,
 		px, py, pz,
 		cx, cy, cz,
+	}
+end
+
+-- Stored velocity as one streak_verts record. A valid phys body wins.
+-- The entity velocity is the fallback. Speed squared at or below 1 is still.
+-- The direction is not integrated. streak_verts shortens it to 160 units.
+function M.velocity_bullet(ent)
+	if type(ent) ~= "table" then
+		return nil
+	end
+	local vel
+	local phys
+	if type(ent.GetPhysicsObject) == "function" then
+		phys = ent:GetPhysicsObject()
+	end
+	if type(phys) == "table" and type(phys.IsValid) == "function" and phys:IsValid()
+		and type(phys.GetVelocity) == "function" then
+		vel = phys:GetVelocity()
+	elseif type(ent.GetVelocity) == "function" then
+		vel = ent:GetVelocity()
+	end
+	if type(vel) ~= "table" then
+		return nil
+	end
+	local dx = tonumber(vel.x) or 0
+	local dy = tonumber(vel.y) or 0
+	local dz = tonumber(vel.z) or 0
+	if dx * dx + dy * dy + dz * dz <= 1 then
+		return nil
+	end
+	local pos = type(ent.GetPos) == "function" and ent:GetPos() or nil
+	if type(pos) ~= "table" then
+		pos = {}
+	end
+	return {
+		x = tonumber(pos.x) or 0,
+		y = tonumber(pos.y) or 0,
+		z = tonumber(pos.z) or 0,
+		dx = dx,
+		dy = dy,
+		dz = dz,
+		damage = 0,
+		num = 1,
 	}
 end
 
