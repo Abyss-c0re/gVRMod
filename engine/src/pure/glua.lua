@@ -131,6 +131,55 @@ local CONTENTS = {
 	CONTENTS_HITBOX = 0x40000000,
 }
 
+-- Source SDK 2013 public/const.h. The tracer does not read these.
+-- A stored group is not a collide.
+local COLLISION_GROUP = {
+	COLLISION_GROUP_NONE = 0,
+	COLLISION_GROUP_DEBRIS = 1,
+	COLLISION_GROUP_DEBRIS_TRIGGER = 2,
+	COLLISION_GROUP_INTERACTIVE_DEBRIS = 3,
+	COLLISION_GROUP_INTERACTIVE = 4,
+	COLLISION_GROUP_PLAYER = 5,
+	COLLISION_GROUP_BREAKABLE_GLASS = 6,
+	COLLISION_GROUP_VEHICLE = 7,
+	COLLISION_GROUP_PLAYER_MOVEMENT = 8,
+	COLLISION_GROUP_NPC = 9,
+	COLLISION_GROUP_IN_VEHICLE = 10,
+	COLLISION_GROUP_WEAPON = 11,
+	COLLISION_GROUP_VEHICLE_CLIP = 12,
+	COLLISION_GROUP_PROJECTILE = 13,
+	COLLISION_GROUP_DOOR_BLOCKER = 14,
+	COLLISION_GROUP_PASSABLE_DOOR = 15,
+	COLLISION_GROUP_DISSOLVING = 16,
+	COLLISION_GROUP_PUSHAWAY = 17,
+	COLLISION_GROUP_NPC_ACTOR = 18,
+	COLLISION_GROUP_NPC_SCRIPTED = 19,
+	LAST_SHARED_COLLISION_GROUP = 20,
+}
+local MOVETYPE = {
+	MOVETYPE_NONE = 0,
+	MOVETYPE_ISOMETRIC = 1,
+	MOVETYPE_WALK = 2,
+	MOVETYPE_STEP = 3,
+	MOVETYPE_FLY = 4,
+	MOVETYPE_FLYGRAVITY = 5,
+	MOVETYPE_VPHYSICS = 6,
+	MOVETYPE_PUSH = 7,
+	MOVETYPE_NOCLIP = 8,
+	MOVETYPE_LADDER = 9,
+	MOVETYPE_OBSERVER = 10,
+	MOVETYPE_CUSTOM = 11,
+}
+local SOLID = {
+	SOLID_NONE = 0,
+	SOLID_BSP = 1,
+	SOLID_BBOX = 2,
+	SOLID_OBB = 3,
+	SOLID_OBB_YAW = 4,
+	SOLID_CUSTOM = 5,
+	SOLID_VPHYSICS = 6,
+}
+
 -- Studio models for HL2 classnames whose spawn-menu entry leaves Model unset.
 -- npc_citizen is not in this table: CNPC_Citizen::SelectModel builds
 -- models/Humans/<group>/head from citizentype (npc_citizen17.cpp).
@@ -628,6 +677,15 @@ function M.boot(opts)
 		env[k] = v
 	end
 	for k, v in pairs(CONTENTS) do
+		env[k] = v
+	end
+	for k, v in pairs(COLLISION_GROUP) do
+		env[k] = v
+	end
+	for k, v in pairs(MOVETYPE) do
+		env[k] = v
+	end
+	for k, v in pairs(SOLID) do
 		env[k] = v
 	end
 	for k, v in pairs(activities) do
@@ -1239,6 +1297,48 @@ function M.boot(opts)
 	function entity_meta:SetMoveType(kind)
 		self.__movetype = kind
 	end
+	-- Stored only. Brush traces do not filter on this.
+	function entity_meta:SetCollisionGroup(g)
+		local n = tonumber(g)
+		if n then
+			self.__collision_group = n
+		end
+	end
+	function entity_meta:GetCollisionGroup()
+		return self.__collision_group or 0
+	end
+	-- Key/value record. Nothing here applies m_flDamage or a laser target.
+	function entity_meta:SetSaveValue(key, value)
+		if type(key) ~= "string" or key == "" then
+			return
+		end
+		local saved = self.__save
+		if not saved then
+			saved = {}
+			self.__save = saved
+		end
+		saved[key] = value
+	end
+	function entity_meta:GetSaveValue(key)
+		local saved = self.__save
+		if not saved or type(key) ~= "string" then
+			return nil
+		end
+		return saved[key]
+	end
+	-- Records the input name. It does not run SetDamage or any other engine input.
+	function entity_meta:Fire(input, param, delay)
+		local inputs = self.__inputs
+		if not inputs then
+			inputs = {}
+			self.__inputs = inputs
+		end
+		inputs[#inputs + 1] = {
+			input = tostring(input or ""),
+			param = param,
+			delay = tonumber(delay) or 0,
+		}
+	end
 	function entity_meta:PhysicsInitBox(mins, maxs)
 		if type(mins) ~= "table" or type(maxs) ~= "table" then
 			return
@@ -1396,6 +1496,41 @@ function M.boot(opts)
 	function entity_meta:EmitSound(name)
 		self.__sounds = self.__sounds or {}
 		self.__sounds[#self.__sounds + 1] = tostring(name or "")
+	end
+	-- A patch that records Play and Stop. No audio is mixed.
+	function env.CreateSound(ent, name)
+		local patch = {
+			__name = tostring(name or ""),
+			__ent = ent,
+			__playing = false,
+		}
+		function patch:Play()
+			self.__playing = true
+			local owner = self.__ent
+			if type(owner) == "table" then
+				owner.__sounds = owner.__sounds or {}
+				owner.__sounds[#owner.__sounds + 1] = self.__name
+			end
+		end
+		function patch:Stop()
+			self.__playing = false
+		end
+		function patch:IsPlaying()
+			return self.__playing == true
+		end
+		function patch:ChangePitch(pitch)
+			self.__pitch = tonumber(pitch) or 100
+		end
+		function patch:ChangeVolume(vol)
+			self.__vol = tonumber(vol) or 1
+		end
+		function patch:SetSoundLevel(level)
+			self.__level = tonumber(level) or 0
+		end
+		function patch:FadeOut()
+			self.__playing = false
+		end
+		return patch
 	end
 	-- Single-player CallOnClient runs the named method on this entity.
 	-- A missing name does nothing. It does not pretend a client UI ran.
@@ -1628,6 +1763,19 @@ function M.boot(opts)
 			return 0
 		end
 		return cv:GetFloat()
+	end
+	-- cfg/skill.cfg from the local game. Names absent from that file stay missing.
+	do
+		local f = io.open(gmod .. "/cfg/skill.cfg", "rb")
+		if f then
+			for line in f:lines() do
+				local name, val = line:match("^%s*([%a_][%w_]*)%s+\"([^\"]*)\"")
+				if name and val and not cvars[name] then
+					convar(name, val)
+				end
+			end
+			f:close()
+		end
 	end
 
 	-- Change callbacks are stored. Nothing here fires them; a convar write does not pretend the game noticed.
