@@ -473,6 +473,10 @@ end
 	owner:SetVelocity(session.env.Vector(50, 0, 0))
 	T.eq(owner:GetAbsVelocity().x, 0, "standing player abs velocity stays 0")
 	T.eq(glua.velocity_bullet(owner), nil, "a still player has no streak")
+	T.eq(session.env.istable(session.env.NULL), false, "NULL is not a table")
+	T.eq(session.env.istable({}), true, "a real table is a table")
+	local rpg = session.env.weapons.Get("arcticvr_hl2_rpg")
+	T.eq(rpg and rpg.LaserDot == session.env.NULL, true, "weapon copy keeps NULL")
 	T.eq(session.env.NULL:IsPlayer(), false, "NULL is not a player")
 	T.eq(session.env.NULL:IsNPC(), false, "NULL is not an npc")
 	T.eq(session.env.NULL:IsValid(), false, "NULL method is invalid")
@@ -483,6 +487,12 @@ end
 	owner:ScreenFade(session.env.SCREENFADE.IN, session.env.Color(255, 225, 205, 64), 0.1, 0)
 	T.eq(owner.__fades and owner.__fades[1].flags, 1, "ScreenFade records the flag")
 	T.eq(owner.__fades[1].hold, 0, "ScreenFade records the hold")
+	T.eq(owner:GetVehicle() == session.env.NULL, true, "standing player has no vehicle")
+	T.eq(owner:InVehicle(), false, "standing player is not in a vehicle")
+	owner.__vehicle = boxent
+	T.eq(owner:GetVehicle(), boxent, "GetVehicle returns the stored vehicle")
+	T.eq(owner:InVehicle(), true, "a stored vehicle counts")
+	owner.__vehicle = nil
 	T.eq(owner:GetInfo("gmod_toolmode"), "", "unset info is empty")
 	T.eq(session.env.GetConVar("gmod_toolmode"), nil, "GetInfo does not create the cvar")
 	owner:SetAngles(session.env.Angle(0, 0, 0))

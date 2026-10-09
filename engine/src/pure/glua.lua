@@ -1671,6 +1671,9 @@ function M.boot(opts)
 	function player_meta:InVehicle()
 		return self.__vehicle ~= nil
 	end
+	function player_meta:GetVehicle()
+		return self.__vehicle or env.NULL
+	end
 	function player_meta:MuzzleFlash()
 		self.__muzzle = (self.__muzzle or 0) + 1
 	end

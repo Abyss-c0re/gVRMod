@@ -330,7 +330,12 @@ function M.make_env(realm)
 	env.isnumber = function(v)
 		return type(v) == "number"
 	end
+	-- NULL is an entity in GMod, not a table. weapons.Get copies tables and
+	-- must keep this exact object or IsValid stops recognizing it.
 	env.istable = function(v)
+		if v == NULL then
+			return false
+		end
 		return type(v) == "table"
 	end
 	-- GMod's IsColor is true for Color(r,g,b). Ours is a plain table, not a class.
