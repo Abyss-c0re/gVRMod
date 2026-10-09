@@ -178,6 +178,10 @@ end
 	T.ok(text ~= nil, "pistol script bytes")
 	local from_script = glua.script_model(text)
 	T.eq(from_script, "models/weapons/w_pistol.mdl", "pistol script model")
+	T.eq(glua.script_damage(text), 12, "pistol script damage")
+	T.eq(glua.script_damage('"damage" "0"'), nil, "zero damage is not a shot")
+	T.eq(glua.script_bullets('"bullets" "6"'), 6, "script bullets")
+	T.eq(glua.script_bullets(text), nil, "pistol does not invent pellets")
 
 	local items, skipped = glua.collect(session, mount)
 	print(string.format("collect %d skipped %d", #items, skipped and #skipped or 0))
@@ -195,6 +199,7 @@ end
 	T.eq(fist_i and fist_i.source, "view", "fists tagged view")
 	local pist = has("weapon_pistol")
 	T.eq(pist and pist.model, "models/weapons/w_pistol.mdl", "collect pistol")
+	T.eq(pist and pist.script_damage, 12, "collect pistol damage")
 	local alyx = has("npc_alyx")
 	T.eq(alyx and alyx.model, "models/alyx.mdl", "collect alyx")
 	local rebel = has("Rebel")
@@ -222,6 +227,11 @@ end
 	T.ok(share_a <= -0.1 and share_a >= -0.2, "SharedRandom stays in range")
 	local rand = session.env.math.Rand(0, 1)
 	T.ok(rand >= 0 and rand < 1, "math.Rand")
+	T.eq(session.env.math.Clamp(5, 0, 3), 3, "math.Clamp high")
+	T.eq(session.env.math.Clamp(-1, 0, 3), 0, "math.Clamp low")
+	local ar = session.env.AngleRand()
+	T.ok(ar and ar.p >= -90 and ar.p <= 90, "AngleRand pitch")
+	T.ok(ar and ar.y >= -180 and ar.y <= 180, "AngleRand yaw")
 	local addons = session.env.engine.GetAddons()
 	T.eq(type(addons), "table", "GetAddons")
 	if #gma_paths > 0 then
@@ -250,6 +260,106 @@ end
 	T.eq(bullet and bullet.y, 20, "bullet y is the weapon")
 	T.eq(bullet and bullet.z, 30, "bullet z is the mesh origin")
 	T.ok(bullet and bullet.dy < -0.9, "bullet travels along the weapon aim")
+
+	local called = false
+	local client = session.make_ent("weapon_base", session.meta_weapon)
+	function client:SPLastShoot()
+		called = true
+		self:SetLastShootTime(4)
+	end
+	client:CallOnClient("SPLastShoot")
+	T.eq(called, true, "CallOnClient runs the method")
+	T.eq(client:LastShootTime(), 4, "last shoot time stored")
+	client:CallOnClient("NoSuchClientMethod")
+	T.eq(called, true, "missing CallOnClient name does nothing")
+
+	local trace_mod = require("pure.trace")
+	session.trace_slot.world = {
+		brushes = { trace_mod.box_brush(-2048, -2048, -16, 2048, 2048, 0) },
+	}
+	local tr = session.env.util.TraceLine({
+		start = session.env.Vector(0, 0, 64),
+		endpos = session.env.Vector(0, 0, -64),
+	})
+	T.eq(tr.Hit, true, "ray hits the floor")
+	T.near(tr.Fraction, 0.5, 1e-3, "ray fraction")
+	T.near(tr.HitNormal.z, 1, 1e-6, "floor normal")
+	T.eq(tr.Entity, session.env.NULL, "ray entity is NULL")
+	T.eq(tr.HitWorld, true, "ray hit the world")
+	T.eq(tr.MatType, 0, "ray material unknown")
+	T.near(tr.HitPos.z, 0, 0.05, "hit near the slab")
+	local miss = session.env.util.TraceLine({
+		start = session.env.Vector(0, 0, 64),
+		endpos = session.env.Vector(0, 0, 32),
+	})
+	T.eq(miss.Hit, false, "short ray misses")
+	T.eq(miss.Fraction, 1, "miss fraction")
+	local eye_ply = session.make_ent("player", session.meta_player)
+	eye_ply:SetPos(session.env.Vector(0, 0, 0))
+	eye_ply:SetAngles(session.env.Angle(90, 0, 0))
+	local eye = eye_ply:GetEyeTrace()
+	T.eq(eye.Hit, true, "GetEyeTrace hits the floor")
+	T.eq(eye_ply:GetEyeTraceNoCursor().Hit, true, "GetEyeTraceNoCursor hits the floor")
+	session.trace_slot.world = nil
+	local noworld = session.env.util.TraceLine({
+		start = session.env.Vector(0, 0, 64),
+		endpos = session.env.Vector(0, 0, -64),
+	})
+	T.eq(noworld.Hit, false, "no world is a miss")
+	T.eq(noworld.Fraction, 1, "no world fraction")
+
+	local arc_stored = session.env.weapons.GetStored("arcticvr_hl2_pistol")
+	T.ok(arc_stored ~= nil, "arcticvr_hl2_pistol is registered")
+	local demo_arc = {
+		{ kind = "weapon", class = "arcticvr_hl2_pistol", x = 8, y = 9, z = 10, yaw = 270, z_off = 0 },
+	}
+	local ashot = glua.exercise(session, demo_arc)
+	T.ok(ashot.bullets >= 1, "arcticvr pistol recorded a bullet " .. table.concat(ashot.lines, " | "))
+	local ab = demo_arc[1].bullets and demo_arc[1].bullets[1]
+	T.eq(ab and ab.x, 8, "arcticvr bullet x")
+	T.eq(ab and ab.y, 9, "arcticvr bullet y")
+	T.eq(ab and ab.z, 10, "arcticvr bullet z")
+	T.near(ab and ab.damage or -1, 14, 1e-6, "arcticvr damage is the midpoint")
+	T.ok(ab and ab.dy < -0.9, "arcticvr bullet follows the aim")
+
+	local demo_p = {
+		{
+			kind = "weapon",
+			class = "weapon_pistol",
+			x = 4,
+			y = 5,
+			z = 6,
+			yaw = 270,
+			z_off = 0,
+			script_damage = pist and pist.script_damage,
+			script_bullets = pist and pist.script_bullets,
+		},
+	}
+	local pshot = glua.exercise(session, demo_p)
+	T.eq(pshot.bullets, 1, "pistol script fired once")
+	T.eq(pshot.attack_ok, 1, "pistol script counted")
+	local pb = demo_p[1].bullets and demo_p[1].bullets[1]
+	T.eq(pb and pb.damage, 12, "pistol damage 12")
+	T.eq(pb and pb.x, 4, "pistol bullet x")
+	T.ok(pb and pb.dy < -0.9, "pistol bullet follows the aim")
+
+	local demo_both = {
+		{
+			kind = "weapon",
+			class = "weapon_base",
+			x = 10,
+			y = 20,
+			z = 30,
+			yaw = 270,
+			z_off = 0,
+			script_damage = 99,
+		},
+	}
+	local both = glua.exercise(session, demo_both)
+	T.eq(both.bullets, 1, "lua primary is not double fired")
+	T.ok(both.attack_bad == 0, "lua primary still clean " .. table.concat(both.lines, " | "))
+	local bb = demo_both[1].bullets and demo_both[1].bullets[1]
+	T.ok(bb and bb.damage ~= 99, "script damage did not replace the lua shot")
 
 	session.env.__pump(0.1)
 	T.ok(fired_timer, "timer.Simple runs after pump")

@@ -631,7 +631,9 @@ local function upload_albedo(bound)
 end
 
 -- Weapon and NPC meshes. NPCs are skinned to one idle frame.
--- Lua Think and PrimaryAttack run once; a recorded bullet becomes a streak.
+-- Lua Think and PrimaryAttack run once. VR_Shoot runs when that recorded no
+-- bullet. A list weapon with a script damage and no Lua records one bullet.
+-- A recorded bullet becomes a streak.
 local function bake_actors(mount, bound, max_edge)
 	local title = (map_name or ""):match("([^/]+)%.bsp$") or "gm_construct"
 	local session = glua.boot({ gmod = gmod_dir(), map = title })
@@ -735,7 +737,7 @@ local function bake_actors(mount, bound, max_edge)
 		end
 	end
 	glua.layout(kept, player.pos, player.yaw)
-	local ex_ok, exercised = pcall(glua.exercise, session, kept)
+	local ex_ok, exercised = pcall(glua.exercise, session, kept, world)
 	if not ex_ok then
 		print("exercise failed " .. tostring(exercised):gsub("%s+", " "))
 		exercised = nil

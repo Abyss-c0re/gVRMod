@@ -6,6 +6,7 @@ local angles = require("pure.angles")
 local activities = require("pure.activities")
 local content = require("pure.content")
 local gma_mod = require("pure.gma")
+local trace = require("pure.trace")
 
 local M = {}
 
@@ -370,6 +371,30 @@ function M.script_model(text)
 	return nil
 end
 
+-- The first "damage" value in a weapon script. Absent or not positive stays nil.
+function M.script_damage(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	local n = tonumber(text:match('"[Dd]amage"%s*"([^"]+)"'))
+	if not n or n <= 0 then
+		return nil
+	end
+	return n
+end
+
+-- Pellet count only when the script writes "bullets". Do not invent a number.
+function M.script_bullets(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	local n = tonumber(text:match('"[Bb]ullets"%s*"([^"]+)"'))
+	if not n or n < 1 then
+		return nil
+	end
+	return n
+end
+
 function M.npc_model_for(entry)
 	if type(entry) ~= "table" then
 		return nil
@@ -395,7 +420,9 @@ end
 -- empty so taller actors standing on the ground further ahead stay visible.
 -- Yaw comes from the same AngleVectors basis as the player. Weapons get a
 -- quarter turn so the barrel crosses the view. The baker runs Think and
--- PrimaryAttack once after this. That pass is not a sandbox tick.
+-- PrimaryAttack once after this, then VR_Shoot when that recorded no bullet.
+-- A list weapon with no Lua and a damage key records one bullet. That pass
+-- is not a sandbox tick.
 function M.layout(items, origin, yaw)
 	local forward, right = angles.angle_vectors(0, yaw or 0, 0)
 	local weapons, npcs, big = {}, {}, {}
@@ -577,7 +604,19 @@ function M.boot(opts)
 				hi = tonumber(hi) or 0
 				return lo + (hi - lo) * math.random()
 			end,
+			-- includes/extensions/math.lua. No swap when low > high.
+			Clamp = function(value, low, high)
+				return math.min(math.max(value, low), high)
+			end,
 		}, { __index = host_math })
+	end
+	-- includes/util.lua AngleRand. Pitch defaults differ from yaw and roll.
+	function env.AngleRand(min, max)
+		return env.Angle(
+			env.math.Rand(min or -90, max or 90),
+			env.math.Rand(min or -180, max or 180),
+			env.math.Rand(min or -180, max or 180)
+		)
 	end
 	install_table(env)
 	env.coroutine = coroutine
@@ -1241,6 +1280,18 @@ function M.boot(opts)
 		self.__sounds = self.__sounds or {}
 		self.__sounds[#self.__sounds + 1] = tostring(name or "")
 	end
+	-- Single-player CallOnClient runs the named method on this entity.
+	-- A missing name does nothing. It does not pretend a client UI ran.
+	function entity_meta:CallOnClient(name)
+		if type(name) ~= "string" or name == "" then
+			return
+		end
+		local fn = self[name]
+		if type(fn) ~= "function" then
+			return
+		end
+		return fn(self)
+	end
 	function weapon_meta:SetHoldType(name)
 		self.__hold = name
 	end
@@ -1295,6 +1346,13 @@ function M.boot(opts)
 	end
 	function weapon_meta:SendWeaponAnim(act)
 		self.__seq_act = act
+	end
+	-- Engine Weapon::SetLastShootTime. Unset reads as 0.
+	function weapon_meta:SetLastShootTime(t)
+		self.__last_shoot = tonumber(t) or env.CurTime()
+	end
+	function weapon_meta:LastShootTime()
+		return self.__last_shoot or 0
 	end
 	function player_meta:IsNPC()
 		return false
@@ -1712,6 +1770,65 @@ function M.boot(opts)
 		end
 		local unit = (hash % 1000003) / 1000003
 		return min + (max - min) * unit
+	end
+	-- Ray and hull against player-solid brushes. No entity collision, so the
+	-- filter is accepted and does not invent a skip. MatType 0 is unknown.
+	local trace_slot = { world = nil }
+	local MAX_TRACE = 1.732050807569 * 2 * 16384
+	local function trace_vec(v)
+		if type(v) ~= "table" then
+			return { x = 0, y = 0, z = 0 }
+		end
+		return {
+			x = tonumber(v.x) or 0,
+			y = tonumber(v.y) or 0,
+			z = tonumber(v.z) or 0,
+		}
+	end
+	local function trace_result(hit, startsolid, fraction, endpos, normal)
+		return {
+			Hit = hit and true or false,
+			StartSolid = startsolid and true or false,
+			Fraction = fraction,
+			HitWorld = hit and true or false,
+			Entity = env.NULL,
+			HitPos = env.Vector(endpos.x, endpos.y, endpos.z),
+			HitNormal = env.Vector(normal.x, normal.y, normal.z),
+			MatType = 0,
+		}
+	end
+	local function brush_trace(data, mins, maxs)
+		if type(data) ~= "table" then
+			return trace_result(false, false, 1, { x = 0, y = 0, z = 0 }, { x = 0, y = 0, z = 1 })
+		end
+		local dest = trace_vec(data.endpos or data.EndPos)
+		local world = trace_slot.world
+		if type(world) ~= "table" or type(world.brushes) ~= "table" then
+			return trace_result(false, false, 1, dest, { x = 0, y = 0, z = 1 })
+		end
+		local tr = trace.hull(world, trace_vec(data.start or data.Start), dest, mins, maxs)
+		return trace_result(tr.hit, tr.startsolid, tr.fraction, tr.endpos, tr.normal)
+	end
+	function env.util.TraceLine(data)
+		local zero = { x = 0, y = 0, z = 0 }
+		return brush_trace(data, zero, zero)
+	end
+	function env.util.TraceHull(data)
+		data = type(data) == "table" and data or {}
+		return brush_trace(data, trace_vec(data.mins), trace_vec(data.maxs))
+	end
+	function player_meta:GetEyeTrace()
+		local start = self:GetShootPos()
+		local aim = self:GetAimVector()
+		local dest = env.Vector(
+			start.x + aim.x * MAX_TRACE,
+			start.y + aim.y * MAX_TRACE,
+			start.z + aim.z * MAX_TRACE
+		)
+		return env.util.TraceLine({ start = start, endpos = dest, filter = self })
+	end
+	function player_meta:GetEyeTraceNoCursor()
+		return self:GetEyeTrace()
 	end
 	function env.util.TableToJSON(val)
 		local function enc(v, depth)
@@ -2395,6 +2512,7 @@ function M.boot(opts)
 		meta_npc = npc_meta,
 		precache = precache,
 		workshops = workshops,
+		trace_slot = trace_slot,
 	}
 end
 
@@ -2435,11 +2553,13 @@ local function absorb_script(dst, src, seen)
 	end
 end
 
-local function call_method(ent, name)
+local function call_method(ent, name, ...)
 	local fn = ent[name]
 	if type(fn) ~= "function" then
 		return nil
 	end
+	local n = select("#", ...)
+	local args = { ... }
 	local steps = 0
 	debug.sethook(function()
 		steps = steps + 1
@@ -2447,7 +2567,7 @@ local function call_method(ent, name)
 			error("think budget")
 		end
 	end, "", 60)
-	local ok, err = pcall(fn, ent)
+	local ok, err = pcall(fn, ent, unpack(args, 1, n))
 	debug.sethook()
 	return ok, err
 end
@@ -2504,8 +2624,11 @@ function M.streak_verts(bullet, fx, fy, fz)
 end
 
 -- Runs Initialize, Think, and one PrimaryAttack on the items about to be drawn.
+-- A weapon that records no bullet and defines VR_Shoot is asked once, with the
+-- owner's shoot position and angles. VR_Melee runs only when VR_Shoot is absent.
+-- A list weapon with no Lua SWEP and a script damage records one FireBullets.
 -- A missing method is skipped. An error is counted and the next item still runs.
-function M.exercise(session, items)
+function M.exercise(session, items, world)
 	local out = {
 		think_ok = 0,
 		think_bad = 0,
@@ -2517,6 +2640,9 @@ function M.exercise(session, items)
 	}
 	if not session or not items then
 		return out
+	end
+	if world ~= nil and session.trace_slot then
+		session.trace_slot.world = world
 	end
 	local env = session.env
 	local player = session.make_ent("player", session.meta_player)
@@ -2544,7 +2670,31 @@ function M.exercise(session, items)
 				script = full
 			end
 		end
+		local function place_owner()
+			-- GetShootPos is 64 above the player. The mesh origin is it.z + z_off,
+			-- so the owner stands 64 below that and the recorded shot starts on the gun.
+			local oz = (it.z or 0) + (it.z_off or 0)
+			player:SetPos(env.Vector(it.x or 0, it.y or 0, oz - 64))
+			player:SetAngles(env.Angle(0, it.yaw or 0, 0))
+			player.__bullets = nil
+		end
 		if not script then
+			local dmg = tonumber(it.script_damage)
+			if it.kind == "weapon" and dmg and dmg > 0 then
+				place_owner()
+				player:FireBullets({
+					Src = player:GetShootPos(),
+					Dir = player:GetAimVector(),
+					Damage = dmg,
+					Num = tonumber(it.script_bullets) or 1,
+				})
+				local shots = player.__bullets
+				if shots and #shots > 0 then
+					it.bullets = shots
+					out.bullets = out.bullets + #shots
+					out.attack_ok = out.attack_ok + 1
+				end
+			end
 			return
 		end
 		local meta = it.kind == "weapon" and session.meta_weapon or session.meta_npc
@@ -2557,12 +2707,7 @@ function M.exercise(session, items)
 		ent:SetOwner(player)
 		ent:SetPos(env.Vector(it.x or 0, it.y or 0, it.z or 0))
 		ent:SetAngles(env.Angle(0, it.yaw or 0, 0))
-		-- GetShootPos is 64 above the player. The mesh origin is it.z + z_off,
-		-- so the owner stands 64 below that and the recorded shot starts on the gun.
-		local oz = (it.z or 0) + (it.z_off or 0)
-		player:SetPos(env.Vector(it.x or 0, it.y or 0, oz - 64))
-		player:SetAngles(env.Angle(0, it.yaw or 0, 0))
-		player.__bullets = nil
+		place_owner()
 		if it.kind == "weapon" and type(ent.Primary) == "table" then
 			local clip = tonumber(ent.Primary.ClipSize)
 			if clip and clip > 0 then
@@ -2592,6 +2737,13 @@ function M.exercise(session, items)
 			ok, err = call_method(ent, "PrimaryAttack")
 			-- A script can fire and then fail on a later line. The bullet still happened.
 			local shots = player.__bullets
+			if not (shots and #shots > 0) and type(ent.VR_Shoot) == "function" then
+				ok, err = call_method(ent, "VR_Shoot", player:GetShootPos(), player:GetAngles(), true)
+				shots = player.__bullets
+			elseif not (shots and #shots > 0) and type(ent.VR_Melee) == "function" then
+				ok, err = call_method(ent, "VR_Melee", player:GetShootPos(), player:GetAimVector())
+				shots = player.__bullets
+			end
 			if shots and #shots > 0 then
 				it.bullets = shots
 				out.bullets = out.bullets + #shots
@@ -2736,6 +2888,8 @@ function M.collect(session, mount)
 							class = class,
 							model = model,
 							source = how or "script",
+							script_damage = M.script_damage(text),
+							script_bullets = M.script_bullets(text),
 						}
 					else
 						skipped[#skipped + 1] = "weapon " .. class .. " no script model"
