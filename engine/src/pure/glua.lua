@@ -1185,6 +1185,15 @@ function M.boot(opts)
 	env.CHAN_STREAM = 5
 	env.CHAN_STATIC = 6
 	env.color_white = env.Color(255, 255, 255, 255)
+	env.vector_origin = env.Vector(0, 0, 0)
+	-- Source FFADE_* bits. ScreenFade records them and does not draw a fade.
+	env.SCREENFADE = {
+		IN = 1,
+		OUT = 2,
+		MODULATE = 4,
+		STAYOUT = 8,
+		PURGE = 16,
+	}
 	env.color_black = env.Color(0, 0, 0, 255)
 	env.color_transparent = env.Color(255, 255, 255, 0)
 	function env.MsgC(...)
@@ -1622,6 +1631,27 @@ function M.boot(opts)
 	end
 	function player_meta:GetVelocity()
 		return env.Vector()
+	end
+	-- The player's copy of a convar. An unknown name is empty and is not created.
+	function player_meta:GetInfo(name)
+		local cv = env.GetConVar(name)
+		if not cv then
+			return ""
+		end
+		return cv:GetString()
+	end
+	function player_meta:ScreenFade(flags, color, fadetime, hold)
+		local fades = self.__fades
+		if not fades then
+			fades = {}
+			self.__fades = fades
+		end
+		fades[#fades + 1] = {
+			flags = tonumber(flags) or 0,
+			color = color,
+			fade = tonumber(fadetime) or 0,
+			hold = tonumber(hold) or 0,
+		}
 	end
 	function player_meta:LagCompensation(on)
 		self.__lag = on and true or false
@@ -2080,6 +2110,20 @@ function M.boot(opts)
 	function env.util.TraceLine(data)
 		local zero = { x = 0, y = 0, z = 0 }
 		return brush_trace(data, zero, zero)
+	end
+	-- includes/extensions/util.lua. 4096 * 8. The mask is stored by the caller
+	-- and this trace still does not filter on it.
+	function env.util.GetPlayerTrace(ply, dir)
+		if type(ply) ~= "table" or type(ply.GetAimVector) ~= "function" then
+			return nil
+		end
+		dir = dir or ply:GetAimVector()
+		local start = ply.EyePos and ply:EyePos() or env.Vector()
+		return {
+			start = start,
+			endpos = start + (dir * (4096 * 8)),
+			filter = ply,
+		}
 	end
 	function env.util.TraceHull(data)
 		data = type(data) == "table" and data or {}

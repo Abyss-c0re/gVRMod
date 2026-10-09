@@ -187,7 +187,30 @@ function A.__mul(a, b)
 	return M.Angle(a.p * b, a.y * b, a.r * b)
 end
 
-local NULL = setmetatable({}, { __tostring = function() return "NULL" end })
+-- Stock weapon_medkit says NULL:IsPlayer and NULL:IsNPC return false.
+-- The method IsValid is false too. A missing method stays missing.
+local NULL = setmetatable({}, {
+	__tostring = function()
+		return "NULL"
+	end,
+	__index = {
+		IsValid = function()
+			return false
+		end,
+		IsPlayer = function()
+			return false
+		end,
+		IsNPC = function()
+			return false
+		end,
+		IsWorld = function()
+			return false
+		end,
+		IsWeapon = function()
+			return false
+		end,
+	},
+})
 M.NULL = NULL
 
 function M.IsValid(o)
