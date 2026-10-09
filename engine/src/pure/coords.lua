@@ -15,6 +15,17 @@ function M.source_axes_to_xr(sx, sy, sz)
 	return -sy, sz, -sx
 end
 
+-- Source `fov` is the horizontal angle on a 4:3 window. A wider window grows
+-- the horizontal angle and keeps that 4:3 vertical angle. Returns full
+-- horizontal and vertical angles in degrees.
+function M.source_fov(fov_deg, w, h)
+	local aspect = w / h
+	local ratio = aspect / (4 / 3)
+	local half_h = math.atan(math.tan(math.rad(fov_deg) * 0.5) * ratio)
+	local half_v = math.atan(math.tan(half_h) / aspect)
+	return math.deg(half_h * 2), math.deg(half_v * 2)
+end
+
 -- Source units → LÖVR/OpenXR meters at a view scale (source units per real meter).
 function M.source_to_lovr(sx, sy, sz, view_scale)
 	local s = view_scale or units.VRMOD_VIEW_SCALE

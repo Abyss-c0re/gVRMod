@@ -89,6 +89,14 @@ return function(T)
 	T.near(ry, 1, 1e-6, "model +Y stays left")
 	T.near(rz, 0, 1e-6, "model +Y z")
 
+	-- Default Source fov 75 is horizontal on 4:3. 16:9 keeps the vertical angle.
+	local hf, vf = coords.source_fov(75, 4, 3)
+	T.near(hf, 75, 1e-6, "4:3 horizontal fov")
+	T.near(vf, 59.840, 0.01, "4:3 vertical fov")
+	hf, vf = coords.source_fov(75, 1280, 720)
+	T.near(hf, 91.309, 0.01, "16:9 horizontal fov")
+	T.near(vf, 59.840, 0.01, "16:9 vertical fov stays")
+
 	-- Stereo disparity. 90° vertical FOV, height 480, IPD 0.064, depth 2 m.
 	-- f = 240 / tan(45°) = 240. disparity = 240 * 0.064 / 2 = 7.68 px.
 	local dpx = coords.stereo_disparity_px(0.064, 2, 90, 480)

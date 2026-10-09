@@ -29,6 +29,7 @@ local vmt = require("pure.vmt")
 local props = require("pure.props")
 local mdl = require("pure.mdl")
 local angles = require("pure.angles")
+local skybox = require("pure.skybox")
 
 local MODE = os.getenv("ENGINE_MODE") or "flat"
 local STEREO = MODE == "stereo" or MODE == "simulator"
@@ -38,6 +39,8 @@ local SHOT = os.getenv("ENGINE_SHOT") == "1"
 local SCALE = tonumber(os.getenv("ENGINE_VIEW_SCALE")) or units.VRMOD_VIEW_SCALE
 local IPD = coords.DEFAULT_IPD_METERS
 local EYE_H = 64
+-- Source default. The number is horizontal on a 4:3 window, not the vertical angle.
+local PLAY_FOV = 75
 
 -- Capture fixture. Same numbers as pure.coords.stereo_disparity_px.
 local CAP_W, CAP_H = 640, 480
@@ -55,6 +58,8 @@ local eye_pass = {}
 local map_mesh
 local map_parts
 local map_name
+local sky_draw
+local draw_origin_x, draw_origin_y, draw_origin_z = 0, 0, 0
 -- Fallback until the map's env_skypaint topcolor is read. Offscreen passes
 -- ignore the window background and clear black unless this is applied.
 local sky_rgb = { 0.45, 0.62, 0.78 }
@@ -90,6 +95,19 @@ end
 local function draw_world(pass)
 	if sampler then
 		pass:setSampler(sampler)
+	end
+	-- 2D skybox sits on the camera. Depth stays clear so the world overwrites it
+	-- and openings keep the painted sky instead of the flat clear color.
+	if sky_draw then
+		pass:setDepthWrite(false)
+		pass:setShader(shader)
+		pass:setColor(1, 1, 1)
+		for i = 1, #sky_draw do
+			pass:setMaterial(sky_draw[i].tex)
+			pass:draw(sky_draw[i].mesh, draw_origin_x, draw_origin_y, draw_origin_z)
+		end
+		pass:setMaterial()
+		pass:setDepthWrite(true)
 	end
 	if map_parts then
 		pass:setShader(shader)
@@ -143,6 +161,7 @@ local function render_target(slot, tex, x, y, z, q, fov, draw)
 		pass:setViewPose(1, x, y, z, 0, 0, 1, 0)
 	end
 	set_proj(pass, 1, fov, tex:getWidth(), tex:getHeight())
+	draw_origin_x, draw_origin_y, draw_origin_z = x, y, z
 	draw(pass)
 	lovr.graphics.submit(pass)
 end
@@ -448,6 +467,73 @@ local function static_prop_parts(mount, path, sky, bound, max_edge)
 	))
 end
 
+local function upload_lovr_mesh(src)
+	local stride = 8
+	local n = math.floor(#src / stride)
+	local mesh_verts = {}
+	for i = 0, n - 1 do
+		local o = i * stride
+		mesh_verts[i + 1] = {
+			src[o + 1], src[o + 2], src[o + 3],
+			src[o + 4], src[o + 5],
+			src[o + 6], src[o + 7], src[o + 8], 1,
+		}
+	end
+	return lovr.graphics.newMesh({
+		{ name = "VertexPosition", type = "vec3" },
+		{ name = "VertexUV", type = "vec2" },
+		{ name = "VertexColor", type = "vec4" },
+	}, mesh_verts)
+end
+
+-- Face distance in source units. The cube is drawn at the eye, so this only
+-- has to sit past the near plane. 256 units is about 8 m at the default scale.
+local SKY_WIDTH = 256
+
+local function upload_skybox(mount, skyname, max_edge)
+	sky_draw = nil
+	if not skyname or skyname == "" then
+		return
+	end
+	local parts = {}
+	local gpu = {}
+	for axis = 1, 6 do
+		local suf = skybox.face_suffix(axis)
+		local mat, err = mount:material("skybox/" .. skyname .. suf, max_edge)
+		if not mat then
+			print("skybox " .. skyname .. suf .. " (" .. tostring(err) .. ")")
+			return
+		end
+		local tri = skybox.face_tris(axis, SKY_WIDTH)
+		local flat = {}
+		local n = math.floor(#tri / 5)
+		for i = 0, n - 1 do
+			local o = i * 5
+			local x, y, z = coords.source_to_lovr(tri[o + 1], tri[o + 2], tri[o + 3], SCALE)
+			local u, v = tri[o + 4], tri[o + 5]
+			if mat.transform then
+				u, v = vmt.apply_uv(u, v, mat.transform)
+			end
+			flat[#flat + 1] = x
+			flat[#flat + 1] = y
+			flat[#flat + 1] = z
+			flat[#flat + 1] = u
+			flat[#flat + 1] = v
+			flat[#flat + 1] = 1
+			flat[#flat + 1] = 1
+			flat[#flat + 1] = 1
+		end
+		local tex = gpu[mat.key]
+		if not tex then
+			tex = make_texture(mat.rgba, mat.w, mat.h)
+			gpu[mat.key] = tex
+		end
+		parts[#parts + 1] = { tex = tex, mesh = upload_lovr_mesh(flat) }
+	end
+	sky_draw = parts
+	print(string.format("skybox %s faces %d", skyname, #parts))
+end
+
 local function upload_albedo(bound)
 	local gpu = {}
 	local parts = {}
@@ -525,6 +611,15 @@ local function try_map()
 		pak_len = loaded.pak_len,
 	})
 	local bound, stats = mount:bind(surfaces, max_edge)
+	local skyname
+	for i = 1, #loaded.entities do
+		local e = loaded.entities[i]
+		if e.classname == "worldspawn" and e.skyname and e.skyname ~= "" then
+			skyname = e.skyname
+			break
+		end
+	end
+	upload_skybox(mount, skyname, max_edge)
 	static_prop_parts(mount, path, loaded.sky, bound, max_edge)
 	for i = 1, #stats.missing do
 		print("missing material " .. stats.missing[i])
@@ -697,7 +792,8 @@ local function write_shot()
 	local function eye(sign, tex, name)
 		local x, y, z = eye_xyz(sign)
 		local q = view_quat(player.yaw, player.pitch)
-		render_target(name, tex, x, y, z, q, 74, draw_world)
+		local _, vfov = coords.source_fov(PLAY_FOV, tex:getWidth(), tex:getHeight())
+		render_target(name, tex, x, y, z, q, vfov, draw_world)
 		lovr.graphics.wait()
 		return tex:getPixels()
 	end
@@ -761,16 +857,19 @@ function lovr.draw(pass)
 		local q = view_quat(player.yaw, player.pitch)
 		local lx, ly, lz = eye_xyz(-1)
 		local rx, ry, rz = eye_xyz(1)
-		render_target("L", left_tex, lx, ly, lz, q, 74, draw_world)
-		render_target("R", right_tex, rx, ry, rz, q, 74, draw_world)
+		local _, vfov = coords.source_fov(PLAY_FOV, left_tex:getWidth(), left_tex:getHeight())
+		render_target("L", left_tex, lx, ly, lz, q, vfov, draw_world)
+		render_target("R", right_tex, rx, ry, rz, q, vfov, draw_world)
 		lovr.graphics.wait()
 		draw_sbs(pass)
 		return
 	end
 	lovr.graphics.setBackgroundColor(sky_rgb[1], sky_rgb[2], sky_rgb[3])
 	local x, y, z = eye_xyz(0)
+	draw_origin_x, draw_origin_y, draw_origin_z = x, y, z
 	pass:setViewPose(1, x, y, z, view_quat(player.yaw, player.pitch))
-	set_proj(pass, 1, 74, pass:getWidth(), pass:getHeight())
+	local _, vfov = coords.source_fov(PLAY_FOV, pass:getWidth(), pass:getHeight())
+	set_proj(pass, 1, vfov, pass:getWidth(), pass:getHeight())
 	draw_world(pass)
 end
 

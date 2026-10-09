@@ -33,6 +33,40 @@ local function vvd_vert(vvd, vstart, index)
 	return f32(vvd, o + 16), f32(vvd, o + 20), f32(vvd, o + 24), f32(vvd, o + 40), f32(vvd, o + 44)
 end
 
+-- vertexFileFixup_t is 12 bytes: lod, sourceVertexID, numVertexes.
+-- LOD 0 keeps every fixup (lod >= 0). The copies are concatenated in order.
+local function vertex_blob(vvd_b)
+	local num_fixups = i32(vvd_b, 48)
+	local vstart = i32(vvd_b, 56)
+	if num_fixups == 0 then
+		return vvd_b, vstart
+	end
+	if num_fixups < 0 or num_fixups > 100000 then
+		return nil, "fixups"
+	end
+	local fixup_at = i32(vvd_b, 52)
+	local parts = {}
+	local total = 0
+	for i = 0, num_fixups - 1 do
+		local o = fixup_at + i * 12
+		local lod = i32(vvd_b, o)
+		local src = i32(vvd_b, o + 4)
+		local n = i32(vvd_b, o + 8)
+		if lod >= 0 and n > 0 then
+			local from = vstart + src * 48
+			if from < 0 or from + n * 48 > #vvd_b then
+				return nil, "fixup range"
+			end
+			parts[#parts + 1] = vvd_b:sub(from + 1, from + n * 48)
+			total = total + n
+		end
+	end
+	if total ~= i32(vvd_b, 16) then
+		return nil, "fixup count"
+	end
+	return table.concat(parts), 0
+end
+
 function M.load(mdl_b, vvd_b, vtx_b)
 	if not mdl_b or mdl_b:sub(1, 4) ~= "IDST" then
 		return nil, "mdl"
@@ -43,10 +77,12 @@ function M.load(mdl_b, vvd_b, vtx_b)
 	if not vtx_b or i32(vtx_b, 0) ~= 7 then
 		return nil, "vtx"
 	end
-	if i32(vvd_b, 48) ~= 0 then
-		return nil, "fixups"
+	-- numFixups at byte 48. VTX indexes the post-fixup array. numFixups == 0
+	-- means the bytes at vertexDataStart are already in that order.
+	local verts, vstart = vertex_blob(vvd_b)
+	if not verts then
+		return nil, vstart
 	end
-	local vstart = i32(vvd_b, 56)
 	local lod_verts = i32(vvd_b, 16)
 
 	local num_cd = i32(mdl_b, 212)
@@ -167,7 +203,7 @@ function M.load(mdl_b, vvd_b, vtx_b)
 						if a and b3 and c and a < numv and b3 < numv and c < numv
 							and voff + a < lod_verts and voff + b3 < lod_verts and voff + c < lod_verts then
 							for _, id in ipairs({ a, b3, c }) do
-								local x, y, z, u, v = vvd_vert(vvd_b, vstart, voff + id)
+								local x, y, z, u, v = vvd_vert(verts, vstart, voff + id)
 								buf[#buf + 1] = x
 								buf[#buf + 1] = y
 								buf[#buf + 1] = z
