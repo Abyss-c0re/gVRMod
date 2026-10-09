@@ -10,6 +10,9 @@ local trace = require("pure.trace")
 
 local M = {}
 
+-- Assigned after boot. Spawn calls it once the script table exists.
+local absorb_script
+
 local function read_all(path)
 	local fh = io.open(path, "rb")
 	if not fh then
@@ -1197,6 +1200,41 @@ function M.boot(opts)
 	function entity_meta:IsPlayer()
 		return false
 	end
+	-- Not the world entity. constraint.CanConstrain asks this before physics.
+	function entity_meta:IsWorld()
+		return false
+	end
+	-- No vphysics body is built. __invalid makes the global IsValid agree with :IsValid.
+	local invalid_phys = { __invalid = true }
+	function invalid_phys:IsValid()
+		return false
+	end
+	function entity_meta:GetPhysicsObject()
+		return invalid_phys
+	end
+	function entity_meta:GetPhysicsObjectNum()
+		return invalid_phys
+	end
+	function entity_meta:Activate()
+		self.__active = true
+	end
+	-- Apply the scripted class, then Initialize. A later missing method still errors.
+	function entity_meta:Spawn()
+		if self.__spawned then
+			return
+		end
+		self.__spawned = true
+		local get = env.scripted_ents and env.scripted_ents.Get
+		if type(get) == "function" then
+			local ok, full = pcall(get, self:GetClass())
+			if ok and type(full) == "table" then
+				absorb_script(self, full, {})
+			end
+		end
+		if type(self.Initialize) == "function" then
+			self:Initialize()
+		end
+	end
 	-- Entity:NetworkVar installs Get/Set for one data-table name. Unset values
 	-- use the Source default for that type. Slot is accepted and not networked.
 	function entity_meta:NetworkVar(kind, slot, name)
@@ -1717,6 +1755,9 @@ function M.boot(opts)
 	function env.ents.Create(class)
 		local ent = make_ent(class)
 		spawned[#spawned + 1] = ent
+		if env.__spawn_log then
+			env.__spawn_log[#env.__spawn_log + 1] = ent
+		end
 		return ent
 	end
 	function env.ents.Iterator()
@@ -2523,7 +2564,7 @@ function M.pump(session, dt)
 	end
 end
 
-local function absorb_script(dst, src, seen)
+absorb_script = function(dst, src, seen)
 	if type(src) ~= "table" or seen[src] then
 		return
 	end
@@ -2645,6 +2686,8 @@ function M.exercise(session, items, world)
 		session.trace_slot.world = world
 	end
 	local env = session.env
+	local spawn_log = {}
+	env.__spawn_log = spawn_log
 	local player = session.make_ent("player", session.meta_player)
 	player:SetHealth(100)
 	player:SetPos(env.Vector())
@@ -2774,6 +2817,8 @@ function M.exercise(session, items, world)
 			note("item", items[i].class, err)
 		end
 	end
+	env.__spawn_log = nil
+	out.projectiles = spawn_log
 	return out
 end
 

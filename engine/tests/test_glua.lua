@@ -361,6 +361,36 @@ end
 	local bb = demo_both[1].bullets and demo_both[1].bullets[1]
 	T.ok(bb and bb.damage ~= 99, "script damage did not replace the lua shot")
 
+	local reg_ok = pcall(session.env.scripted_ents.Register, {
+		Type = "anim",
+		Base = "base_anim",
+		Model = "models/weapons/w_missile_launch.mdl",
+		Initialize = function(self)
+			self:SetModel(self.Model)
+			self:SetCollisionGroup(0)
+		end,
+	}, "engine_test_rocket")
+	T.eq(reg_ok, true, "test rocket registered")
+	local rocket = session.env.ents.Create("engine_test_rocket")
+	rocket:SetPos(session.env.Vector(3, 4, 5))
+	local spawn_ok, spawn_err = pcall(function()
+		rocket:Spawn()
+	end)
+	T.eq(spawn_ok, false, "Spawn does not hide a missing method " .. tostring(spawn_err))
+	T.eq(rocket.__spawned, true, "spawn marked")
+	T.eq(rocket:GetModel(), "models/weapons/w_missile_launch.mdl", "model set before the miss")
+	T.eq(rocket:GetPos().x, 3, "spawn keeps the position")
+	T.eq(session.env.IsValid(rocket:GetPhysicsObject()), false, "physics object is invalid")
+	T.eq(rocket:GetPhysicsObject():IsValid(), false, "physics method is invalid")
+	T.eq(rocket:IsWorld(), false, "projectile is not the world")
+	rocket:Activate()
+	T.eq(rocket.__active, true, "Activate marks the entity")
+	local noc = session.env.constraint and session.env.constraint.NoCollide
+	if type(noc) == "function" then
+		local nok, nerr = pcall(noc, rocket, rocket, 0, 0)
+		T.eq(nok, true, "NoCollide returns without a body " .. tostring(nerr))
+	end
+
 	session.env.__pump(0.1)
 	T.ok(fired_timer, "timer.Simple runs after pump")
 end

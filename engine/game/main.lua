@@ -770,6 +770,43 @@ local function bake_actors(mount, bound, max_edge)
 	for i = 1, math.min(8, #ranked) do
 		print(string.format("exercise miss %d %s", ranked[i].n, ranked[i].text))
 	end
+	-- Entities Spawn created during that pass. One pose at the position the
+	-- script set. No physics step. Cap so a spammy Think cannot fill the frame.
+	local proj_drawn = 0
+	local proj_list = exercised.projectiles or {}
+	for i = 1, #proj_list do
+		if proj_drawn >= 48 then
+			break
+		end
+		local ent = proj_list[i]
+		if type(ent) == "table" and ent.__spawned and type(ent.GetModel) == "function" then
+			local model = ent:GetModel()
+			if type(model) == "string" and model ~= "" then
+				local loaded = load_model(model, false)
+				if loaded and loaded.meshes and #loaded.meshes > 0 then
+					local pos = ent.GetPos and ent:GetPos() or {}
+					local ang = ent.GetAngles and ent:GetAngles() or {}
+					kept[#kept + 1] = {
+						kind = "projectile",
+						class = type(ent.GetClass) == "function" and ent:GetClass() or "",
+						model = model,
+						loaded = loaded,
+						x = pos.x or 0,
+						y = pos.y or 0,
+						z = pos.z or 0,
+						z_off = 0,
+						yaw = ang.y or ang.yaw or 0,
+						pitch = ang.p or ang.pitch or 0,
+						roll = ang.r or ang.roll or 0,
+					}
+					proj_drawn = proj_drawn + 1
+				else
+					print("projectile skip " .. tostring(ent:GetClass()) .. " " .. model)
+				end
+			end
+		end
+	end
+	print(string.format("projectiles made %d drawn %d", #proj_list, proj_drawn))
 	local view_fwd = angles.angle_vectors(player.pitch or 0, player.yaw or 0, 0)
 	local streak_name = "models/debug/debugwhite"
 	local groups = {}
@@ -861,13 +898,15 @@ local function bake_actors(mount, bound, max_edge)
 			end
 		end
 	end
-	local weapons, npcs = 0, 0
+	local weapons, npcs, projs = 0, 0, 0
 	local near_d, far_d = 1e9, 0
 	for i = 1, #kept do
 		if kept[i].kind == "weapon" then
 			weapons = weapons + 1
 		elseif kept[i].kind == "npc" then
 			npcs = npcs + 1
+		elseif kept[i].kind == "projectile" then
+			projs = projs + 1
 		end
 		local dx = kept[i].x - player.pos.x
 		local dy = kept[i].y - player.pos.y
@@ -883,9 +922,9 @@ local function bake_actors(mount, bound, max_edge)
 		near_d, far_d = 0, 0
 	end
 	actor_line = string.format(
-		"\nactors draw %d weapons %d npcs %d posed %d attack %d bullets %d streaks %d missing %d tris %d materials %d skipped %d near %.0f far %.0f\n%s\n",
+		"\nactors draw %d weapons %d npcs %d posed %d attack %d bullets %d streaks %d missing %d tris %d materials %d skipped %d proj %d near %.0f far %.0f\n%s\n",
 		#kept, weapons, npcs, posed, exercised.attack_ok, exercised.bullets, streaks,
-		missing_model, tris, added, #skipped, near_d, far_d, session.summary
+		missing_model, tris, added, #skipped, projs, near_d, far_d, session.summary
 	)
 	print(actor_line)
 	for i = 1, math.min(8, #skipped) do
