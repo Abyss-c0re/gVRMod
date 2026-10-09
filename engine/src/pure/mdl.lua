@@ -1,5 +1,5 @@
--- Reference-pose studio mesh. MDL + VVD + DX90 VTX, bind pose only.
--- Bones, flexes, and LODs above 0 are not applied. Positions come from the VVD.
+-- Studio mesh. MDL + VVD + DX90 VTX. Bind pose unless skin matrices are passed.
+-- Flexes and LODs above 0 are not applied. Positions come from the VVD.
 local bin = require("pure.bin")
 
 local M = {}
@@ -28,9 +28,32 @@ local function cstr(s, off0)
 	return s:sub(i, z - 1)
 end
 
-local function vvd_vert(vvd, vstart, index)
+local function vvd_vert(vvd, vstart, index, skin)
 	local o = vstart + index * 48
-	return f32(vvd, o + 16), f32(vvd, o + 20), f32(vvd, o + 24), f32(vvd, o + 40), f32(vvd, o + 44)
+	local x, y, z = f32(vvd, o + 16), f32(vvd, o + 20), f32(vvd, o + 24)
+	local u, v = f32(vvd, o + 40), f32(vvd, o + 44)
+	if skin then
+		local nbw = vvd:byte(o + 16) or 0
+		if nbw >= 1 and nbw <= 3 then
+			local sx, sy, sz = 0, 0, 0
+			for i = 0, nbw - 1 do
+				local w = f32(vvd, o + i * 4)
+				local b = vvd:byte(o + 13 + i) or 0
+				local m = skin[b]
+				if m then
+					sx = sx + (m[1] * x + m[2] * y + m[3] * z + m[4]) * w
+					sy = sy + (m[5] * x + m[6] * y + m[7] * z + m[8]) * w
+					sz = sz + (m[9] * x + m[10] * y + m[11] * z + m[12]) * w
+				else
+					sx = sx + x * w
+					sy = sy + y * w
+					sz = sz + z * w
+				end
+			end
+			x, y, z = sx, sy, sz
+		end
+	end
+	return x, y, z, u, v
 end
 
 -- vertexFileFixup_t is 12 bytes: lod, sourceVertexID, numVertexes.
@@ -67,7 +90,7 @@ local function vertex_blob(vvd_b)
 	return table.concat(parts), 0
 end
 
-function M.load(mdl_b, vvd_b, vtx_b)
+function M.load(mdl_b, vvd_b, vtx_b, skin)
 	if not mdl_b or mdl_b:sub(1, 4) ~= "IDST" then
 		return nil, "mdl"
 	end
@@ -203,7 +226,7 @@ function M.load(mdl_b, vvd_b, vtx_b)
 						if a and b3 and c and a < numv and b3 < numv and c < numv
 							and voff + a < lod_verts and voff + b3 < lod_verts and voff + c < lod_verts then
 							for _, id in ipairs({ a, b3, c }) do
-								local x, y, z, u, v = vvd_vert(verts, vstart, voff + id)
+								local x, y, z, u, v = vvd_vert(verts, vstart, voff + id, skin)
 								buf[#buf + 1] = x
 								buf[#buf + 1] = y
 								buf[#buf + 1] = z

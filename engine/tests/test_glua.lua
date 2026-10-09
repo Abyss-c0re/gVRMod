@@ -48,6 +48,37 @@ end
 	T.ok(math.abs(lg) < 200, "gunship stays in the street y=" .. tostring(placed[3].y))
 	T.ok(math.abs(voff(placed[3])) < ag * 0.58, "gunship inside vertical fov")
 
+	local streak = glua.streak_verts(
+		{ x = 0, y = 0, z = 0, dx = 0, dy = -1, dz = 0 },
+		fwd.x, fwd.y, fwd.z
+	)
+	T.eq(streak and #streak, 18, "streak has two triangles")
+	if streak then
+		local miny, maxy, minz, maxz, maxx = 0, 0, 0, 0, 0
+		for i = 1, #streak, 3 do
+			local ax = math.abs(streak[i])
+			if ax > maxx then
+				maxx = ax
+			end
+			if streak[i + 1] < miny then
+				miny = streak[i + 1]
+			end
+			if streak[i + 1] > maxy then
+				maxy = streak[i + 1]
+			end
+			if streak[i + 2] < minz then
+				minz = streak[i + 2]
+			end
+			if streak[i + 2] > maxz then
+				maxz = streak[i + 2]
+			end
+		end
+		T.ok(maxx < 1e-6, "streak crosses the view")
+		T.near(miny, -160, 1e-6, "streak length")
+		T.near(maxy, 0, 1e-6, "streak starts at the bullet")
+		T.near(maxz - minz, 8, 1e-6, "streak has visible height")
+	end
+
 	local sample = '"viewmodel" "models/weapons/v_pistol.mdl"\n"playermodel" "models/weapons/w_pistol.mdl"\n'
 	local model, how = glua.script_model(sample)
 	T.eq(model, "models/weapons/w_pistol.mdl", "pistol playermodel")
@@ -101,6 +132,10 @@ end
 	T.ok(session.env.ConVarExists("unit_missing_cvar"), "ConVarExists after CreateConVar")
 	local left = session.env.Angle(0, 0, 0):Left()
 	T.near(left.y, 1, 1e-9, "Angle:Left is -right at yaw 0")
+	local ang = session.env.Angle(10, 20, 30)
+	T.eq(ang.pitch, 10, "Angle.pitch")
+	ang.yaw = 21
+	T.eq(ang.y, 21, "Angle.yaw writes y")
 	T.eq(type(session.env.player_manager), "table", "player_manager module")
 	T.eq(type(session.env.player_manager.AddValidModel), "function", "AddValidModel")
 	local gma_paths = content.gma_paths(content.workshop_dir(gmod))
@@ -170,4 +205,52 @@ end
 	T.ok(mount:read("models/humans/group03/male_07.mdl") ~= nil, "rebel mdl bytes")
 	T.ok(mount:read("models/combine_soldier.mdl") ~= nil, "combine mdl")
 	T.ok(mount:read("models/weapons/w_pistol.mdl") ~= nil, "w_pistol mdl")
+
+	T.eq(type(session.env.FindMetaTable("Entity")), "table", "Entity meta")
+	T.eq(type(session.env.FindMetaTable("Player")), "table", "Player meta")
+	T.eq(session.meta_player:IsPlayer(), true, "Player:IsPlayer")
+	T.eq(session.meta_player:InVehicle(), false, "player has no vehicle")
+	T.eq(session.meta_weapon:IsPlayer(), false, "Weapon:IsPlayer")
+	local dt = session.make_ent("weapon_base", session.meta_weapon)
+	dt:NetworkVar("Bool", 0, "Reloading")
+	T.eq(dt:GetReloading(), false, "NetworkVar bool default")
+	dt:SetReloading(true)
+	T.eq(dt:GetReloading(), true, "NetworkVar bool set")
+	local share_a = session.env.util.SharedRandom("weapon_base", -0.2, -0.1, 0)
+	local share_b = session.env.util.SharedRandom("weapon_base", -0.2, -0.1, 0)
+	T.eq(share_a, share_b, "SharedRandom is stable")
+	T.ok(share_a <= -0.1 and share_a >= -0.2, "SharedRandom stays in range")
+	local rand = session.env.math.Rand(0, 1)
+	T.ok(rand >= 0 and rand < 1, "math.Rand")
+	local addons = session.env.engine.GetAddons()
+	T.eq(type(addons), "table", "GetAddons")
+	if #gma_paths > 0 then
+		T.ok(#addons > 0, "GetAddons lists the mounted gmas")
+		T.eq(type(addons[1].title), "string", "GetAddons title")
+		T.eq(addons[1].mounted, true, "GetAddons mounted")
+	end
+
+	local fired_timer = false
+	session.env.timer.Simple(0, function()
+		fired_timer = true
+	end)
+	T.ok(not fired_timer, "timer.Simple does not run at Create")
+
+	local demo = {
+		{ kind = "weapon", class = "weapon_base", x = 10, y = 20, z = 30, yaw = 270, z_off = 0 },
+	}
+	local shot = glua.exercise(session, demo)
+	T.eq(shot.attack_ok, 1, "weapon_base primary ran")
+	T.eq(shot.attack_bad, 0, "weapon_base primary error " .. table.concat(shot.lines, " | "))
+	T.ok(shot.bullets >= 1, "weapon_base recorded a bullet")
+	T.ok(shot.think_ok >= 2, "weapon_base init and think")
+	T.eq(shot.think_bad, 0, "weapon_base think error " .. table.concat(shot.lines, " | "))
+	local bullet = demo[1].bullets and demo[1].bullets[1]
+	T.eq(bullet and bullet.x, 10, "bullet x is the weapon")
+	T.eq(bullet and bullet.y, 20, "bullet y is the weapon")
+	T.eq(bullet and bullet.z, 30, "bullet z is the mesh origin")
+	T.ok(bullet and bullet.dy < -0.9, "bullet travels along the weapon aim")
+
+	session.env.__pump(0.1)
+	T.ok(fired_timer, "timer.Simple runs after pump")
 end

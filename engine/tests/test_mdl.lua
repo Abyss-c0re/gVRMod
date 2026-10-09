@@ -66,4 +66,51 @@ return function(T)
 		local span = math.sqrt(hx * hx + hy * hy + hz * hz)
 		T.ok(worst < span * 0.85, string.format("row house edges stay on the shell %.1f < %.1f", worst, span))
 	end
+
+	local anim = require("pure.studio_anim")
+	local function fetch(path)
+		return mount:read(path)
+	end
+	local function mesh_delta(a, b)
+		local worst = 0
+		local n = math.min(#a.verts, #b.verts)
+		for i = 1, n, 5 do
+			local dx = a.verts[i] - b.verts[i]
+			local dy = a.verts[i + 1] - b.verts[i + 1]
+			local dz = a.verts[i + 2] - b.verts[i + 2]
+			local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+			if d > worst then
+				worst = d
+			end
+		end
+		return worst
+	end
+	local citizen_b = mount:read("models/humans/group03/male_07.mdl")
+	local residual = anim.bind_residual(citizen_b)
+	T.ok(residual and residual < 0.001, "bind pose matrices reconstruct identity " .. tostring(residual))
+	local mats, seq, moved = anim.matrices(citizen_b, fetch)
+	T.eq(seq, "idle_subtle", "citizen sequence " .. tostring(seq))
+	T.ok(moved and moved > 0.5 and moved < 80, "idle bone travel " .. tostring(moved))
+	local cm, cv, cx = grab("models/humans/group03/male_07")
+	local bind = mdl.load(cm, cv, cx)
+	local posed = mdl.load(cm, cv, cx, mats)
+	T.ok(bind and posed and posed.tris == bind.tris, "idle keeps the citizen triangles")
+	if bind and posed and bind.meshes[1] and posed.meshes[1] then
+		local delta = 0
+		for i = 1, math.min(#bind.meshes, #posed.meshes) do
+			local d = mesh_delta(bind.meshes[i], posed.meshes[i])
+			if d > delta then
+				delta = d
+			end
+		end
+		T.ok(delta > 0.5 and delta < 150, "idle moves the citizen mesh " .. tostring(delta))
+	end
+	local zombie_b = mount:read("models/zombie/classic.mdl")
+	local zmats, zseq, zmoved = anim.matrices(zombie_b, fetch)
+	T.ok(zseq and zseq:lower():find("idle", 1, true), "zombie sequence " .. tostring(zseq))
+	T.ok(zmoved and zmoved > 0.2 and zmoved < 120, "zombie bone travel " .. tostring(zmoved))
+	local zb, zv, zx = grab("models/zombie/classic")
+	local zbind = mdl.load(zb, zv, zx)
+	local zposed = mdl.load(zb, zv, zx, zmats)
+	T.ok(zbind and zposed and zposed.tris == zbind.tris, "idle keeps the zombie triangles")
 end

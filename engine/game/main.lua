@@ -28,6 +28,7 @@ local content = require("pure.content")
 local vmt = require("pure.vmt")
 local props = require("pure.props")
 local mdl = require("pure.mdl")
+local studio_anim = require("pure.studio_anim")
 local angles = require("pure.angles")
 local skybox = require("pure.skybox")
 local glua = require("pure.glua")
@@ -629,8 +630,8 @@ local function upload_albedo(bound)
 	return parts
 end
 
--- Reference-pose weapon and NPC meshes from the game's own Lua.
--- A loaded script is not a thinking NPC and not a firing weapon.
+-- Weapon and NPC meshes. NPCs are skinned to one idle frame.
+-- Lua Think and PrimaryAttack run once; a recorded bullet becomes a streak.
 local function bake_actors(mount, bound, max_edge)
 	local title = (map_name or ""):match("([^/]+)%.bsp$") or "gm_construct"
 	local session = glua.boot({ gmod = gmod_dir(), map = title })
@@ -638,21 +639,45 @@ local function bake_actors(mount, bound, max_edge)
 	for i = 1, #session.failure_lines do
 		print("fail " .. session.failure_lines[i])
 	end
+	glua.pump(session, 1)
+	print(string.format(
+		"timers ran %d errors %d",
+		session.env.__timer_ran or 0,
+		session.env.__timer_errors and #session.env.__timer_errors or 0
+	))
+	local timer_errors = session.env.__timer_errors or {}
+	for i = 1, #timer_errors do
+		print("timer " .. timer_errors[i])
+	end
 	local items, skipped = glua.collect(session, mount)
 	local cache = {}
-	local function load_model(model)
+	local function load_model(model, pose)
 		local key = tostring(model):lower():gsub("\\", "/")
+		if pose then
+			key = key .. "#idle"
+		end
 		if cache[key] ~= nil then
 			return cache[key] or nil
 		end
-		local base = key:gsub("%.mdl$", "")
+		local base = key:gsub("#idle$", ""):gsub("%.mdl$", "")
 		local a = mount:read(base .. ".mdl")
 		local b = mount:read(base .. ".vvd")
 		local c = mount:read(base .. ".dx90.vtx") or mount:read(base .. ".vtx")
 		local loaded = nil
 		if a and b and c then
-			local ok, mesh = pcall(mdl.load, a, b, c)
-			if ok then
+			local skin, seq
+			if pose then
+				local okm, mats, name = pcall(studio_anim.matrices, a, function(path)
+					return mount:read(path)
+				end, pose ~= true and pose or nil)
+				if okm and type(mats) == "table" then
+					skin = mats
+					seq = name
+				end
+			end
+			local ok, mesh = pcall(mdl.load, a, b, c, skin)
+			if ok and type(mesh) == "table" then
+				mesh.sequence = seq
 				loaded = mesh
 			end
 		end
@@ -668,7 +693,7 @@ local function bake_actors(mount, bound, max_edge)
 	local missing_model = 0
 	for i = 1, #items do
 		local it = items[i]
-		local loaded = load_model(it.model)
+		local loaded = load_model(it.model, it.kind == "npc")
 		if (not loaded or not loaded.meshes or #loaded.meshes == 0) and it.view and it.view ~= it.model then
 			local alt = load_model(it.view)
 			if alt and alt.meshes and #alt.meshes > 0 then
@@ -710,16 +735,53 @@ local function bake_actors(mount, bound, max_edge)
 		end
 	end
 	glua.layout(kept, player.pos, player.yaw)
+	local ex_ok, exercised = pcall(glua.exercise, session, kept)
+	if not ex_ok then
+		print("exercise failed " .. tostring(exercised):gsub("%s+", " "))
+		exercised = nil
+	end
+	exercised = exercised or {
+		think_ok = 0,
+		think_bad = 0,
+		attack_ok = 0,
+		attack_bad = 0,
+		bullets = 0,
+		lines = {},
+		miss = {},
+	}
+	print(string.format(
+		"exercise think_ok %d think_bad %d attack_ok %d attack_bad %d bullets %d",
+		exercised.think_ok, exercised.think_bad, exercised.attack_ok,
+		exercised.attack_bad, exercised.bullets
+	))
+	local ex_lines = exercised.lines or {}
+	for i = 1, #ex_lines do
+		print("exercise " .. ex_lines[i])
+	end
+	local ranked = {}
+	for text, n in pairs(exercised.miss or {}) do
+		ranked[#ranked + 1] = { n = n, text = text }
+	end
+	table.sort(ranked, function(a, b)
+		return a.n > b.n
+	end)
+	for i = 1, math.min(8, #ranked) do
+		print(string.format("exercise miss %d %s", ranked[i].n, ranked[i].text))
+	end
+	local view_fwd = angles.angle_vectors(player.pitch or 0, player.yaw or 0, 0)
+	local streak_name = "models/debug/debugwhite"
 	local groups = {}
 	local tris = 0
+	local posed = 0
+	local streaks = 0
 	for i = 1, #kept do
 		local it = kept[i]
 		local model = it.loaded
 		local oz = it.z + (it.z_off or 0)
 		if i <= 8 then
 			print(string.format(
-				"actor %s %s at %.0f %.0f %.0f yaw %.0f model %s",
-				it.kind, it.class, it.x, it.y, oz, it.yaw or 0, it.model
+				"actor %s %s at %.0f %.0f %.0f yaw %.0f seq %s model %s",
+				it.kind, it.class, it.x, it.y, oz, it.yaw or 0, tostring(model.sequence), it.model
 			))
 		end
 		for m = 1, #model.meshes do
@@ -746,6 +808,32 @@ local function bake_actors(mount, bound, max_edge)
 				gv[#gv + 1] = 1
 				gv[#gv + 1] = 0
 			end
+		end
+		if model.sequence then
+			posed = posed + 1
+		end
+		local streak = glua.streak_verts(it.bullets and it.bullets[1], view_fwd.x, view_fwd.y, view_fwd.z)
+		if streak then
+			local g = groups[streak_name]
+			if not g then
+				g = { verts = {}, alphatest = alphatest_name(streak_name) }
+				groups[streak_name] = g
+			end
+			local gv = g.verts
+			local n = math.floor(#streak / 3)
+			for v = 0, n - 1 do
+				local o = v * 3
+				gv[#gv + 1] = streak[o + 1]
+				gv[#gv + 1] = streak[o + 2]
+				gv[#gv + 1] = streak[o + 3]
+				gv[#gv + 1] = 0.5
+				gv[#gv + 1] = 0.5
+				gv[#gv + 1] = 1
+				gv[#gv + 1] = 1
+				gv[#gv + 1] = 1
+				gv[#gv + 1] = 0
+			end
+			streaks = streaks + 1
 		end
 		tris = tris + (model.tris or 0)
 		it.loaded = nil
@@ -793,8 +881,9 @@ local function bake_actors(mount, bound, max_edge)
 		near_d, far_d = 0, 0
 	end
 	actor_line = string.format(
-		"\nactors draw %d weapons %d npcs %d missing %d tris %d materials %d skipped %d near %.0f far %.0f\n%s\n",
-		#kept, weapons, npcs, missing_model, tris, added, #skipped, near_d, far_d, session.summary
+		"\nactors draw %d weapons %d npcs %d posed %d attack %d bullets %d streaks %d missing %d tris %d materials %d skipped %d near %.0f far %.0f\n%s\n",
+		#kept, weapons, npcs, posed, exercised.attack_ok, exercised.bullets, streaks,
+		missing_model, tris, added, #skipped, near_d, far_d, session.summary
 	)
 	print(actor_line)
 	for i = 1, math.min(8, #skipped) do

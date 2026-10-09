@@ -394,8 +394,8 @@ end
 -- each mesh in its own cell on one plane. A street down the middle stays
 -- empty so taller actors standing on the ground further ahead stay visible.
 -- Yaw comes from the same AngleVectors basis as the player. Weapons get a
--- quarter turn so the barrel crosses the view. This is a reference pose,
--- not a sandbox spawn and not a thinking NPC.
+-- quarter turn so the barrel crosses the view. The baker runs Think and
+-- PrimaryAttack once after this. That pass is not a sandbox tick.
 function M.layout(items, origin, yaw)
 	local forward, right = angles.angle_vectors(0, yaw or 0, 0)
 	local weapons, npcs, big = {}, {}, {}
@@ -569,6 +569,16 @@ function M.boot(opts)
 		or "/home/voldemar/.local/share/Steam/steamapps/common/GarrysMod/garrysmod"
 	local mapname = opts.map or "gm_construct"
 	local env = compat.make_env("server")
+	do
+		local host_math = env.math or math
+		env.math = setmetatable({
+			Rand = function(lo, hi)
+				lo = tonumber(lo) or 0
+				hi = tonumber(hi) or 0
+				return lo + (hi - lo) * math.random()
+			end,
+		}, { __index = host_math })
+	end
 	install_table(env)
 	env.coroutine = coroutine
 	for k, v in pairs(SPAWN_CONST) do
@@ -1012,6 +1022,23 @@ function M.boot(opts)
 		ActiveGamemode = function()
 			return "sandbox"
 		end,
+		-- Workshop GMAs this process actually opened. Titles are the archive file names.
+		GetAddons = function()
+			local paths = content.gma_paths(content.workshop_dir(gmod))
+			local out = {}
+			for i = 1, #paths do
+				local path = paths[i]
+				out[#out + 1] = {
+					title = path:match("([^/]+)%.gma$") or path,
+					wsid = path:match("/(%d+)/[^/]+$"),
+					file = path,
+					mounted = true,
+					downloaded = true,
+					models = 0,
+				}
+			end
+			return out
+		end,
 	}, {
 		__index = function(_, key)
 			missing["engine." .. tostring(key)] = (missing["engine." .. tostring(key)] or 0) + 1
@@ -1072,9 +1099,269 @@ function M.boot(opts)
 			io.write(table.concat(parts))
 		end
 	end
-	-- No Player/Weapon/Entity metatable is registered. FindMetaTable returns nil
-	-- until something actually registers one. Callers that nil-check then return.
+	-- Entity, Player, Weapon, and NPC tables exist so addons can add methods.
+	-- A method that is not defined here is still nil. Nothing below fakes a hit,
+	-- a sound, or a player that is not the table we pass in.
 	local meta_tables = {}
+	local entity_meta = {}
+	local player_meta = {}
+	local weapon_meta = {}
+	local npc_meta = {}
+	meta_tables.Entity = entity_meta
+	meta_tables.Player = player_meta
+	meta_tables.Weapon = weapon_meta
+	meta_tables.NPC = npc_meta
+	setmetatable(player_meta, { __index = entity_meta })
+	setmetatable(weapon_meta, { __index = entity_meta })
+	setmetatable(npc_meta, { __index = entity_meta })
+	function entity_meta:GetClass()
+		return self.ClassName
+	end
+	function entity_meta:SetModel(model)
+		self.__model = model
+		return self
+	end
+	function entity_meta:GetModel()
+		return self.__model
+	end
+	function entity_meta:SetPos(v)
+		self.__pos = v
+	end
+	function entity_meta:GetPos()
+		return self.__pos or env.Vector()
+	end
+	function entity_meta:SetAngles(a)
+		self.__ang = a
+	end
+	function entity_meta:GetAngles()
+		return self.__ang or env.Angle()
+	end
+	function entity_meta:SetOwner(o)
+		self.__owner = o
+	end
+	function entity_meta:GetOwner()
+		return self.__owner
+	end
+	function entity_meta:IsValid()
+		return self.__removed ~= true
+	end
+	function entity_meta:Remove()
+		self.__removed = true
+	end
+	function entity_meta:EntIndex()
+		return self.__id or -1
+	end
+	function entity_meta:IsNPC()
+		local class = tostring(self.ClassName or "")
+		return class:sub(1, 4) == "npc_"
+	end
+	function entity_meta:IsPlayer()
+		return false
+	end
+	-- Entity:NetworkVar installs Get/Set for one data-table name. Unset values
+	-- use the Source default for that type. Slot is accepted and not networked.
+	function entity_meta:NetworkVar(kind, slot, name)
+		if type(name) ~= "string" or name == "" then
+			return
+		end
+		local store = "__nv_" .. name
+		self["Set" .. name] = function(ent, value)
+			ent[store] = value
+		end
+		self["Get" .. name] = function(ent)
+			local value = ent[store]
+			if value ~= nil then
+				return value
+			end
+			if kind == "Bool" then
+				return false
+			end
+			if kind == "Float" or kind == "Int" then
+				return 0
+			end
+			if kind == "String" then
+				return ""
+			end
+			if kind == "Vector" then
+				return env.Vector()
+			end
+			if kind == "Angle" then
+				return env.Angle()
+			end
+			if kind == "Entity" then
+				return env.NULL
+			end
+			return nil
+		end
+	end
+	function entity_meta:DTVar(kind, slot, name)
+		return self:NetworkVar(kind, slot, name)
+	end
+	function entity_meta:GetForward()
+		return self:GetAngles():Forward()
+	end
+	function entity_meta:SetHealth(h)
+		self.__health = tonumber(h) or 0
+	end
+	function entity_meta:GetHealth()
+		return self.__health or 0
+	end
+	function entity_meta:Health()
+		return self.__health or 0
+	end
+	function entity_meta:Alive()
+		return self.__removed ~= true and (self.__health or 0) > 0
+	end
+	function entity_meta:SetSequence(seq)
+		self.__sequence = seq
+		return 0
+	end
+	function entity_meta:GetSequence()
+		return self.__sequence or 0
+	end
+	function entity_meta:ResetSequence(seq)
+		self.__sequence = seq
+		self.__cycle = 0
+	end
+	function entity_meta:SetCycle(c)
+		self.__cycle = tonumber(c) or 0
+	end
+	function entity_meta:GetCycle()
+		return self.__cycle or 0
+	end
+	-- Unknown names stay -1. The baker only poses a sequence the model actually has.
+	function entity_meta:LookupSequence(name)
+		if type(name) ~= "string" or name == "" then
+			return -1
+		end
+		self.__lookup = name
+		return -1
+	end
+	function entity_meta:EmitSound(name)
+		self.__sounds = self.__sounds or {}
+		self.__sounds[#self.__sounds + 1] = tostring(name or "")
+	end
+	function weapon_meta:SetHoldType(name)
+		self.__hold = name
+	end
+	function weapon_meta:SetDeploySpeed(n)
+		self.__deploy_speed = tonumber(n) or 1
+	end
+	function weapon_meta:GetDeploySpeed()
+		return self.__deploy_speed or 1
+	end
+	-- No reserve ammo is stored. An empty clip does not become full.
+	function weapon_meta:DefaultReload()
+		return false
+	end
+	function weapon_meta:GetHoldType()
+		return self.__hold
+	end
+	function weapon_meta:SetClip1(n)
+		self.__clip1 = tonumber(n) or 0
+	end
+	function weapon_meta:Clip1()
+		if self.__clip1 == nil then
+			return -1
+		end
+		return self.__clip1
+	end
+	function weapon_meta:SetClip2(n)
+		self.__clip2 = tonumber(n) or 0
+	end
+	function weapon_meta:Clip2()
+		if self.__clip2 == nil then
+			return -1
+		end
+		return self.__clip2
+	end
+	function weapon_meta:GetPrimaryAmmoType()
+		return self.Primary and self.Primary.Ammo or ""
+	end
+	function weapon_meta:GetSecondaryAmmoType()
+		return self.Secondary and self.Secondary.Ammo or ""
+	end
+	function weapon_meta:SetNextPrimaryFire(t)
+		self.__next1 = tonumber(t) or 0
+	end
+	function weapon_meta:GetNextPrimaryFire()
+		return self.__next1 or 0
+	end
+	function weapon_meta:SetNextSecondaryFire(t)
+		self.__next2 = tonumber(t) or 0
+	end
+	function weapon_meta:GetNextSecondaryFire()
+		return self.__next2 or 0
+	end
+	function weapon_meta:SendWeaponAnim(act)
+		self.__seq_act = act
+	end
+	function player_meta:IsNPC()
+		return false
+	end
+	function player_meta:IsPlayer()
+		return true
+	end
+	function player_meta:EyeAngles()
+		return self:GetAngles()
+	end
+	function player_meta:SetEyeAngles(ang)
+		if type(ang) == "table" then
+			self:SetAngles(ang)
+		end
+	end
+	function player_meta:GetVelocity()
+		return env.Vector()
+	end
+	function player_meta:LagCompensation(on)
+		self.__lag = on and true or false
+	end
+	function player_meta:GetShootPos()
+		local p = self:GetPos()
+		return env.Vector(p.x, p.y, p.z + 64)
+	end
+	function player_meta:EyePos()
+		return self:GetShootPos()
+	end
+	function player_meta:GetAimVector()
+		return self:GetAngles():Forward()
+	end
+	-- VRMod replaces GetAimVector and asks this first. No vehicle is stored, so the
+	-- answer is false and the original aim vector is used.
+	function player_meta:InVehicle()
+		return self.__vehicle ~= nil
+	end
+	function player_meta:MuzzleFlash()
+		self.__muzzle = (self.__muzzle or 0) + 1
+	end
+	function player_meta:SetAnimation(act)
+		self.__player_anim = act
+	end
+	function player_meta:ViewPunch(ang)
+		self.__punch = ang
+	end
+	function player_meta:RemoveAmmo(num, ammo)
+		self.__ammo = self.__ammo or {}
+		local key = tostring(ammo or "")
+		self.__ammo[key] = (self.__ammo[key] or 0) - (tonumber(num) or 0)
+	end
+	-- Records the bullet the Lua asked for. It does not apply damage.
+	function player_meta:FireBullets(bullet)
+		if type(bullet) ~= "table" or type(bullet.Src) ~= "table" or type(bullet.Dir) ~= "table" then
+			return
+		end
+		self.__bullets = self.__bullets or {}
+		self.__bullets[#self.__bullets + 1] = {
+			x = bullet.Src.x or 0,
+			y = bullet.Src.y or 0,
+			z = bullet.Src.z or 0,
+			dx = bullet.Dir.x or 0,
+			dy = bullet.Dir.y or 0,
+			dz = bullet.Dir.z or 0,
+			damage = tonumber(bullet.Damage) or 0,
+			num = tonumber(bullet.Num) or 1,
+		}
+	end
 	function env.FindMetaTable(name)
 		return meta_tables[name]
 	end
@@ -1345,32 +1632,23 @@ function M.boot(opts)
 	})
 
 	local spawned = {}
-	local function make_ent(class)
-		local ent = { __ent = true, ClassName = class or "" }
-		function ent:GetClass()
-			return self.ClassName
-		end
-		function ent:SetModel(model)
-			self.__model = model
-			return self
-		end
-		function ent:GetModel()
-			return self.__model
-		end
-		function ent:SetPos(v)
-			self.__pos = v
-		end
-		function ent:GetPos()
-			return self.__pos or compat.Vector()
-		end
-		function ent:SetAngles(a)
-			self.__ang = a
-		end
-		function ent:GetAngles()
-			return self.__ang or compat.Angle()
-		end
+	local ent_seq = 0
+	local function make_ent(class, meta)
+		ent_seq = ent_seq + 1
+		local ent = { __ent = true, ClassName = class or "", __id = ent_seq }
+		meta = meta or entity_meta
 		return setmetatable(ent, {
 			__index = function(_, key)
+				local v = meta[key]
+				if v ~= nil then
+					return v
+				end
+				if meta ~= entity_meta then
+					v = entity_meta[key]
+					if v ~= nil then
+						return v
+					end
+				end
 				missing["ent." .. tostring(key)] = (missing["ent." .. tostring(key)] or 0) + 1
 				return nil
 			end,
@@ -1422,6 +1700,18 @@ function M.boot(opts)
 	end
 	function env.util.AddNetworkString(name)
 		precache["net:" .. tostring(name)] = true
+	end
+	-- Same inputs, same float. Recoil must not depend on math.random.
+	function env.util.SharedRandom(name, min, max, extra)
+		min = tonumber(min) or 0
+		max = tonumber(max) or 1
+		local text = tostring(name or "") .. "\0" .. tostring(extra or 0)
+		local hash = 2166136261
+		for i = 1, #text do
+			hash = (hash + text:byte(i) * i) % 4294967296
+		end
+		local unit = (hash % 1000003) / 1000003
+		return min + (max - min) * unit
 	end
 	function env.util.TableToJSON(val)
 		local function enc(v, depth)
@@ -1675,11 +1965,22 @@ function M.boot(opts)
 		return nil
 	end
 
-	-- Identifiers are stored. Callbacks are not run; there is no think loop yet.
+	-- Timers fire only from env.__pump. Create does not call the callback.
+	-- reps 0 repeats. A 0 delay fires on the next pump, once per pump call.
 	local timers = {}
+	local clock = 0
 	env.timer = {}
+	env.__timer_ran = 0
+	env.__timer_errors = {}
 	function env.timer.Create(id, delay, reps, fn)
-		timers[tostring(id)] = { delay = delay, reps = reps, fn = fn }
+		delay = tonumber(delay) or 0
+		reps = tonumber(reps) or 0
+		timers[tostring(id)] = {
+			t = clock + delay,
+			every = delay,
+			left = reps,
+			fn = fn,
+		}
 	end
 	function env.timer.Remove(id)
 		timers[tostring(id)] = nil
@@ -1690,7 +1991,67 @@ function M.boot(opts)
 	local simple_n = 0
 	function env.timer.Simple(delay, fn)
 		simple_n = simple_n + 1
-		timers["#simple:" .. tostring(simple_n)] = { delay = delay, reps = 1, fn = fn }
+		timers["#simple:" .. tostring(simple_n)] = {
+			t = clock + (tonumber(delay) or 0),
+			once = true,
+			fn = fn,
+		}
+	end
+	function env.__pump(dt)
+		dt = tonumber(dt) or 0
+		if dt < 0 then
+			dt = 0
+		end
+		clock = clock + dt
+		env.__curtime = clock
+		env.__frametime = dt
+		local ids = {}
+		for id in pairs(timers) do
+			ids[#ids + 1] = id
+		end
+		table.sort(ids)
+		for i = 1, #ids do
+			local id = ids[i]
+			local it = timers[id]
+			local spins = 0
+			while it and clock + 1e-9 >= it.t and spins < 4 do
+				spins = spins + 1
+				local steps = 0
+				debug.sethook(function()
+					steps = steps + 1
+					if steps > 80000 then
+						error("timer budget")
+					end
+				end, "", 60)
+				local ok, err = pcall(it.fn)
+				debug.sethook()
+				env.__timer_ran = env.__timer_ran + 1
+				if not ok then
+					local list = env.__timer_errors
+					if #list < 8 then
+						list[#list + 1] = id .. " " .. tostring(err):gsub("%s+", " "):sub(1, 140)
+					end
+				end
+				if it.once or not timers[id] then
+					timers[id] = nil
+					break
+				end
+				if not it.every or it.every <= 0 then
+					it.t = clock + 1
+					break
+				end
+				if it.left == 0 then
+					it.t = it.t + it.every
+				else
+					it.left = it.left - 1
+					if it.left <= 0 then
+						timers[id] = nil
+						break
+					end
+					it.t = it.t + it.every
+				end
+			end
+		end
 	end
 	setmetatable(env.file, {
 		__index = function(_, key)
@@ -2029,9 +2390,239 @@ function M.boot(opts)
 		summary = summary,
 		spawned = spawned,
 		make_ent = make_ent,
+		meta_player = player_meta,
+		meta_weapon = weapon_meta,
+		meta_npc = npc_meta,
 		precache = precache,
 		workshops = workshops,
 	}
+end
+
+function M.pump(session, dt)
+	local env = session and session.env
+	if env and env.__pump then
+		env.__pump(dt or 0)
+	end
+end
+
+local function absorb_script(dst, src, seen)
+	if type(src) ~= "table" or seen[src] then
+		return
+	end
+	seen[src] = true
+	local mt = getmetatable(src)
+	if type(mt) == "table" and type(mt.__index) == "table" then
+		absorb_script(dst, mt.__index, seen)
+	end
+	for k, v in pairs(src) do
+		if k ~= "BaseClass" then
+			local existing = dst[k]
+			if type(existing) == "function" and type(v) ~= "function" then
+				-- A string under a method name would hide the method. Hold-type strings
+				-- are the old field; apply them through the method.
+				if k == "SetHoldType" and type(v) == "string" then
+					existing(dst, v)
+				end
+			else
+				dst[k] = v
+			end
+		end
+	end
+	-- Keep the parent table. Derived SWEPs call self.BaseClass.PrimaryAttack(self).
+	-- Do not walk it: BaseClass points back at the parent and would cycle.
+	if src.BaseClass ~= nil then
+		dst.BaseClass = src.BaseClass
+	end
+end
+
+local function call_method(ent, name)
+	local fn = ent[name]
+	if type(fn) ~= "function" then
+		return nil
+	end
+	local steps = 0
+	debug.sethook(function()
+		steps = steps + 1
+		if steps > 80000 then
+			error("think budget")
+		end
+	end, "", 60)
+	local ok, err = pcall(fn, ent)
+	debug.sethook()
+	return ok, err
+end
+
+local function finite_num(n)
+	return type(n) == "number" and n == n and n < math.huge and n > -math.huge
+end
+
+-- One camera-facing ribbon along a recorded FireBullets call.
+-- Width is dir × view_forward so the quad is not edge-on when the camera
+-- looks down -X and the weapon aims along -Y. An XY-only width would be.
+-- Length is 160 source units. Half-width is 4. Returns 6 vertices (18 numbers).
+function M.streak_verts(bullet, fx, fy, fz)
+	if type(bullet) ~= "table" then
+		return nil
+	end
+	local x, y, z = bullet.x, bullet.y, bullet.z
+	local dx, dy, dz = bullet.dx, bullet.dy, bullet.dz
+	if not (finite_num(x) and finite_num(y) and finite_num(z)
+		and finite_num(dx) and finite_num(dy) and finite_num(dz)) then
+		return nil
+	end
+	if not (finite_num(fx) and finite_num(fy) and finite_num(fz)) then
+		fx, fy, fz = -1, 0, 0
+	end
+	local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+	if len < 1e-8 then
+		return nil
+	end
+	dx, dy, dz = dx / len, dy / len, dz / len
+	local wx = dy * fz - dz * fy
+	local wy = dz * fx - dx * fz
+	local wz = dx * fy - dy * fx
+	local wlen = math.sqrt(wx * wx + wy * wy + wz * wz)
+	if wlen < 1e-4 then
+		wx, wy, wz = 0, 0, 1
+		wlen = 1
+	end
+	local half = 4 / wlen
+	wx, wy, wz = wx * half, wy * half, wz * half
+	local reach = 160
+	local ax, ay, az = x - wx, y - wy, z - wz
+	local bx, by, bz = x + wx, y + wy, z + wz
+	local px, py, pz = ax + dx * reach, ay + dy * reach, az + dz * reach
+	local cx, cy, cz = bx + dx * reach, by + dy * reach, bz + dz * reach
+	return {
+		bx, by, bz,
+		ax, ay, az,
+		px, py, pz,
+		bx, by, bz,
+		px, py, pz,
+		cx, cy, cz,
+	}
+end
+
+-- Runs Initialize, Think, and one PrimaryAttack on the items about to be drawn.
+-- A missing method is skipped. An error is counted and the next item still runs.
+function M.exercise(session, items)
+	local out = {
+		think_ok = 0,
+		think_bad = 0,
+		attack_ok = 0,
+		attack_bad = 0,
+		bullets = 0,
+		lines = {},
+		miss = {},
+	}
+	if not session or not items then
+		return out
+	end
+	local env = session.env
+	local player = session.make_ent("player", session.meta_player)
+	player:SetHealth(100)
+	player:SetPos(env.Vector())
+	player:SetAngles(env.Angle())
+	local function note(kind, class, err)
+		local lines = out.lines
+		local text = tostring(err):gsub("%s+", " "):sub(1, 120)
+		if #lines < 8 then
+			lines[#lines + 1] = kind .. " " .. tostring(class) .. " " .. text
+		end
+		out.miss[text] = (out.miss[text] or 0) + 1
+	end
+	local function one(it)
+		local script
+		if it.kind == "weapon" and env.weapons and env.weapons.Get then
+			local ok, full = pcall(env.weapons.Get, it.class)
+			if ok and type(full) == "table" then
+				script = full
+			end
+		elseif it.kind == "npc" and env.scripted_ents and env.scripted_ents.Get then
+			local ok, full = pcall(env.scripted_ents.Get, it.npc or it.class)
+			if ok and type(full) == "table" then
+				script = full
+			end
+		end
+		if not script then
+			return
+		end
+		local meta = it.kind == "weapon" and session.meta_weapon or session.meta_npc
+		local ent = session.make_ent(it.class, meta)
+		absorb_script(ent, script, {})
+		if ent.Weapon == nil then
+			ent.Weapon = ent
+		end
+		ent.Owner = player
+		ent:SetOwner(player)
+		ent:SetPos(env.Vector(it.x or 0, it.y or 0, it.z or 0))
+		ent:SetAngles(env.Angle(0, it.yaw or 0, 0))
+		-- GetShootPos is 64 above the player. The mesh origin is it.z + z_off,
+		-- so the owner stands 64 below that and the recorded shot starts on the gun.
+		local oz = (it.z or 0) + (it.z_off or 0)
+		player:SetPos(env.Vector(it.x or 0, it.y or 0, oz - 64))
+		player:SetAngles(env.Angle(0, it.yaw or 0, 0))
+		player.__bullets = nil
+		if it.kind == "weapon" and type(ent.Primary) == "table" then
+			local clip = tonumber(ent.Primary.ClipSize)
+			if clip and clip > 0 then
+				ent:SetClip1(clip)
+			end
+		end
+		local ok, err = call_method(ent, "SetupDataTables")
+		if ok == false then
+			out.think_bad = out.think_bad + 1
+			note("dt", it.class, err)
+		end
+		ok, err = call_method(ent, "Initialize")
+		if ok == true then
+			out.think_ok = out.think_ok + 1
+		elseif ok == false then
+			out.think_bad = out.think_bad + 1
+			note("init", it.class, err)
+		end
+		ok, err = call_method(ent, "Think")
+		if ok == true then
+			out.think_ok = out.think_ok + 1
+		elseif ok == false then
+			out.think_bad = out.think_bad + 1
+			note("think", it.class, err)
+		end
+		if it.kind == "weapon" then
+			ok, err = call_method(ent, "PrimaryAttack")
+			-- A script can fire and then fail on a later line. The bullet still happened.
+			local shots = player.__bullets
+			if shots and #shots > 0 then
+				it.bullets = shots
+				out.bullets = out.bullets + #shots
+			end
+			if ok == true then
+				out.attack_ok = out.attack_ok + 1
+			elseif ok == false then
+				out.attack_bad = out.attack_bad + 1
+				note("attack", it.class, err)
+			end
+		end
+		if type(ent.__sequence) == "string" and ent.__sequence ~= "" then
+			it.anim = ent.__sequence
+		elseif type(ent.__lookup) == "string" and ent.__lookup ~= "" then
+			it.anim = ent.__lookup
+		end
+	end
+	for i = 1, #items do
+		if i % 40 == 0 then
+			print(string.format(
+				"exercise %d/%d think %d attack %d bullets %d",
+				i, #items, out.think_ok, out.attack_ok, out.bullets
+			))
+		end
+		local ok, err = pcall(one, items[i])
+		if not ok then
+			out.think_bad = out.think_bad + 1
+			note("item", items[i].class, err)
+		end
+	end
+	return out
 end
 
 function M.collect(session, mount)

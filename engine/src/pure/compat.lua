@@ -126,7 +126,24 @@ function V.__tostring(a)
 end
 
 local A = {}
-A.__index = A
+local ANGLE_ALIAS = { pitch = "p", yaw = "y", roll = "r" }
+
+function A.__index(self, key)
+	local real = ANGLE_ALIAS[key]
+	if real then
+		return rawget(self, real)
+	end
+	return A[key]
+end
+
+function A.__newindex(self, key, value)
+	local real = ANGLE_ALIAS[key]
+	if real then
+		rawset(self, real, value)
+		return
+	end
+	rawset(self, key, value)
+end
 
 function M.Angle(p, y, r)
 	if type(p) == "table" then
@@ -257,6 +274,10 @@ function M.make_env(realm)
 	env.CLIENT = realm ~= "server"
 	env.CurTime = function()
 		return env.__curtime or 0
+	end
+	-- Server predicted hooks run once. Client prediction is not simulated.
+	env.IsFirstTimePredicted = function()
+		return realm ~= "client"
 	end
 	env.FrameTime = function()
 		return env.__frametime or (1 / 66)
