@@ -226,4 +226,7 @@ return function(T)
 	T.ok(gk == nil and ge == "transparent", "glass is not drawn as magenta (" .. tostring(ge) .. ")")
 	local wk, we = mount:describe("gm_construct/water_13_beneath")
 	T.ok(wk ~= nil and wk ~= "", "water beneath resolves (" .. tostring(we) .. ")")
+	local cards = mount:read("materials/models/props_foliage/tree_springers_cards_01.vmt")
+	T.ok(vmt.alphatest(vmt.pairs(cards)), "springer cards are alphatest")
+	T.ok(not vmt.alphatest(vmt.pairs('"LightmappedGeneric" { "$basetexture" "brick/brick" }')), "opaque is not alphatest")
 end

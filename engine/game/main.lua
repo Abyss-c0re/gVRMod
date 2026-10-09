@@ -52,6 +52,7 @@ local world
 local crate
 local acc = 0
 local shader
+local alpha_shader
 local solid
 local left_tex, right_tex
 local eye_pass = {}
@@ -110,11 +111,14 @@ local function draw_world(pass)
 		pass:setDepthWrite(true)
 	end
 	if map_parts then
-		pass:setShader(shader)
 		pass:setColor(1, 1, 1)
 		for i = 1, #map_parts do
-			pass:setMaterial(map_parts[i].tex)
-			pass:draw(map_parts[i].mesh)
+			local part = map_parts[i]
+			-- Alphatest cards (the springer trees) discard the empty texels.
+			-- Drawn solid, the same quads are green slabs.
+			pass:setShader(part.alphatest and alpha_shader or shader)
+			pass:setMaterial(part.tex)
+			pass:draw(part.mesh)
 		end
 		pass:setMaterial()
 	elseif map_mesh then
@@ -391,17 +395,17 @@ local function static_prop_parts(mount, path, sky, bound, max_edge)
 	end
 	local groups = {}
 	local drawn, skipped, tris = 0, 0, 0
+	local function alphatest_name(name)
+		local n = name:lower():gsub("\\", "/"):gsub("^materials/", ""):gsub("%.vmt$", "")
+		local text = mount:read("materials/" .. n .. ".vmt")
+		return vmt.alphatest(vmt.pairs(text))
+	end
 	for i = 1, #list do
 		local p = list[i]
-		local lname = p.model:lower()
-		-- Foliage cards are alphatest quads. Drawn solid, they become green slabs.
-		if lname:find("foliage", 1, true) or lname:find("tree_", 1, true) then
+		local model = load_model(p.model)
+		if not model or not model.meshes then
 			skipped = skipped + 1
 		else
-			local model = load_model(p.model)
-			if not model or not model.meshes then
-				skipped = skipped + 1
-			else
 				local sky_prop = false
 				local scale = 1
 				local ox, oy, oz = p.x, p.y, p.z
@@ -413,38 +417,38 @@ local function static_prop_parts(mount, path, sky, bound, max_edge)
 						ox, oy, oz = bsp.sky_place(p.x, p.y, p.z, sky)
 					end
 				end
-				for m = 1, #model.meshes do
-					local mesh = model.meshes[m]
-					local g = groups[mesh.material]
-					if not g then
-						g = {}
-						groups[mesh.material] = g
-					end
-					local src = mesh.verts
-					local n = math.floor(#src / 5)
-					for v = 0, n - 1 do
-						local o = v * 5
-						local x = src[o + 1] * scale
-						local y = src[o + 2] * scale
-						local z = src[o + 3] * scale
-						x, y, z = angles.rotate(p.pitch, p.yaw, p.roll, x, y, z)
-						g[#g + 1] = ox + x
-						g[#g + 1] = oy + y
-						g[#g + 1] = oz + z
-						g[#g + 1] = src[o + 4]
-						g[#g + 1] = src[o + 5]
-						g[#g + 1] = 1
-						g[#g + 1] = 1
-						g[#g + 1] = 1
-					end
+			for m = 1, #model.meshes do
+				local mesh = model.meshes[m]
+				local g = groups[mesh.material]
+				if not g then
+					g = { verts = {}, alphatest = alphatest_name(mesh.material) }
+					groups[mesh.material] = g
 				end
-				drawn = drawn + 1
-				tris = tris + (model.tris or 0)
+				local src = mesh.verts
+				local n = math.floor(#src / 5)
+				for v = 0, n - 1 do
+					local o = v * 5
+					local x = src[o + 1] * scale
+					local y = src[o + 2] * scale
+					local z = src[o + 3] * scale
+					x, y, z = angles.rotate(p.pitch, p.yaw, p.roll, x, y, z)
+					local gv = g.verts
+					gv[#gv + 1] = ox + x
+					gv[#gv + 1] = oy + y
+					gv[#gv + 1] = oz + z
+					gv[#gv + 1] = src[o + 4]
+					gv[#gv + 1] = src[o + 5]
+					gv[#gv + 1] = 1
+					gv[#gv + 1] = 1
+					gv[#gv + 1] = 1
+				end
 			end
+			drawn = drawn + 1
+			tris = tris + (model.tris or 0)
 		end
 	end
 	local added = 0
-	for name, verts in pairs(groups) do
+	for name, g in pairs(groups) do
 		local mat, err = mount:material(name, max_edge)
 		if mat then
 			bound[#bound + 1] = {
@@ -453,8 +457,9 @@ local function static_prop_parts(mount, path, sky, bound, max_edge)
 				h = mat.h,
 				rgba = mat.rgba,
 				transform = mat.transform,
-				verts = verts,
+				verts = g.verts,
 				name = name,
+				alphatest = g.alphatest,
 			}
 			added = added + 1
 		else
@@ -548,6 +553,7 @@ local function upload_albedo(bound)
 			tex = tex,
 			mesh = upload_uv_mesh(s.verts, s.transform),
 			name = s.name,
+			alphatest = s.alphatest,
 		}
 		s.rgba = nil
 	end
@@ -648,6 +654,19 @@ function lovr.load()
 		}
 	]], [[
 		vec4 lovrmain() { return Color * getPixel(ColorTexture, UV); }
+	]])
+	-- Source $alphatestreference default is 0.7. Below that the card is a hole.
+	alpha_shader = lovr.graphics.newShader([[
+		vec4 lovrmain() {
+			Color = VertexColor;
+			return DefaultPosition;
+		}
+	]], [[
+		vec4 lovrmain() {
+			vec4 tex = getPixel(ColorTexture, UV);
+			if (tex.a < 0.7) { discard; }
+			return Color * vec4(tex.rgb, 1.0);
+		}
 	]])
 	sampler = lovr.graphics.newSampler({ wrap = "repeat", filter = "linear" })
 	local function eye_tex(w, h)

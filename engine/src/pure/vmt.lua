@@ -46,6 +46,12 @@ function M.transform(str)
 	return xf
 end
 
+-- $alphatest "1" punches the card. Absent or 0 stays solid.
+function M.alphatest(keys)
+	local a = keys and keys["$alphatest"]
+	return a == "1" or a == "1.0"
+end
+
 function M.apply_uv(u, v, xf)
 	if not xf then
 		return u, v
