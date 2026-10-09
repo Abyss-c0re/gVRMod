@@ -1424,10 +1424,49 @@ function M.boot(opts)
 		end
 	end
 	-- Entity:NetworkVar installs Get/Set for one data-table name. Unset values
-	-- use the Source default for that type. Slot is accepted and not networked.
-	function entity_meta:NetworkVar(kind, slot, name)
-		if type(name) ~= "string" or name == "" then
+	-- use the Source default for that type. Nothing is networked.
+	-- Facepunch: the numeric slot may be omitted. The arguments shift, and the
+	-- next free slot for that type on this entity is used. An explicit number
+	-- keeps that slot. A later KeyName table is accepted and ignored.
+	function entity_meta:NetworkVar(kind, slot, name, extended)
+		if type(slot) == "string" then
+			extended = name
+			name = slot
+			slot = nil
+		end
+		if type(name) ~= "string" or name == "" or type(kind) ~= "string" then
 			return
+		end
+		local used = self.__nv_used
+		if not used then
+			used = {}
+			self.__nv_used = used
+		end
+		local by_type = used[kind]
+		if not by_type then
+			by_type = {}
+			used[kind] = by_type
+		end
+		if type(slot) ~= "number" then
+			slot = 0
+			while by_type[slot] do
+				slot = slot + 1
+			end
+		end
+		by_type[slot] = name
+		local index = self.__nv_index
+		if not index then
+			index = {}
+			self.__nv_index = index
+		end
+		index[name] = slot
+		if type(extended) == "table" then
+			local extra = self.__nv_extended
+			if not extra then
+				extra = {}
+				self.__nv_extended = extra
+			end
+			extra[name] = extended
 		end
 		local store = "__nv_" .. name
 		self["Set" .. name] = function(ent, value)
