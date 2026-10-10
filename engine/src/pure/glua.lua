@@ -3674,6 +3674,26 @@ function M.boot(opts)
 				note_fail("module", "scripted_ents.OnLoaded", err)
 			end
 		end
+
+		-- Wiremod's own TriggerOutput is left in place. A missing one only records.
+		-- It does not walk links or change any input.
+		if type(env.WireLib) ~= "table" then
+			env.WireLib = {}
+		end
+		if type(env.WireLib.TriggerOutput) ~= "function" then
+			function env.WireLib.TriggerOutput(ent, name, value)
+				local outputs = env.__wire_out
+				if not outputs then
+					outputs = {}
+					env.__wire_out = outputs
+				end
+				outputs[#outputs + 1] = {
+					ent = ent,
+					name = tostring(name or ""),
+					value = value,
+				}
+			end
+		end
 	end
 
 	local shown = {}

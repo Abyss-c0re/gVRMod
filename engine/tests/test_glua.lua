@@ -807,6 +807,11 @@ end
 	T.near(center.x, 10, 1e-4, "center x")
 	T.near(center.z, 1, 1e-4, "center z")
 	T.eq(cracker:OBBMins().y, -4, "obb mins")
+	T.eq(type(session.env.WireLib) == "table" and type(session.env.WireLib.TriggerOutput), "function", "wire output recorder")
+	session.env.WireLib.TriggerOutput(nil, "Active", 0)
+	local wires = session.env.__wire_out
+	T.eq(wires and wires[#wires].name, "Active", "wire output name stored")
+	T.eq(wires[#wires].value, 0, "wire output value stored")
 	local doomed = session.make_ent("light_dynamic")
 	session.env.SafeRemoveEntityDelayed(doomed, 0.1)
 	T.eq(doomed.__removed, nil, "delayed remove waits")
