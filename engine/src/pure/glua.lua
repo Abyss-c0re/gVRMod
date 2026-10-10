@@ -1358,6 +1358,39 @@ function M.boot(opts)
 	function entity_meta:GetPos()
 		return self.__pos or env.Vector()
 	end
+	function entity_meta:OBBMins()
+		local mins = self.__mins
+		if type(mins) ~= "table" then
+			return env.Vector()
+		end
+		return env.Vector(mins.x, mins.y, mins.z)
+	end
+	function entity_meta:OBBMaxs()
+		local maxs = self.__maxs
+		if type(maxs) ~= "table" then
+			return env.Vector()
+		end
+		return env.Vector(maxs.x, maxs.y, maxs.z)
+	end
+	-- Center of the stored collision box. No box means the origin.
+	function entity_meta:WorldSpaceCenter()
+		local pos = self:GetPos()
+		local mins = self.__mins
+		local maxs = self.__maxs
+		if type(mins) ~= "table" or type(maxs) ~= "table" then
+			return env.Vector(pos.x, pos.y, pos.z)
+		end
+		local ang = self:GetAngles()
+		local ox, oy, oz = angles.rotate(
+			ang.p or ang.pitch or 0,
+			ang.y or ang.yaw or 0,
+			ang.r or ang.roll or 0,
+			((mins.x or 0) + (maxs.x or 0)) * 0.5,
+			((mins.y or 0) + (maxs.y or 0)) * 0.5,
+			((mins.z or 0) + (maxs.z or 0)) * 0.5
+		)
+		return env.Vector((pos.x or 0) + ox, (pos.y or 0) + oy, (pos.z or 0) + oz)
+	end
 	function entity_meta:SetAngles(a)
 		self.__ang = a
 	end
@@ -2019,6 +2052,12 @@ function M.boot(opts)
 		self.__sequence = seq
 		return 0
 	end
+	-- Stores the sequence id. No studio length is known, so the duration is 0.
+	function entity_meta:SendViewModelMatchingSequence(seq)
+		self.__sequence = seq
+		self.__cycle = 0
+		return 0
+	end
 	function entity_meta:GetSequence()
 		return self.__sequence or 0
 	end
@@ -2558,11 +2597,97 @@ function M.boot(opts)
 		numpad_fns[tostring(name)] = fn
 	end
 
-	-- net.Receive stores a handler. Nothing is sent or received.
+	-- net.Receive stores a handler. Writes are kept on this state.
+	-- Send, Broadcast, and SendPVS do not call the handler and do not transmit.
 	local net_receivers = {}
 	env.net = {}
 	function env.net.Receive(name, fn)
 		net_receivers[tostring(name)] = fn
+	end
+	local function net_msg()
+		local msg = env.__net_cur
+		if not msg then
+			msg = { name = "", values = {} }
+			env.__net_cur = msg
+		end
+		return msg
+	end
+	local function net_write(kind, value)
+		local msg = net_msg()
+		local values = msg.values
+		values[#values + 1] = { kind = kind, value = value }
+	end
+	local function net_finish(how, target)
+		local msg = env.__net_cur
+		env.__net_cur = nil
+		if not msg then
+			return
+		end
+		msg.how = how
+		msg.target = target
+		local out = env.__net_out
+		if not out then
+			out = {}
+			env.__net_out = out
+		end
+		out[#out + 1] = msg
+	end
+	function env.net.Start(name)
+		env.__net_cur = { name = tostring(name or ""), values = {} }
+	end
+	function env.net.WriteBit(n)
+		net_write("bit", (tonumber(n) or 0) ~= 0 and 1 or 0)
+	end
+	function env.net.WriteBool(v)
+		net_write("bool", v and true or false)
+	end
+	function env.net.WriteString(s)
+		net_write("string", tostring(s or ""))
+	end
+	function env.net.WriteFloat(n)
+		net_write("float", tonumber(n) or 0)
+	end
+	function env.net.WriteDouble(n)
+		net_write("double", tonumber(n) or 0)
+	end
+	function env.net.WriteInt(n, bits)
+		net_write("int", { n = math.floor(tonumber(n) or 0), bits = tonumber(bits) or 32 })
+	end
+	function env.net.WriteUInt(n, bits)
+		net_write("uint", { n = math.floor(tonumber(n) or 0), bits = tonumber(bits) or 32 })
+	end
+	function env.net.WriteEntity(ent)
+		net_write("entity", ent)
+	end
+	function env.net.WriteVector(v)
+		if type(v) ~= "table" then
+			v = env.Vector()
+		end
+		net_write("vector", env.Vector(v.x, v.y, v.z))
+	end
+	function env.net.WriteAngle(a)
+		if type(a) ~= "table" then
+			a = env.Angle()
+		end
+		net_write("angle", env.Angle(a.p or a.x, a.y, a.r or a.z))
+	end
+	function env.net.Broadcast()
+		net_finish("broadcast", nil)
+	end
+	function env.net.Send(target)
+		net_finish("send", target)
+	end
+	function env.net.SendOmit(target)
+		net_finish("omit", target)
+	end
+	function env.net.SendToServer()
+		net_finish("server", nil)
+	end
+	function env.net.SendPVS(pos)
+		net_finish("pvs", pos)
+	end
+	function env.net.Abort()
+		env.__net_cur = nil
 	end
 
 	-- IMaterial is not rendered. The call has to return so entity scripts finish loading.
