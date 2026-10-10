@@ -274,6 +274,18 @@ end
 	T.eq(vm:SequenceDuration(), 0, "empty viewmodel has no sequence")
 	vm:SetPlaybackRate(2.5)
 	T.eq(vm:GetPlaybackRate(), 2.5, "playback stored")
+	session.env.EmitSound("NPC_Vortigaunt.Shoot")
+	T.eq(session.env.__sounds[1], "NPC_Vortigaunt.Shoot", "EmitSound records the name")
+	T.eq(session.env.RunConsoleCommand, nil, "RunConsoleCommand stays missing")
+	buttons:SendLua('RunConsoleCommand( "jpeg" )')
+	T.eq(buttons.__lua[1], 'RunConsoleCommand( "jpeg" )', "SendLua records the string")
+	local fx = session.env.EffectData()
+	fx:SetOrigin(session.env.Vector(1, 2, 3))
+	fx:SetMagnitude(8)
+	session.env.util.Effect("Sparks", fx)
+	T.eq(session.env.__effects[1].name, "Sparks", "util.Effect records the name")
+	T.eq(fx:GetOrigin().x, 1, "effect origin stored")
+	T.eq(fx:GetMagnitude(), 8, "effect magnitude stored")
 	T.eq(session.meta_weapon:IsPlayer(), false, "Weapon:IsPlayer")
 	local dt = session.make_ent("weapon_base", session.meta_weapon)
 	dt:NetworkVar("Bool", 0, "Reloading")
@@ -357,6 +369,13 @@ end
 	T.eq(client:LastShootTime(), 4, "last shoot time stored")
 	client:CallOnClient("NoSuchClientMethod")
 	T.eq(called, true, "missing CallOnClient name does nothing")
+	local reenter = 0
+	function client:Deploy()
+		reenter = reenter + 1
+		self:CallOnClient("Deploy")
+	end
+	client:CallOnClient("Deploy")
+	T.eq(reenter, 1, "CallOnClient does not re-enter itself")
 
 	local trace_mod = require("pure.trace")
 	session.trace_slot.world = {

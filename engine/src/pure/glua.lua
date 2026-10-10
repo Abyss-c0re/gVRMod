@@ -1648,6 +1648,33 @@ function M.boot(opts)
 		self.__sounds = self.__sounds or {}
 		self.__sounds[#self.__sounds + 1] = tostring(name or "")
 	end
+	-- Global EmitSound. The name is recorded. No audio is mixed.
+	function env.EmitSound(name)
+		local sounds = env.__sounds
+		if not sounds then
+			sounds = {}
+			env.__sounds = sounds
+		end
+		sounds[#sounds + 1] = tostring(name or "")
+	end
+	-- Effect payload. util.Effect stores it and draws nothing.
+	function env.EffectData()
+		local data = {}
+		function data:SetOrigin(v) self.origin = v end
+		function data:SetNormal(v) self.normal = v end
+		function data:SetStart(v) self.start = v end
+		function data:SetAngles(v) self.angles = v end
+		function data:SetEntity(v) self.entity = v end
+		function data:SetMagnitude(n) self.magnitude = tonumber(n) or 0 end
+		function data:SetScale(n) self.scale = tonumber(n) or 0 end
+		function data:SetRadius(n) self.radius = tonumber(n) or 0 end
+		function data:SetFlags(n) self.flags = tonumber(n) or 0 end
+		function data:GetOrigin() return self.origin or env.Vector() end
+		function data:GetNormal() return self.normal or env.Vector() end
+		function data:GetMagnitude() return self.magnitude or 0 end
+		function data:GetScale() return self.scale or 0 end
+		return data
+	end
 	-- A patch that records Play and Stop. No audio is mixed.
 	function env.CreateSound(ent, name)
 		local patch = {
@@ -1683,8 +1710,9 @@ function M.boot(opts)
 		end
 		return patch
 	end
-	-- Single-player CallOnClient runs the named method on this entity.
-	-- A missing name does nothing. It does not pretend a client UI ran.
+	-- Single-player CallOnClient runs the named method on this entity once.
+	-- A method that asks for itself again does not re-enter. There is no second
+	-- client Lua state. A missing name does nothing.
 	function entity_meta:CallOnClient(name)
 		if type(name) ~= "string" or name == "" then
 			return
@@ -1693,7 +1721,20 @@ function M.boot(opts)
 		if type(fn) ~= "function" then
 			return
 		end
-		return fn(self)
+		local guard = self.__client_call
+		if not guard then
+			guard = {}
+			self.__client_call = guard
+		end
+		if guard[name] then
+			return
+		end
+		guard[name] = true
+		local ok, err = pcall(fn, self)
+		guard[name] = nil
+		if not ok then
+			error(err, 0)
+		end
 	end
 	function weapon_meta:SetHoldType(name)
 		self.__hold = name
@@ -1867,6 +1908,15 @@ function M.boot(opts)
 	end
 	function player_meta:ViewPunch(ang)
 		self.__punch = ang
+	end
+	-- Records the client string. It is not executed.
+	function player_meta:SendLua(code)
+		local queued = self.__lua
+		if not queued then
+			queued = {}
+			self.__lua = queued
+		end
+		queued[#queued + 1] = tostring(code or "")
 	end
 	function player_meta:RemoveAmmo(num, ammo)
 		self.__ammo = self.__ammo or {}
@@ -2331,6 +2381,14 @@ function M.boot(opts)
 		end
 		local tr = trace.hull(world, start, dest, mins, maxs)
 		return trace_result(tr.hit, tr.startsolid, tr.fraction, tr.endpos, tr.normal, start)
+	end
+	function env.util.Effect(name, data)
+		local fx = env.__effects
+		if not fx then
+			fx = {}
+			env.__effects = fx
+		end
+		fx[#fx + 1] = { name = tostring(name or ""), data = data }
 	end
 	function env.util.TraceLine(data)
 		local zero = { x = 0, y = 0, z = 0 }
