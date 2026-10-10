@@ -1355,6 +1355,47 @@ function M.boot(opts)
 		return self.__collision_group or 0
 	end
 	-- Key/value record. Nothing here applies m_flDamage or a laser target.
+	-- Script variable. Not networked. A missing name returns the default.
+	function entity_meta:SetVar(key, value)
+		if type(key) ~= "string" or key == "" then
+			return
+		end
+		local vars = self.__var
+		if not vars then
+			vars = {}
+			self.__var = vars
+		end
+		vars[key] = value
+	end
+	function entity_meta:GetVar(key, default)
+		local vars = self.__var
+		if type(key) ~= "string" or not vars or vars[key] == nil then
+			return default
+		end
+		return vars[key]
+	end
+	-- Local record of a networked bool. Nothing is sent.
+	function entity_meta:SetNWBool(key, value)
+		if type(key) ~= "string" or key == "" then
+			return
+		end
+		local nw = self.__nw
+		if not nw then
+			nw = {}
+			self.__nw = nw
+		end
+		nw[key] = value and true or false
+	end
+	function entity_meta:GetNWBool(key, default)
+		local nw = self.__nw
+		if type(key) ~= "string" or not nw or nw[key] == nil then
+			if default == nil then
+				return false
+			end
+			return default
+		end
+		return nw[key]
+	end
 	function entity_meta:SetSaveValue(key, value)
 		if type(key) ~= "string" or key == "" then
 			return
@@ -1584,6 +1625,16 @@ function M.boot(opts)
 	end
 	function entity_meta:GetCycle()
 		return self.__cycle or 0
+	end
+	-- No sequence length is known. Callers that wait on it wait zero seconds.
+	function entity_meta:SequenceDuration()
+		return 0
+	end
+	function entity_meta:SetPlaybackRate(rate)
+		self.__playback = tonumber(rate) or 1
+	end
+	function entity_meta:GetPlaybackRate()
+		return self.__playback or 1
 	end
 	-- Unknown names stay -1. The baker only poses a sequence the model actually has.
 	function entity_meta:LookupSequence(name)
@@ -2126,6 +2177,8 @@ function M.boot(opts)
 	local function make_ent(class, meta)
 		ent_seq = ent_seq + 1
 		local ent = { __ent = true, ClassName = class or "", __id = ent_seq }
+		-- Old scripted entities use self.Entity. It is this object.
+		ent.Entity = ent
 		meta = meta or entity_meta
 		return setmetatable(ent, {
 			__index = function(_, key)
@@ -2153,6 +2206,36 @@ function M.boot(opts)
 			env.__spawn_log[#env.__spawn_log + 1] = ent
 		end
 		return ent
+	end
+	-- Index from this process. A missing index is NULL. There is no world entity.
+	function env.Entity(index)
+		local n = tonumber(index)
+		if not n then
+			return env.NULL
+		end
+		for i = 1, #spawned do
+			local ent = spawned[i]
+			if ent.__id == n and ent.__removed ~= true then
+				return ent
+			end
+		end
+		return env.NULL
+	end
+	-- One empty view model slot per index. It has no studio sequence.
+	function player_meta:GetViewModel(index)
+		index = tonumber(index) or 0
+		local slots = self.__viewmodels
+		if not slots then
+			slots = {}
+			self.__viewmodels = slots
+		end
+		local vm = slots[index]
+		if vm == nil then
+			vm = make_ent("predicted_viewmodel", entity_meta)
+			vm.__viewmodel = true
+			slots[index] = vm
+		end
+		return vm
 	end
 	function env.ents.Iterator()
 		local i = 0
