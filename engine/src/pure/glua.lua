@@ -1603,6 +1603,24 @@ function M.boot(opts)
 	function entity_meta:GetHealth()
 		return self.__health or 0
 	end
+	function entity_meta:SetMaxHealth(h)
+		self.__maxhealth = tonumber(h) or 0
+	end
+	function entity_meta:GetMaxHealth()
+		return self.__maxhealth or 0
+	end
+	-- Stored only. Brush traces do not use this box.
+	function entity_meta:SetCollisionBounds(mins, maxs)
+		if type(mins) == "table" then
+			self.__mins = env.Vector(tonumber(mins.x) or 0, tonumber(mins.y) or 0, tonumber(mins.z) or 0)
+		end
+		if type(maxs) == "table" then
+			self.__maxs = env.Vector(tonumber(maxs.x) or 0, tonumber(maxs.y) or 0, tonumber(maxs.z) or 0)
+		end
+	end
+	function entity_meta:SetUseType(kind)
+		self.__use_type = kind
+	end
 	function entity_meta:Health()
 		return self.__health or 0
 	end
@@ -1803,6 +1821,13 @@ function M.boot(opts)
 	end
 	function player_meta:IsPlayer()
 		return true
+	end
+	-- A player who was never given a max still has the engine default of 100.
+	function player_meta:GetMaxHealth()
+		if self.__maxhealth == nil then
+			return 100
+		end
+		return self.__maxhealth
 	end
 	function player_meta:EyeAngles()
 		return self:GetAngles()
