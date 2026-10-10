@@ -1203,6 +1203,15 @@ function M.boot(opts)
 		GetProperties = function(name)
 			return sound_props[name]
 		end,
+		-- The name is recorded. No audio is mixed.
+		Play = function(name)
+			local sounds = env.__sounds
+			if not sounds then
+				sounds = {}
+				env.__sounds = sounds
+			end
+			sounds[#sounds + 1] = tostring(name or "")
+		end,
 	}, {
 		__index = function(_, key)
 			missing["sound." .. tostring(key)] = (missing["sound." .. tostring(key)] or 0) + 1
@@ -1285,6 +1294,29 @@ function M.boot(opts)
 	end
 	function entity_meta:GetOwner()
 		return self.__owner
+	end
+	function entity_meta:SetCreator(ply)
+		self.__creator = ply
+	end
+	function entity_meta:GetCreator()
+		return self.__creator
+	end
+	-- Aim this entity's forward at the target. Roll stays 0.
+	function entity_meta:PointAtEntity(target)
+		if type(target) ~= "table" or type(target.GetPos) ~= "function" then
+			return
+		end
+		local there = target:GetPos()
+		local here = self:GetPos()
+		if type(there) ~= "table" or type(here) ~= "table" then
+			return
+		end
+		local dir = env.Vector(
+			(tonumber(there.x) or 0) - (tonumber(here.x) or 0),
+			(tonumber(there.y) or 0) - (tonumber(here.y) or 0),
+			(tonumber(there.z) or 0) - (tonumber(here.z) or 0)
+		)
+		self:SetAngles(dir:Angle())
 	end
 	function entity_meta:IsValid()
 		return self.__removed ~= true
@@ -1485,6 +1517,16 @@ function M.boot(opts)
 	function entity_meta:Activate()
 		self.__active = true
 	end
+	-- Wake a cooked body. An uncooked phys is left invalid.
+	function entity_meta:PhysWake()
+		local phys = self:GetPhysicsObject()
+		if type(phys) ~= "table" or type(phys.IsValid) ~= "function" or not phys:IsValid() then
+			return
+		end
+		if type(phys.Wake) == "function" then
+			phys:Wake()
+		end
+	end
 	-- Apply the scripted class, install its data table, then Initialize.
 	-- A later missing method still errors.
 	function entity_meta:Spawn()
@@ -1492,12 +1534,17 @@ function M.boot(opts)
 			return
 		end
 		self.__spawned = true
-		local get = env.scripted_ents and env.scripted_ents.Get
-		if type(get) == "function" then
-			local ok, full = pcall(get, self:GetClass())
-			if ok and type(full) == "table" then
-				absorb_script(self, full, {})
+		-- Create already copied the class. A second copy would wipe fields set
+		-- between Create and Spawn, such as the thrower.
+		if self.__scripted ~= true then
+			local get = env.scripted_ents and env.scripted_ents.Get
+			if type(get) == "function" then
+				local ok, full = pcall(get, self:GetClass())
+				if ok and type(full) == "table" then
+					absorb_script(self, full, {})
+				end
 			end
+			self.__scripted = true
 		end
 		if type(self.SetupDataTables) == "function" then
 			self:SetupDataTables()
@@ -1507,10 +1554,37 @@ function M.boot(opts)
 		end
 	end
 	-- Entity:NetworkVar installs Get/Set for one data-table name. Unset values
-	-- use the Source default for that type. Nothing is networked.
+	-- use the Source default for that type. The same value is visible on .dt.
+	-- Nothing is networked.
 	-- Facepunch: the numeric slot may be omitted. The arguments shift, and the
 	-- next free slot for that type on this entity is used. An explicit number
 	-- keeps that slot. A later KeyName table is accepted and ignored.
+	local function nv_default(kind)
+		if kind == "Bool" then
+			return false
+		end
+		if kind == "Float" or kind == "Int" then
+			return 0
+		end
+		if kind == "String" then
+			return ""
+		end
+		if kind == "Vector" then
+			return env.Vector()
+		end
+		if kind == "Angle" then
+			return env.Angle()
+		end
+		if kind == "Entity" then
+			return env.NULL
+		end
+		return nil
+	end
+	local function nv_has_default(kind)
+		return kind == "Bool" or kind == "Float" or kind == "Int"
+			or kind == "String" or kind == "Vector" or kind == "Angle"
+			or kind == "Entity"
+	end
 	function entity_meta:NetworkVar(kind, slot, name, extended)
 		if type(slot) == "string" then
 			extended = name
@@ -1551,32 +1625,31 @@ function M.boot(opts)
 			end
 			extra[name] = extended
 		end
+		if type(self.dt) ~= "table" then
+			self.dt = {}
+		end
+		if self.dt[name] == nil and nv_has_default(kind) then
+			self.dt[name] = nv_default(kind)
+		end
 		local store = "__nv_" .. name
 		self["Set" .. name] = function(ent, value)
 			ent[store] = value
+			if type(ent.dt) ~= "table" then
+				ent.dt = {}
+			end
+			ent.dt[name] = value
 		end
 		self["Get" .. name] = function(ent)
+			local dt = ent.dt
+			if type(dt) == "table" and dt[name] ~= nil then
+				return dt[name]
+			end
 			local value = ent[store]
 			if value ~= nil then
 				return value
 			end
-			if kind == "Bool" then
-				return false
-			end
-			if kind == "Float" or kind == "Int" then
-				return 0
-			end
-			if kind == "String" then
-				return ""
-			end
-			if kind == "Vector" then
-				return env.Vector()
-			end
-			if kind == "Angle" then
-				return env.Angle()
-			end
-			if kind == "Entity" then
-				return env.NULL
+			if nv_has_default(kind) then
+				return nv_default(kind)
 			end
 			return nil
 		end
@@ -1620,6 +1693,16 @@ function M.boot(opts)
 	end
 	function entity_meta:SetUseType(kind)
 		self.__use_type = kind
+	end
+	-- Stored only. Brush traces do not use the hull.
+	function entity_meta:SetHullType(kind)
+		self.__hull = kind
+	end
+	function entity_meta:GetHullType()
+		return self.__hull
+	end
+	function entity_meta:SetHullSizeNormal()
+		self.__hull_normal = true
 	end
 	function entity_meta:Health()
 		return self.__health or 0
@@ -1674,6 +1757,10 @@ function M.boot(opts)
 			env.__sounds = sounds
 		end
 		sounds[#sounds + 1] = tostring(name or "")
+	end
+	-- One Lua state. The argument is recorded. Effects are not dropped.
+	function env.SuppressHostEvents(ent)
+		env.__suppress_host = ent
 	end
 	-- Effect payload. util.Effect stores it and draws nothing.
 	function env.EffectData()
@@ -2251,8 +2338,9 @@ function M.boot(opts)
 	local ent_seq = 0
 	local function make_ent(class, meta)
 		ent_seq = ent_seq + 1
-		local ent = { __ent = true, ClassName = class or "", __id = ent_seq }
+		local ent = { __ent = true, ClassName = class or "", __id = ent_seq, dt = {} }
 		-- Old scripted entities use self.Entity. It is this object.
+		-- dt is local storage. Nothing is networked.
 		ent.Entity = ent
 		meta = meta or entity_meta
 		return setmetatable(ent, {
@@ -2276,6 +2364,16 @@ function M.boot(opts)
 	env.ents = {}
 	function env.ents.Create(class)
 		local ent = make_ent(class)
+		-- Methods exist before Spawn. GMod sets the owner and thrower first,
+		-- then Spawn runs SetupDataTables and Initialize.
+		local get = env.scripted_ents and env.scripted_ents.Get
+		if type(get) == "function" then
+			local ok, full = pcall(get, class)
+			if ok and type(full) == "table" then
+				absorb_script(ent, full, {})
+				ent.__scripted = true
+			end
+		end
 		spawned[#spawned + 1] = ent
 		if env.__spawn_log then
 			env.__spawn_log[#env.__spawn_log + 1] = ent
@@ -3153,7 +3251,9 @@ absorb_script = function(dst, src, seen)
 		absorb_script(dst, mt.__index, seen)
 	end
 	for k, v in pairs(src) do
-		if k ~= "BaseClass" then
+		-- A script Spawn would hide the engine method that runs SetupDataTables
+		-- and Initialize. In the engine, Spawn is not a script override.
+		if k ~= "BaseClass" and not (k == "Spawn" and type(v) == "function") then
 			local existing = dst[k]
 			if type(existing) == "function" and type(v) ~= "function" then
 				-- A string under a method name would hide the method. Hold-type strings
