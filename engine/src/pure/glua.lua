@@ -1633,11 +1633,23 @@ function M.boot(opts)
 		end
 		local store = "__nv_" .. name
 		self["Set" .. name] = function(ent, value)
+			local old
+			local prev = ent.dt
+			if type(prev) == "table" and prev[name] ~= nil then
+				old = prev[name]
+			else
+				old = ent[store]
+			end
 			ent[store] = value
 			if type(ent.dt) ~= "table" then
 				ent.dt = {}
 			end
 			ent.dt[name] = value
+			local notes = ent.__nv_notify
+			local fn = notes and notes[name]
+			if type(fn) == "function" then
+				fn(ent, name, old, value)
+			end
 		end
 		self["Get" .. name] = function(ent)
 			local dt = ent.dt
@@ -1653,6 +1665,19 @@ function M.boot(opts)
 			end
 			return nil
 		end
+	end
+	-- Stores a callback for one data-table name. The setter calls it.
+	-- Nothing is networked.
+	function entity_meta:NetworkVarNotify(name, fn)
+		if type(name) ~= "string" or name == "" or type(fn) ~= "function" then
+			return
+		end
+		local notes = self.__nv_notify
+		if not notes then
+			notes = {}
+			self.__nv_notify = notes
+		end
+		notes[name] = fn
 	end
 	function entity_meta:DTVar(kind, slot, name)
 		return self:NetworkVar(kind, slot, name)

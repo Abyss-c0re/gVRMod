@@ -172,6 +172,45 @@ function A:Up()
 	return M.Vector(up.x, up.y, up.z)
 end
 
+-- Rodrigues rotation of the angle basis around an axis. Degrees, right-handed.
+-- Rebuilt pitch and yaw use vector_angles, so straight up is pitch 270.
+function A:RotateAroundAxis(axis, degrees)
+	if type(axis) ~= "table" then
+		return self
+	end
+	local ax = tonumber(axis.x) or 0
+	local ay = tonumber(axis.y) or 0
+	local az = tonumber(axis.z) or 0
+	local len = math.sqrt(ax * ax + ay * ay + az * az)
+	if len < 1e-8 then
+		return self
+	end
+	ax, ay, az = ax / len, ay / len, az / len
+	local rad = math.rad(tonumber(degrees) or 0)
+	local ca, sa = math.cos(rad), math.sin(rad)
+	local function spin(vx, vy, vz)
+		local dot = ax * vx + ay * vy + az * vz
+		local cx = ay * vz - az * vy
+		local cy = az * vx - ax * vz
+		local cz = ax * vy - ay * vx
+		local one = 1 - ca
+		return vx * ca + cx * sa + ax * dot * one,
+			vy * ca + cy * sa + ay * dot * one,
+			vz * ca + cz * sa + az * dot * one
+	end
+	local forward, _, up = angles.angle_vectors(self.p, self.y, self.r)
+	local fx, fy, fz = spin(forward.x, forward.y, forward.z)
+	local ux, uy, uz = spin(up.x, up.y, up.z)
+	local pitch, yaw = angles.vector_angles(fx, fy, fz)
+	local _, _, up0 = angles.angle_vectors(pitch, yaw, 0)
+	local sx = up0.y * uz - up0.z * uy
+	local sy = up0.z * ux - up0.x * uz
+	local sz = up0.x * uy - up0.y * ux
+	local roll = math.atan2(sx * fx + sy * fy + sz * fz, up0.x * ux + up0.y * uy + up0.z * uz) * 180 / math.pi
+	self.p, self.y, self.r = pitch, yaw, roll
+	return self
+end
+
 function A:Unpack()
 	return self.p, self.y, self.r
 end

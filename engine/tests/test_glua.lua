@@ -329,6 +329,17 @@ end
 	dt:SetReloading(true)
 	T.eq(dt:GetReloading(), true, "NetworkVar bool set")
 	T.eq(dt.dt.Reloading, true, "data table mirrors the bool")
+	local noted = 0
+	local noted_old, noted_new
+	dt:NetworkVarNotify("Reloading", function(_, _, old, new)
+		noted = noted + 1
+		noted_old = old
+		noted_new = new
+	end)
+	dt:SetReloading(false)
+	T.eq(noted, 1, "NetworkVarNotify runs on set")
+	T.eq(noted_old, true, "NetworkVarNotify sees the old value")
+	T.eq(noted_new, false, "NetworkVarNotify sees the new value")
 	local omit = session.make_ent("weapon_base", session.meta_weapon)
 	omit:NetworkVar("Bool", "Reloading")
 	T.eq(omit:GetReloading(), false, "omitted slot bool default")
