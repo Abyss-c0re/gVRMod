@@ -220,6 +220,27 @@ end
 	shadow:DrawShadow(true)
 	T.eq(shadow.__shadow, true, "DrawShadow records on")
 	T.eq(session.meta_player:InVehicle(), false, "player has no vehicle")
+	T.eq(session.env.IN_ATTACK, 1, "IN_ATTACK")
+	T.eq(session.env.IN_ATTACK2, 2048, "IN_ATTACK2")
+	T.eq(session.env.IN_USE, 32, "IN_USE")
+	local buttons = session.make_ent("player", session.meta_player)
+	T.eq(buttons:IsBot(), false, "player is not a bot")
+	buttons.__bot = true
+	T.eq(buttons:IsBot(), true, "marked bot")
+	buttons.__bot = nil
+	T.eq(buttons:KeyDown(session.env.IN_ATTACK), false, "attack starts up")
+	T.eq(buttons:KeyPressed(session.env.IN_ATTACK2), false, "attack2 was not pressed")
+	T.eq(buttons:KeyReleased(session.env.IN_USE), false, "use was not released")
+	buttons.__buttons = session.env.IN_ATTACK
+	T.eq(buttons:KeyDown(session.env.IN_ATTACK), true, "attack is down")
+	T.eq(buttons:KeyDown(session.env.IN_ATTACK2), false, "attack2 stays up")
+	buttons.__buttons_pressed = session.env.IN_ATTACK2
+	T.eq(buttons:KeyPressed(session.env.IN_ATTACK2), true, "attack2 pressed this frame")
+	buttons.__buttons_released = session.env.IN_USE
+	T.eq(buttons:KeyReleased(session.env.IN_USE), true, "use released this frame")
+	local think_ent = session.make_ent("prop_physics")
+	think_ent:NextThink(1.5)
+	T.eq(think_ent.__next_think, 1.5, "NextThink stores the time")
 	T.eq(session.meta_weapon:IsPlayer(), false, "Weapon:IsPlayer")
 	local dt = session.make_ent("weapon_base", session.meta_weapon)
 	dt:NetworkVar("Bool", 0, "Reloading")

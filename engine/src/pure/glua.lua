@@ -180,6 +180,37 @@ local SOLID = {
 	SOLID_VPHYSICS = 6,
 }
 
+-- Garry's Mod IN enum. Same bits as Source in_buttons.h from ATTACK through
+-- GRENADE2. Facepunch lists these numbers. This install's server binary has
+-- no IN_ATTACK3 string. A button that is not stored is up.
+local BUTTON = {
+	IN_ATTACK = 1,
+	IN_JUMP = 2,
+	IN_DUCK = 4,
+	IN_FORWARD = 8,
+	IN_BACK = 16,
+	IN_USE = 32,
+	IN_CANCEL = 64,
+	IN_LEFT = 128,
+	IN_RIGHT = 256,
+	IN_MOVELEFT = 512,
+	IN_MOVERIGHT = 1024,
+	IN_ATTACK2 = 2048,
+	IN_RUN = 4096,
+	IN_RELOAD = 8192,
+	IN_ALT1 = 16384,
+	IN_ALT2 = 32768,
+	IN_SCORE = 65536,
+	IN_SPEED = 131072,
+	IN_WALK = 262144,
+	IN_ZOOM = 524288,
+	IN_WEAPON1 = 1048576,
+	IN_WEAPON2 = 2097152,
+	IN_BULLRUSH = 4194304,
+	IN_GRENADE1 = 8388608,
+	IN_GRENADE2 = 16777216,
+}
+
 -- Studio models for HL2 classnames whose spawn-menu entry leaves Model unset.
 -- npc_citizen is not in this table: CNPC_Citizen::SelectModel builds
 -- models/Humans/<group>/head from citizentype (npc_citizen17.cpp).
@@ -686,6 +717,9 @@ function M.boot(opts)
 		env[k] = v
 	end
 	for k, v in pairs(SOLID) do
+		env[k] = v
+	end
+	for k, v in pairs(BUTTON) do
 		env[k] = v
 	end
 	for k, v in pairs(activities) do
@@ -1512,6 +1546,10 @@ function M.boot(opts)
 	function entity_meta:GetForward()
 		return self:GetAngles():Forward()
 	end
+	-- Records the next absolute think time. Exercise still calls Think once.
+	function entity_meta:NextThink(t)
+		self.__next_think = tonumber(t) or 0
+	end
 	function entity_meta:SetHealth(h)
 		self.__health = tonumber(h) or 0
 	end
@@ -1720,6 +1758,26 @@ function M.boot(opts)
 	end
 	function player_meta:GetVehicle()
 		return self.__vehicle or env.NULL
+	end
+	-- No bot is created unless a caller marks __bot.
+	function player_meta:IsBot()
+		return self.__bot == true
+	end
+	local function button_held(self, key, field)
+		local bitn = tonumber(key)
+		if not bitn or bitn == 0 then
+			return false
+		end
+		return bit.band(self[field] or 0, bitn) ~= 0
+	end
+	function player_meta:KeyDown(key)
+		return button_held(self, key, "__buttons")
+	end
+	function player_meta:KeyPressed(key)
+		return button_held(self, key, "__buttons_pressed")
+	end
+	function player_meta:KeyReleased(key)
+		return button_held(self, key, "__buttons_released")
 	end
 	function player_meta:MuzzleFlash()
 		self.__muzzle = (self.__muzzle or 0) + 1
