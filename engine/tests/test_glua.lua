@@ -237,6 +237,63 @@ end
 	buttons:RemoveAmmo(-3, "Gravity")
 	T.eq(buttons:GetAmmoCount("Gravity"), 3, "ammo count stored")
 	T.eq(buttons:WaterLevel(), 0, "player is not in water")
+	T.eq(session.env.FSOLID_NOT_STANDABLE, 16, "not standable flag")
+	T.eq(session.env.FSOLID_TRIGGER, 8, "trigger flag")
+	T.eq(session.env.MOVECOLLIDE_DEFAULT, 0, "default move collide")
+	T.eq(session.env.MOVECOLLIDE_FLY_BOUNCE, 1, "fly bounce collide")
+	local lamp = session.make_ent("light_dynamic")
+	local kv_seen = nil
+	function lamp:KeyValue(key, value)
+		kv_seen = key .. "=" .. value
+	end
+	lamp:SetKeyValue("brightness", 3)
+	T.eq(lamp.__kv.brightness, 3, "keyvalue stored")
+	T.eq(kv_seen, "brightness=3", "keyvalue hook")
+	lamp:SetParent(buttons, 1)
+	T.eq(lamp:GetParent(), buttons, "parent stored")
+	T.eq(lamp.__parent_attachment, 1, "parent attachment stored")
+	T.eq(lamp:GetActivity(), -1, "no activity yet")
+	T.eq(lamp:GetSequenceActivity(0), -1, "sequence activity is unknown")
+	lamp:SetNoDraw(true)
+	T.eq(lamp:GetNoDraw(), true, "nodraw stored")
+	lamp:SetMoveCollide(session.env.MOVECOLLIDE_DEFAULT)
+	T.eq(lamp.__movecollide, 0, "move collide stored")
+	lamp:AddSolidFlags(session.env.FSOLID_NOT_STANDABLE)
+	T.eq(lamp:GetSolidFlags(), 16, "solid flag stored")
+	T.eq(lamp:GetGravity(), 1, "gravity scale default")
+	lamp:SetGravity(0.3)
+	T.eq(lamp:GetGravity(), 0.3, "gravity scale stored")
+	local heat = session.env.CreateSound(lamp, "Weapon_XenPortalGun.Heat")
+	T.eq(heat:GetVolume(), 1, "sound volume default")
+	heat:ChangeVolume(0, 0.01)
+	T.eq(heat:GetVolume(), 0, "sound volume stored")
+	T.eq(lamp:GetAttachment(1), nil, "attachment needs model bytes")
+	local vpk = require("pure.vpk")
+	local studio_anim = require("pure.studio_anim")
+	local pistol_pack = vpk.open(gmod .. "/../sourceengine/hl2_misc_dir.vpk")
+	local pistol_mdl = pistol_pack and pistol_pack:read("models/weapons/v_pistol.mdl")
+	local pistol_atts = pistol_mdl and studio_anim.attachments(pistol_mdl)
+	T.eq(pistol_atts and pistol_atts[1] and pistol_atts[1].name, "muzzle", "pistol attachment is the muzzle")
+	session.env.__model_bytes = function(path)
+		if path == "models/weapons/v_pistol.mdl" then
+			return pistol_mdl
+		end
+		return nil
+	end
+	local vm = session.make_ent("predicted_viewmodel")
+	vm:SetModel("models/weapons/v_pistol.mdl")
+	vm:SetPos(session.env.Vector(10, 0, 0))
+	local muzzle = vm:GetAttachment(1)
+	T.ok(muzzle and muzzle.Pos, "attachment has a position")
+	if muzzle and pistol_atts and pistol_atts[1] then
+		T.near(muzzle.Pos.x, 10 + pistol_atts[1].x, 1e-3, "attachment follows the entity")
+		T.near(muzzle.Pos.y, pistol_atts[1].y, 1e-3, "attachment y")
+		T.near(muzzle.Pos.z, pistol_atts[1].z, 1e-3, "attachment z")
+	end
+	T.eq(vm:GetAttachment(0), nil, "attachment 0 is absent")
+	T.eq(vm:GetAttachment(99), nil, "missing attachment is nil")
+	session.env.__model_bytes = nil
+	session.env.__attach_cache = nil
 	local bounds = session.make_ent("prop_physics")
 	bounds:SetMaxHealth(40)
 	T.eq(bounds:GetMaxHealth(), 40, "entity max health stored")
@@ -726,6 +783,12 @@ end
 	T.near(look.endpos.x, 32768, 1e-3, "player trace reaches 32768")
 	T.eq(look.filter, owner, "player trace filters the owner")
 
+	local doomed = session.make_ent("light_dynamic")
+	session.env.SafeRemoveEntityDelayed(doomed, 0.1)
+	T.eq(doomed.__removed, nil, "delayed remove waits")
+	session.env.SafeRemoveEntity(owner)
+	T.eq(owner.__removed, nil, "player is not removed")
 	session.env.__pump(0.1)
 	T.ok(fired_timer, "timer.Simple runs after pump")
+	T.eq(doomed.__removed, true, "delayed remove runs")
 end

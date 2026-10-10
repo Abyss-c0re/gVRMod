@@ -8,6 +8,7 @@ local content = require("pure.content")
 local gma_mod = require("pure.gma")
 local trace = require("pure.trace")
 local vphysics = require("pure.vphysics")
+local studio_anim = require("pure.studio_anim")
 
 local M = {}
 
@@ -178,6 +179,25 @@ local SOLID = {
 	SOLID_OBB_YAW = 4,
 	SOLID_CUSTOM = 5,
 	SOLID_VPHYSICS = 6,
+}
+-- Source SDK 2013 public/const.h SolidFlags_t and MoveCollide_t.
+local SOLID_FLAGS = {
+	FSOLID_CUSTOMRAYTEST = 1,
+	FSOLID_CUSTOMBOXTEST = 2,
+	FSOLID_NOT_SOLID = 4,
+	FSOLID_TRIGGER = 8,
+	FSOLID_NOT_STANDABLE = 16,
+	FSOLID_VOLUME_CONTENTS = 32,
+	FSOLID_FORCE_WORLD_ALIGNED = 64,
+	FSOLID_USE_TRIGGER_BOUNDS = 128,
+	FSOLID_ROOT_PARENT_ALIGNED = 256,
+	FSOLID_TRIGGER_TOUCH_DEBRIS = 512,
+}
+local MOVECOLLIDE = {
+	MOVECOLLIDE_DEFAULT = 0,
+	MOVECOLLIDE_FLY_BOUNCE = 1,
+	MOVECOLLIDE_FLY_CUSTOM = 2,
+	MOVECOLLIDE_FLY_SLIDE = 3,
 }
 
 -- Garry's Mod IN enum. Same bits as Source in_buttons.h from ATTACK through
@@ -717,6 +737,12 @@ function M.boot(opts)
 		env[k] = v
 	end
 	for k, v in pairs(SOLID) do
+		env[k] = v
+	end
+	for k, v in pairs(SOLID_FLAGS) do
+		env[k] = v
+	end
+	for k, v in pairs(MOVECOLLIDE) do
 		env[k] = v
 	end
 	for k, v in pairs(BUTTON) do
@@ -1277,6 +1303,55 @@ function M.boot(opts)
 	function entity_meta:GetModel()
 		return self.__model
 	end
+	-- Bind-pose attachment in world space. No model or no such index is nil.
+	-- Roll is 0 because vector_angles does not recover it.
+	function entity_meta:GetAttachment(id)
+		local index = tonumber(id)
+		if not index then
+			return nil
+		end
+		index = math.floor(index)
+		if index < 1 then
+			return nil
+		end
+		local model = self.__model
+		if type(model) ~= "string" or model == "" then
+			return nil
+		end
+		local read = env.__model_bytes
+		if type(read) ~= "function" then
+			return nil
+		end
+		local cache = env.__attach_cache
+		if not cache then
+			cache = {}
+			env.__attach_cache = cache
+		end
+		local key = model:lower():gsub("\\", "/")
+		local list = cache[key]
+		if list == nil then
+			local ok, bytes = pcall(read, key)
+			local parsed = ok and studio_anim.attachments(bytes) or nil
+			list = parsed or false
+			cache[key] = list
+		end
+		if type(list) ~= "table" or type(list[index]) ~= "table" then
+			return nil
+		end
+		local att = list[index]
+		local ang = self:GetAngles()
+		local pitch = ang.p or ang.pitch or 0
+		local yaw = ang.y or ang.yaw or 0
+		local roll = ang.r or ang.roll or 0
+		local ox, oy, oz = angles.rotate(pitch, yaw, roll, att.x or 0, att.y or 0, att.z or 0)
+		local pos = self:GetPos()
+		local fx, fy, fz = angles.rotate(pitch, yaw, roll, att.fx or 0, att.fy or 0, att.fz or 0)
+		local ap, ayaw = angles.vector_angles(fx, fy, fz)
+		return {
+			Pos = env.Vector((pos.x or 0) + ox, (pos.y or 0) + oy, (pos.z or 0) + oz),
+			Ang = env.Angle(ap, ayaw, 0),
+		}
+	end
 	function entity_meta:SetPos(v)
 		self.__pos = v
 	end
@@ -1291,6 +1366,27 @@ function M.boot(opts)
 	end
 	function entity_meta:SetOwner(o)
 		self.__owner = o
+	end
+	-- Parent is stored. The child is not moved to follow it.
+	function entity_meta:SetParent(parent, attachment)
+		if parent == nil then
+			self.__parent = nil
+			self.__parent_attachment = nil
+			return
+		end
+		self.__parent = parent
+		if attachment ~= nil then
+			self.__parent_attachment = tonumber(attachment) or attachment
+		else
+			self.__parent_attachment = nil
+		end
+	end
+	function entity_meta:GetParent()
+		local parent = self.__parent
+		if parent == nil then
+			return env.NULL
+		end
+		return parent
 	end
 	function entity_meta:GetOwner()
 		return self.__owner
@@ -1394,12 +1490,42 @@ function M.boot(opts)
 	function entity_meta:SetSolid(solid)
 		self.__solid = solid
 	end
+	function entity_meta:AddSolidFlags(flags)
+		local n = tonumber(flags) or 0
+		self.__solid_flags = bit.bor(self.__solid_flags or 0, n)
+	end
+	function entity_meta:GetSolidFlags()
+		return self.__solid_flags or 0
+	end
 	function entity_meta:SetMoveType(kind)
 		self.__movetype = kind
+	end
+	function entity_meta:GetMoveType()
+		return self.__movetype or 0
+	end
+	function entity_meta:SetMoveCollide(kind)
+		self.__movecollide = kind
+	end
+	-- Gravity scale is stored. Entity velocity with no body is not stepped.
+	function entity_meta:SetGravity(g)
+		self.__gravity = tonumber(g) or 0
+	end
+	function entity_meta:GetGravity()
+		if self.__gravity == nil then
+			return 1
+		end
+		return self.__gravity
 	end
 	-- Records the shadow flag. No shadow is drawn.
 	function entity_meta:DrawShadow(draw)
 		self.__shadow = draw and true or false
+	end
+	-- SetNoDraw(true) hides the model. The flag does not delete it.
+	function entity_meta:SetNoDraw(nodraw)
+		self.__nodraw = nodraw and true or false
+	end
+	function entity_meta:GetNoDraw()
+		return self.__nodraw == true
 	end
 	-- Stored only. Brush traces do not filter on this.
 	function entity_meta:SetCollisionGroup(g)
@@ -1582,6 +1708,23 @@ function M.boot(opts)
 			return nil
 		end
 		return saved[key]
+	end
+	-- Key is stored. A script KeyValue on this entity runs. Nothing else is applied.
+	function entity_meta:SetKeyValue(key, value)
+		if key == nil then
+			return
+		end
+		local name = tostring(key)
+		local kv = self.__kv
+		if not kv then
+			kv = {}
+			self.__kv = kv
+		end
+		kv[name] = value
+		local hook = rawget(self, "KeyValue")
+		if type(hook) == "function" then
+			hook(self, name, tostring(value))
+		end
 	end
 	-- Records the input name. It does not run SetDamage or any other engine input.
 	function entity_meta:Fire(input, param, delay)
@@ -1879,6 +2022,17 @@ function M.boot(opts)
 	function entity_meta:GetSequence()
 		return self.__sequence or 0
 	end
+	-- No sequence is playing. ACT_INVALID is -1.
+	function entity_meta:GetActivity()
+		if self.__activity == nil then
+			return -1
+		end
+		return self.__activity
+	end
+	-- No studio sequence-to-activity map is loaded.
+	function entity_meta:GetSequenceActivity()
+		return -1
+	end
 	function entity_meta:ResetSequence(seq)
 		self.__sequence = seq
 		self.__cycle = 0
@@ -1968,6 +2122,12 @@ function M.boot(opts)
 		end
 		function patch:ChangeVolume(vol)
 			self.__vol = tonumber(vol) or 1
+		end
+		function patch:GetVolume()
+			if self.__vol == nil then
+				return 1
+			end
+			return self.__vol
 		end
 		function patch:SetSoundLevel(level)
 			self.__level = tonumber(level) or 0
@@ -3005,6 +3165,23 @@ function M.boot(opts)
 			fn = fn,
 		}
 	end
+	-- Does not remove a player. A missing entity is ignored.
+	function env.SafeRemoveEntity(ent)
+		if type(ent) ~= "table" or ent == env.NULL then
+			return
+		end
+		if type(ent.IsPlayer) == "function" and ent:IsPlayer() then
+			return
+		end
+		if type(ent.Remove) == "function" then
+			ent:Remove()
+		end
+	end
+	function env.SafeRemoveEntityDelayed(ent, delay)
+		env.timer.Simple(delay, function()
+			env.SafeRemoveEntity(ent)
+		end)
+	end
 	function env.__pump(dt)
 		dt = tonumber(dt) or 0
 		if dt < 0 then
@@ -3677,6 +3854,14 @@ function M.exercise(session, items, world)
 			if clip and clip > 0 then
 				ent:SetClip1(clip)
 			end
+		end
+		-- This weapon is the one being fired, so the viewmodel wears its model.
+		-- A weapon with no view model clears the slot.
+		local vm = player:GetViewModel()
+		if it.kind == "weapon" and type(ent.ViewModel) == "string" and ent.ViewModel ~= "" then
+			vm:SetModel(ent.ViewModel)
+		else
+			vm:SetModel(nil)
 		end
 		local ok, err = call_method(ent, "SetupDataTables")
 		if ok == false then

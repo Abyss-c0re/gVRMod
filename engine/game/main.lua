@@ -737,6 +737,9 @@ local function bake_actors(mount, bound, max_edge)
 		end
 	end
 	glua.layout(kept, player.pos, player.yaw)
+	session.env.__model_bytes = function(path)
+		return mount:read(path)
+	end
 	local ex_ok, exercised = pcall(glua.exercise, session, kept, world)
 	if not ex_ok then
 		print("exercise failed " .. tostring(exercised):gsub("%s+", " "))
@@ -788,6 +791,9 @@ local function bake_actors(mount, bound, max_edge)
 		local model = ent:GetModel()
 		if type(model) ~= "string" or model == "" then
 			return nil, nil
+		end
+		if type(ent.GetNoDraw) == "function" and ent:GetNoDraw() then
+			return nil, model
 		end
 		local loaded = load_model(model, false)
 		if loaded and loaded.meshes and #loaded.meshes > 0 then

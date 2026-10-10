@@ -242,6 +242,63 @@ function M.bind_residual(mdl_b)
 	return worst
 end
 
+-- studiohdr_t numlocalattachments / localattachmentindex, Source SDK 2013.
+-- mstudioattachment_t is 92 bytes. The bind-pose bone matrix takes the local
+-- attachment into model space. Index 1 is the first attachment.
+local ATTACH = 92
+
+function M.attachments(mdl)
+	if not mdl or mdl:sub(1, 4) ~= "IDST" then
+		return nil
+	end
+	local n = i32(mdl, 240)
+	local ix = i32(mdl, 244)
+	if not n or n < 1 or n > 128 or not ix or ix < 0 then
+		return nil
+	end
+	local bones = read_bones(mdl)
+	if not bones then
+		return nil
+	end
+	local world = {}
+	for i = 0, #bones do
+		local localm = qmat(bones[i].quat, bones[i].pos)
+		local parent = bones[i].parent
+		if parent >= 0 and world[parent] then
+			world[i] = mul(world[parent], localm)
+		else
+			world[i] = localm
+		end
+	end
+	local out = {}
+	for i = 0, n - 1 do
+		local o = ix + i * ATTACH
+		if o < 0 or o + ATTACH > #mdl then
+			return nil
+		end
+		local bone = i32(mdl, o + 8)
+		local localm = {}
+		for k = 0, 11 do
+			localm[k + 1] = f32(mdl, o + 12 + k * 4)
+		end
+		local space = localm
+		if bone and bone >= 0 and world[bone] then
+			space = mul(world[bone], localm)
+		end
+		local name_rel = i32(mdl, o)
+		out[i + 1] = {
+			name = cstr(mdl, o + (name_rel or 0)),
+			x = space[4],
+			y = space[8],
+			z = space[12],
+			fx = space[1],
+			fy = space[5],
+			fz = space[9],
+		}
+	end
+	return out
+end
+
 local function includes_of(mdl)
 	local n = i32(mdl, 336)
 	local ix = i32(mdl, 340)
