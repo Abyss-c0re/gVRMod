@@ -1,9 +1,17 @@
 return function(T)
 	local compat = require("pure.compat")
 
+	local zero = compat.Vector()
+	T.eq(zero:IsZero(), true, "zero vector")
 	local v = compat.Vector(1, 2, 3) + compat.Vector(4, 5, 6)
+	T.eq(v:IsZero(), false, "nonzero vector")
+	T.eq(v[1], 5, "vector x index")
+	T.eq(v[2], 7, "vector y index")
+	T.eq(v[3], 9, "vector z index")
 	T.near(v.x, 5, 0, "vec add")
 	T.near(v:Dot(compat.Vector(1, 0, 0)), 5, 0, "dot")
+	v[1] = 8
+	T.eq(v.x, 8, "vector x write")
 	local fwd = compat.Angle(0, 90, 0):Forward()
 	T.near(fwd.y, 1, 1e-6, "angle forward")
 	T.near(fwd.x, 0, 1e-6, "angle forward x")

@@ -1366,6 +1366,21 @@ function M.boot(opts)
 	function entity_meta:PhysicsInit(solid)
 		self.__solid = solid
 	end
+	-- Points are stored. No convex collide is cooked, so this returns false.
+	function entity_meta:PhysicsInitConvex(points)
+		if type(points) ~= "table" then
+			return false
+		end
+		self.__convex = points
+		return false
+	end
+	-- Skin index only. The drawn material does not change.
+	function entity_meta:SetSkin(n)
+		self.__skin = tonumber(n) or 0
+	end
+	function entity_meta:GetSkin()
+		return self.__skin or 0
+	end
 	function entity_meta:SetSolid(solid)
 		self.__solid = solid
 	end
@@ -1427,6 +1442,118 @@ function M.boot(opts)
 			return default
 		end
 		return nw[key]
+	end
+	-- Local records. Nothing is sent. NW and NW2 do not share a table.
+	local function nw_set(ent, field, key, value)
+		if type(key) ~= "string" or key == "" then
+			return
+		end
+		local nw = ent[field]
+		if not nw then
+			nw = {}
+			ent[field] = nw
+		end
+		nw[key] = value
+	end
+	local function nw_get(ent, field, key, default, fallback)
+		local nw = ent[field]
+		if type(key) ~= "string" or not nw or nw[key] == nil then
+			if default == nil then
+				return fallback
+			end
+			return default
+		end
+		return nw[key]
+	end
+	function entity_meta:SetNWInt(key, value)
+		nw_set(self, "__nw", key, math.floor(tonumber(value) or 0))
+	end
+	function entity_meta:GetNWInt(key, default)
+		return nw_get(self, "__nw", key, default, 0)
+	end
+	function entity_meta:SetNWFloat(key, value)
+		nw_set(self, "__nw", key, tonumber(value) or 0)
+	end
+	function entity_meta:GetNWFloat(key, default)
+		return nw_get(self, "__nw", key, default, 0)
+	end
+	function entity_meta:SetNWString(key, value)
+		nw_set(self, "__nw", key, tostring(value or ""))
+	end
+	function entity_meta:GetNWString(key, default)
+		return nw_get(self, "__nw", key, default, "")
+	end
+	function entity_meta:SetNWEntity(key, value)
+		nw_set(self, "__nw", key, value)
+	end
+	function entity_meta:GetNWEntity(key, default)
+		return nw_get(self, "__nw", key, default, env.NULL)
+	end
+	function entity_meta:SetNWVector(key, value)
+		if type(value) ~= "table" then
+			value = env.Vector()
+		end
+		nw_set(self, "__nw", key, env.Vector(value.x, value.y, value.z))
+	end
+	function entity_meta:GetNWVector(key, default)
+		return nw_get(self, "__nw", key, default, env.Vector())
+	end
+	function entity_meta:SetNWAngle(key, value)
+		if type(value) ~= "table" then
+			value = env.Angle()
+		end
+		nw_set(self, "__nw", key, env.Angle(value.p or value.x, value.y, value.r or value.z))
+	end
+	function entity_meta:GetNWAngle(key, default)
+		return nw_get(self, "__nw", key, default, env.Angle())
+	end
+	function entity_meta:SetNW2Int(key, value)
+		nw_set(self, "__nw2", key, math.floor(tonumber(value) or 0))
+	end
+	function entity_meta:GetNW2Int(key, default)
+		return nw_get(self, "__nw2", key, default, 0)
+	end
+	function entity_meta:SetNW2Float(key, value)
+		nw_set(self, "__nw2", key, tonumber(value) or 0)
+	end
+	function entity_meta:GetNW2Float(key, default)
+		return nw_get(self, "__nw2", key, default, 0)
+	end
+	function entity_meta:SetNW2Bool(key, value)
+		nw_set(self, "__nw2", key, value and true or false)
+	end
+	function entity_meta:GetNW2Bool(key, default)
+		return nw_get(self, "__nw2", key, default, false)
+	end
+	function entity_meta:SetNW2Entity(key, value)
+		nw_set(self, "__nw2", key, value)
+	end
+	function entity_meta:GetNW2Entity(key, default)
+		return nw_get(self, "__nw2", key, default, env.NULL)
+	end
+	function entity_meta:SetNW2String(key, value)
+		nw_set(self, "__nw2", key, tostring(value or ""))
+	end
+	function entity_meta:GetNW2String(key, default)
+		return nw_get(self, "__nw2", key, default, "")
+	end
+	function entity_meta:SetNW2Vector(key, value)
+		if type(value) ~= "table" then
+			value = env.Vector()
+		end
+		nw_set(self, "__nw2", key, env.Vector(value.x, value.y, value.z))
+	end
+	function entity_meta:GetNW2Vector(key, default)
+		return nw_get(self, "__nw2", key, default, env.Vector())
+	end
+	function entity_meta:SetNW2Angle(key, value)
+		if type(value) ~= "table" then
+			value = env.Angle()
+		end
+		nw_set(self, "__nw2", key, env.Angle(value.p or value.x, value.y, value.r or value.z))
+	end
+	function entity_meta:GetNW2Angle(key, default)
+		return nw_get(self, "__nw2", key, default, env.Angle())
 	end
 	function entity_meta:SetSaveValue(key, value)
 		if type(key) ~= "string" or key == "" then

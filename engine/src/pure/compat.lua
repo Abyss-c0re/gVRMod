@@ -7,7 +7,35 @@ local angles = require("pure.angles")
 local M = {}
 
 local V = {}
-V.__index = V
+-- 1, 2, 3 are x, y, z. Methods stay on this table.
+function V.__index(self, key)
+	if key == 1 then
+		return rawget(self, "x")
+	end
+	if key == 2 then
+		return rawget(self, "y")
+	end
+	if key == 3 then
+		return rawget(self, "z")
+	end
+	return V[key]
+end
+
+function V.__newindex(self, key, value)
+	if key == 1 then
+		rawset(self, "x", value)
+		return
+	end
+	if key == 2 then
+		rawset(self, "y", value)
+		return
+	end
+	if key == 3 then
+		rawset(self, "z", value)
+		return
+	end
+	rawset(self, key, value)
+end
 
 function M.Vector(x, y, z)
 	if type(x) == "table" then
@@ -24,6 +52,10 @@ end
 function V:Sub(o)
 	self.x, self.y, self.z = self.x - o.x, self.y - o.y, self.z - o.z
 	return self
+end
+
+function V:IsZero()
+	return self.x == 0 and self.y == 0 and self.z == 0
 end
 
 function V:Mul(s)
