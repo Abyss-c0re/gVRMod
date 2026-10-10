@@ -1546,6 +1546,12 @@ function M.boot(opts)
 	function entity_meta:GetForward()
 		return self:GetAngles():Forward()
 	end
+	function entity_meta:GetRight()
+		return self:GetAngles():Right()
+	end
+	function entity_meta:GetUp()
+		return self:GetAngles():Up()
+	end
 	-- Records the next absolute think time. Exercise still calls Think once.
 	function entity_meta:NextThink(t)
 		self.__next_think = tonumber(t) or 0
@@ -1762,6 +1768,29 @@ function M.boot(opts)
 	-- No bot is created unless a caller marks __bot.
 	function player_meta:IsBot()
 		return self.__bot == true
+	end
+	-- The owner is placed in the air. Movement is what sets __ground.
+	function player_meta:IsOnGround()
+		return self.__ground == true
+	end
+	-- Unset speeds stay 0. The sandbox player class is not applied here.
+	function player_meta:SetWalkSpeed(n)
+		self.__walk = tonumber(n) or 0
+	end
+	function player_meta:GetWalkSpeed()
+		return self.__walk or 0
+	end
+	function player_meta:SetRunSpeed(n)
+		self.__run = tonumber(n) or 0
+	end
+	function player_meta:GetRunSpeed()
+		return self.__run or 0
+	end
+	function player_meta:SetJumpPower(n)
+		self.__jump = tonumber(n) or 0
+	end
+	function player_meta:GetJumpPower()
+		return self.__jump or 0
 	end
 	local function button_held(self, key, field)
 		local bitn = tonumber(key)

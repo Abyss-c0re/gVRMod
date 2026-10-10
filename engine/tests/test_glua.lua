@@ -225,6 +225,23 @@ end
 	T.eq(session.env.IN_USE, 32, "IN_USE")
 	local buttons = session.make_ent("player", session.meta_player)
 	T.eq(buttons:IsBot(), false, "player is not a bot")
+	T.eq(buttons:IsOnGround(), false, "placed player is not on the ground")
+	buttons.__ground = true
+	T.eq(buttons:IsOnGround(), true, "movement can mark the ground")
+	buttons.__ground = nil
+	T.eq(buttons:GetWalkSpeed(), 0, "walk speed unset")
+	buttons:SetWalkSpeed(1)
+	buttons:SetRunSpeed(400)
+	buttons:SetJumpPower(200)
+	T.eq(buttons:GetWalkSpeed(), 1, "walk speed stored")
+	T.eq(buttons:GetRunSpeed(), 400, "run speed stored")
+	T.eq(buttons:GetJumpPower(), 200, "jump power stored")
+	buttons:SetAngles(session.env.Angle(0, 270, 0))
+	local right = buttons:GetRight()
+	T.near(right.x, -1, 1e-6, "yaw 270 right is -X")
+	T.near(right.y, 0, 1e-6, "yaw 270 right y")
+	local up = buttons:GetUp()
+	T.near(up.z, 1, 1e-6, "level up is +Z")
 	buttons.__bot = true
 	T.eq(buttons:IsBot(), true, "marked bot")
 	buttons.__bot = nil
