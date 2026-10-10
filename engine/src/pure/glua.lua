@@ -2197,6 +2197,17 @@ function M.boot(opts)
 		local key = tostring(ammo or "")
 		self.__ammo[key] = (self.__ammo[key] or 0) - (tonumber(num) or 0)
 	end
+	function player_meta:GetAmmoCount(ammo)
+		local store = self.__ammo
+		if not store then
+			return 0
+		end
+		return store[tostring(ammo or "")] or 0
+	end
+	-- No water is simulated. A dry player is level 0.
+	function player_meta:WaterLevel()
+		return 0
+	end
 	-- Records the bullet the Lua asked for. It does not apply damage.
 	function player_meta:FireBullets(bullet)
 		if type(bullet) ~= "table" or type(bullet.Src) ~= "table" or type(bullet.Dir) ~= "table" then
