@@ -1381,6 +1381,16 @@ function M.boot(opts)
 	function entity_meta:GetSkin()
 		return self.__skin or 0
 	end
+	-- Stored render color. The mesh is not tinted.
+	function entity_meta:SetColor(col)
+		if type(col) ~= "table" then
+			return
+		end
+		self.__color = env.Color(col.r, col.g, col.b, col.a)
+	end
+	function entity_meta:GetColor()
+		return self.__color or env.Color(255, 255, 255, 255)
+	end
 	function entity_meta:SetSolid(solid)
 		self.__solid = solid
 	end

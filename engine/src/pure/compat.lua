@@ -58,6 +58,16 @@ function V:IsZero()
 	return self.x == 0 and self.y == 0 and self.z == 0
 end
 
+function V:Set(other)
+	if type(other) ~= "table" then
+		return self
+	end
+	self.x = tonumber(other.x) or 0
+	self.y = tonumber(other.y) or 0
+	self.z = tonumber(other.z) or 0
+	return self
+end
+
 function V:Mul(s)
 	if type(s) == "table" then
 		self.x, self.y, self.z = self.x * s.x, self.y * s.y, self.z * s.z
@@ -240,6 +250,16 @@ function A:RotateAroundAxis(axis, degrees)
 	local sz = up0.x * uy - up0.y * ux
 	local roll = math.atan2(sx * fx + sy * fy + sz * fz, up0.x * ux + up0.y * uy + up0.z * uz) * 180 / math.pi
 	self.p, self.y, self.r = pitch, yaw, roll
+	return self
+end
+
+function A:Set(other)
+	if type(other) ~= "table" then
+		return self
+	end
+	self.p = tonumber(other.p or other.pitch or other.x) or 0
+	self.y = tonumber(other.y or other.yaw) or 0
+	self.r = tonumber(other.r or other.roll or other.z) or 0
 	return self
 end
 
