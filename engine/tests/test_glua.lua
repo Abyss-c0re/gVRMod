@@ -214,6 +214,11 @@ end
 	T.eq(type(session.env.FindMetaTable("Entity")), "table", "Entity meta")
 	T.eq(type(session.env.FindMetaTable("Player")), "table", "Player meta")
 	T.eq(session.meta_player:IsPlayer(), true, "Player:IsPlayer")
+	local shadow = session.make_ent("prop_physics", session.meta_entity or nil)
+	shadow:DrawShadow(false)
+	T.eq(shadow.__shadow, false, "DrawShadow records off")
+	shadow:DrawShadow(true)
+	T.eq(shadow.__shadow, true, "DrawShadow records on")
 	T.eq(session.meta_player:InVehicle(), false, "player has no vehicle")
 	T.eq(session.meta_weapon:IsPlayer(), false, "Weapon:IsPlayer")
 	local dt = session.make_ent("weapon_base", session.meta_weapon)
@@ -314,6 +319,8 @@ end
 	T.eq(tr.HitWorld, true, "ray hit the world")
 	T.eq(tr.MatType, 0, "ray material unknown")
 	T.near(tr.HitPos.z, 0, 0.05, "hit near the slab")
+	T.near(tr.StartPos.z, 64, 1e-6, "trace keeps its start")
+	T.near(tr.StartPos.x, 0, 1e-6, "trace start x")
 	local miss = session.env.util.TraceLine({
 		start = session.env.Vector(0, 0, 64),
 		endpos = session.env.Vector(0, 0, 32),
@@ -325,6 +332,9 @@ end
 	eye_ply:SetAngles(session.env.Angle(90, 0, 0))
 	local eye = eye_ply:GetEyeTrace()
 	T.eq(eye.Hit, true, "GetEyeTrace hits the floor")
+	T.near(eye.StartPos.z, 64, 1e-4, "eye trace starts at the eyes")
+	local span = eye.HitPos - eye.StartPos
+	T.ok(span and span:Length() > 0, "hit minus start is a length")
 	T.eq(eye_ply:GetEyeTraceNoCursor().Hit, true, "GetEyeTraceNoCursor hits the floor")
 	session.trace_slot.world = nil
 	local noworld = session.env.util.TraceLine({
@@ -404,6 +414,23 @@ end
 	end)
 	T.eq(spawn_ok, false, "Spawn does not hide a missing method " .. tostring(spawn_err))
 	T.eq(rocket.__spawned, true, "spawn marked")
+	local dt_ok = pcall(session.env.scripted_ents.Register, {
+		Type = "anim",
+		Base = "base_anim",
+		SetupDataTables = function(self)
+			self:NetworkVar("Float", "Effectiveness")
+		end,
+		Initialize = function(self)
+			self:SetEffectiveness(0.25)
+		end,
+	}, "engine_test_dt")
+	T.eq(dt_ok, true, "data table entity registered")
+	local dt_ent = session.env.ents.Create("engine_test_dt")
+	local dt_spawn, dt_err = pcall(function()
+		dt_ent:Spawn()
+	end)
+	T.eq(dt_spawn, true, "Spawn runs SetupDataTables before Initialize " .. tostring(dt_err))
+	T.eq(dt_ent:GetEffectiveness(), 0.25, "Initialize sees the networked float")
 	T.eq(rocket:GetModel(), "models/weapons/w_missile_launch.mdl", "model set before the miss")
 	T.eq(rocket:GetPos().x, 3, "spawn keeps the position")
 	T.eq(session.env.IsValid(rocket:GetPhysicsObject()), false, "physics object is invalid")

@@ -1306,6 +1306,10 @@ function M.boot(opts)
 	function entity_meta:SetMoveType(kind)
 		self.__movetype = kind
 	end
+	-- Records the shadow flag. No shadow is drawn.
+	function entity_meta:DrawShadow(draw)
+		self.__shadow = draw and true or false
+	end
 	-- Stored only. Brush traces do not filter on this.
 	function entity_meta:SetCollisionGroup(g)
 		local n = tonumber(g)
@@ -1406,7 +1410,8 @@ function M.boot(opts)
 	function entity_meta:Activate()
 		self.__active = true
 	end
-	-- Apply the scripted class, then Initialize. A later missing method still errors.
+	-- Apply the scripted class, install its data table, then Initialize.
+	-- A later missing method still errors.
 	function entity_meta:Spawn()
 		if self.__spawned then
 			return
@@ -1418,6 +1423,9 @@ function M.boot(opts)
 			if ok and type(full) == "table" then
 				absorb_script(self, full, {})
 			end
+		end
+		if type(self.SetupDataTables) == "function" then
+			self:SetupDataTables()
 		end
 		if type(self.Initialize) == "function" then
 			self:Initialize()
@@ -2125,7 +2133,10 @@ function M.boot(opts)
 			z = tonumber(v.z) or 0,
 		}
 	end
-	local function trace_result(hit, startsolid, fraction, endpos, normal)
+	local function trace_result(hit, startsolid, fraction, endpos, normal, startpos)
+		if type(startpos) ~= "table" then
+			startpos = { x = 0, y = 0, z = 0 }
+		end
 		return {
 			Hit = hit and true or false,
 			StartSolid = startsolid and true or false,
@@ -2133,6 +2144,7 @@ function M.boot(opts)
 			HitWorld = hit and true or false,
 			Entity = env.NULL,
 			HitPos = env.Vector(endpos.x, endpos.y, endpos.z),
+			StartPos = env.Vector(startpos.x, startpos.y, startpos.z),
 			HitNormal = env.Vector(normal.x, normal.y, normal.z),
 			MatType = 0,
 		}
@@ -2141,13 +2153,14 @@ function M.boot(opts)
 		if type(data) ~= "table" then
 			return trace_result(false, false, 1, { x = 0, y = 0, z = 0 }, { x = 0, y = 0, z = 1 })
 		end
+		local start = trace_vec(data.start or data.Start)
 		local dest = trace_vec(data.endpos or data.EndPos)
 		local world = trace_slot.world
 		if type(world) ~= "table" or type(world.brushes) ~= "table" then
-			return trace_result(false, false, 1, dest, { x = 0, y = 0, z = 1 })
+			return trace_result(false, false, 1, dest, { x = 0, y = 0, z = 1 }, start)
 		end
-		local tr = trace.hull(world, trace_vec(data.start or data.Start), dest, mins, maxs)
-		return trace_result(tr.hit, tr.startsolid, tr.fraction, tr.endpos, tr.normal)
+		local tr = trace.hull(world, start, dest, mins, maxs)
+		return trace_result(tr.hit, tr.startsolid, tr.fraction, tr.endpos, tr.normal, start)
 	end
 	function env.util.TraceLine(data)
 		local zero = { x = 0, y = 0, z = 0 }
