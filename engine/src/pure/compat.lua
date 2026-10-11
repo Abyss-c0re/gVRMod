@@ -123,6 +123,10 @@ function V:Unpack()
 	return self.x, self.y, self.z
 end
 
+function V:SetUnpacked(x, y, z)
+	self.x, self.y, self.z = x, y, z
+end
+
 function V:Zero()
 	self.x, self.y, self.z = 0, 0, 0
 	return self
@@ -402,6 +406,10 @@ function M.make_env(realm)
 	env.RealTime = env.SysTime
 	env.Color = function(r, g, b, a)
 		return { r = r or 255, g = g or 255, b = b or 255, a = a or 255 }
+	end
+	-- includes/util/color.lua. Replaces alpha. Does not draw.
+	env.ColorAlpha = function(c, a)
+		return env.Color(c.r, c.g, c.b, a)
 	end
 	env.Either = function(c, a, b)
 		if c then

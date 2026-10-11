@@ -517,6 +517,26 @@ local function install_table(env)
 			return (str:gsub(what, with))
 		end
 	end
+	-- includes/extensions/string.lua. string.sub, not a clipped copy.
+	if not string.Left then
+		function string.Left(str, num)
+			return string.sub(str, 1, num)
+		end
+	end
+	if not string.Right then
+		function string.Right(str, num)
+			return string.sub(str, -num)
+		end
+	end
+	if not string.ToColor then
+		function string.ToColor(str)
+			local r, g, b, a = string.match(str, "(%d+) (%d+) (%d+) (%d+)")
+			if not a then
+				r, g, b = string.match(str, "(%d+) (%d+) (%d+)")
+			end
+			return env.Color(tonumber(r) or 255, tonumber(g) or 255, tonumber(b) or 255, tonumber(a) or 255)
+		end
+	end
 	env.table = table
 	env.string = string
 end
@@ -773,6 +793,9 @@ function M.boot(opts)
 			Clamp = function(value, low, high)
 				return math.min(math.max(value, low), high)
 			end,
+			-- includes/extensions/math.lua aliases. Same function as math.max.
+			Max = math.max,
+			Min = math.min,
 		}, { __index = host_math })
 	end
 	-- includes/util.lua AngleRand. Pitch defaults differ from yaw and roll.
@@ -1340,6 +1363,16 @@ function M.boot(opts)
 	env.CHAN_STATIC = 6
 	env.color_white = env.Color(255, 255, 255, 255)
 	env.vector_origin = env.Vector(0, 0, 0)
+	-- includes/util.lua. One shared vector. Mutating it mutates the global.
+	env.vector_up = env.Vector(0, 0, 1)
+	env.angle_zero = env.Angle(0, 0, 0)
+	-- sv_gravity 600, Source +Z up. The open solver subtracts this from z.
+	-- SetGravity is not implemented, so this vector does not change.
+	env.physenv = {
+		GetGravity = function()
+			return env.Vector(0, 0, -vphysics.GRAVITY)
+		end,
+	}
 	-- Source FFADE_* bits. ScreenFade records them and does not draw a fade.
 	env.SCREENFADE = {
 		IN = 1,
@@ -1375,6 +1408,9 @@ function M.boot(opts)
 	meta_tables.Player = player_meta
 	meta_tables.Weapon = weapon_meta
 	meta_tables.NPC = npc_meta
+	-- The same tables Vector() and Angle() use. A missing method stays nil.
+	meta_tables.Vector = getmetatable(env.Vector())
+	meta_tables.Angle = getmetatable(env.Angle())
 	setmetatable(player_meta, { __index = entity_meta })
 	setmetatable(weapon_meta, { __index = entity_meta })
 	setmetatable(npc_meta, { __index = entity_meta })
@@ -1922,6 +1958,64 @@ function M.boot(opts)
 			delay = tonumber(delay) or 0,
 		}
 	end
+	-- Shared by every cooked box. An uncooked phys does not use this table,
+	-- so SetVelocity stays missing there. WorldToLocal is not on this table.
+	local phys_meta = {}
+	phys_meta.__index = phys_meta
+	function phys_meta:IsValid()
+		return self.__body ~= nil
+	end
+	function phys_meta:Wake()
+		self.__awake = true
+	end
+	function phys_meta:SetBuoyancyRatio(n)
+		self.__buoy = tonumber(n) or 0
+	end
+	function phys_meta:SetMass(n)
+		local body = self.__body
+		local mass = tonumber(n)
+		if body and mass and mass > 0 then
+			body.mass = mass
+		end
+	end
+	function phys_meta:EnableGravity(on)
+		local body = self.__body
+		if not body then
+			return
+		end
+		body.gravity = on and vphysics.GRAVITY or 0
+	end
+	function phys_meta:EnableDrag(on)
+		self.__drag = on and true or false
+	end
+	-- Stored. The open solver does not apply these coefficients.
+	function phys_meta:SetDragCoefficient(n)
+		self.__drag_coeff = tonumber(n) or 0
+	end
+	function phys_meta:SetAngleDragCoefficient(n)
+		self.__angle_drag = tonumber(n) or 0
+	end
+	function phys_meta:SetVelocity(v)
+		local body = self.__body
+		if not body or type(v) ~= "table" then
+			return
+		end
+		body.vel.x = tonumber(v.x) or 0
+		body.vel.y = tonumber(v.y) or 0
+		body.vel.z = tonumber(v.z) or 0
+	end
+	function phys_meta:SetVelocityInstantaneous(v)
+		self:SetVelocity(v)
+	end
+	function phys_meta:GetVelocity()
+		local body = self.__body
+		if not body then
+			return env.Vector()
+		end
+		return env.Vector(body.vel.x, body.vel.y, body.vel.z)
+	end
+	meta_tables.PhysObj = phys_meta
+
 	function entity_meta:PhysicsInitBox(mins, maxs)
 		if type(mins) ~= "table" or type(maxs) ~= "table" then
 			return
@@ -1938,49 +2032,7 @@ function M.boot(opts)
 			pos.x, pos.y, pos.z,
 			half(mins.x, maxs.x), half(mins.y, maxs.y), half(mins.z, maxs.z)
 		)
-		local phys = { __body = body }
-		function phys:IsValid()
-			return true
-		end
-		function phys:Wake()
-			self.__awake = true
-		end
-		function phys:SetBuoyancyRatio(n)
-			self.__buoy = tonumber(n) or 0
-		end
-		function phys:SetMass(n)
-			local mass = tonumber(n)
-			if mass and mass > 0 then
-				body.mass = mass
-			end
-		end
-		function phys:EnableGravity(on)
-			body.gravity = on and vphysics.GRAVITY or 0
-		end
-		function phys:EnableDrag(on)
-			self.__drag = on and true or false
-		end
-		-- Stored. The open solver does not apply these coefficients.
-		function phys:SetDragCoefficient(n)
-			self.__drag_coeff = tonumber(n) or 0
-		end
-		function phys:SetAngleDragCoefficient(n)
-			self.__angle_drag = tonumber(n) or 0
-		end
-		function phys:SetVelocity(v)
-			if type(v) ~= "table" then
-				return
-			end
-			body.vel.x = tonumber(v.x) or 0
-			body.vel.y = tonumber(v.y) or 0
-			body.vel.z = tonumber(v.z) or 0
-		end
-		function phys:SetVelocityInstantaneous(v)
-			self:SetVelocity(v)
-		end
-		function phys:GetVelocity()
-			return env.Vector(body.vel.x, body.vel.y, body.vel.z)
-		end
+		local phys = setmetatable({ __body = body }, phys_meta)
 		self.__phys = phys
 		return phys
 	end
@@ -2714,6 +2766,21 @@ function M.boot(opts)
 			return 0
 		end
 		return cv:GetFloat()
+	end
+	-- Local only. Nothing is replicated to a client.
+	local global_ints = {}
+	function env.SetGlobalInt(name, value)
+		global_ints[tostring(name)] = tonumber(value) or 0
+	end
+	function env.GetGlobalInt(name, default)
+		local v = global_ints[tostring(name)]
+		if v == nil then
+			if default == nil then
+				return 0
+			end
+			return default
+		end
+		return v
 	end
 	-- cfg/skill.cfg from the local game. Names absent from that file stay missing.
 	do
