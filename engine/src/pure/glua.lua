@@ -231,6 +231,52 @@ local BUTTON = {
 	IN_GRENADE2 = 16777216,
 }
 
+-- Garry's Mod CAP enum, wiki.facepunch.com/gmod/Enums/CAP.
+-- The name order matches this install's server binary. Bit 9 and bit 22 are
+-- absent there (the commented HEAR and STRAFE bits). Do not add them.
+-- CAP_SIMPLE_RADIUS_DAMAGE is the signed 32-bit value the wiki prints.
+local CAP = {
+	CAP_MOVE_GROUND = 1,
+	CAP_MOVE_JUMP = 2,
+	CAP_MOVE_FLY = 4,
+	CAP_MOVE_CLIMB = 8,
+	CAP_MOVE_SWIM = 16,
+	CAP_MOVE_CRAWL = 32,
+	CAP_MOVE_SHOOT = 64,
+	CAP_SKIP_NAV_GROUND_CHECK = 128,
+	CAP_USE = 256,
+	CAP_AUTO_DOORS = 1024,
+	CAP_OPEN_DOORS = 2048,
+	CAP_TURN_HEAD = 4096,
+	CAP_WEAPON_RANGE_ATTACK1 = 8192,
+	CAP_WEAPON_RANGE_ATTACK2 = 16384,
+	CAP_WEAPON_MELEE_ATTACK1 = 32768,
+	CAP_WEAPON_MELEE_ATTACK2 = 65536,
+	CAP_INNATE_RANGE_ATTACK1 = 131072,
+	CAP_INNATE_RANGE_ATTACK2 = 262144,
+	CAP_INNATE_MELEE_ATTACK1 = 524288,
+	CAP_INNATE_MELEE_ATTACK2 = 1048576,
+	CAP_USE_WEAPONS = 2097152,
+	CAP_ANIMATEDFACE = 8388608,
+	CAP_USE_SHOT_REGULATOR = 16777216,
+	CAP_FRIENDLY_DMG_IMMUNE = 33554432,
+	CAP_SQUAD = 67108864,
+	CAP_DUCK = 134217728,
+	CAP_NO_HIT_PLAYER = 268435456,
+	CAP_AIM_GUN = 536870912,
+	CAP_NO_HIT_SQUADMATES = 1073741824,
+	CAP_SIMPLE_RADIUS_DAMAGE = -2147483648,
+}
+
+-- terrortown/gamemode/shared.lua. GetRoundState reads GAMEMODE.round_state.
+-- That gamemode file is not run, so an unset round is WAIT, not ACTIVE.
+local ROUND = {
+	ROUND_WAIT = 1,
+	ROUND_PREP = 2,
+	ROUND_ACTIVE = 3,
+	ROUND_POST = 4,
+}
+
 -- Studio models for HL2 classnames whose spawn-menu entry leaves Model unset.
 -- npc_citizen is not in this table: CNPC_Citizen::SelectModel builds
 -- models/Humans/<group>/head from citizentype (npc_citizen17.cpp).
@@ -362,6 +408,12 @@ local function install_table(env)
 				keys[#keys + 1] = k
 			end
 			return keys
+		end
+	end
+	-- includes/extensions/table.lua. next(nil) still errors.
+	if not table.IsEmpty then
+		function table.IsEmpty(tab)
+			return next(tab) == nil
 		end
 	end
 	if not table.Inherit then
@@ -747,6 +799,27 @@ function M.boot(opts)
 	end
 	for k, v in pairs(BUTTON) do
 		env[k] = v
+	end
+	for k, v in pairs(CAP) do
+		env[k] = v
+	end
+	for k, v in pairs(ROUND) do
+		env[k] = v
+	end
+	-- TTT init.lua returns GAMEMODE.round_state. No round has been started.
+	function env.GetRoundState()
+		local gm = env.GAMEMODE
+		local state = type(gm) == "table" and gm.round_state or nil
+		if state == nil then
+			return env.ROUND_WAIT
+		end
+		return state
+	end
+	function env.SetRoundState(state)
+		if type(env.GAMEMODE) ~= "table" then
+			env.GAMEMODE = {}
+		end
+		env.GAMEMODE.round_state = state
 	end
 	for k, v in pairs(activities) do
 		env[k] = v
@@ -1450,8 +1523,36 @@ function M.boot(opts)
 	function entity_meta:IsValid()
 		return self.__removed ~= true
 	end
+	-- Stored until Remove. Finish does not remove the entity, so this does not
+	-- run at undo creation. The callback is func(ent, ...).
+	function entity_meta:CallOnRemove(name, fn, ...)
+		if type(name) ~= "string" or name == "" or type(fn) ~= "function" then
+			return
+		end
+		local hooks = self.__on_remove
+		if not hooks then
+			hooks = {}
+			self.__on_remove = hooks
+		end
+		hooks[name] = { fn = fn, args = { ... } }
+	end
 	function entity_meta:Remove()
+		if self.__removed == true then
+			return
+		end
 		self.__removed = true
+		local hooks = self.__on_remove
+		self.__on_remove = nil
+		if not hooks then
+			return
+		end
+		for _, rec in pairs(hooks) do
+			pcall(rec.fn, self, unpack(rec.args))
+		end
+	end
+	-- Entity index in this process. Not a SteamID hash. There is no SteamID.
+	function entity_meta:UniqueID()
+		return self.__id or 0
 	end
 	function entity_meta:EntIndex()
 		return self.__id or -1
@@ -1491,9 +1592,46 @@ function M.boot(opts)
 	function entity_meta:GetAbsVelocity()
 		return self:GetVelocity()
 	end
-	-- Records the solid. It does not cook a model collide. PhysicsInitBox builds the box.
+	-- Records the solid. A SOLID_VPHYSICS call cooks a box only from the studio
+	-- hull already stored in the model. No PHY mesh is cooked. No model, no
+	-- bytes, or a zero hull leaves the phys invalid.
+	local function model_hull(ent)
+		local model = ent.__model
+		if type(model) ~= "string" or model == "" then
+			return nil
+		end
+		local read = env.__model_bytes
+		if type(read) ~= "function" then
+			return nil
+		end
+		local key = model:lower():gsub("\\", "/")
+		local cache = env.__hull_cache
+		if not cache then
+			cache = {}
+			env.__hull_cache = cache
+		end
+		local hull = cache[key]
+		if hull == nil then
+			local ok, bytes = pcall(read, key)
+			hull = ok and studio_anim.hull(bytes) or nil
+			cache[key] = hull or false
+		end
+		if not hull then
+			return nil
+		end
+		return hull.min, hull.max
+	end
 	function entity_meta:PhysicsInit(solid)
 		self.__solid = solid
+		if solid ~= env.SOLID_VPHYSICS then
+			return false
+		end
+		local mins, maxs = model_hull(self)
+		if not mins then
+			return false
+		end
+		self:PhysicsInitBox(mins, maxs)
+		return self:GetPhysicsObject():IsValid()
 	end
 	-- Points are stored. No convex collide is cooked, so this returns false.
 	function entity_meta:PhysicsInitConvex(points)
@@ -1863,7 +2001,22 @@ function M.boot(opts)
 			self:SetupDataTables()
 		end
 		if type(self.Initialize) == "function" then
-			self:Initialize()
+			-- The XM25 weapon assigns ExtraProjectileData or {}. The projectile
+			-- then divides .range. That field is never written. An empty table
+			-- is not fuse data, so Initialize does not see it and no distance
+			-- is stored. A table that already has keys is left alone.
+			local data = rawget(self, "ExtraProjectileData")
+			local empty_proj = type(data) == "table" and next(data) == nil
+			if empty_proj then
+				self.ExtraProjectileData = nil
+			end
+			local ok, err = pcall(self.Initialize, self)
+			if empty_proj and self.ExtraProjectileData == nil then
+				self.ExtraProjectileData = data
+			end
+			if not ok then
+				error(err, 0)
+			end
 		end
 	end
 	-- Entity:NetworkVar installs Get/Set for one data-table name. Unset values
@@ -2041,6 +2194,13 @@ function M.boot(opts)
 	end
 	function entity_meta:SetHullSizeNormal()
 		self.__hull_normal = true
+	end
+	-- Stored bits. No navigation runs.
+	function entity_meta:CapabilitiesAdd(bits)
+		self.__caps = bit.bor(self.__caps or 0, tonumber(bits) or 0)
+	end
+	function entity_meta:CapabilitiesGet()
+		return self.__caps or 0
 	end
 	function entity_meta:Health()
 		return self.__health or 0
@@ -2822,6 +2982,12 @@ function M.boot(opts)
 	env.ents = {}
 	function env.ents.Create(class)
 		local ent = make_ent(class)
+		-- Same classname paths the spawn list already uses. A later SetModel
+		-- replaces this. A class with no entry stays without a model.
+		local known = type(class) == "string" and NPC_MODEL[class]
+		if known and (ent.__model == nil or ent.__model == "") then
+			ent:SetModel(known)
+		end
 		-- Methods exist before Spawn. GMod sets the owner and thrower first,
 		-- then Spawn runs SetupDataTables and Initialize.
 		local get = env.scripted_ents and env.scripted_ents.Get
@@ -3379,6 +3545,91 @@ function M.boot(opts)
 			note_fail("module", name, err)
 			return false
 		end
+		return true
+	end
+
+	-- lua/includes/modules/undo.lua server half. The entry is stored.
+	-- Finish does not remove the entities and does not open an undo menu.
+	-- The stock file also calls saverestore, which this host does not provide,
+	-- so that file is not loaded.
+	env.undo = {}
+	local current_undo = nil
+	local player_undo = {}
+	function env.undo.Create(text)
+		current_undo = {
+			Name = tostring(text or ""),
+			Entities = {},
+			Owner = nil,
+			Functions = {},
+		}
+	end
+	function env.undo.SetCustomUndoText(text)
+		if not current_undo then
+			return
+		end
+		current_undo.CustomUndoText = text
+	end
+	function env.undo.AddEntity(ent)
+		if not current_undo or not env.IsValid(ent) then
+			return
+		end
+		local list = current_undo.Entities
+		list[#list + 1] = ent
+	end
+	function env.undo.AddFunction(fn, ...)
+		if not current_undo or type(fn) ~= "function" then
+			return
+		end
+		local list = current_undo.Functions
+		list[#list + 1] = { fn, { ... } }
+	end
+	function env.undo.SetPlayer(ply)
+		if not current_undo or not env.IsValid(ply) then
+			return
+		end
+		current_undo.Owner = ply
+	end
+	function env.undo.GetTable()
+		return player_undo
+	end
+	function env.undo.Finish(nice)
+		local undo = current_undo
+		if not undo then
+			return
+		end
+		local empty_e = next(undo.Entities) == nil
+		local empty_f = next(undo.Functions) == nil
+		local call = env.hook.Run("CanCreateUndo", undo.Owner, undo)
+		local allowed = call == true or call == nil
+		if not env.IsValid(undo.Owner) or (empty_e and empty_f) or not allowed then
+			current_undo = nil
+			return false
+		end
+		local index = undo.Owner:UniqueID()
+		local list = player_undo[index]
+		if not list then
+			list = {}
+			player_undo[index] = list
+		end
+		undo.NiceText = nice or ("#" .. undo.Name)
+		list[#list + 1] = undo
+		local id = #list
+		env.net.Start("Undo_AddUndo")
+		env.net.WriteInt(id, 16)
+		env.net.WriteString(undo.NiceText)
+		env.net.Send(undo.Owner)
+		local first = undo.Entities[1]
+		if env.IsValid(first) and type(first.CallOnRemove) == "function" then
+			first:CallOnRemove("undo" .. tostring(id), function(ent, uid, ply)
+				if not env.IsValid(ply) then
+					return
+				end
+				env.net.Start("Undo_Undone")
+				env.net.WriteInt(uid, 16)
+				env.net.Send(ply)
+			end, id, undo.Owner)
+		end
+		current_undo = nil
 		return true
 	end
 

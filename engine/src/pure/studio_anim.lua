@@ -714,4 +714,27 @@ function M.matrices(mdl_b, fetch, prefer)
 	return mats, seq.name, moved
 end
 
+-- studiohdr_t hull_min at byte 104, hull_max at byte 116. Source SDK 2013.
+-- A zero hull is not a box. This does not read the PHY collide.
+function M.hull(mdl)
+	if type(mdl) ~= "string" or #mdl < 128 or mdl:sub(1, 4) ~= "IDST" then
+		return nil
+	end
+	local minx, miny, minz = f32(mdl, 104), f32(mdl, 108), f32(mdl, 112)
+	local maxx, maxy, maxz = f32(mdl, 116), f32(mdl, 120), f32(mdl, 124)
+	if not minx or not miny or not minz or not maxx or not maxy or not maxz then
+		return nil
+	end
+	local sx = math.abs(maxx - minx)
+	local sy = math.abs(maxy - miny)
+	local sz = math.abs(maxz - minz)
+	if sx < 1e-3 and sy < 1e-3 and sz < 1e-3 then
+		return nil
+	end
+	return {
+		min = { x = minx, y = miny, z = minz },
+		max = { x = maxx, y = maxy, z = maxz },
+	}
+end
+
 return M

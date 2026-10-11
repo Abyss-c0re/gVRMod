@@ -677,6 +677,43 @@ end
 	boxent:PhysicsInit(6)
 	T.eq(session.env.IsValid(boxent:GetPhysicsObject()), false, "PhysicsInit does not fake a collide")
 	T.eq(boxent:GetPhysicsObject():IsValid(), false, "PhysicsInit method stays invalid")
+	T.eq(boxent:GetPhysicsObject().SetVelocity, nil, "uncooked phys still has no SetVelocity")
+	local ffi = require("ffi")
+	local f1 = ffi.new("float[1]")
+	local function fbytes(n)
+		f1[0] = n
+		return ffi.string(f1, 4)
+	end
+	local hull_mdl = "IDST" .. string.rep("\0", 100)
+		.. fbytes(-8) .. fbytes(-3) .. fbytes(-4)
+		.. fbytes(8) .. fbytes(3) .. fbytes(4)
+	local zero_mdl = "IDST" .. string.rep("\0", 124)
+	session.env.__model_bytes = function(path)
+		if path == "models/test_hull.mdl" then
+			return hull_mdl
+		end
+		if path == "models/test_zero.mdl" then
+			return zero_mdl
+		end
+		return nil
+	end
+	local hulled = session.env.ents.Create("prop_physics")
+	hulled:SetPos(session.env.Vector(4, 5, 6))
+	hulled:SetModel("models/test_hull.mdl")
+	hulled:PhysicsInit(session.env.SOLID_BBOX)
+	T.eq(hulled:GetPhysicsObject():IsValid(), false, "a bbox solid does not cook the hull")
+	T.eq(hulled:PhysicsInit(session.env.SOLID_VPHYSICS), true, "vphysics solid cooks the studio hull")
+	local hphys = hulled:GetPhysicsObject()
+	T.eq(hphys:IsValid(), true, "hull box is a phys")
+	hphys:SetVelocity(session.env.Vector(0, -40, 0))
+	T.near(hphys:GetVelocity().y, -40, 1e-6, "hull box accepts velocity")
+	T.near(hphys.__body.half.x, 8, 1e-4, "hull half extent x")
+	local flat = session.env.ents.Create("prop_physics")
+	flat:SetModel("models/test_zero.mdl")
+	T.eq(flat:PhysicsInit(session.env.SOLID_VPHYSICS), false, "a zero hull is not a box")
+	T.eq(flat:GetPhysicsObject().SetVelocity, nil, "zero hull stays uncooked")
+	session.env.__model_bytes = nil
+	session.env.__hull_cache = nil
 	boxent:PhysicsInitBox(session.env.Vector(-1, -1, -1), session.env.Vector(1, 1, 1))
 	local phys = boxent:GetPhysicsObject()
 	T.eq(phys:IsValid(), true, "box phys is valid")
@@ -812,6 +849,84 @@ end
 	local wires = session.env.__wire_out
 	T.eq(wires and wires[#wires].name, "Active", "wire output name stored")
 	T.eq(wires[#wires].value, 0, "wire output value stored")
+	T.eq(session.env.CAP_MOVE_GROUND, 1, "cap move ground")
+	T.eq(session.env.CAP_OPEN_DOORS, 2048, "cap open doors")
+	T.eq(session.env.CAP_ANIMATEDFACE, 8388608, "cap animated face")
+	T.eq(session.env.CAP_SQUAD, 67108864, "cap squad")
+	T.eq(session.env.CAP_USE_WEAPONS, 2097152, "cap use weapons")
+	T.eq(session.env.CAP_DUCK, 134217728, "cap duck")
+	T.eq(session.env.CAP_USE_SHOT_REGULATOR, 16777216, "cap shot regulator")
+	T.eq(session.env.CAP_AIM_GUN, 536870912, "cap aim gun")
+	T.eq(session.env.CAP_SIMPLE_RADIUS_DAMAGE, -2147483648, "cap radius damage")
+	T.eq(session.env.CAP_HEAR, nil, "hear bit stays absent")
+	T.eq(session.env.CAP_STRAFE, nil, "strafe bit stays absent")
+	local cap_mask = bit.bor(
+		session.env.CAP_MOVE_GROUND,
+		session.env.CAP_OPEN_DOORS,
+		session.env.CAP_ANIMATEDFACE,
+		session.env.CAP_SQUAD,
+		session.env.CAP_USE_WEAPONS,
+		session.env.CAP_DUCK,
+		session.env.CAP_MOVE_SHOOT,
+		session.env.CAP_TURN_HEAD,
+		session.env.CAP_USE_SHOT_REGULATOR,
+		session.env.CAP_AIM_GUN
+	)
+	local cap_npc = session.make_ent("macron_f", session.meta_npc)
+	cap_npc:CapabilitiesAdd(cap_mask)
+	T.eq(cap_npc:CapabilitiesGet(), cap_mask, "capability mask stored")
+	T.eq(session.env.ROUND_WAIT, 1, "round wait")
+	T.eq(session.env.ROUND_PREP, 2, "round prep")
+	T.eq(session.env.ROUND_ACTIVE, 3, "round active")
+	T.eq(session.env.ROUND_POST, 4, "round post")
+	T.eq(session.env.GetRoundState(), session.env.ROUND_WAIT, "unset round is wait")
+	T.eq(session.env.GetRoundState() == session.env.ROUND_ACTIVE, false, "unset round is not active")
+	T.eq(session.env.GetRoundState() == session.env.ROUND_PREP, false, "wait is not prep")
+	T.eq(session.env.GetRoundState() == session.env.ROUND_POST, false, "wait is not post")
+	session.env.GAMEMODE.round_state = session.env.ROUND_PREP
+	T.eq(session.env.GetRoundState(), session.env.ROUND_PREP, "stored prep is prep")
+	session.env.GAMEMODE.round_state = nil
+	T.eq(session.env.GetRoundState(), session.env.ROUND_WAIT, "cleared round returns to wait")
+	local hack = session.env.ents.Create("npc_manhack")
+	T.eq(hack:GetModel(), "models/manhack.mdl", "manhack uses the spawn-list model")
+	local roller = session.env.ents.Create("npc_rollermine")
+	T.eq(roller:GetModel(), "models/roller.mdl", "rollermine uses the spawn-list model")
+	local bare = session.env.ents.Create("sent_no_such")
+	T.eq(bare:GetModel(), nil, "unknown class has no invented model")
+	session.env.undo.Create("npc_manhack")
+	session.env.undo.AddEntity(nil)
+	session.env.undo.AddEntity(hack)
+	session.env.undo.SetPlayer(owner)
+	T.eq(session.env.undo.Finish(), true, "undo finish stores the entry")
+	T.eq(hack:IsValid(), true, "finish does not remove the entity")
+	T.eq(hack.__removed, nil, "manhack is still spawned")
+	local undos = session.env.undo.GetTable()[owner:UniqueID()]
+	T.eq(undos and undos[1].Name, "npc_manhack", "undo name stored")
+	T.eq(undos[1].Entities[1], hack, "undo keeps the entity")
+	local outs = session.env.__net_out
+	T.eq(outs and outs[#outs].name, "Undo_AddUndo", "undo records a net message")
+	session.env.undo.Create("empty")
+	session.env.undo.SetPlayer(owner)
+	T.eq(session.env.undo.Finish(), false, "empty undo is refused")
+	local fused = session.env.ents.Create("prop_physics")
+	fused.ExtraProjectileData = {}
+	function fused:Initialize()
+		if self.ExtraProjectileData then
+			self.FuseTime = self.ExtraProjectileData.range / 10000 / 0.333
+		end
+		self.Armed = true
+	end
+	fused:Spawn()
+	T.eq(fused.Armed, true, "empty projectile data skips the fuse divide")
+	T.eq(fused.FuseTime, nil, "no fuse time is invented")
+	T.eq(next(fused.ExtraProjectileData), nil, "empty projectile table is restored")
+	local ranged = session.env.ents.Create("prop_physics")
+	ranged.ExtraProjectileData = { range = 10000 }
+	function ranged:Initialize()
+		self.FuseTime = self.ExtraProjectileData.range / 10000 / 0.333
+	end
+	ranged:Spawn()
+	T.near(ranged.FuseTime, 10000 / 10000 / 0.333, 1e-6, "authored range still divides")
 	local doomed = session.make_ent("light_dynamic")
 	session.env.SafeRemoveEntityDelayed(doomed, 0.1)
 	T.eq(doomed.__removed, nil, "delayed remove waits")
