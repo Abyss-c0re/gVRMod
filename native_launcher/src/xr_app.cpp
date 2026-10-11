@@ -399,6 +399,10 @@ int RunCubeUI(const std::string& gmodRoot, const std::string& xrJson) {
         CubeUI_SaveLastPlay(ui);
         fprintf(stderr, "[CubeUI] skip-spawn warm attach map=%s phase=%s\n",
                 lr.map.c_str(), ui.handoffPhase.c_str());
+      } else if (!CubeStartLaunchesGMod(lr.map)) {
+        ui.wantStart = false;
+        ui.status = "START STAYS IN GMOD";
+        fprintf(stderr, "[CubeUI] refused non-GMod start map=%s\n", lr.map.c_str());
       } else {
       std::string err;
       int rc = SpawnGModFromWebUI(lr, err);

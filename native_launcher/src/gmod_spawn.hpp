@@ -63,6 +63,14 @@ struct LaunchRequest {
 // Returns 0 on spawn success. Does not take OpenXR — caller keeps session until handoff.
 int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut);
 
+// CS maps (cs_office, de_dust2, fy_*, …) are mounted GMod maps.
+// Start always spawns GarrysMod and keeps this shell until that process is up.
+// Quitting here to run another game left the headset empty.
+inline bool CubeStartLaunchesGMod(const std::string& mapName) {
+  (void)mapName;
+  return true;
+}
+
 bool GModProcessRunning();
 std::string ReadCubeHandoffPhase(const std::string& gmodRoot);
 void ClearCubeHandoffMarkers(const std::string& gmodRoot);

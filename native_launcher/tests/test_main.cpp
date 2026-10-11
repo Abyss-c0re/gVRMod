@@ -629,6 +629,17 @@ TEST(launcher_supersample_cold_cap_g29) {
     ASSERT_NEAR(live.applied, 1.75f, 1e-4f);
 }
 
+// CS maps start inside GMod. The shell must not quit into another game.
+TEST(launcher_cs_maps_start_gmod) {
+    ASSERT_TRUE(CubeStartLaunchesGMod("cs_office"));
+    ASSERT_TRUE(CubeStartLaunchesGMod("de_dust2"));
+    ASSERT_TRUE(CubeStartLaunchesGMod("de_dust"));
+    ASSERT_TRUE(CubeStartLaunchesGMod("fy_iceworld"));
+    ASSERT_TRUE(CubeStartLaunchesGMod("gm_construct"));
+    ASSERT_TRUE(CubeStartLaunchesGMod("gm_goldencity_v2"));
+    ASSERT_TRUE(CubeStartLaunchesGMod(""));
+}
+
 // G28: soft handoff timeout law (90s soft / 180s hard; never racey)
 TEST(launcher_handoff_timeout_law_g28) {
     ASSERT_NEAR(CubeHandoffSoftReleaseSeconds(), 90.f, 1e-3f);

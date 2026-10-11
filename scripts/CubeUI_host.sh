@@ -44,6 +44,30 @@ if pgrep -x CubeUI >/dev/null 2>&1; then
   exit 0
 fi
 
+# Desktop launches this script, which used to skip rebuilds. A stale CubeUI
+# quit on Counter-Strike maps (cs_*, de_*) and never spawned GMod.
+src_newest=0
+while IFS= read -r t; do
+  [[ -z "$t" ]] && continue
+  t=${t%%.*}
+  [[ "$t" =~ ^[0-9]+$ ]] || continue
+  if (( t > src_newest )); then src_newest=$t; fi
+done < <(find "$ROOT/native_launcher/src" "$ROOT/native_launcher/CMakeLists.txt" \
+              "$ROOT/shared/openxr" -type f \
+              \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name 'CMakeLists.txt' \) \
+              -printf '%T@\n' 2>/dev/null)
+bin_mtime=$(stat -c '%Y' "$BIN" 2>/dev/null || echo 0)
+if (( src_newest > bin_mtime )); then
+  echo "[cube-host] CubeUI older than sources — rebuilding" >>"$LOG"
+  mkdir -p "$ROOT/native_launcher/build" "$ROOT/install/native"
+  if [[ ! -f "$ROOT/native_launcher/build/CMakeCache.txt" ]]; then
+    cmake -S "$ROOT/native_launcher" -B "$ROOT/native_launcher/build" >>"$LOG" 2>&1 || true
+  fi
+  if ! cmake --build "$ROOT/native_launcher/build" -j"$(nproc)" --target CubeUI >>"$LOG" 2>&1; then
+    echo "[cube-host] rebuild failed — keeping existing binary" >>"$LOG"
+  fi
+fi
+
 # Always wait a few seconds after VR exit so OpenXR is free.
 # Temp return keeps GMod (hl2) running — do NOT wait for process death.
 echo "[cube-host] waiting 3s for OpenXR drain after GMod VR exit..." >>"$LOG"
