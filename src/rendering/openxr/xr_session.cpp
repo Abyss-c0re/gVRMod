@@ -117,6 +117,9 @@ static int g_passthroughChromaMask = 1;
 
 // XR_FB_passthrough — real camera under projection (void = room, not black).
 static bool g_fbPtExtEnabled = false;
+// XR_EXT_eye_gaze_interaction — gaze pose for character eyes. Not Pico-specific.
+static bool g_eyeGazeExtEnabled = false;
+static bool g_eyeGazeSupported = false;
 static XrPassthroughFB g_fbPassthrough = XR_NULL_HANDLE;
 static XrPassthroughLayerFB g_fbPtLayer = XR_NULL_HANDLE;
 static PFN_xrCreatePassthroughFB g_pfnCreatePt = nullptr;
@@ -242,6 +245,14 @@ XrPassthroughLayerFB XR_GetFbPassthroughLayer() {
 
 bool XR_HasFbPassthrough() {
     return g_fbPtExtEnabled && g_fbPtLayer != XR_NULL_HANDLE && g_passthroughChroma;
+}
+
+bool XR_EyeGazeExtensionEnabled() {
+    return g_eyeGazeExtEnabled;
+}
+
+bool XR_EyeGazeSupported() {
+    return g_eyeGazeSupported;
 }
 
 void XR_SetPassthroughChroma(bool enable, float tolerance) {
@@ -542,15 +553,12 @@ bool XR_Init(char* errMsg, int errMsgLen) {
         return false;
     }
 
-    // 1) Create instance with graphics API + optional FB passthrough (void = real room).
+    // 1) Create instance with graphics API + optional FB passthrough and eye gaze.
     g_fbPtExtEnabled = false;
-    std::vector<const char*> extList;
-#ifdef _WIN32
-    extList.push_back(XR_KHR_D3D11_ENABLE_EXTENSION_NAME);
-#else
-    extList.push_back(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
-#endif
-    // Probe FB passthrough before CreateInstance
+    g_eyeGazeExtEnabled = false;
+    g_eyeGazeSupported = false;
+    bool wantFb = false;
+    bool wantGaze = false;
     {
         uint32_t n = 0;
         if (g_xrEnumerateInstanceExtensionProperties)
@@ -559,37 +567,62 @@ bool XR_Init(char* errMsg, int errMsgLen) {
         if (n && g_xrEnumerateInstanceExtensionProperties)
             g_xrEnumerateInstanceExtensionProperties(nullptr, n, &n, props.data());
         for (uint32_t i = 0; i < n; ++i) {
-            if (std::strcmp(props[i].extensionName, XR_FB_PASSTHROUGH_EXTENSION_NAME) == 0) {
-                extList.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
-                g_fbPtExtEnabled = true;
-                break;
-            }
+            if (std::strcmp(props[i].extensionName, XR_FB_PASSTHROUGH_EXTENSION_NAME) == 0)
+                wantFb = true;
+            else if (std::strcmp(props[i].extensionName, XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME) == 0)
+                wantGaze = true;
         }
     }
+    std::vector<const char*> extList;
     XrInstanceCreateInfo ici = {XR_TYPE_INSTANCE_CREATE_INFO};
     strncpy(ici.applicationInfo.applicationName, "gVRMod", XR_MAX_APPLICATION_NAME_SIZE - 1);
     ici.applicationInfo.applicationVersion = 1;
     ici.applicationInfo.engineName[0] = '\0';
     ici.applicationInfo.engineVersion = 0;
     ici.applicationInfo.apiVersion = XR_MAKE_VERSION(1, 0, 0);
-    ici.enabledExtensionCount = (uint32_t)extList.size();
-    ici.enabledExtensionNames = extList.data();
 
-    XrResult res = g_xrCreateInstance(&ici, &g_xrInstance);
-    if (res != XR_SUCCESS && g_fbPtExtEnabled) {
-        // Retry without FB passthrough
-        VRMOD_LOG_WARN("xrCreateInstance failed with FB passthrough — retry without");
+    // Optional extensions are retried independently. A rejected eye-gaze
+    // extension must not drop FB passthrough, and the reverse.
+    auto tryInstance = [&](bool fb, bool gaze) -> XrResult {
+        extList.clear();
+#ifdef _WIN32
+        extList.push_back(XR_KHR_D3D11_ENABLE_EXTENSION_NAME);
+#else
+        extList.push_back(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
+#endif
         g_fbPtExtEnabled = false;
-        extList.resize(1);
-        ici.enabledExtensionCount = 1;
+        g_eyeGazeExtEnabled = false;
+        if (fb) {
+            extList.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
+            g_fbPtExtEnabled = true;
+        }
+        if (gaze) {
+            extList.push_back(XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME);
+            g_eyeGazeExtEnabled = true;
+        }
+        ici.enabledExtensionCount = (uint32_t)extList.size();
         ici.enabledExtensionNames = extList.data();
-        res = g_xrCreateInstance(&ici, &g_xrInstance);
+        g_xrInstance = XR_NULL_HANDLE;
+        return g_xrCreateInstance(&ici, &g_xrInstance);
+    };
+
+    XrResult res = tryInstance(wantFb, wantGaze);
+    if (res != XR_SUCCESS && wantFb && wantGaze) {
+        VRMOD_LOG_WARN("xrCreateInstance failed with FB passthrough and eye gaze — retrying");
+        res = tryInstance(false, true);
+        if (res != XR_SUCCESS)
+            res = tryInstance(true, false);
+    }
+    if (res != XR_SUCCESS && (wantFb || wantGaze)) {
+        VRMOD_LOG_WARN("xrCreateInstance failed with optional extensions — graphics only");
+        res = tryInstance(false, false);
     }
     if (res != XR_SUCCESS) {
         snprintf(errMsg, errMsgLen, "VRMOD OpenXR: xrCreateInstance failed (%d)", (int)res);
         return false;
     }
-    VRMOD_LOG_INFO("OpenXR instance created (FB_passthrough ext=%d)", (int)g_fbPtExtEnabled);
+    VRMOD_LOG_INFO("OpenXR instance created (FB_passthrough ext=%d eye_gaze ext=%d)",
+        (int)g_fbPtExtEnabled, (int)g_eyeGazeExtEnabled);
 
     // Load all instance functions
     XR_LOAD(xrDestroyInstance);
@@ -646,9 +679,15 @@ bool XR_Init(char* errMsg, int errMsgLen) {
 
     XR_EnumerateBlendModes();
 
+    XrSystemEyeGazeInteractionPropertiesEXT eyeGazeProps = {
+        XR_TYPE_SYSTEM_EYE_GAZE_INTERACTION_PROPERTIES_EXT};
     XrSystemProperties sysProp = {XR_TYPE_SYSTEM_PROPERTIES};
+    if (g_eyeGazeExtEnabled)
+        sysProp.next = &eyeGazeProps;
     g_xrGetSystemProperties(g_xrInstance, g_xrSystemId, &sysProp);
-    VRMOD_LOG_INFO("OpenXR system: %s (vendorId=%u)", sysProp.systemName, sysProp.vendorId);
+    g_eyeGazeSupported = g_eyeGazeExtEnabled && eyeGazeProps.supportsEyeGazeInteraction;
+    VRMOD_LOG_INFO("OpenXR system: %s (vendorId=%u eyeGaze=%d)",
+        sysProp.systemName, sysProp.vendorId, (int)g_eyeGazeSupported);
 
     // 3) Query view configuration
     uint32_t viewConfigCount = 0;
@@ -1083,6 +1122,8 @@ bool XR_GetDisplayInfo(float nearZ, float farZ, XrDisplayInfo* out) {
 void XR_Shutdown() {
     VRMOD_LOG_INFO("Shutting down OpenXR...");
     g_xrSubmitEnabled = false;
+    g_eyeGazeExtEnabled = false;
+    g_eyeGazeSupported = false;
     if (g_xrFrameBegun && g_xrSession && g_xrEndFrame) {
         XR_EndFrame();
     }

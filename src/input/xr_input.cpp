@@ -836,6 +836,16 @@ static bool XR_SuggestAllInteractionBindings() {
             kProfileKhrSimple, simple, (uint32_t)sn);
     }
 
+    // Eye gaze is its own interaction profile. Do not add this path to Touch/Index
+    // tables — one rejected path fails the whole suggest on some runtimes.
+    if (XR_EyeGazeExtensionEnabled()) {
+        XrActionSuggestedBinding gazeBind[1];
+        int gn = 0;
+        PushBinding(gazeBind, &gn, 1, A("pose_gaze"), path::eyeGazePose);
+        if (gn > 0)
+            SuggestBindingsForProfile(cube_xr::kProfileEyeGaze, gazeBind, (uint32_t)gn);
+    }
+
     if (!okTouch && !okIndex) {
         VRMOD_LOG_WARN("No full controller profile accepted bindings; input may be limited to simple_controller");
     }
@@ -1317,8 +1327,9 @@ void XR_SyncActions(const actionSet* activeSets, int activeCount) {
                 walkY = st.currentState.y;
             }
         }
-        VRMOD_LOG_INFO("INPUT health: leftPose=%d rightPose=%d walk=(%.2f,%.2f) spaces=%d attached=%d",
-            poseActive(left), poseActive(right), walkX, walkY,
+        XrAction gaze = FindXrActionByName("pose_gaze");
+        VRMOD_LOG_INFO("INPUT health: leftPose=%d rightPose=%d gazePose=%d walk=(%.2f,%.2f) spaces=%d attached=%d",
+            poseActive(left), poseActive(right), poseActive(gaze), walkX, walkY,
             g_xrActionSpaceCount, (int)g_xrActionsAttached);
     }
 }
@@ -1452,9 +1463,11 @@ PoseResult XR_GetPoseAction(VRActionHandle handle) {
 
     // Find the action space for this handle
     XrSpace space = XR_NULL_HANDLE;
+    const char* spaceName = nullptr;
     for (int i = 0; i < g_xrActionSpaceCount; i++) {
         if (g_xrActionSpaces[i].vrActionHandle == handle) {
             space = g_xrActionSpaces[i].space;
+            spaceName = g_xrActionSpaces[i].name;
             break;
         }
     }
@@ -1467,6 +1480,30 @@ PoseResult XR_GetPoseAction(VRActionHandle handle) {
     XrResult res = g_xrLocateSpace(space, g_xrStageSpace,
         g_xrFrameState.predictedDisplayTime, &location);
     if (res != XR_SUCCESS) return r;
+
+    // XR_EXT eye gaze: orientation is the usable sample. Position is the
+    // midpoint between the eyes and some runtimes omit it. Require a tracked
+    // orientation, and fill a missing position from the view (head) space so
+    // ConvertXrPose can publish a Source pose. Do not accept an untracked
+    // orientation — that is a blink / lost sample, not a look direction.
+    bool isGaze = spaceName != nullptr && std::strcmp(spaceName, "pose_gaze") == 0;
+    if (isGaze) {
+        const bool oriOk = (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0
+            && (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT) != 0;
+        if (!oriOk) return r;
+        if ((location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) == 0
+            && g_xrViewSpace != XR_NULL_HANDLE && g_xrLocateSpace) {
+            XrSpaceLocation viewLoc = {XR_TYPE_SPACE_LOCATION};
+            XrResult viewRes = g_xrLocateSpace(g_xrViewSpace, g_xrStageSpace,
+                g_xrFrameState.predictedDisplayTime, &viewLoc);
+            if (viewRes == XR_SUCCESS
+                && (viewLoc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0) {
+                location.pose.position = viewLoc.pose.position;
+                location.locationFlags |= XR_SPACE_LOCATION_POSITION_VALID_BIT;
+                velocity.velocityFlags &= ~XR_SPACE_VELOCITY_LINEAR_VALID_BIT;
+            }
+        }
+    }
 
     r = ConvertXrPose(location);
     return r;

@@ -192,6 +192,13 @@ LUA_FUNCTION(IsHMDPresent) {
     return 1;
 }
 
+// True when the runtime reported supportsEyeGazeInteraction. Lua also treats
+// a live pose_gaze sample as support, so a late-attached tracker still works.
+LUA_FUNCTION(EyeGazeSupported) {
+    LUA->PushBool(XR_EyeGazeSupported());
+    return 1;
+}
+
 LUA_FUNCTION(Init) {
     // After a proper Shutdown(), g_xrInitialized is false → always cold-start here.
     // Double-start while already live is a no-op (Lua re-ShareTexture after).
@@ -1407,6 +1414,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "GetBackend");
     LUA->PushCFunction(IsHMDPresent);
     LUA->SetField(-2, "IsHMDPresent");
+    LUA->PushCFunction(EyeGazeSupported);
+    LUA->SetField(-2, "EyeGazeSupported");
     LUA->PushCFunction(Init);
     LUA->SetField(-2, "Init");
     LUA->PushCFunction(SetActionManifest);

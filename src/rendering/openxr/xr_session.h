@@ -148,6 +148,10 @@ XrEnvironmentBlendMode XR_ActiveEnvironmentBlendMode();
 // XR_FB_passthrough layer under projection when home void is on (real room cameras).
 XrPassthroughLayerFB XR_GetFbPassthroughLayer();
 bool XR_HasFbPassthrough();
+// XR_EXT_eye_gaze_interaction was enabled on this instance.
+bool XR_EyeGazeExtensionEnabled();
+// System reported supportsEyeGazeInteraction. A later pose can still arrive.
+bool XR_EyeGazeSupported();
 
 // ── View/display info ──
 struct XrDisplayInfo {

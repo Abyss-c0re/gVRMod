@@ -12,6 +12,7 @@ static const char* kExpectedExports[] = {
     "Shutdown",
     "GetPoses",
     "GetActions",
+    "EyeGazeSupported",
     "UpdatePosesAndActions",
     "ShareTextureBegin",
     "ShareTextureFinish",

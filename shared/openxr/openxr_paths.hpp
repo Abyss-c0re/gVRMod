@@ -15,6 +15,9 @@ inline constexpr const char* kProfileTouchPlus =
     "/interaction_profiles/meta/touch_controller_plus";
 inline constexpr const char* kProfileKhrSimple =
     "/interaction_profiles/khr/simple_controller";
+// Separate from controller profiles. One bad path must not reject hand bindings.
+inline constexpr const char* kProfileEyeGaze =
+    "/interaction_profiles/ext/eye_gaze_interaction";
 
 // ── Hands ──
 namespace path {
@@ -22,6 +25,7 @@ inline constexpr const char* leftAimPose   = "/user/hand/left/input/aim/pose";
 inline constexpr const char* rightAimPose  = "/user/hand/right/input/aim/pose";
 inline constexpr const char* leftGripPose  = "/user/hand/left/input/grip/pose";
 inline constexpr const char* rightGripPose = "/user/hand/right/input/grip/pose";
+inline constexpr const char* eyeGazePose   = "/user/eyes_ext/input/gaze_ext/pose";
 
 inline constexpr const char* leftTriggerValue  = "/user/hand/left/input/trigger/value";
 inline constexpr const char* rightTriggerValue = "/user/hand/right/input/trigger/value";
