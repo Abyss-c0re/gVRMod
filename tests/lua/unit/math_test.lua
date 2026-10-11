@@ -25,6 +25,38 @@ return function(H, env)
 		H.assert_vec_near(c, Vector(5, 0, 0))
 	end)
 
+	-- Walk and snap-turn move g_VR.origin after a stock foregrip caches the
+	-- left hand in world space. The cache must ride with the playspace.
+	H.TEST("util.math.rebase_playspace_pose", function()
+		local p = Vector(10, 0, 50)
+		local a = Angle(10, 20, 30)
+		local np, na = u.RebasePlayspacePose(p, a, Vector(0, 0, 0), 0, Vector(5, 0, 0), 0)
+		H.assert_vec_near(np, Vector(15, 0, 50))
+		H.assert_near(na.p, 10, 1e-4)
+		H.assert_near(na.y, 20, 1e-4)
+		H.assert_near(na.r, 30, 1e-4)
+		-- Caller cache must stay put until it copies the result.
+		H.assert_vec_near(p, Vector(10, 0, 50))
+		H.assert_near(a.y, 20, 1e-4)
+
+		-- Yaw +90: Source yaw 0 = +X, yaw 90 = +Y. (10,0) swings to (0,10).
+		np, na = u.RebasePlayspacePose(Vector(10, 0, 50), Angle(10, 20, 30), Vector(0, 0, 0), 0, Vector(0, 0, 0), 90)
+		H.assert_vec_near(np, Vector(0, 10, 50))
+		H.assert_near(na.p, 10, 1e-4)
+		H.assert_near(na.y, 110, 1e-4)
+		H.assert_near(na.r, 30, 1e-4)
+
+		-- Snap-right lowers origin yaw. (10,0) swings to (0,-10).
+		np, na = u.RebasePlayspacePose(Vector(10, 0, 50), Angle(0, 0, 0), Vector(0, 0, 0), 0, Vector(0, 0, 0), -90)
+		H.assert_vec_near(np, Vector(0, -10, 50))
+		H.assert_near(na.y, -90, 1e-4)
+
+		local sameP, sameA = u.RebasePlayspacePose(nil, nil, Vector(0, 0, 0), 0, Vector(1, 0, 0), 0)
+		H.assert_true(sameP == nil and sameA == nil)
+		local keepP, keepA = u.RebasePlayspacePose(p, a, nil, 0, Vector(1, 0, 0), 0)
+		H.assert_true(keepP == p and keepA == a)
+	end)
+
 	H.TEST("util.smooth.value_number", function()
 		H.assert_near(u.SmoothValue(0, 10, 0.5), 5, 1e-6)
 		H.assert_eq(u.SmoothValue(1, 2, 0), 2)

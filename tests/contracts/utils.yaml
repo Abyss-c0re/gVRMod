@@ -1567,6 +1567,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
     tier: pure
     tests: [util.pose_sot_law.single_path_g25]
+  - id: vrmod.utils.RebasePlayspacePose
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
+    tier: pure
+    tests: [util.math.rebase_playspace_pose]
   - id: vrmod.utils.RefreshStereoLights
     file: addon/vrmod-x64/lua/vrmod/utils/cl_stereo_lights.lua
     tier: seam

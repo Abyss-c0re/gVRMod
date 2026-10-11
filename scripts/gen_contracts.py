@@ -21,6 +21,7 @@ PURE_TESTED = {
     "vrmod.utils.SmoothVector": "util.smooth.vector",
     "vrmod.utils.SmoothValue": "util.smooth.value_number",
     "vrmod.utils.SmoothAngle": "util.smooth.vector",
+    "vrmod.utils.RebasePlayspacePose": "util.math.rebase_playspace_pose",
     "vrmod.utils.IsFloorOrCeilingNormal": "util.collisions.floor_not_wall",
     "vrmod.utils.ParseColor": "util.color.parse_rgba",
     "vrmod.utils.TryParseColor": "util.color.try_parse",

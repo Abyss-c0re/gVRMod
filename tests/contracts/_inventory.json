@@ -1505,6 +1505,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua"
     ],
     [
+      "vrmod.utils.RebasePlayspacePose",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
+    ],
+    [
       "vrmod.utils.RefreshStereoLights",
       "addon/vrmod-x64/lua/vrmod/utils/cl_stereo_lights.lua"
     ],
