@@ -268,6 +268,15 @@ local CAP = {
 	CAP_SIMPLE_RADIUS_DAMAGE = -2147483648,
 }
 
+-- wiki.facepunch.com/gmod/Enums/TEAM. An unset player is unassigned.
+-- TEAM_TERROR is terrortown/gamemode/shared.lua. Nobody has been assigned it.
+local TEAM = {
+	TEAM_CONNECTING = 0,
+	TEAM_UNASSIGNED = 1001,
+	TEAM_SPECTATOR = 1002,
+	TEAM_TERROR = 1,
+}
+
 -- terrortown/gamemode/shared.lua. GetRoundState reads GAMEMODE.round_state.
 -- That gamemode file is not run, so an unset round is WAIT, not ACTIVE.
 local ROUND = {
@@ -804,6 +813,9 @@ function M.boot(opts)
 		env[k] = v
 	end
 	for k, v in pairs(ROUND) do
+		env[k] = v
+	end
+	for k, v in pairs(TEAM) do
 		env[k] = v
 	end
 	-- TTT init.lua returns GAMEMODE.round_state. No round has been started.
@@ -1948,6 +1960,13 @@ function M.boot(opts)
 		function phys:EnableDrag(on)
 			self.__drag = on and true or false
 		end
+		-- Stored. The open solver does not apply these coefficients.
+		function phys:SetDragCoefficient(n)
+			self.__drag_coeff = tonumber(n) or 0
+		end
+		function phys:SetAngleDragCoefficient(n)
+			self.__angle_drag = tonumber(n) or 0
+		end
 		function phys:SetVelocity(v)
 			if type(v) ~= "table" then
 				return
@@ -1967,6 +1986,13 @@ function M.boot(opts)
 	end
 	function entity_meta:Activate()
 		self.__active = true
+	end
+	-- The flag is stored. PhysicsSimulate is not called.
+	function entity_meta:StartMotionController()
+		self.__motion_controller = true
+	end
+	function entity_meta:StopMotionController()
+		self.__motion_controller = false
 	end
 	-- Wake a cooked body. An uncooked phys is left invalid.
 	function entity_meta:PhysWake()
@@ -2429,6 +2455,19 @@ function M.boot(opts)
 	end
 	function player_meta:IsPlayer()
 		return true
+	end
+	-- No team has been assigned. TTT IsTerror is team == TEAM_TERROR.
+	function player_meta:Team()
+		if self.__team == nil then
+			return env.TEAM_UNASSIGNED
+		end
+		return self.__team
+	end
+	function player_meta:SetTeam(team)
+		self.__team = tonumber(team) or 0
+	end
+	function player_meta:IsTerror()
+		return self:Team() == env.TEAM_TERROR
 	end
 	-- A player who was never given a max still has the engine default of 100.
 	function player_meta:GetMaxHealth()
