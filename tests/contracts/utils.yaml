@@ -2138,6 +2138,14 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.WorkshopMap_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_workshop_map_law.lua
+    tier: pure
+    tests: [util.workshop_map.hold]
+  - id: vrmod.utils.WorkshopMap_PassMapOnCommandLine
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_workshop_map_law.lua
+    tier: pure
+    tests: [util.workshop_map.hold]
   - id: vrmod.utils.WorldModelLaw_AllowDualGhost
     file: addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua
     tier: pure

@@ -2049,6 +2049,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
     [
+      "vrmod.utils.WorkshopMap_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_workshop_map_law.lua"
+    ],
+    [
+      "vrmod.utils.WorkshopMap_PassMapOnCommandLine",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_workshop_map_law.lua"
+    ],
+    [
       "vrmod.utils.WorldModelLaw_AllowDualGhost",
       "addon/vrmod-x64/lua/vrmod/utils/sh_worldmodel_law.lua"
     ],

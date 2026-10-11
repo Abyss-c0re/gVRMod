@@ -477,6 +477,9 @@ PURE_TESTED = {
     "vrmod.utils.WarmAttach_ShouldExecuteChangelevel": "util.warm_attach.decide_g04",
     "vrmod.utils.WarmAttach_ExecuteChangelevel": "util.warm_attach.decide_g04",
     "vrmod.utils.WarmAttach_ExecuteToast": "util.warm_attach.decide_g04",
+    # Cold Start waits for workshop before `map` (no command-line +map).
+    "vrmod.utils.WorkshopMap_PassMapOnCommandLine": "util.workshop_map.hold",
+    "vrmod.utils.WorkshopMap_Decide": "util.workshop_map.hold",
     "vrmod.utils.WarmAttach_HmdExpect": "util.warm_attach.decide_g04",
     "vrmod.AddInGameMenuItem": "api.menu.dedupe_name",
     "vrmod.DedupInGameMenuItems": "api.menu.dedup_function",

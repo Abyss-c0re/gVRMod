@@ -63,6 +63,11 @@ struct LaunchRequest {
 // Returns 0 on spawn success. Does not take OpenXR — caller keeps session until handoff.
 int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut);
 
+// Cold Start must not pass +map. The engine loads the map while workshop
+// addons are still downloading and sticks on that screen. bg_map is enough;
+// the menu runs `map` after workshop idle.
+inline bool CubeSpawn_PassMapOnCommandLine() { return false; }
+
 bool GModProcessRunning();
 std::string ReadCubeHandoffPhase(const std::string& gmodRoot);
 void ClearCubeHandoffMarkers(const std::string& gmodRoot);

@@ -205,10 +205,11 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " +hostname \"" << req.hostname << "\""
         << " +p2p_enabled " << (req.p2p ? 1 : 0)
         << " +p2p_friendsonly " << (req.p2pFriends ? 1 : 0)
-        << " +gamemode " << req.gamemode
-        << " +map " << req.map
-        // Exec AFTER map so textures/models are not stomped by map/video defaults
-        << " +exec " << req.cubeCfg
+        << " +gamemode " << req.gamemode;
+    // Map is bg_map in openxr_launch.txt. Menu loads it after workshop idle.
+    if (CubeSpawn_PassMapOnCommandLine() && !req.map.empty())
+      cmd << " +map " << req.map;
+    cmd << " +exec " << req.cubeCfg
         << " +exec cube_gfx"
         << " >/tmp/gVRMod_gmod.log 2>&1 &";
   } else {
@@ -220,9 +221,10 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
         << " +maxplayers " << req.maxPlayers
         << " +sv_lan " << (req.svLan ? 1 : 0)
         << " +hostname \"" << req.hostname << "\""
-        << " +gamemode " << req.gamemode
-        << " +map " << req.map
-        << " +exec " << req.cubeCfg
+        << " +gamemode " << req.gamemode;
+    if (CubeSpawn_PassMapOnCommandLine() && !req.map.empty())
+      cmd << " +map " << req.map;
+    cmd << " +exec " << req.cubeCfg
         << " +exec cube_gfx"
         << " >/tmp/gVRMod_gmod.log 2>&1 &";
   }
@@ -231,6 +233,8 @@ int SpawnGModFromWebUI(const LaunchRequest& req, std::string& errOut) {
             "phase=spawned\nts=" + std::to_string((long)time(nullptr)) + "\n");
   unlink((dataDir + "/cube_ready.txt").c_str());
 
+  fprintf(stderr, "[gVRMod] map %s waits for workshop (no command-line +map)\n",
+          req.map.c_str());
   fprintf(stderr, "[gVRMod] StartGame → %s\n", cmd.str().c_str());
   int rc = system(cmd.str().c_str());
   if (rc != 0) {

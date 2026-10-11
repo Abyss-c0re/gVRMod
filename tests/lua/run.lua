@@ -64,6 +64,7 @@ dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_stereo_load.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_cube_return.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_warm_attach.lua")
+dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_workshop_map_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_hud_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua")
@@ -114,6 +115,7 @@ local units = {
 	"unit.math_test",
 	"unit.experience_test",
 	"unit.menu_test",
+	"unit.workshop_map_test",
 }
 
 for _, u in ipairs(units) do

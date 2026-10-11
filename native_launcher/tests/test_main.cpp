@@ -693,6 +693,10 @@ TEST(launcher_window_chrome_sanitize_and_args) {
     ASSERT_TRUE(full.find("-windowed") == std::string::npos);
 }
 
+TEST(launcher_spawn_omits_map_until_workshop) {
+    ASSERT_TRUE(!CubeSpawn_PassMapOnCommandLine());
+}
+
 TEST(launcher_window_chrome_hmd_expect) {
     auto framed = WindowChrome_CubeDefault();
     auto he = WindowChrome_HmdExpect(framed);
