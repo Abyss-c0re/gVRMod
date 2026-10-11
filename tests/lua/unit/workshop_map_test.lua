@@ -33,14 +33,66 @@ return function(H, env)
 		H.assert_eq(ready.reason, "addons_ready")
 		H.assert_eq(ready.want_map, "gm_construct")
 
+		local settling = u.WorkshopMap_Decide({
+			want_map = "de_dust2",
+			elapsed_sec = 8,
+			workshop_busy = false,
+			workshop_idle_seen = false,
+		})
+		H.assert_eq(settling.action, "wait")
+		H.assert_eq(settling.reason, "workshop_settle")
+
+		-- No WorkshopEnd and no addon list. Quiet long enough still loads.
+		-- Waiting forever here left Cube on the main menu.
 		local settled = u.WorkshopMap_Decide({
 			want_map = "de_dust2",
 			elapsed_sec = 30,
 			workshop_busy = false,
 			workshop_idle_seen = false,
 		})
-		H.assert_eq(settled.action, "wait")
-		H.assert_eq(settled.reason, "workshop_settle")
+		H.assert_eq(settled.action, "load")
+		H.assert_eq(settled.reason, "addons_ready")
+
+		local fresh_quiet = u.WorkshopMap_Decide({
+			want_map = "de_dust2",
+			elapsed_sec = 30,
+			quiet_sec = 0,
+			workshop_busy = false,
+			workshop_idle_seen = false,
+		})
+		H.assert_eq(fresh_quiet.action, "wait")
+		H.assert_eq(fresh_quiet.reason, "workshop_settle")
+
+		local nolist = u.WorkshopMap_Decide({
+			want_map = "cs_office",
+			elapsed_sec = 4,
+			list_ready = false,
+			workshop_idle_seen = false,
+			pending_downloads = 0,
+		})
+		H.assert_eq(nolist.action, "wait")
+		H.assert_eq(nolist.reason, "list_not_ready")
+
+		local nolist_quiet = u.WorkshopMap_Decide({
+			want_map = "cs_office",
+			elapsed_sec = 20,
+			list_ready = false,
+			quiet_sec = 12,
+			pending_downloads = 0,
+			workshop_idle_seen = false,
+		})
+		H.assert_eq(nolist_quiet.action, "load")
+		H.assert_eq(nolist_quiet.reason, "addons_ready")
+
+		local pending_unlisted = u.WorkshopMap_Decide({
+			want_map = "cs_office",
+			elapsed_sec = 40,
+			list_ready = false,
+			pending_downloads = 2,
+			quiet_sec = 40,
+		})
+		H.assert_eq(pending_unlisted.action, "wait")
+		H.assert_eq(pending_unlisted.reason, "workshop_downloading")
 
 		local cached_list = u.WorkshopMap_Decide({
 			want_map = "cs_office",
