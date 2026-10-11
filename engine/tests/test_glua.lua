@@ -907,6 +907,40 @@ end
 	T.eq(drag.__motion_controller, true, "motion controller flag is stored")
 	drag:StopMotionController()
 	T.eq(drag.__motion_controller, false, "motion controller flag clears")
+	local seen_owner = false
+	for _, ply in ipairs(session.env.player.GetAll()) do
+		if ply == owner then
+			seen_owner = true
+		end
+	end
+	T.eq(seen_owner, true, "player.GetAll includes the made player")
+	local bot = session.make_ent("player", session.meta_player)
+	bot.__bot = true
+	local human_hit, bot_hit = false, false
+	for _, ply in ipairs(session.env.player.GetHumans()) do
+		if ply == owner then
+			human_hit = true
+		end
+		if ply == bot then
+			human_hit = false
+		end
+	end
+	for _, ply in ipairs(session.env.player.GetBots()) do
+		if ply == bot then
+			bot_hit = true
+		end
+	end
+	T.eq(human_hit, true, "humans keep the real player")
+	T.eq(bot_hit, true, "bots keep the bot")
+	T.eq(session.env.player.GetCount(), #session.env.player.GetAll(), "count matches the list")
+	bot:Remove()
+	local bot_left = false
+	for _, ply in ipairs(session.env.player.GetAll()) do
+		if ply == bot then
+			bot_left = true
+		end
+	end
+	T.eq(bot_left, false, "a removed player leaves the list")
 	local hack = session.env.ents.Create("npc_manhack")
 	T.eq(hack:GetModel(), "models/manhack.mdl", "manhack uses the spawn-list model")
 	local roller = session.env.ents.Create("npc_rollermine")

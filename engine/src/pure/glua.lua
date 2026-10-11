@@ -2993,6 +2993,7 @@ function M.boot(opts)
 
 	local spawned = {}
 	local ent_seq = 0
+	local players = {}
 	local function make_ent(class, meta)
 		ent_seq = ent_seq + 1
 		local ent = { __ent = true, ClassName = class or "", __id = ent_seq, dt = {} }
@@ -3000,7 +3001,7 @@ function M.boot(opts)
 		-- dt is local storage. Nothing is networked.
 		ent.Entity = ent
 		meta = meta or entity_meta
-		return setmetatable(ent, {
+		ent = setmetatable(ent, {
 			__index = function(_, key)
 				local v = meta[key]
 				if v ~= nil then
@@ -3016,6 +3017,38 @@ function M.boot(opts)
 				return nil
 			end,
 		})
+		if meta == player_meta or class == "player" then
+			players[#players + 1] = ent
+		end
+		return ent
+	end
+	-- player.GetAll is the live list. A removed player is left out.
+	-- No SteamIDs are invented.
+	env.player = {}
+	local function live_players(want_bot)
+		local out = {}
+		for i = 1, #players do
+			local ply = players[i]
+			if type(ply) == "table" and ply.__removed ~= true then
+				local bot = ply.__bot == true
+				if want_bot == nil or bot == want_bot then
+					out[#out + 1] = ply
+				end
+			end
+		end
+		return out
+	end
+	function env.player.GetAll()
+		return live_players(nil)
+	end
+	function env.player.GetHumans()
+		return live_players(false)
+	end
+	function env.player.GetBots()
+		return live_players(true)
+	end
+	function env.player.GetCount()
+		return #env.player.GetAll()
 	end
 
 	env.ents = {}
