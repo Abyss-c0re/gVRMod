@@ -1955,6 +1955,69 @@ return function(H, env)
 		H.assert_true(not stock.restore_device_ang)
 	end)
 
+	-- ArcVR drop keeps mag rounds; reload pose is one sample, mag draw is per eye
+	H.TEST("util.arcvr_drop_law.ammo_and_stereo", function()
+		local u = env.vrmod.utils
+		H.assert_true(u.ArcVrReloadThink_ShouldRun("left"))
+		H.assert_true(u.ArcVrReloadThink_ShouldRun(nil))
+		H.assert_true(not u.ArcVrReloadThink_ShouldRun("right"))
+		H.assert_true(not u.ArcVrHoldDraw_AlreadyPainted({
+			drawn_frame = 4, drawn_eye = "left", frame = 4, eye = "right",
+		}))
+		H.assert_true(u.ArcVrHoldDraw_AlreadyPainted({
+			drawn_frame = 4, drawn_eye = "left", frame = 4, eye = "left",
+		}))
+		H.assert_true(not u.ArcVrHoldDraw_AlreadyPainted({
+			drawn_frame = 3, drawn_eye = "left", frame = 4, eye = "left",
+		}))
+		local arc = {
+			ArcticVR = true,
+			LoadedRounds = 12.8,
+			Chambered = 1,
+			EmptyChambered = 0,
+			Magazine = "m4a1_30",
+			SlideLockedBack = true,
+			Firemode = 1,
+			Attachments = {
+				{ Installed = "optic" },
+				{ Installed = nil },
+			},
+		}
+		H.assert_true(not u.ArcVrDrop_ShouldRefillClip(arc))
+		H.assert_true(u.ArcVrDrop_ShouldRefillClip({}))
+		local snap = u.ArcVrDrop_CopyState(arc)
+		H.assert_eq(snap.LoadedRounds, 12)
+		H.assert_eq(snap.Chambered, 1)
+		H.assert_eq(snap.Magazine, "m4a1_30")
+		H.assert_eq(snap.AttInstalled[1], "optic")
+		H.assert_eq(snap.AttInstalled[2], "")
+		snap.AttInstalled[1] = "mutated"
+		local again = u.ArcVrDrop_CopyState(arc)
+		H.assert_eq(again.AttInstalled[1], "optic")
+		local fresh = {
+			LoadedRounds = 0,
+			Chambered = 0,
+			Magazine = nil,
+			Attachments = {
+				{ Installed = "default_optic" },
+				{ Installed = "default_laser" },
+			},
+		}
+		H.assert_true(u.ArcVrDrop_ApplyState(fresh, again))
+		H.assert_eq(fresh.LoadedRounds, 12)
+		H.assert_eq(fresh.Chambered, 1)
+		H.assert_eq(fresh.Magazine, "m4a1_30")
+		H.assert_true(fresh.SlideLockedBack)
+		H.assert_eq(fresh.Attachments[1].Installed, "optic")
+		H.assert_eq(fresh.Attachments[2].Installed, nil)
+		H.assert_eq(fresh.avrSnapshot.LoadedRounds, 12)
+		fresh.avrSnapshot.LoadedRounds = 1
+		H.assert_eq(u.ArcVrDrop_CloneState(again).LoadedRounds, 12)
+		H.assert_eq(u.ArcVrDrop_ReserveRounds(again), 13)
+		H.assert_eq(u.ArcVrDrop_CopyState({ ArcticVR = false, LoadedRounds = 5 }), nil)
+		H.assert_eq(u.ArcVrDrop_ReserveRounds(nil), 0)
+	end)
+
 	-- G51 Submit-first frame budget (no third RenderView / collect on late frames)
 	H.TEST("util.frame_budget_law.submit_first_g51", function()
 		local u = env.vrmod.utils

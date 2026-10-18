@@ -434,6 +434,14 @@ PURE_TESTED = {
     "vrmod.utils.ArcVrWristLaw_StatusLabel": "util.arcvr_wrist_law.device_g50",
     "vrmod.utils.ArcVrWristLaw_HmdExpect": "util.arcvr_wrist_law.device_g50",
     "vrmod.utils.ArcVrWristLaw_IsTwistRisk": "util.arcvr_wrist_law.device_g50",
+    # ArcVR drop ammo + reload stereo (one think, per-eye mag draw)
+    "vrmod.utils.ArcVrReloadThink_ShouldRun": "util.arcvr_drop_law.ammo_and_stereo",
+    "vrmod.utils.ArcVrHoldDraw_AlreadyPainted": "util.arcvr_drop_law.ammo_and_stereo",
+    "vrmod.utils.ArcVrDrop_ShouldRefillClip": "util.arcvr_drop_law.ammo_and_stereo",
+    "vrmod.utils.ArcVrDrop_CopyState": "util.arcvr_drop_law.ammo_and_stereo",
+    "vrmod.utils.ArcVrDrop_CloneState": "util.arcvr_drop_law.ammo_and_stereo",
+    "vrmod.utils.ArcVrDrop_ApplyState": "util.arcvr_drop_law.ammo_and_stereo",
+    "vrmod.utils.ArcVrDrop_ReserveRounds": "util.arcvr_drop_law.ammo_and_stereo",
     # G51 Submit-first frame budget (no shutter from desktop/collect on the XR path)
     "vrmod.utils.FrameBudget_DesktopSkipMs": "util.frame_budget_law.submit_first_g51",
     "vrmod.utils.FrameBudget_InputAfterSubmit": "util.frame_budget_law.submit_first_g51",

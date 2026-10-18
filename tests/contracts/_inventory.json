@@ -25,6 +25,34 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_weps.lua"
     ],
     [
+      "vrmod.utils.ArcVrDrop_ApplyState",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrDrop_CloneState",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrDrop_CopyState",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrDrop_ReserveRounds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrDrop_ShouldRefillClip",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrHoldDraw_AlreadyPainted",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua"
+    ],
+    [
+      "vrmod.utils.ArcVrReloadThink_ShouldRun",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua"
+    ],
+    [
       "vrmod.utils.ArcVrWristLaw_AllowForegripAngleAsWrist",
       "addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua"
     ],
