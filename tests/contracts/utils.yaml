@@ -1427,6 +1427,10 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.MenuLaw_AllowForceUnpause
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.quit_game]
   - id: vrmod.utils.MenuLaw_CanonicalClimbId
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
@@ -1471,6 +1475,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
     tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_QuitArgs
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.quit_game]
   - id: vrmod.utils.MenuLaw_ShellRequest
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure

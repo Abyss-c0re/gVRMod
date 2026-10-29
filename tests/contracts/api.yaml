@@ -1146,6 +1146,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
     tier: pure
     tests: [api.menu.dedupe_name]
+  - id: vrmod.RequestQuitGame
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_vr_unpause.lua
+    tier: seam
+    tests: [api.smoke.RequestQuitGame]
+    notes: "thin getter / smoke"
   - id: vrmod.ResetAllWindowLayouts
     file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
     tier: seam

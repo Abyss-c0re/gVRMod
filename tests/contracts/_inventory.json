@@ -1369,6 +1369,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
     [
+      "vrmod.utils.MenuLaw_AllowForceUnpause",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
       "vrmod.utils.MenuLaw_CanonicalClimbId",
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
@@ -1410,6 +1414,10 @@
     ],
     [
       "vrmod.utils.MenuLaw_NormalizeName",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_QuitArgs",
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
     [
@@ -3077,6 +3085,10 @@
     [
       "vrmod.RemoveInGameMenuItem",
       "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
+    ],
+    [
+      "vrmod.RequestQuitGame",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_vr_unpause.lua"
     ],
     [
       "vrmod.ResetAllWindowLayouts",

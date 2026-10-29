@@ -96,4 +96,14 @@ return function(H, env)
 		H.assert_true(env.vrmod.utils.MenuLaw_KeepScreenClicker({ derma_focused = true }))
 		H.assert_true(not env.vrmod.utils.MenuLaw_KeepScreenClicker({ derma_focused = false }))
 	end)
+
+	H.TEST("menu.quit_game", function()
+		local cmd, arg = env.vrmod.utils.MenuLaw_QuitArgs()
+		H.assert_eq(cmd, "gamemenucommand")
+		H.assert_eq(arg, "QuitNoConfirm")
+		local A = env.vrmod.utils.MenuLaw_AllowForceUnpause
+		H.assert_true(not A({ quitting = true }))
+		H.assert_true(A({ quitting = false }))
+		H.assert_true(A({}))
+	end)
 end
