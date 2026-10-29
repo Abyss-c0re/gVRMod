@@ -341,6 +341,8 @@ PURE_TESTED = {
     "vrmod.utils.MenuLaw_ShellShowing": "menu.shell_showing",
     "vrmod.utils.MenuLaw_ShellRequest": "menu.shell_request",
     "vrmod.utils.MenuLaw_KeepShellOnEngineClose": "menu.shell_engine_close",
+    "vrmod.utils.ScrollLaw_Zone": "menu.scroll_zone",
+    "vrmod.utils.ScrollLaw_PumpWhileHeld": "menu.scroll_zone",
     # G25 pure pose SoT law (one energy path; no dual-truth pose/angvel forks)
     "vrmod.utils.PoseSoT_PipelineSteps": "util.pose_sot_law.single_path_g25",
     "vrmod.utils.PoseSoT_PublicSource": "util.pose_sot_law.single_path_g25",

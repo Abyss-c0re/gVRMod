@@ -64,4 +64,18 @@ return function(H, env)
 		H.assert_true(not K({ vr_active = true, bound = true, panel_visible = false }))
 		H.assert_true(K({ vr_active = true, bound = true, panel_visible = true }))
 	end)
+
+	H.TEST("menu.scroll_zone", function()
+		local Z = env.vrmod.utils.ScrollLaw_Zone
+		-- Vertical bar: buttons 16px, grip at 40 size 20, track 200
+		H.assert_eq(Z(4, 40, 20, 16, 200, true), "up")
+		H.assert_eq(Z(190, 40, 20, 16, 200, true), "down")
+		H.assert_eq(Z(50, 40, 20, 16, 200, true), "grip")
+		H.assert_eq(Z(30, 40, 20, 16, 200, true), "page_dec")
+		H.assert_eq(Z(80, 40, 20, 16, 200, true), "page_inc")
+		H.assert_eq(Z(-2, 40, 20, 16, 200, true), "miss")
+		H.assert_eq(Z(4, 40, 20, 16, 200, false), "left")
+		H.assert_true(env.vrmod.utils.ScrollLaw_PumpWhileHeld(true))
+		H.assert_true(not env.vrmod.utils.ScrollLaw_PumpWhileHeld(false))
+	end)
 end

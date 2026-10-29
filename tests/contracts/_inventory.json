@@ -1565,6 +1565,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_npc2rag.lua"
     ],
     [
+      "vrmod.utils.ScrollLaw_PumpWhileHeld",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.ScrollLaw_Zone",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
       "vrmod.utils.SendPickupNetMessage",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
@@ -3081,6 +3089,10 @@
     [
       "vrmod.SaveWeaponViewModelConfig",
       "addon/vrmod-x64/lua/vrmod/player/cl_viewmodeledit.lua"
+    ],
+    [
+      "vrmod.ScrollApplyAt",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [
       "vrmod.SetLeftHandClosedFingerAngles",

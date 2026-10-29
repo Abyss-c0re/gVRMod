@@ -1631,6 +1631,14 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.ScrollLaw_PumpWhileHeld
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.scroll_zone]
+  - id: vrmod.utils.ScrollLaw_Zone
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.scroll_zone]
   - id: vrmod.utils.SendPickupNetMessage
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
     tier: seam
