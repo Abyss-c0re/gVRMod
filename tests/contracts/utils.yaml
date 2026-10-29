@@ -1455,10 +1455,22 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
     tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_KeepShellOnEngineClose
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.shell_engine_close]
   - id: vrmod.utils.MenuLaw_NormalizeName
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
     tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_ShellRequest
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.shell_request]
+  - id: vrmod.utils.MenuLaw_ShellShowing
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.shell_showing]
   - id: vrmod.utils.MenuLaw_StableKey
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure

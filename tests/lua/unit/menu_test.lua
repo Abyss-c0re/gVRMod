@@ -41,4 +41,27 @@ return function(H, env)
 		env.vrmod.DedupInGameMenuItems()
 		H.assert_eq(#g_VR.menuItems, 2)
 	end)
+
+	H.TEST("menu.shell_showing", function()
+		local S = env.vrmod.utils.MenuLaw_ShellShowing
+		H.assert_true(not S({}))
+		H.assert_true(not S({ bound = true, surface = true, panel_valid = true, panel_visible = false }))
+		H.assert_true(not S({ bound = true, surface = false, panel_valid = true, panel_visible = true }))
+		H.assert_true(S({ bound = true, surface = true, panel_valid = true, panel_visible = true }))
+	end)
+
+	H.TEST("menu.shell_request", function()
+		local R = env.vrmod.utils.MenuLaw_ShellRequest
+		H.assert_eq(R({ showing = false }), "open")
+		H.assert_eq(R({ showing = true }), "close")
+		H.assert_eq(R({ showing = true, force = true }), "keep")
+		H.assert_eq(R({ showing = false, force = true }), "open")
+	end)
+
+	H.TEST("menu.shell_engine_close", function()
+		local K = env.vrmod.utils.MenuLaw_KeepShellOnEngineClose
+		H.assert_true(not K({ vr_active = false, bound = true, panel_visible = true }))
+		H.assert_true(not K({ vr_active = true, bound = true, panel_visible = false }))
+		H.assert_true(K({ vr_active = true, bound = true, panel_visible = true }))
+	end)
 end

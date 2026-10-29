@@ -1397,7 +1397,19 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
     [
+      "vrmod.utils.MenuLaw_KeepShellOnEngineClose",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
       "vrmod.utils.MenuLaw_NormalizeName",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_ShellRequest",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_ShellShowing",
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
     [
