@@ -1447,6 +1447,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
     tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_EscAction
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.esc_pause]
   - id: vrmod.utils.MenuLaw_HmdExpect
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure

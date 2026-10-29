@@ -1389,6 +1389,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
     [
+      "vrmod.utils.MenuLaw_EscAction",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
       "vrmod.utils.MenuLaw_HmdExpect",
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
@@ -3253,6 +3257,10 @@
     [
       "vrmod.UnbindMainMenuFromVR",
       "addon/vrmod-x64/lua/vrmod/ui/cl_vr_mainmenu.lua"
+    ],
+    [
+      "vrmod.UnpausePolicyOpts",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_vr_unpause.lua"
     ],
     [
       "vrmod.UpdateSeatedOffset",

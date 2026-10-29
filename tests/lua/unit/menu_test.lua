@@ -105,5 +105,15 @@ return function(H, env)
 		H.assert_true(not A({ quitting = true }))
 		H.assert_true(A({ quitting = false }))
 		H.assert_true(A({}))
+		H.assert_true(not A({ shift_down = true }))
+		H.assert_true(not A({ stock_pause = true }))
+	end)
+
+	H.TEST("menu.esc_pause", function()
+		local E = env.vrmod.utils.MenuLaw_EscAction
+		H.assert_eq(E({ vr_active = false, shift_down = true }), "desktop")
+		H.assert_eq(E({ vr_active = true }), "hub")
+		H.assert_eq(E({ vr_active = true, shift_down = true }), "stock")
+		H.assert_eq(E({ vr_active = true, stock_pause = true }), "stock")
 	end)
 end

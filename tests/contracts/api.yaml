@@ -1356,6 +1356,11 @@ symbols:
     tier: seam
     tests: [api.smoke.UnbindMainMenuFromVR]
     notes: "thin getter / smoke"
+  - id: vrmod.UnpausePolicyOpts
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_vr_unpause.lua
+    tier: seam
+    tests: [api.smoke.UnpausePolicyOpts]
+    notes: "thin getter / smoke"
   - id: vrmod.UpdateSeatedOffset
     file: addon/vrmod-x64/lua/vrmod/input/cl_seated.lua
     tier: seam
