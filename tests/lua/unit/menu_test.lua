@@ -78,4 +78,22 @@ return function(H, env)
 		H.assert_true(env.vrmod.utils.ScrollLaw_PumpWhileHeld(true))
 		H.assert_true(not env.vrmod.utils.ScrollLaw_PumpWhileHeld(false))
 	end)
+
+	H.TEST("menu.click_focus", function()
+		local F = env.vrmod.utils.MenuLaw_ClickFocus
+		H.assert_eq(F({ focus = "miscmenu", stereo_frame = 10, hits = {} }), "miscmenu")
+		local uid = F({
+			focus = false,
+			stereo_frame = 10,
+			hits = {
+				{ uid = "vr_hub", frame = 10, dist = 4 },
+				{ uid = "p2v_spawnmenu", frame = 9, dist = 1 },
+				{ uid = "old", frame = 7, dist = 0 },
+			},
+		})
+		H.assert_eq(uid, "p2v_spawnmenu")
+		H.assert_eq(F({ focus = false, stereo_frame = 10, hits = { { uid = "old", frame = 3, dist = 0 } } }), nil)
+		H.assert_true(env.vrmod.utils.MenuLaw_KeepScreenClicker({ derma_focused = true }))
+		H.assert_true(not env.vrmod.utils.MenuLaw_KeepScreenClicker({ derma_focused = false }))
+	end)
 end

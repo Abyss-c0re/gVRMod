@@ -1373,6 +1373,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
     [
+      "vrmod.utils.MenuLaw_ClickFocus",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
       "vrmod.utils.MenuLaw_Decide",
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
@@ -1394,6 +1398,10 @@
     ],
     [
       "vrmod.utils.MenuLaw_ItemsMatch",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
+      "vrmod.utils.MenuLaw_KeepScreenClicker",
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
     [
@@ -3000,6 +3008,10 @@
     ],
     [
       "vrmod.MenuShouldRepaint",
+      "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
+    ],
+    [
+      "vrmod.MenuUidForClick",
       "addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua"
     ],
     [

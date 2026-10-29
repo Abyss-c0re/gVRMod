@@ -1062,6 +1062,11 @@ symbols:
     tier: seam
     tests: [api.smoke.MenuShouldRepaint]
     notes: "thin getter / smoke"
+  - id: vrmod.MenuUidForClick
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
+    tier: seam
+    tests: [api.smoke.MenuUidForClick]
+    notes: "thin getter / smoke"
   - id: vrmod.ModuleSupportsEyeSizeArgs
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
     tier: seam
@@ -1170,6 +1175,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/player/cl_viewmodeledit.lua
     tier: seam
     tests: [api.smoke.SaveWeaponViewModelConfig]
+    notes: "thin getter / smoke"
+  - id: vrmod.ScrollApplyAt
+    file: addon/vrmod-x64/lua/vrmod/ui/cl_ui.lua
+    tier: seam
+    tests: [api.smoke.ScrollApplyAt]
     notes: "thin getter / smoke"
   - id: vrmod.SetLeftHandClosedFingerAngles
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua

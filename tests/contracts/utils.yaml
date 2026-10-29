@@ -1431,6 +1431,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
     tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_ClickFocus
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.click_focus]
   - id: vrmod.utils.MenuLaw_Decide
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
@@ -1455,6 +1459,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
     tests: [util.menu_law.dedupe_g26]
+  - id: vrmod.utils.MenuLaw_KeepScreenClicker
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.click_focus]
   - id: vrmod.utils.MenuLaw_KeepShellOnEngineClose
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
