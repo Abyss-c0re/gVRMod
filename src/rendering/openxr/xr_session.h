@@ -152,6 +152,8 @@ bool XR_HasFbPassthrough();
 bool XR_EyeGazeExtensionEnabled();
 // System reported supportsEyeGazeInteraction. A later pose can still arrive.
 bool XR_EyeGazeSupported();
+// XR_HTCX_vive_tracker_interaction was enabled (waist + feet).
+bool XR_ViveTrackerExtensionEnabled();
 
 // ── View/display info ──
 struct XrDisplayInfo {

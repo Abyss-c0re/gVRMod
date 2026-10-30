@@ -15,6 +15,16 @@ inline constexpr const char* kProfileTouchPlus =
     "/interaction_profiles/meta/touch_controller_plus";
 inline constexpr const char* kProfileKhrSimple =
     "/interaction_profiles/khr/simple_controller";
+// Pico Neo 3 / 4 / G3. WiVRn exposes these; Touch suggestions do not apply.
+inline constexpr const char* kProfilePicoNeo3 =
+    "/interaction_profiles/bytedance/pico_neo3_controller";
+inline constexpr const char* kProfilePico4 =
+    "/interaction_profiles/bytedance/pico4_controller";
+inline constexpr const char* kProfilePicoG3 =
+    "/interaction_profiles/bytedance/pico_g3_controller";
+// HTCX body trackers (waist + feet). Requires XR_HTCX_vive_tracker_interaction.
+inline constexpr const char* kProfileViveTracker =
+    "/interaction_profiles/htc/vive_tracker_htcx";
 // Separate from controller profiles. One bad path must not reject hand bindings.
 inline constexpr const char* kProfileEyeGaze =
     "/interaction_profiles/ext/eye_gaze_interaction";
@@ -54,6 +64,14 @@ inline constexpr const char* rightSelectClick = "/user/hand/right/input/select/c
 
 inline constexpr const char* leftHaptic  = "/user/hand/left/output/haptic";
 inline constexpr const char* rightHaptic = "/user/hand/right/output/haptic";
+
+// Pico Neo 3 exposes squeeze as a click. A /value path rejects the whole profile.
+inline constexpr const char* trackerLeftFootPose =
+    "/user/vive_tracker_htcx/role/left_foot/input/grip/pose";
+inline constexpr const char* trackerRightFootPose =
+    "/user/vive_tracker_htcx/role/right_foot/input/grip/pose";
+inline constexpr const char* trackerWaistPose =
+    "/user/vive_tracker_htcx/role/waist/input/grip/pose";
 } // namespace path
 
 } // namespace cube_xr

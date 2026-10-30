@@ -120,6 +120,7 @@ static bool g_fbPtExtEnabled = false;
 // XR_EXT_eye_gaze_interaction — gaze pose for character eyes. Not Pico-specific.
 static bool g_eyeGazeExtEnabled = false;
 static bool g_eyeGazeSupported = false;
+static bool g_viveTrackerExtEnabled = false;
 static XrPassthroughFB g_fbPassthrough = XR_NULL_HANDLE;
 static XrPassthroughLayerFB g_fbPtLayer = XR_NULL_HANDLE;
 static PFN_xrCreatePassthroughFB g_pfnCreatePt = nullptr;
@@ -253,6 +254,10 @@ bool XR_EyeGazeExtensionEnabled() {
 
 bool XR_EyeGazeSupported() {
     return g_eyeGazeSupported;
+}
+
+bool XR_ViveTrackerExtensionEnabled() {
+    return g_viveTrackerExtEnabled;
 }
 
 void XR_SetPassthroughChroma(bool enable, float tolerance) {
@@ -557,8 +562,10 @@ bool XR_Init(char* errMsg, int errMsgLen) {
     g_fbPtExtEnabled = false;
     g_eyeGazeExtEnabled = false;
     g_eyeGazeSupported = false;
+    g_viveTrackerExtEnabled = false;
     bool wantFb = false;
     bool wantGaze = false;
+    bool wantTracker = false;
     {
         uint32_t n = 0;
         if (g_xrEnumerateInstanceExtensionProperties)
@@ -571,6 +578,8 @@ bool XR_Init(char* errMsg, int errMsgLen) {
                 wantFb = true;
             else if (std::strcmp(props[i].extensionName, XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME) == 0)
                 wantGaze = true;
+            else if (std::strcmp(props[i].extensionName, XR_HTCX_VIVE_TRACKER_INTERACTION_EXTENSION_NAME) == 0)
+                wantTracker = true;
         }
     }
     std::vector<const char*> extList;
@@ -583,7 +592,7 @@ bool XR_Init(char* errMsg, int errMsgLen) {
 
     // Optional extensions are retried independently. A rejected eye-gaze
     // extension must not drop FB passthrough, and the reverse.
-    auto tryInstance = [&](bool fb, bool gaze) -> XrResult {
+    auto tryInstance = [&](bool fb, bool gaze, bool tracker) -> XrResult {
         extList.clear();
 #ifdef _WIN32
         extList.push_back(XR_KHR_D3D11_ENABLE_EXTENSION_NAME);
@@ -592,6 +601,7 @@ bool XR_Init(char* errMsg, int errMsgLen) {
 #endif
         g_fbPtExtEnabled = false;
         g_eyeGazeExtEnabled = false;
+        g_viveTrackerExtEnabled = false;
         if (fb) {
             extList.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
             g_fbPtExtEnabled = true;
@@ -600,29 +610,37 @@ bool XR_Init(char* errMsg, int errMsgLen) {
             extList.push_back(XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME);
             g_eyeGazeExtEnabled = true;
         }
+        if (tracker) {
+            extList.push_back(XR_HTCX_VIVE_TRACKER_INTERACTION_EXTENSION_NAME);
+            g_viveTrackerExtEnabled = true;
+        }
         ici.enabledExtensionCount = (uint32_t)extList.size();
         ici.enabledExtensionNames = extList.data();
         g_xrInstance = XR_NULL_HANDLE;
         return g_xrCreateInstance(&ici, &g_xrInstance);
     };
 
-    XrResult res = tryInstance(wantFb, wantGaze);
+    XrResult res = tryInstance(wantFb, wantGaze, wantTracker);
+    if (res != XR_SUCCESS && wantTracker) {
+        VRMOD_LOG_WARN("xrCreateInstance failed with vive tracker ext — retrying without it");
+        res = tryInstance(wantFb, wantGaze, false);
+    }
     if (res != XR_SUCCESS && wantFb && wantGaze) {
         VRMOD_LOG_WARN("xrCreateInstance failed with FB passthrough and eye gaze — retrying");
-        res = tryInstance(false, true);
+        res = tryInstance(false, true, false);
         if (res != XR_SUCCESS)
-            res = tryInstance(true, false);
+            res = tryInstance(true, false, false);
     }
     if (res != XR_SUCCESS && (wantFb || wantGaze)) {
         VRMOD_LOG_WARN("xrCreateInstance failed with optional extensions — graphics only");
-        res = tryInstance(false, false);
+        res = tryInstance(false, false, false);
     }
     if (res != XR_SUCCESS) {
         snprintf(errMsg, errMsgLen, "VRMOD OpenXR: xrCreateInstance failed (%d)", (int)res);
         return false;
     }
-    VRMOD_LOG_INFO("OpenXR instance created (FB_passthrough ext=%d eye_gaze ext=%d)",
-        (int)g_fbPtExtEnabled, (int)g_eyeGazeExtEnabled);
+    VRMOD_LOG_INFO("OpenXR instance created (FB_passthrough ext=%d eye_gaze ext=%d vive_tracker ext=%d)",
+        (int)g_fbPtExtEnabled, (int)g_eyeGazeExtEnabled, (int)g_viveTrackerExtEnabled);
 
     // Load all instance functions
     XR_LOAD(xrDestroyInstance);
@@ -1124,6 +1142,7 @@ void XR_Shutdown() {
     g_xrSubmitEnabled = false;
     g_eyeGazeExtEnabled = false;
     g_eyeGazeSupported = false;
+    g_viveTrackerExtEnabled = false;
     if (g_xrFrameBegun && g_xrSession && g_xrEndFrame) {
         XR_EndFrame();
     }

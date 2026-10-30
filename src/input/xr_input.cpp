@@ -789,6 +789,46 @@ static bool XR_SuggestAllInteractionBindings() {
     if (okTouchPlus) VRMOD_LOG_INFO("Suggested Touch-compatible bindings for meta/touch_controller_plus");
     okTouch = okTouch || okTouchPro || okTouchPlus;
 
+    // Pico Neo 3 Pro Eye / Pico 4 / G3. Same hand paths as Touch, except Neo 3
+    // has squeeze/click and no squeeze/value — a value path rejects the profile.
+    auto suggestPico = [&](const char* profile) {
+        if (SuggestBindingsForProfile(profile, binds, (uint32_t)n)) {
+            VRMOD_LOG_INFO("Suggested Pico bindings for %s (%d)", profile, n);
+            okTouch = true;
+            return;
+        }
+        XrActionSuggestedBinding core[32];
+        int cn = 0;
+        PushBinding(core, &cn, 32, A("pose_lefthand"),  path::leftGripPose);
+        PushBinding(core, &cn, 32, A("pose_righthand"), path::rightGripPose);
+        PushBinding(core, &cn, 32, A("vibration_left"),  path::leftHaptic);
+        PushBinding(core, &cn, 32, A("vibration_right"), path::rightHaptic);
+        PushBinding(core, &cn, 32, A("vector2_walkdirection"), path::leftThumbstick);
+        PushBinding(core, &cn, 32, A("vector2_smoothturn"),    path::rightThumbstick);
+        PushBinding(core, &cn, 32, g_xrLeftStickVec2,  path::leftThumbstick);
+        PushBinding(core, &cn, 32, g_xrRightStickVec2, path::rightThumbstick);
+        XrAction rt = A("vector1_primaryfire");
+        if (rt == XR_NULL_HANDLE) rt = g_xrRightTriggerFloat;
+        PushBinding(core, &cn, 32, rt, path::rightTriggerValue);
+        PushBinding(core, &cn, 32, g_xrLeftTriggerFloat, path::leftTriggerValue);
+        PushBinding(core, &cn, 32, A("boolean_jump"),      path::rightBClick);
+        PushBinding(core, &cn, 32, A("boolean_crouch"),    path::rightAClick);
+        PushBindingAllByName(core, &cn, 32, "boolean_spawnmenu", path::leftYClick);
+        PushBinding(core, &cn, 32, A("boolean_use"),       path::leftXClick);
+        PushBinding(core, &cn, 32, A("boolean_flashlight"), path::leftMenuClick);
+        PushBindingAllByName(core, &cn, 32, "boolean_left_pickup",  path::leftSqueezeClick);
+        PushBindingAllByName(core, &cn, 32, "boolean_right_pickup", path::rightSqueezeClick);
+        if (SuggestBindingsForProfile(profile, core, (uint32_t)cn)) {
+            VRMOD_LOG_INFO("Pico profile accepted squeeze-click set: %s", profile);
+            okTouch = true;
+        } else {
+            VRMOD_LOG_WARN("Pico profile rejected bindings: %s", profile);
+        }
+    };
+    suggestPico(cube_xr::kProfilePicoNeo3);
+    suggestPico(cube_xr::kProfilePico4);
+    suggestPico(cube_xr::kProfilePicoG3);
+
     // If the full table was rejected (one bad path fails the whole suggest on some
     // runtimes), retry a reduced core set that every Touch/Index profile must support.
     if (!okTouch) {
@@ -842,8 +882,24 @@ static bool XR_SuggestAllInteractionBindings() {
         XrActionSuggestedBinding gazeBind[1];
         int gn = 0;
         PushBinding(gazeBind, &gn, 1, A("pose_gaze"), path::eyeGazePose);
-        if (gn > 0)
-            SuggestBindingsForProfile(cube_xr::kProfileEyeGaze, gazeBind, (uint32_t)gn);
+        if (gn > 0 && SuggestBindingsForProfile(cube_xr::kProfileEyeGaze, gazeBind, (uint32_t)gn))
+            VRMOD_LOG_INFO("Suggested eye gaze pose");
+        else
+            VRMOD_LOG_WARN("Eye gaze extension on, but gaze pose binding was rejected");
+    }
+
+    // Three body trackers: waist + feet. Unbound pose actions stay inactive, so
+    // sixPoints never becomes true and the trackers do nothing.
+    if (XR_ViveTrackerExtensionEnabled()) {
+        XrActionSuggestedBinding trk[4];
+        int tn = 0;
+        PushBinding(trk, &tn, 4, A("pose_leftfoot"),  path::trackerLeftFootPose);
+        PushBinding(trk, &tn, 4, A("pose_rightfoot"), path::trackerRightFootPose);
+        PushBinding(trk, &tn, 4, A("pose_waist"),     path::trackerWaistPose);
+        if (tn > 0 && SuggestBindingsForProfile(cube_xr::kProfileViveTracker, trk, (uint32_t)tn))
+            VRMOD_LOG_INFO("Suggested vive tracker poses (waist + feet)");
+        else
+            VRMOD_LOG_WARN("Vive tracker extension on, but role pose bindings were rejected");
     }
 
     if (!okTouch && !okIndex) {
@@ -1299,7 +1355,16 @@ void XR_SyncActions(const actionSet* activeSets, int activeCount) {
     syncInfo.activeActionSets = activeXrSets;
 
     XrResult res = g_xrSyncActions(g_xrSession, &syncInfo);
-    if (res != XR_SUCCESS && res != XR_SESSION_NOT_FOCUSED) {
+    if (res == XR_SESSION_NOT_FOCUSED) {
+        // Runtime is not giving this session input. Buttons, sticks, trackers
+        // and gaze stay at the last sample (usually zeros) until FOCUSED.
+        static bool s_loggedUnfocused = false;
+        if (!s_loggedUnfocused) {
+            s_loggedUnfocused = true;
+            VRMOD_LOG_WARN("xrSyncActions: session not focused (state=%d) — controller, tracker and gaze input is frozen",
+                (int)g_xrSessionState);
+        }
+    } else if (res != XR_SUCCESS) {
         VRMOD_LOG_WARN("xrSyncActions failed: %s", XR_ResultToString(res));
     }
 
@@ -1328,9 +1393,33 @@ void XR_SyncActions(const actionSet* activeSets, int activeCount) {
             }
         }
         XrAction gaze = FindXrActionByName("pose_gaze");
-        VRMOD_LOG_INFO("INPUT health: leftPose=%d rightPose=%d gazePose=%d walk=(%.2f,%.2f) spaces=%d attached=%d",
-            poseActive(left), poseActive(right), poseActive(gaze), walkX, walkY,
-            g_xrActionSpaceCount, (int)g_xrActionsAttached);
+        XrAction waist = FindXrActionByName("pose_waist");
+        XrAction lfoot = FindXrActionByName("pose_leftfoot");
+        XrAction rfoot = FindXrActionByName("pose_rightfoot");
+        char profile[128] = "?";
+        static PFN_xrGetCurrentInteractionProfile s_getProfile = nullptr;
+        if (!s_getProfile && g_xrGetInstanceProcAddr && g_xrInstance)
+            g_xrGetInstanceProcAddr(g_xrInstance, "xrGetCurrentInteractionProfile",
+                (PFN_xrVoidFunction*)&s_getProfile);
+        if (s_getProfile && g_xrStringToPath && g_xrPathToString) {
+            XrPath hand = XR_NULL_PATH;
+            if (g_xrStringToPath(g_xrInstance, "/user/hand/left", &hand) == XR_SUCCESS) {
+                XrInteractionProfileState ips = {XR_TYPE_INTERACTION_PROFILE_STATE};
+                if (s_getProfile(g_xrSession, hand, &ips) == XR_SUCCESS && ips.interactionProfile) {
+                    uint32_t len = 0;
+                    g_xrPathToString(g_xrInstance, ips.interactionProfile, 0, &len, nullptr);
+                    if (len > 1 && len < sizeof(profile))
+                        g_xrPathToString(g_xrInstance, ips.interactionProfile, sizeof(profile), &len, profile);
+                } else {
+                    snprintf(profile, sizeof(profile), "none");
+                }
+            }
+        }
+        VRMOD_LOG_INFO("INPUT health: state=%d profile=%s left=%d right=%d gaze=%d waist=%d Lfoot=%d Rfoot=%d walk=(%.2f,%.2f) spaces=%d",
+            (int)g_xrSessionState, profile,
+            poseActive(left), poseActive(right), poseActive(gaze),
+            poseActive(waist), poseActive(lfoot), poseActive(rfoot),
+            walkX, walkY, g_xrActionSpaceCount);
     }
 }
 
