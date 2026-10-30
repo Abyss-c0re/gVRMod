@@ -1,4 +1,5 @@
 #include "xr_session.h"
+#include "input/xr_input.h"
 #include "core/vrmod_log.h"
 
 #include <cstring>
@@ -121,6 +122,11 @@ static bool g_fbPtExtEnabled = false;
 static bool g_eyeGazeExtEnabled = false;
 static bool g_eyeGazeSupported = false;
 static bool g_viveTrackerExtEnabled = false;
+static bool g_bodyExtEnabled = false;
+static bool g_fullBodyExtEnabled = false;
+static bool g_bodySupported = false;
+static bool g_fullBodySupported = false;
+static bool g_bdExtEnabled = false;
 static XrPassthroughFB g_fbPassthrough = XR_NULL_HANDLE;
 static XrPassthroughLayerFB g_fbPtLayer = XR_NULL_HANDLE;
 static PFN_xrCreatePassthroughFB g_pfnCreatePt = nullptr;
@@ -258,6 +264,22 @@ bool XR_EyeGazeSupported() {
 
 bool XR_ViveTrackerExtensionEnabled() {
     return g_viveTrackerExtEnabled;
+}
+
+bool XR_BodyTrackingExtensionEnabled() {
+    return g_bodyExtEnabled;
+}
+
+bool XR_FullBodyExtensionEnabled() {
+    return g_fullBodyExtEnabled;
+}
+
+bool XR_BodyTrackingSupported() {
+    return g_bodySupported;
+}
+
+bool XR_FullBodySupported() {
+    return g_fullBodySupported;
 }
 
 void XR_SetPassthroughChroma(bool enable, float tolerance) {
@@ -563,9 +585,16 @@ bool XR_Init(char* errMsg, int errMsgLen) {
     g_eyeGazeExtEnabled = false;
     g_eyeGazeSupported = false;
     g_viveTrackerExtEnabled = false;
+    g_bodyExtEnabled = false;
+    g_fullBodyExtEnabled = false;
+    g_bodySupported = false;
+    g_fullBodySupported = false;
     bool wantFb = false;
     bool wantGaze = false;
     bool wantTracker = false;
+    bool wantBody = false;
+    bool wantFull = false;
+    bool wantBd = false;
     {
         uint32_t n = 0;
         if (g_xrEnumerateInstanceExtensionProperties)
@@ -580,8 +609,15 @@ bool XR_Init(char* errMsg, int errMsgLen) {
                 wantGaze = true;
             else if (std::strcmp(props[i].extensionName, XR_HTCX_VIVE_TRACKER_INTERACTION_EXTENSION_NAME) == 0)
                 wantTracker = true;
+            else if (std::strcmp(props[i].extensionName, XR_FB_BODY_TRACKING_EXTENSION_NAME) == 0)
+                wantBody = true;
+            else if (std::strcmp(props[i].extensionName, XR_META_BODY_TRACKING_FULL_BODY_EXTENSION_NAME) == 0)
+                wantFull = true;
+            else if (std::strcmp(props[i].extensionName, XR_BD_CONTROLLER_INTERACTION_EXTENSION_NAME) == 0)
+                wantBd = true;
         }
     }
+    if (wantFull && !wantBody) wantFull = false;
     std::vector<const char*> extList;
     XrInstanceCreateInfo ici = {XR_TYPE_INSTANCE_CREATE_INFO};
     strncpy(ici.applicationInfo.applicationName, "gVRMod", XR_MAX_APPLICATION_NAME_SIZE - 1);
@@ -592,7 +628,7 @@ bool XR_Init(char* errMsg, int errMsgLen) {
 
     // Optional extensions are retried independently. A rejected eye-gaze
     // extension must not drop FB passthrough, and the reverse.
-    auto tryInstance = [&](bool fb, bool gaze, bool tracker) -> XrResult {
+    auto tryInstance = [&](bool fb, bool gaze, bool tracker, bool body, bool full, bool bd) -> XrResult {
         extList.clear();
 #ifdef _WIN32
         extList.push_back(XR_KHR_D3D11_ENABLE_EXTENSION_NAME);
@@ -602,6 +638,9 @@ bool XR_Init(char* errMsg, int errMsgLen) {
         g_fbPtExtEnabled = false;
         g_eyeGazeExtEnabled = false;
         g_viveTrackerExtEnabled = false;
+        g_bodyExtEnabled = false;
+        g_fullBodyExtEnabled = false;
+        g_bdExtEnabled = false;
         if (fb) {
             extList.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
             g_fbPtExtEnabled = true;
@@ -614,33 +653,58 @@ bool XR_Init(char* errMsg, int errMsgLen) {
             extList.push_back(XR_HTCX_VIVE_TRACKER_INTERACTION_EXTENSION_NAME);
             g_viveTrackerExtEnabled = true;
         }
+        if (body) {
+            extList.push_back(XR_FB_BODY_TRACKING_EXTENSION_NAME);
+            g_bodyExtEnabled = true;
+        }
+        if (full && body) {
+            extList.push_back(XR_META_BODY_TRACKING_FULL_BODY_EXTENSION_NAME);
+            g_fullBodyExtEnabled = true;
+        }
+        if (bd) {
+            extList.push_back(XR_BD_CONTROLLER_INTERACTION_EXTENSION_NAME);
+            g_bdExtEnabled = true;
+        }
         ici.enabledExtensionCount = (uint32_t)extList.size();
         ici.enabledExtensionNames = extList.data();
         g_xrInstance = XR_NULL_HANDLE;
         return g_xrCreateInstance(&ici, &g_xrInstance);
     };
 
-    XrResult res = tryInstance(wantFb, wantGaze, wantTracker);
+    XrResult res = tryInstance(wantFb, wantGaze, wantTracker, wantBody, wantFull, wantBd);
     if (res != XR_SUCCESS && wantTracker) {
         VRMOD_LOG_WARN("xrCreateInstance failed with vive tracker ext — retrying without it");
-        res = tryInstance(wantFb, wantGaze, false);
+        res = tryInstance(wantFb, wantGaze, false, wantBody, wantFull, wantBd);
+    }
+    if (res != XR_SUCCESS && wantFull) {
+        VRMOD_LOG_WARN("xrCreateInstance failed with full-body ext — retrying without it");
+        res = tryInstance(wantFb, wantGaze, false, wantBody, false, wantBd);
+    }
+    if (res != XR_SUCCESS && wantBody) {
+        VRMOD_LOG_WARN("xrCreateInstance failed with body-tracking ext — retrying without it");
+        res = tryInstance(wantFb, wantGaze, false, false, false, wantBd);
+    }
+    if (res != XR_SUCCESS && wantBd) {
+        VRMOD_LOG_WARN("xrCreateInstance failed with Pico controller ext — retrying without it");
+        res = tryInstance(wantFb, wantGaze, false, false, false, false);
     }
     if (res != XR_SUCCESS && wantFb && wantGaze) {
         VRMOD_LOG_WARN("xrCreateInstance failed with FB passthrough and eye gaze — retrying");
-        res = tryInstance(false, true, false);
+        res = tryInstance(false, true, false, false, false, false);
         if (res != XR_SUCCESS)
-            res = tryInstance(true, false, false);
+            res = tryInstance(true, false, false, false, false, false);
     }
     if (res != XR_SUCCESS && (wantFb || wantGaze)) {
         VRMOD_LOG_WARN("xrCreateInstance failed with optional extensions — graphics only");
-        res = tryInstance(false, false, false);
+        res = tryInstance(false, false, false, false, false, false);
     }
     if (res != XR_SUCCESS) {
         snprintf(errMsg, errMsgLen, "VRMOD OpenXR: xrCreateInstance failed (%d)", (int)res);
         return false;
     }
-    VRMOD_LOG_INFO("OpenXR instance created (FB_passthrough ext=%d eye_gaze ext=%d vive_tracker ext=%d)",
-        (int)g_fbPtExtEnabled, (int)g_eyeGazeExtEnabled, (int)g_viveTrackerExtEnabled);
+    VRMOD_LOG_INFO("OpenXR instance created (passthrough=%d eye_gaze=%d vive_tracker=%d body=%d full_body=%d pico_bd=%d)",
+        (int)g_fbPtExtEnabled, (int)g_eyeGazeExtEnabled, (int)g_viveTrackerExtEnabled,
+        (int)g_bodyExtEnabled, (int)g_fullBodyExtEnabled, (int)g_bdExtEnabled);
 
     // Load all instance functions
     XR_LOAD(xrDestroyInstance);
@@ -699,13 +763,31 @@ bool XR_Init(char* errMsg, int errMsgLen) {
 
     XrSystemEyeGazeInteractionPropertiesEXT eyeGazeProps = {
         XR_TYPE_SYSTEM_EYE_GAZE_INTERACTION_PROPERTIES_EXT};
+    XrSystemBodyTrackingPropertiesFB bodyProps = {XR_TYPE_SYSTEM_BODY_TRACKING_PROPERTIES_FB};
+    XrSystemPropertiesBodyTrackingFullBodyMETA fullBodyProps = {
+        XR_TYPE_SYSTEM_PROPERTIES_BODY_TRACKING_FULL_BODY_META};
     XrSystemProperties sysProp = {XR_TYPE_SYSTEM_PROPERTIES};
-    if (g_eyeGazeExtEnabled)
-        sysProp.next = &eyeGazeProps;
+    void* chain = nullptr;
+    if (g_fullBodyExtEnabled) {
+        fullBodyProps.next = chain;
+        chain = &fullBodyProps;
+    }
+    if (g_bodyExtEnabled) {
+        bodyProps.next = chain;
+        chain = &bodyProps;
+    }
+    if (g_eyeGazeExtEnabled) {
+        eyeGazeProps.next = chain;
+        chain = &eyeGazeProps;
+    }
+    sysProp.next = chain;
     g_xrGetSystemProperties(g_xrInstance, g_xrSystemId, &sysProp);
     g_eyeGazeSupported = g_eyeGazeExtEnabled && eyeGazeProps.supportsEyeGazeInteraction;
-    VRMOD_LOG_INFO("OpenXR system: %s (vendorId=%u eyeGaze=%d)",
-        sysProp.systemName, sysProp.vendorId, (int)g_eyeGazeSupported);
+    g_bodySupported = g_bodyExtEnabled && bodyProps.supportsBodyTracking;
+    g_fullBodySupported = g_fullBodyExtEnabled && fullBodyProps.supportsFullBodyTracking;
+    VRMOD_LOG_INFO("OpenXR system: %s (vendorId=%u eyeGaze=%d body=%d fullBody=%d)",
+        sysProp.systemName, sysProp.vendorId, (int)g_eyeGazeSupported,
+        (int)g_bodySupported, (int)g_fullBodySupported);
 
     // 3) Query view configuration
     uint32_t viewConfigCount = 0;
@@ -1163,6 +1245,7 @@ void XR_Shutdown() {
     }
 
     // 2) Destroy session — detaches action sets (required before set destroy).
+    XR_DestroyBodyTracker();
     if (g_xrSession != XR_NULL_HANDLE && g_xrDestroySession) {
         g_xrDestroySession(g_xrSession);
         g_xrSession = XR_NULL_HANDLE;

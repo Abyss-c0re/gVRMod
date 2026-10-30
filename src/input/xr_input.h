@@ -35,6 +35,7 @@ int XR_FindOrCreateActionSet(const char* name, actionSet* sets, int* count);
 
 // ── Sync actions (called per frame) ──
 void XR_SyncActions(const actionSet* activeSets, int activeCount);
+void XR_DestroyBodyTracker();
 
 // ── Query action states ──
 // isActive (optional): true if OpenXR reports the action active, or if analog/chord

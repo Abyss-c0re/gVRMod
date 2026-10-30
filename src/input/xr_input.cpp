@@ -1309,6 +1309,143 @@ int XR_EnsureActionSpaces() {
     return created;
 }
 
+// WiVRn does not advertise XR_HTCX_vive_tracker_interaction. Pico motion
+// trackers arrive as XR_FB_body_tracking joints. Full-body adds the ankles.
+static XrBodyTrackerFB g_bodyTracker = XR_NULL_HANDLE;
+static PFN_xrCreateBodyTrackerFB g_xrCreateBodyTrackerFB = nullptr;
+static PFN_xrDestroyBodyTrackerFB g_xrDestroyBodyTrackerFB = nullptr;
+static PFN_xrLocateBodyJointsFB g_xrLocateBodyJointsFB = nullptr;
+static bool g_bodyCreateTried = false;
+static bool g_bodyFull = false;
+static bool g_bodyLocateActive = false;
+static XrBodyJointLocationFB g_bodyJoints[XR_FULL_BODY_JOINT_COUNT_META];
+static uint32_t g_bodyJointCount = 0;
+
+void XR_DestroyBodyTracker() {
+    if (g_bodyTracker != XR_NULL_HANDLE && g_xrDestroyBodyTrackerFB)
+        g_xrDestroyBodyTrackerFB(g_bodyTracker);
+    g_bodyTracker = XR_NULL_HANDLE;
+    g_bodyCreateTried = false;
+    g_bodyFull = false;
+    g_bodyLocateActive = false;
+    g_bodyJointCount = 0;
+}
+
+static bool BodyJointTracked(const XrBodyJointLocationFB& j) {
+    const XrSpaceLocationFlags need =
+        XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+    return (j.locationFlags & need) == need;
+}
+
+static const XrBodyJointLocationFB* BodyJointAt(int index) {
+    if (index < 0 || (uint32_t)index >= g_bodyJointCount) return nullptr;
+    if (!BodyJointTracked(g_bodyJoints[index])) return nullptr;
+    return &g_bodyJoints[index];
+}
+
+static void XR_EnsureBodyTracker() {
+    if (g_bodyTracker != XR_NULL_HANDLE || g_bodyCreateTried || !g_xrSession) return;
+    // WiVRn reports supportsBodyTracking=0 until an app actually creates a
+    // tracker. Pico Swift trackers only start streaming after that request.
+    if (!XR_BodyTrackingExtensionEnabled()) {
+        g_bodyCreateTried = true;
+        return;
+    }
+    g_bodyCreateTried = true;
+    if (g_xrGetInstanceProcAddr && g_xrInstance) {
+        if (!g_xrCreateBodyTrackerFB)
+            g_xrGetInstanceProcAddr(g_xrInstance, "xrCreateBodyTrackerFB",
+                (PFN_xrVoidFunction*)&g_xrCreateBodyTrackerFB);
+        if (!g_xrDestroyBodyTrackerFB)
+            g_xrGetInstanceProcAddr(g_xrInstance, "xrDestroyBodyTrackerFB",
+                (PFN_xrVoidFunction*)&g_xrDestroyBodyTrackerFB);
+        if (!g_xrLocateBodyJointsFB)
+            g_xrGetInstanceProcAddr(g_xrInstance, "xrLocateBodyJointsFB",
+                (PFN_xrVoidFunction*)&g_xrLocateBodyJointsFB);
+    }
+    if (!g_xrCreateBodyTrackerFB) {
+        VRMOD_LOG_WARN("Body tracking: xrCreateBodyTrackerFB missing");
+        return;
+    }
+    XrBodyTrackerCreateInfoFB ci = {XR_TYPE_BODY_TRACKER_CREATE_INFO_FB};
+    // Three Pico Swift trackers are full-body (hips + ankles), even when the
+    // system property still says full-body is unsupported.
+    bool full = XR_FullBodyExtensionEnabled();
+    ci.bodyJointSet = full ? XR_BODY_JOINT_SET_FULL_BODY_META : XR_BODY_JOINT_SET_DEFAULT_FB;
+    XrResult res = g_xrCreateBodyTrackerFB(g_xrSession, &ci, &g_bodyTracker);
+    if (res != XR_SUCCESS && full) {
+        VRMOD_LOG_WARN("Full-body tracker create failed (%s) — trying upper body",
+            XR_ResultToString(res));
+        ci.bodyJointSet = XR_BODY_JOINT_SET_DEFAULT_FB;
+        full = false;
+        g_bodyTracker = XR_NULL_HANDLE;
+        res = g_xrCreateBodyTrackerFB(g_xrSession, &ci, &g_bodyTracker);
+    }
+    if (res != XR_SUCCESS) {
+        VRMOD_LOG_WARN("Body tracker create failed: %s", XR_ResultToString(res));
+        g_bodyTracker = XR_NULL_HANDLE;
+        return;
+    }
+    g_bodyFull = full;
+    VRMOD_LOG_INFO("Body tracker created (%s)", full ? "full body, hips + ankles" : "upper body");
+}
+
+static void XR_PollBody() {
+    XR_EnsureBodyTracker();
+    g_bodyLocateActive = false;
+    g_bodyJointCount = 0;
+    if (g_bodyTracker == XR_NULL_HANDLE || !g_xrLocateBodyJointsFB || !g_xrSessionRunning)
+        return;
+    if (g_xrFrameState.predictedDisplayTime == 0) return;
+    const uint32_t cap = g_bodyFull
+        ? (uint32_t)XR_FULL_BODY_JOINT_COUNT_META
+        : (uint32_t)XR_BODY_JOINT_COUNT_FB;
+    XrBodyJointsLocateInfoFB info = {XR_TYPE_BODY_JOINTS_LOCATE_INFO_FB};
+    info.baseSpace = g_xrStageSpace;
+    info.time = g_xrFrameState.predictedDisplayTime;
+    XrBodyJointLocationsFB locs = {XR_TYPE_BODY_JOINT_LOCATIONS_FB};
+    locs.jointCount = cap;
+    locs.jointLocations = g_bodyJoints;
+    XrResult res = g_xrLocateBodyJointsFB(g_bodyTracker, &info, &locs);
+    if (res != XR_SUCCESS) {
+        static int s_bodyLocateWarn = 0;
+        if ((s_bodyLocateWarn++ % 300) == 0)
+            VRMOD_LOG_WARN("xrLocateBodyJointsFB: %s", XR_ResultToString(res));
+        return;
+    }
+    g_bodyLocateActive = locs.isActive == XR_TRUE;
+    g_bodyJointCount = locs.jointCount < cap ? locs.jointCount : cap;
+}
+
+static PoseResult PoseFromBodyJoint(const XrBodyJointLocationFB* j) {
+    XrSpaceLocation loc = {XR_TYPE_SPACE_LOCATION};
+    if (!j) return ConvertXrPose(loc);
+    loc.locationFlags = j->locationFlags;
+    loc.pose = j->pose;
+    return ConvertXrPose(loc);
+}
+
+static PoseResult BodyPoseForName(const char* name) {
+    PoseResult empty;
+    memset(&empty, 0, sizeof(empty));
+    if (!name || !g_bodyLocateActive) return empty;
+    const XrBodyJointLocationFB* j = nullptr;
+    if (std::strcmp(name, "pose_waist") == 0) {
+        j = BodyJointAt(g_bodyFull ? (int)XR_FULL_BODY_JOINT_HIPS_META : (int)XR_BODY_JOINT_HIPS_FB);
+    } else if (g_bodyFull && std::strcmp(name, "pose_leftankle") == 0) {
+        j = BodyJointAt((int)XR_FULL_BODY_JOINT_LEFT_FOOT_ANKLE_META);
+    } else if (g_bodyFull && std::strcmp(name, "pose_rightankle") == 0) {
+        j = BodyJointAt((int)XR_FULL_BODY_JOINT_RIGHT_FOOT_ANKLE_META);
+    } else if (g_bodyFull && std::strcmp(name, "pose_leftfoot") == 0) {
+        j = BodyJointAt((int)XR_FULL_BODY_JOINT_LEFT_FOOT_BALL_META);
+        if (!j) j = BodyJointAt((int)XR_FULL_BODY_JOINT_LEFT_FOOT_ANKLE_META);
+    } else if (g_bodyFull && std::strcmp(name, "pose_rightfoot") == 0) {
+        j = BodyJointAt((int)XR_FULL_BODY_JOINT_RIGHT_FOOT_BALL_META);
+        if (!j) j = BodyJointAt((int)XR_FULL_BODY_JOINT_RIGHT_FOOT_ANKLE_META);
+    }
+    return PoseFromBodyJoint(j);
+}
+
 void XR_SyncActions(const actionSet* activeSets, int activeCount) {
     if (!g_xrSessionRunning) return;
 
@@ -1353,6 +1490,8 @@ void XR_SyncActions(const actionSet* activeSets, int activeCount) {
     XrActionsSyncInfo syncInfo = {XR_TYPE_ACTIONS_SYNC_INFO};
     syncInfo.countActiveActionSets = validCount;
     syncInfo.activeActionSets = activeXrSets;
+
+    XR_PollBody();
 
     XrResult res = g_xrSyncActions(g_xrSession, &syncInfo);
     if (res == XR_SESSION_NOT_FOCUSED) {
@@ -1415,10 +1554,17 @@ void XR_SyncActions(const actionSet* activeSets, int activeCount) {
                 }
             }
         }
-        VRMOD_LOG_INFO("INPUT health: state=%d profile=%s left=%d right=%d gaze=%d waist=%d Lfoot=%d Rfoot=%d walk=(%.2f,%.2f) spaces=%d",
+        auto jointOn = [](int index) -> int {
+            return BodyJointAt(index) ? 1 : 0;
+        };
+        const int hips = g_bodyFull ? (int)XR_FULL_BODY_JOINT_HIPS_META : (int)XR_BODY_JOINT_HIPS_FB;
+        const int lAnkle = g_bodyFull ? jointOn((int)XR_FULL_BODY_JOINT_LEFT_FOOT_ANKLE_META) : 0;
+        const int rAnkle = g_bodyFull ? jointOn((int)XR_FULL_BODY_JOINT_RIGHT_FOOT_ANKLE_META) : 0;
+        VRMOD_LOG_INFO("INPUT health: state=%d profile=%s left=%d right=%d gaze=%d waist=%d Lfoot=%d Rfoot=%d body=%d hips=%d Lankle=%d Rankle=%d walk=(%.2f,%.2f) spaces=%d",
             (int)g_xrSessionState, profile,
             poseActive(left), poseActive(right), poseActive(gaze),
             poseActive(waist), poseActive(lfoot), poseActive(rfoot),
+            g_bodyLocateActive ? 1 : 0, jointOn(hips), lAnkle, rAnkle,
             walkX, walkY, g_xrActionSpaceCount);
     }
 }
@@ -1568,6 +1714,15 @@ PoseResult XR_GetPoseAction(VRActionHandle handle) {
 
     XrResult res = g_xrLocateSpace(space, g_xrStageSpace,
         g_xrFrameState.predictedDisplayTime, &location);
+    const bool actionTracked = res == XR_SUCCESS
+        && (location.locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT) != 0
+        && (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT) != 0;
+    // Unbound vive-tracker actions stay untracked. Pico motion trackers are
+    // body joints (hips + ankles), so publish those under the same pose names.
+    if (!actionTracked && spaceName) {
+        PoseResult bodyPose = BodyPoseForName(spaceName);
+        if (bodyPose.valid) return bodyPose;
+    }
     if (res != XR_SUCCESS) return r;
 
     // XR_EXT eye gaze: orientation is the usable sample. Position is the

@@ -154,6 +154,14 @@ bool XR_EyeGazeExtensionEnabled();
 bool XR_EyeGazeSupported();
 // XR_HTCX_vive_tracker_interaction was enabled (waist + feet).
 bool XR_ViveTrackerExtensionEnabled();
+// XR_FB_body_tracking was enabled. WiVRn publishes Pico motion trackers here,
+// not as HTCX vive trackers.
+bool XR_BodyTrackingExtensionEnabled();
+// XR_META_body_tracking_full_body was enabled (hips, ankles, feet).
+bool XR_FullBodyExtensionEnabled();
+// Runtime said this system can locate a body skeleton.
+bool XR_BodyTrackingSupported();
+bool XR_FullBodySupported();
 
 // ── View/display info ──
 struct XrDisplayInfo {
