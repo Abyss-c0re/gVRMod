@@ -91,7 +91,20 @@ return function(H, env)
 				{ uid = "old", frame = 7, dist = 0 },
 			},
 		})
-		H.assert_eq(uid, "p2v_spawnmenu")
+		-- This frame's hub hit wins over a closer hit from the frame before.
+		H.assert_eq(uid, "vr_hub")
+		-- The laser is on the Cube hub this frame. A leftover focus must not swallow the press.
+		H.assert_eq(F({
+			focus = "miscmenu",
+			stereo_frame = 10,
+			hits = { { uid = "vr_hub", frame = 10, dist = 2 } },
+		}), "vr_hub")
+		-- No hit this frame: keep the surface the player already has.
+		H.assert_eq(F({
+			focus = "miscmenu",
+			stereo_frame = 10,
+			hits = { { uid = "p2v_spawnmenu", frame = 9, dist = 1 } },
+		}), "miscmenu")
 		H.assert_eq(F({ focus = false, stereo_frame = 10, hits = { { uid = "old", frame = 3, dist = 0 } } }), nil)
 		H.assert_true(env.vrmod.utils.MenuLaw_KeepScreenClicker({ derma_focused = true }))
 		H.assert_true(not env.vrmod.utils.MenuLaw_KeepScreenClicker({ derma_focused = false }))
