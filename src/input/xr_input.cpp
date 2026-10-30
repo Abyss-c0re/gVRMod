@@ -1037,6 +1037,15 @@ bool XR_AttachActionSets() {
     // Includes pose/haptic/buttons/sticks + internal trigger/squeeze floats + sources.
     XR_SuggestAllInteractionBindings();
 
+    // Suggest reassigns g_xrRightTriggerFloat onto vector1_primaryfire after the
+    // source table already copied the internal handle. Refresh so right_trigger
+    // reads the same analog that curls the index. A stale handle stays at 0 and
+    // the Lua binding layer then clears boolean_primaryfire.
+    for (int i = 0; i < g_ctrlSourceCount; i++) {
+        if (g_ctrlSources[i].shared && *g_ctrlSources[i].shared != XR_NULL_HANDLE)
+            g_ctrlSources[i].action = *g_ctrlSources[i].shared;
+    }
+
     XrSessionActionSetsAttachInfo attachInfo = {XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
     attachInfo.countActionSets = g_xrActionSetCount;
     attachInfo.actionSets = g_xrActionSets;

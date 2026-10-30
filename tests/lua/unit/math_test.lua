@@ -1585,6 +1585,16 @@ return function(H, env)
 		H.assert_eq(u.LaserLaw_PrimaryHandFromInt(1), "left")
 		H.assert_eq(u.LaserLaw_SecondaryHand("right"), "left")
 		H.assert_true(u.LaserLaw_IsMenuPrimaryClick("boolean_primaryfire", "right"))
+		local click = u.LaserLaw_TriggerClick
+		H.assert_true(click({ sources_live = false, native_pressed = true, analog = 0 }))
+		H.assert_true(click({ sources_live = false, native_pressed = false, analog = 0.8 }))
+		H.assert_true(not click({ sources_live = false, native_pressed = false, analog = 0.2 }))
+		H.assert_true(click({
+			sources_live = true, source_pressed = false, source_value = 0, analog = 0.9,
+		}))
+		H.assert_true(not click({
+			sources_live = true, source_pressed = false, source_value = 0, analog = 0,
+		}))
 		H.assert_true(not u.LaserLaw_IsMenuPrimaryClick("boolean_left_primaryfire", "right"))
 		H.assert_true(u.LaserLaw_IsMenuPrimaryClick("boolean_left_primaryfire", "left"))
 		H.assert_true(u.LaserLaw_IsMenuPrimaryClick("boolean_car_mouse_left", "right"))
