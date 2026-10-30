@@ -196,6 +196,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
     tier: pure
     tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_KnownProfile
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.controller_profile]
   - id: vrmod.utils.BindingsLaw_ManifestRelPath
     file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
     tier: pure
@@ -208,6 +212,18 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
     tier: pure
     tests: [util.bindings_law.self_heal_g31]
+  - id: vrmod.utils.BindingsLaw_PicoOverrides
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.controller_profile]
+  - id: vrmod.utils.BindingsLaw_ProfileId
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.controller_profile]
+  - id: vrmod.utils.BindingsLaw_ProfileLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.bindings_law.controller_profile]
   - id: vrmod.utils.BindingsLaw_RequireToastOnFail
     file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
     tier: pure
@@ -1378,6 +1394,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
     tier: pure
     tests: [util.laser_law.sacred_g16]
+  - id: vrmod.utils.LaserLaw_TriggerClick
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.LengthSqr
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
@@ -2052,6 +2073,22 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.TrackingLaw_AllowVendorInGmod
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.tracking_law.openxr_only]
+  - id: vrmod.utils.TrackingLaw_BodyApi
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.tracking_law.openxr_only]
+  - id: vrmod.utils.TrackingLaw_EyeApi
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.tracking_law.openxr_only]
+  - id: vrmod.utils.TrackingLaw_FullBodyApi
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua
+    tier: pure
+    tests: [util.tracking_law.openxr_only]
   - id: vrmod.utils.TryParseColor
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure

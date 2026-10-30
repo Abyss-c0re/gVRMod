@@ -42,6 +42,9 @@ void XR_DestroyBodyTracker();
 // synthesis forced a pressed state. Used by GetActions to avoid inactive driving-set
 // actions clobbering main-set short names in the Lua table.
 bool XR_GetBooleanAction(VRActionHandle handle, bool* changed, bool* isActive = nullptr);
+
+// Live OpenXR interaction profile path (/interaction_profiles/...), or false.
+bool XR_CopyInteractionProfile(char* out, int outLen);
 float XR_GetFloatAction(VRActionHandle handle, bool* isActive = nullptr);
 void XR_GetVector2Action(VRActionHandle handle, float* x, float* y, bool* isActive = nullptr);
 PoseResult XR_GetPoseAction(VRActionHandle handle);

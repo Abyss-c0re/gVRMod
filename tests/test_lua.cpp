@@ -139,7 +139,8 @@ TEST(ModuleRegistration_AllFunctionsPresent) {
         "SetSubmitCropMode", "GetSubmitCropMode",
         "ShouldRender", "CollectEyes", "HasCollectedEyes",
         "SetKnownSubmitSize", "SubmitSharedTexture",
-        "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames"
+        "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames",
+        "GetInteractionProfile"
     };
 
     // Simulate what GMOD_MODULE_OPEN does: PushCFunction + SetField for each

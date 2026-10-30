@@ -1126,15 +1126,25 @@ LUA_FUNCTION(TriggerHaptic) {
 }
 
 LUA_FUNCTION(GetTrackedDeviceNames) {
-    // OpenXR doesn't have the same tracked device enumeration.
-    // For PoC, return a table with the controller interaction profiles.
+    // OpenXR interaction profile path when the session has one.
+    // Empty until xrGetCurrentInteractionProfile returns a path.
     LUA->CreateTable();
+    char profile[256];
+    if (XR_CopyInteractionProfile(profile, (int)sizeof(profile))) {
+        LUA->PushNumber(1);
+        LUA->PushString(profile);
+        LUA->SetTable(-3);
+    }
+    return 1;
+}
 
-    // Return a basic list indicating Quest 3 controllers
-    LUA->PushNumber(1);
-    LUA->PushString("meta_quest_touch_pro");
-    LUA->SetTable(-3);
-
+LUA_FUNCTION(GetInteractionProfile) {
+    char profile[256];
+    if (!XR_CopyInteractionProfile(profile, (int)sizeof(profile))) {
+        LUA->PushString("");
+        return 1;
+    }
+    LUA->PushString(profile);
     return 1;
 }
 
@@ -1486,6 +1496,8 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "TriggerHaptic");
     LUA->PushCFunction(GetTrackedDeviceNames);
     LUA->SetField(-2, "GetTrackedDeviceNames");
+    LUA->PushCFunction(GetInteractionProfile);
+    LUA->SetField(-2, "GetInteractionProfile");
     LUA->PushCFunction(VirtualDisplayIsSupported);
     LUA->SetField(-2, "VirtualDisplayIsSupported");
     LUA->PushCFunction(VirtualDisplayCreate);

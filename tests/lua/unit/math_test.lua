@@ -1366,6 +1366,48 @@ return function(H, env)
 		H.assert_true(not noRw.path_ok)
 	end)
 
+	-- Quest 3 keeps the saved map. Pico is a second profile. Eyes and body
+	-- in gVRMod are OpenXR; a bare hardware id must not flip the profile.
+	H.TEST("util.bindings_law.controller_profile", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.BindingsLaw_ProfileId("/interaction_profiles/bytedance/pico_neo3_controller"), "pico_neo3")
+		H.assert_eq(u.BindingsLaw_ProfileId("/interaction_profiles/bytedance/pico4_controller"), "pico_neo3")
+		H.assert_eq(u.BindingsLaw_ProfileId("/interaction_profiles/meta/touch_controller_plus"), "quest3_touch")
+		H.assert_eq(u.BindingsLaw_ProfileId("/interaction_profiles/oculus/touch_controller"), "quest3_touch")
+		H.assert_eq(u.BindingsLaw_ProfileId("/interaction_profiles/facebook/touch_controller_pro"), "quest3_touch")
+		H.assert_eq(u.BindingsLaw_ProfileId(""), nil)
+		H.assert_eq(u.BindingsLaw_ProfileId("none"), nil)
+		H.assert_eq(u.BindingsLaw_ProfileId("meta_quest_touch_pro"), nil)
+		H.assert_eq(u.BindingsLaw_ProfileId("/interaction_profiles/valve/index_controller"), nil)
+		H.assert_true(u.BindingsLaw_KnownProfile("quest3_touch"))
+		H.assert_true(u.BindingsLaw_KnownProfile("pico_neo3"))
+		H.assert_true(not u.BindingsLaw_KnownProfile("index"))
+		H.assert_eq(u.BindingsLaw_ProfileLabel("pico_neo3"), "Pico Neo 3")
+		H.assert_eq(u.BindingsLaw_ProfileLabel("quest3_touch"), "Quest 3")
+		local pico = u.BindingsLaw_PicoOverrides()
+		local function usesThumbrest(rule)
+			for _, id in ipairs(rule.sources or {}) do
+				if string.find(id, "thumbrest", 1, true) then return true end
+			end
+			return false
+		end
+		for _, rule in pairs(pico) do
+			H.assert_true(not usesThumbrest(rule))
+		end
+		H.assert_eq(pico.boolean_teleport.sources[1], "left_stick_click")
+		H.assert_eq(pico.boolean_teleport.sources[2], "right_stick_click")
+		H.assert_eq(pico.boolean_reload.sources[1], "right_a")
+		H.assert_eq(pico.boolean_reload.sources[2], "right_b")
+		local right = pico.boolean_signal_right.sources
+		local altTurret = (right[1] == "right_squeeze" and right[2] == "right_stick_click")
+			or (right[1] == "right_stick_click" and right[2] == "right_squeeze")
+		H.assert_true(not altTurret)
+		H.assert_eq(u.TrackingLaw_EyeApi(), "XR_EXT_eye_gaze_interaction")
+		H.assert_eq(u.TrackingLaw_BodyApi(), "XR_FB_body_tracking")
+		H.assert_eq(u.TrackingLaw_FullBodyApi(), "XR_META_body_tracking_full_body")
+		H.assert_true(not u.TrackingLaw_AllowVendorInGmod())
+	end)
+
 	-- G27 pure engine blacklist law (never call blocked convars / W2)
 	H.TEST("util.engine_blacklist_law.never_call_g27", function()
 		local u = env.vrmod.utils

@@ -494,6 +494,9 @@ static XrAction g_xrLeftTriggerFloat  = XR_NULL_HANDLE;
 static XrAction g_xrRightTriggerFloat = XR_NULL_HANDLE; // mirrors vector1_primaryfire when present
 static XrAction g_xrLeftSqueezeFloat  = XR_NULL_HANDLE;
 static XrAction g_xrRightSqueezeFloat = XR_NULL_HANDLE;
+// Pico Neo 3 grip is squeeze/click. The float source stays for Quest /value.
+static XrAction g_xrLeftSqueezeClick  = XR_NULL_HANDLE;
+static XrAction g_xrRightSqueezeClick = XR_NULL_HANDLE;
 // Companion booleans for SteamVR-style chords (OpenXR has no chord API).
 // Oculus Touch: dual thumbrest touch → boolean_reload (see vrmod oculus bindings).
 static XrAction g_xrLeftThumbrestTouch  = XR_NULL_HANDLE;
@@ -568,6 +571,8 @@ static void XR_ClearInternalActionHandles() {
     g_xrRightTriggerFloat = XR_NULL_HANDLE;
     g_xrLeftSqueezeFloat = XR_NULL_HANDLE;
     g_xrRightSqueezeFloat = XR_NULL_HANDLE;
+    g_xrLeftSqueezeClick = XR_NULL_HANDLE;
+    g_xrRightSqueezeClick = XR_NULL_HANDLE;
     g_xrLeftThumbrestTouch = XR_NULL_HANDLE;
     g_xrRightThumbrestTouch = XR_NULL_HANDLE;
     g_xrLeftStickVec2 = XR_NULL_HANDLE;
@@ -797,27 +802,38 @@ static bool XR_SuggestAllInteractionBindings() {
             okTouch = true;
             return;
         }
-        XrActionSuggestedBinding core[32];
+        XrActionSuggestedBinding core[48];
         int cn = 0;
-        PushBinding(core, &cn, 32, A("pose_lefthand"),  path::leftGripPose);
-        PushBinding(core, &cn, 32, A("pose_righthand"), path::rightGripPose);
-        PushBinding(core, &cn, 32, A("vibration_left"),  path::leftHaptic);
-        PushBinding(core, &cn, 32, A("vibration_right"), path::rightHaptic);
-        PushBinding(core, &cn, 32, A("vector2_walkdirection"), path::leftThumbstick);
-        PushBinding(core, &cn, 32, A("vector2_smoothturn"),    path::rightThumbstick);
-        PushBinding(core, &cn, 32, g_xrLeftStickVec2,  path::leftThumbstick);
-        PushBinding(core, &cn, 32, g_xrRightStickVec2, path::rightThumbstick);
+        PushBinding(core, &cn, 48, A("pose_lefthand"),  path::leftGripPose);
+        PushBinding(core, &cn, 48, A("pose_righthand"), path::rightGripPose);
+        PushBinding(core, &cn, 48, A("vibration_left"),  path::leftHaptic);
+        PushBinding(core, &cn, 48, A("vibration_right"), path::rightHaptic);
+        PushBinding(core, &cn, 48, A("vector2_walkdirection"), path::leftThumbstick);
+        PushBinding(core, &cn, 48, A("vector2_smoothturn"),    path::rightThumbstick);
+        PushBinding(core, &cn, 48, g_xrLeftStickVec2,  path::leftThumbstick);
+        PushBinding(core, &cn, 48, g_xrRightStickVec2, path::rightThumbstick);
         XrAction rt = A("vector1_primaryfire");
         if (rt == XR_NULL_HANDLE) rt = g_xrRightTriggerFloat;
-        PushBinding(core, &cn, 32, rt, path::rightTriggerValue);
-        PushBinding(core, &cn, 32, g_xrLeftTriggerFloat, path::leftTriggerValue);
-        PushBinding(core, &cn, 32, A("boolean_jump"),      path::rightBClick);
-        PushBinding(core, &cn, 32, A("boolean_crouch"),    path::rightAClick);
-        PushBindingAllByName(core, &cn, 32, "boolean_spawnmenu", path::leftYClick);
-        PushBinding(core, &cn, 32, A("boolean_use"),       path::leftXClick);
-        PushBinding(core, &cn, 32, A("boolean_flashlight"), path::leftMenuClick);
-        PushBindingAllByName(core, &cn, 32, "boolean_left_pickup",  path::leftSqueezeClick);
-        PushBindingAllByName(core, &cn, 32, "boolean_right_pickup", path::rightSqueezeClick);
+        PushBinding(core, &cn, 48, rt, path::rightTriggerValue);
+        PushBinding(core, &cn, 48, g_xrLeftTriggerFloat, path::leftTriggerValue);
+        PushBinding(core, &cn, 48, A("boolean_jump"),      path::rightBClick);
+        PushBinding(core, &cn, 48, A("boolean_crouch"),    path::rightAClick);
+        PushBindingAllByName(core, &cn, 48, "boolean_spawnmenu", path::leftYClick);
+        PushBinding(core, &cn, 48, A("boolean_use"),       path::leftXClick);
+        PushBinding(core, &cn, 48, A("boolean_flashlight"), path::leftMenuClick);
+        PushBindingAllByName(core, &cn, 48, "boolean_left_pickup",  path::leftSqueezeClick);
+        PushBindingAllByName(core, &cn, 48, "boolean_right_pickup", path::rightSqueezeClick);
+        // Lua chords read these source actions. The full Touch table is rejected
+        // on Neo 3 (squeeze/value, thumbrest), so the fallback has to bind them.
+        PushBinding(core, &cn, 48, s_srcLeftX, path::leftXClick);
+        PushBinding(core, &cn, 48, s_srcLeftY, path::leftYClick);
+        PushBinding(core, &cn, 48, s_srcLeftMenu, path::leftMenuClick);
+        PushBinding(core, &cn, 48, s_srcRightA, path::rightAClick);
+        PushBinding(core, &cn, 48, s_srcRightB, path::rightBClick);
+        PushBinding(core, &cn, 48, s_srcLeftStickClick, path::leftThumbClick);
+        PushBinding(core, &cn, 48, s_srcRightStickClick, path::rightThumbClick);
+        PushBinding(core, &cn, 48, g_xrLeftSqueezeClick, path::leftSqueezeClick);
+        PushBinding(core, &cn, 48, g_xrRightSqueezeClick, path::rightSqueezeClick);
         if (SuggestBindingsForProfile(profile, core, (uint32_t)cn)) {
             VRMOD_LOG_INFO("Pico profile accepted squeeze-click set: %s", profile);
             okTouch = true;
@@ -979,6 +995,25 @@ static bool ReadBooleanActionRaw(XrAction action) {
     return state.currentState == XR_TRUE;
 }
 
+static bool FloatActionIsActive(XrAction action) {
+    if (action == XR_NULL_HANDLE || !g_xrSession) return false;
+    XrActionStateGetInfo getInfo = {XR_TYPE_ACTION_STATE_GET_INFO};
+    getInfo.action = action;
+    XrActionStateFloat state = {XR_TYPE_ACTION_STATE_FLOAT};
+    if (g_xrGetActionStateFloat(g_xrSession, &getInfo, &state) != XR_SUCCESS) return false;
+    return state.isActive;
+}
+
+// Quest grip is a float. Pico Neo 3 only has squeeze/click, so a dead float
+// falls back to that click. Lua still sees one left_squeeze / right_squeeze.
+static float ReadSqueezeAxis(bool left) {
+    XrAction analog = left ? g_xrLeftSqueezeFloat : g_xrRightSqueezeFloat;
+    XrAction click = left ? g_xrLeftSqueezeClick : g_xrRightSqueezeClick;
+    if (FloatActionIsActive(analog)) return ReadFloatActionRaw(analog);
+    if (ReadBooleanActionRaw(click)) return 1.0f;
+    return ReadFloatActionRaw(analog);
+}
+
 bool XR_AttachActionSets() {
     if (g_xrActionsAttached) return true;
     if (g_xrActionSetCount == 0) return false;
@@ -1002,6 +1037,10 @@ bool XR_AttachActionSets() {
             g_xrLeftSqueezeFloat = CreateInternalFloatAction(base, "internal_left_squeeze");
         if (g_xrRightSqueezeFloat == XR_NULL_HANDLE)
             g_xrRightSqueezeFloat = CreateInternalFloatAction(base, "internal_right_squeeze");
+        if (g_xrLeftSqueezeClick == XR_NULL_HANDLE)
+            g_xrLeftSqueezeClick = CreateInternalBooleanAction(base, "internal_left_squeeze_click");
+        if (g_xrRightSqueezeClick == XR_NULL_HANDLE)
+            g_xrRightSqueezeClick = CreateInternalBooleanAction(base, "internal_right_squeeze_click");
         if (g_xrLeftThumbrestTouch == XR_NULL_HANDLE)
             g_xrLeftThumbrestTouch = CreateInternalBooleanAction(base, "internal_left_thumbrest");
         if (g_xrRightThumbrestTouch == XR_NULL_HANDLE)
@@ -1140,6 +1179,8 @@ float XR_GetControllerSourceValue(int index) {
     }
     XrAction a = CtrlSourceAction(index);
     if (a == XR_NULL_HANDLE) return 0.0f;
+    if (a == g_xrLeftSqueezeFloat) return ReadSqueezeAxis(true);
+    if (a == g_xrRightSqueezeFloat) return ReadSqueezeAxis(false);
     if (g_ctrlSources[index].isFloat)
         return ReadFloatActionRaw(a);
     return ReadBooleanActionRaw(a) ? 1.0f : 0.0f;
@@ -1154,6 +1195,10 @@ bool XR_GetControllerSourceIsActive(int index) {
     }
     XrAction a = CtrlSourceAction(index);
     if (a == XR_NULL_HANDLE || !g_xrSession) return false;
+    if (a == g_xrLeftSqueezeFloat && (FloatActionIsActive(a) || ReadBooleanActionRaw(g_xrLeftSqueezeClick)))
+        return true;
+    if (a == g_xrRightSqueezeFloat && (FloatActionIsActive(a) || ReadBooleanActionRaw(g_xrRightSqueezeClick)))
+        return true;
     XrActionStateGetInfo getInfo = {XR_TYPE_ACTION_STATE_GET_INFO};
     getInfo.action = a;
     if (g_ctrlSources[index].isFloat) {
@@ -1192,7 +1237,7 @@ bool XR_GetSkeletalSummaryData(VRActionHandle action, int eSummaryType,
 
     if (leftHand) {
         trigger = ReadFloatActionRaw(g_xrLeftTriggerFloat);
-        squeeze = ReadFloatActionRaw(g_xrLeftSqueezeFloat);
+        squeeze = ReadSqueezeAxis(true);
         if (trigger < 0.02f) {
             XrAction fire = FindXrActionByName("boolean_left_primaryfire");
             if (fire != XR_NULL_HANDLE && ReadBooleanActionRaw(fire)) trigger = 1.0f;
@@ -1222,7 +1267,7 @@ bool XR_GetSkeletalSummaryData(VRActionHandle action, int eSummaryType,
                 if (v > trigger) trigger = v;
             }
         }
-        squeeze = ReadFloatActionRaw(g_xrRightSqueezeFloat);
+        squeeze = ReadSqueezeAxis(false);
         if (trigger < 0.02f) {
             XrAction fire = FindXrActionByName("boolean_primaryfire");
             if (fire != XR_NULL_HANDLE && ReadBooleanActionRaw(fire)) trigger = 1.0f;
@@ -1455,6 +1500,33 @@ static PoseResult BodyPoseForName(const char* name) {
     return PoseFromBodyJoint(j);
 }
 
+bool XR_CopyInteractionProfile(char* out, int outLen) {
+    if (!out || outLen < 2) return false;
+    out[0] = '\0';
+    if (!g_xrSession || !g_xrInstance || !g_xrGetInstanceProcAddr || !g_xrStringToPath || !g_xrPathToString)
+        return false;
+    static PFN_xrGetCurrentInteractionProfile s_getProfile = nullptr;
+    if (!s_getProfile) {
+        g_xrGetInstanceProcAddr(g_xrInstance, "xrGetCurrentInteractionProfile",
+            (PFN_xrVoidFunction*)&s_getProfile);
+    }
+    if (!s_getProfile) return false;
+    const char* hands[] = {"/user/hand/left", "/user/hand/right"};
+    for (const char* handPath : hands) {
+        XrPath hand = XR_NULL_PATH;
+        if (g_xrStringToPath(g_xrInstance, handPath, &hand) != XR_SUCCESS) continue;
+        XrInteractionProfileState ips = {XR_TYPE_INTERACTION_PROFILE_STATE};
+        if (s_getProfile(g_xrSession, hand, &ips) != XR_SUCCESS || !ips.interactionProfile)
+            continue;
+        uint32_t len = 0;
+        if (g_xrPathToString(g_xrInstance, ips.interactionProfile, (uint32_t)outLen, &len, out) != XR_SUCCESS)
+            continue;
+        if (out[0] != '\0') return true;
+    }
+    out[0] = '\0';
+    return false;
+}
+
 void XR_SyncActions(const actionSet* activeSets, int activeCount) {
     if (!g_xrSessionRunning) return;
 
@@ -1544,25 +1616,9 @@ void XR_SyncActions(const actionSet* activeSets, int activeCount) {
         XrAction waist = FindXrActionByName("pose_waist");
         XrAction lfoot = FindXrActionByName("pose_leftfoot");
         XrAction rfoot = FindXrActionByName("pose_rightfoot");
-        char profile[128] = "?";
-        static PFN_xrGetCurrentInteractionProfile s_getProfile = nullptr;
-        if (!s_getProfile && g_xrGetInstanceProcAddr && g_xrInstance)
-            g_xrGetInstanceProcAddr(g_xrInstance, "xrGetCurrentInteractionProfile",
-                (PFN_xrVoidFunction*)&s_getProfile);
-        if (s_getProfile && g_xrStringToPath && g_xrPathToString) {
-            XrPath hand = XR_NULL_PATH;
-            if (g_xrStringToPath(g_xrInstance, "/user/hand/left", &hand) == XR_SUCCESS) {
-                XrInteractionProfileState ips = {XR_TYPE_INTERACTION_PROFILE_STATE};
-                if (s_getProfile(g_xrSession, hand, &ips) == XR_SUCCESS && ips.interactionProfile) {
-                    uint32_t len = 0;
-                    g_xrPathToString(g_xrInstance, ips.interactionProfile, 0, &len, nullptr);
-                    if (len > 1 && len < sizeof(profile))
-                        g_xrPathToString(g_xrInstance, ips.interactionProfile, sizeof(profile), &len, profile);
-                } else {
-                    snprintf(profile, sizeof(profile), "none");
-                }
-            }
-        }
+        char profile[128] = "none";
+        if (!XR_CopyInteractionProfile(profile, (int)sizeof(profile)))
+            snprintf(profile, sizeof(profile), "none");
         auto jointOn = [](int index) -> int {
             return BodyJointAt(index) ? 1 : 0;
         };
@@ -1625,9 +1681,9 @@ bool XR_GetBooleanAction(VRActionHandle handle, bool* changed, bool* isActiveOut
                        strcmp(name, "boolean_left_secondaryfire") == 0) {
                 analog = ReadFloatActionRaw(g_xrLeftTriggerFloat);
             } else if (strcmp(name, "boolean_right_pickup") == 0) {
-                analog = ReadFloatActionRaw(g_xrRightSqueezeFloat);
+                analog = ReadSqueezeAxis(false);
             } else if (strcmp(name, "boolean_left_pickup") == 0) {
-                analog = ReadFloatActionRaw(g_xrLeftSqueezeFloat);
+                analog = ReadSqueezeAxis(true);
             }
             if (analog >= kTriggerClickThreshold) {
                 if (!boolState) boolChanged = true;

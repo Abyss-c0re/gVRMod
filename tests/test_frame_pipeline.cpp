@@ -249,7 +249,8 @@ TEST(ModuleRegistration_PipelineExportsPresent) {
         "SetSubmitCropMode", "GetSubmitCropMode",
         "ShouldRender", "CollectEyes", "HasCollectedEyes",
         "SubmitSharedTexture", "SetKnownSubmitSize",
-        "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames"
+        "Shutdown", "TriggerHaptic", "GetTrackedDeviceNames",
+        "GetInteractionProfile"
     };
     // Presence check only — names we register in GMOD_MODULE_OPEN
     int n = (int)(sizeof(expected) / sizeof(expected[0]));

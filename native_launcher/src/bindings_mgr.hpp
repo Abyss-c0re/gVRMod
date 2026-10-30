@@ -21,9 +21,11 @@ struct BindActionInfo {
 struct BindingsManager {
   std::string gmodRoot;
   std::string filePath;
-  int version = 2;
+  int version = 4;
   std::string preset = "quest3_touch";
-  std::map<std::string, BindRule> actions; // action id → rule
+  std::map<std::string, BindRule> actions; // active profile
+  // quest3_touch and pico_neo3. Save writes both. Reset touches the active one.
+  std::map<std::string, std::map<std::string, BindRule>> profiles;
   // Extended logical list = built-in + custom actions from file
   std::vector<BindActionInfo> logical;
   int filter = 0;   // 0=all 1=foot/main 2=vehicle/driving 3=custom

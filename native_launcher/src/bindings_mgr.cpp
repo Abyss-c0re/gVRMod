@@ -231,38 +231,59 @@ void Bindings_LoadCustomActions(BindingsManager& m) {
   }
 }
 
-void Bindings_DefaultMap(BindingsManager& m) {
-  m.version = 2;
-  m.preset = "quest3_touch";
-  m.actions.clear();
+static void FillQuestActions(std::map<std::string, BindRule>& a) {
+  a.clear();
   // Quest 3 / Touch gold (must match Lua DefaultMap)
-  m.actions["boolean_primaryfire"] = R({"right_trigger"}, "any", "main");
-  m.actions["boolean_secondaryfire"] = R({"left_trigger"}, "any", "main");
-  m.actions["boolean_left_primaryfire"] = R({"left_trigger"}, "any", "main");
-  m.actions["boolean_jump"] = R({"right_b"}, "any", "main");
-  m.actions["boolean_crouch"] = R({"right_a"}, "any", "main");
-  m.actions["boolean_use"] = R({"left_x"}, "any", "main");
-  m.actions["boolean_flashlight"] = R({"left_menu"}, "any", "main");
-  m.actions["boolean_sprint"] = R({"left_stick_click"}, "any", "main");
-  m.actions["boolean_changeweapon"] = R({"right_stick_click"}, "any", "main");
-  m.actions["boolean_teleport"] = R({"left_stick_click", "right_thumbrest"}, "all", "main");
-  m.actions["boolean_spawnmenu"] = R({"left_y"}, "any", "");
-  m.actions["boolean_left_pickup"] = R({"left_squeeze"}, "any", "");
-  m.actions["boolean_right_pickup"] = R({"right_squeeze"}, "any", "");
-  m.actions["boolean_reload"] = R({"left_thumbrest", "right_thumbrest"}, "all", "");
-  m.actions["boolean_handbrake"] = R({"right_a"}, "any", "driving");
-  m.actions["boolean_turbo"] = R({"right_b"}, "any", "driving");
-  m.actions["boolean_exit"] = R({"left_x"}, "any", "driving");
-  m.actions["boolean_switch_weapon"] = R({"left_thumbrest", "right_thumbrest"}, "all", "driving");
-  m.actions["boolean_signal_left"] = R({"left_squeeze", "left_thumbrest"}, "all", "driving");
-  m.actions["boolean_signal_right"] = R({"right_squeeze", "right_thumbrest"}, "all", "driving");
-  m.actions["boolean_alt_turret"] = R({"right_squeeze", "right_stick_click"}, "all", "driving");
-  m.actions["boolean_shift_up"] = R({"right_stick_north"}, "any", "driving");
-  m.actions["boolean_shift_down"] = R({"right_stick_south"}, "any", "driving");
-  m.actions["boolean_lights"] = R({"right_stick_east"}, "any", "driving");
-  m.actions["boolean_siren"] = R({"right_stick_west"}, "any", "driving");
-  m.actions["boolean_turret"] = R({"right_stick_click"}, "any", "driving");
-  m.actions["boolean_horn"] = R({"left_stick_click"}, "any", "driving");
+  a["boolean_primaryfire"] = R({"right_trigger"}, "any", "main");
+  a["boolean_secondaryfire"] = R({"left_trigger"}, "any", "main");
+  a["boolean_left_primaryfire"] = R({"left_trigger"}, "any", "main");
+  a["boolean_jump"] = R({"right_b"}, "any", "main");
+  a["boolean_crouch"] = R({"right_a"}, "any", "main");
+  a["boolean_use"] = R({"left_x"}, "any", "main");
+  a["boolean_flashlight"] = R({"left_menu"}, "any", "main");
+  a["boolean_sprint"] = R({"left_stick_click"}, "any", "main");
+  a["boolean_changeweapon"] = R({"right_stick_click"}, "any", "main");
+  a["boolean_teleport"] = R({"left_stick_click", "right_thumbrest"}, "all", "main");
+  a["boolean_spawnmenu"] = R({"left_y"}, "any", "");
+  a["boolean_left_pickup"] = R({"left_squeeze"}, "any", "");
+  a["boolean_right_pickup"] = R({"right_squeeze"}, "any", "");
+  a["boolean_reload"] = R({"left_thumbrest", "right_thumbrest"}, "all", "");
+  a["boolean_handbrake"] = R({"right_a"}, "any", "driving");
+  a["boolean_turbo"] = R({"right_b"}, "any", "driving");
+  a["boolean_exit"] = R({"left_x"}, "any", "driving");
+  a["boolean_switch_weapon"] = R({"left_thumbrest", "right_thumbrest"}, "all", "driving");
+  a["boolean_signal_left"] = R({"left_squeeze", "left_thumbrest"}, "all", "driving");
+  a["boolean_signal_right"] = R({"right_squeeze", "right_thumbrest"}, "all", "driving");
+  a["boolean_alt_turret"] = R({"right_squeeze", "right_stick_click"}, "all", "driving");
+  a["boolean_shift_up"] = R({"right_stick_north"}, "any", "driving");
+  a["boolean_shift_down"] = R({"right_stick_south"}, "any", "driving");
+  a["boolean_lights"] = R({"right_stick_east"}, "any", "driving");
+  a["boolean_siren"] = R({"right_stick_west"}, "any", "driving");
+  a["boolean_turret"] = R({"right_stick_click"}, "any", "driving");
+  a["boolean_horn"] = R({"left_stick_click"}, "any", "driving");
+}
+
+static void FillPicoActions(std::map<std::string, BindRule>& a) {
+  FillQuestActions(a);
+  // Match vrmod.utils.BindingsLaw_PicoOverrides. No thumbrest on Neo 3.
+  // Right grip + stick click stays alt turret, so the right signal is grip+trigger.
+  a["boolean_teleport"] = R({"left_stick_click", "right_stick_click"}, "all", "main");
+  a["boolean_reload"] = R({"right_a", "right_b"}, "all", "");
+  a["boolean_switch_weapon"] = R({"left_squeeze", "right_squeeze"}, "all", "driving");
+  a["boolean_signal_left"] = R({"left_squeeze", "left_stick_click"}, "all", "driving");
+  a["boolean_signal_right"] = R({"right_squeeze", "right_trigger"}, "all", "driving");
+}
+
+static bool KnownProfileId(const std::string& id) {
+  return id == "quest3_touch" || id == "pico_neo3";
+}
+
+void Bindings_DefaultMap(BindingsManager& m) {
+  m.version = 4;
+  m.preset = "quest3_touch";
+  FillQuestActions(m.actions);
+  FillQuestActions(m.profiles["quest3_touch"]);
+  FillPicoActions(m.profiles["pico_neo3"]);
   Bindings_LoadCustomActions(m);
   m.dirty = false;
   m.status = "QUEST 3 / TOUCH DEFAULTS";
@@ -278,48 +299,88 @@ static std::string JsonEscape(const std::string& s) {
   return o;
 }
 
-static std::string Serialize(const BindingsManager& m) {
-  std::ostringstream ss;
-  ss << "{\n  \"version\": " << m.version << ",\n  \"preset\": \"" << JsonEscape(m.preset)
-     << "\",\n  \"actions\": {\n";
+static void WriteActions(std::ostringstream& ss, const std::map<std::string, BindRule>& actions, const char* pad) {
+  ss << "{\n";
   bool first = true;
-  for (const auto& kv : m.actions) {
+  for (const auto& kv : actions) {
     if (!first) ss << ",\n";
     first = false;
     const auto& r = kv.second;
-    ss << "    \"" << JsonEscape(kv.first) << "\": {\n";
-    ss << "      \"mode\": \"" << (r.mode == "all" ? "all" : "any") << "\",\n";
+    ss << pad << "  \"" << JsonEscape(kv.first) << "\": {\n";
+    ss << pad << "    \"mode\": \"" << (r.mode == "all" ? "all" : "any") << "\",\n";
     if (!r.set.empty())
-      ss << "      \"set\": \"" << JsonEscape(r.set) << "\",\n";
-    ss << "      \"sources\": [";
+      ss << pad << "    \"set\": \"" << JsonEscape(r.set) << "\",\n";
+    ss << pad << "    \"sources\": [";
     for (size_t i = 0; i < r.sources.size(); ++i) {
       if (i) ss << ", ";
       ss << "\"" << JsonEscape(r.sources[i]) << "\"";
     }
-    ss << "]\n    }";
+    ss << "]\n" << pad << "  }";
   }
+  ss << "\n" << pad << "}";
+}
+
+static std::string Serialize(const BindingsManager& m) {
+  std::ostringstream ss;
+  ss << "{\n  \"version\": 4,\n  \"preset\": \"" << JsonEscape(m.preset)
+     << "\",\n  \"actions\": ";
+  WriteActions(ss, m.actions, "  ");
+  ss << ",\n  \"profiles\": {\n";
+  auto writeProfile = [&](const char* id, bool comma) {
+    if (comma) ss << ",\n";
+    ss << "    \"" << id << "\": {\n      \"actions\": ";
+    auto it = m.profiles.find(id);
+    static const std::map<std::string, BindRule> empty;
+    WriteActions(ss, it != m.profiles.end() ? it->second : empty, "      ");
+    ss << "\n    }";
+  };
+  writeProfile("quest3_touch", false);
+  writeProfile("pico_neo3", true);
   ss << "\n  }\n}\n";
   return ss.str();
 }
 
+static size_t MatchBrace(const std::string& s, size_t open) {
+  if (open >= s.size() || s[open] != '{') return std::string::npos;
+  int depth = 0;
+  bool inStr = false;
+  for (size_t i = open; i < s.size(); ++i) {
+    char c = s[i];
+    if (inStr) {
+      if (c == '\\') { ++i; continue; }
+      if (c == '"') inStr = false;
+      continue;
+    }
+    if (c == '"') { inStr = true; continue; }
+    if (c == '{') ++depth;
+    else if (c == '}') {
+      --depth;
+      if (depth == 0) return i;
+    }
+  }
+  return std::string::npos;
+}
+
 static void ParseActions(const std::string& body, BindingsManager& m) {
-  // Find each action key under "actions"
+  // Find each action key under the first "actions" object. Brace-match so a
+  // nested sets{} object does not end the action early.
   auto actPos = body.find("\"actions\"");
   if (actPos == std::string::npos) return;
   size_t i = body.find('{', actPos);
   if (i == std::string::npos) return;
+  size_t actionsEnd = MatchBrace(body, i);
+  if (actionsEnd == std::string::npos) actionsEnd = body.size();
   ++i;
-  while (i < body.size()) {
-    // skip to next "
-    while (i < body.size() && body[i] != '"' && body[i] != '}') ++i;
-    if (i >= body.size() || body[i] == '}') break;
+  while (i < actionsEnd) {
+    while (i < actionsEnd && body[i] != '"' && body[i] != '}') ++i;
+    if (i >= actionsEnd || body[i] == '}') break;
     auto ke = body.find('"', i + 1);
-    if (ke == std::string::npos) break;
+    if (ke == std::string::npos || ke >= actionsEnd) break;
     std::string action = body.substr(i + 1, ke - i - 1);
     i = ke + 1;
     auto brace = body.find('{', i);
-    if (brace == std::string::npos) break;
-    auto end = body.find('}', brace);
+    if (brace == std::string::npos || brace >= actionsEnd) break;
+    auto end = MatchBrace(body, brace);
     if (end == std::string::npos) break;
     std::string block = body.substr(brace, end - brace + 1);
     BindRule r;
@@ -349,6 +410,20 @@ static void ParseActions(const std::string& body, BindingsManager& m) {
   }
 }
 
+static void ParseProfileInto(const std::string& body, const char* id, std::map<std::string, BindRule>& dst) {
+  auto profiles = body.find("\"profiles\"");
+  if (profiles == std::string::npos) return;
+  auto key = body.find(std::string("\"") + id + "\"", profiles);
+  if (key == std::string::npos) return;
+  auto brace = body.find('{', key);
+  if (brace == std::string::npos) return;
+  auto end = MatchBrace(body, brace);
+  if (end == std::string::npos) return;
+  BindingsManager tmp;
+  ParseActions(body.substr(brace, end - brace + 1), tmp);
+  for (auto& kv : tmp.actions) dst[kv.first] = kv.second;
+}
+
 bool Bindings_Load(BindingsManager& m, const std::string& gmodRoot) {
   m.gmodRoot = gmodRoot;
   m.filePath = gmodRoot + "/garrysmod/data/vrmod/vrmod_openxr_bindings.json";
@@ -362,13 +437,30 @@ bool Bindings_Load(BindingsManager& m, const std::string& gmodRoot) {
   ss << f.rdbuf();
   std::string body = ss.str();
   if (body.empty()) return true;
-  // merge user over defaults (same path Lua reads/writes)
-  BindingsManager user = m;
-  user.actions.clear();
+  // Top-level actions are the active profile. A flat v3 file is Quest 3.
+  BindingsManager user;
   ParseActions(body, user);
-  for (auto& kv : user.actions) {
-    m.actions[kv.first] = kv.second;
-    // surface unknown action ids (customs bound only in JSON)
+  auto pr = ExtractString(body, 0, "preset");
+  bool hasProfiles = body.find("\"profiles\"") != std::string::npos;
+  if (hasProfiles) {
+    ParseProfileInto(body, "quest3_touch", m.profiles["quest3_touch"]);
+    ParseProfileInto(body, "pico_neo3", m.profiles["pico_neo3"]);
+    m.preset = KnownProfileId(pr) ? pr : "quest3_touch";
+  } else {
+    m.preset = "quest3_touch";
+    for (auto& kv : user.actions)
+      m.profiles["quest3_touch"][kv.first] = kv.second;
+  }
+  if (!user.actions.empty()) {
+    std::map<std::string, BindRule> active;
+    if (m.preset == "pico_neo3") FillPicoActions(active);
+    else FillQuestActions(active);
+    for (auto& kv : user.actions) active[kv.first] = kv.second;
+    m.profiles[m.preset] = active;
+  }
+  auto activeIt = m.profiles.find(m.preset);
+  if (activeIt != m.profiles.end()) m.actions = activeIt->second;
+  for (auto& kv : m.actions) {
     bool known = false;
     for (auto& L : m.logical)
       if (L.id == kv.first) {
@@ -378,8 +470,7 @@ bool Bindings_Load(BindingsManager& m, const std::string& gmodRoot) {
     if (!known)
       AppendCustomIfNew(m, kv.first, kv.second.set == "driving");
   }
-  auto pr = ExtractString(body, 0, "preset");
-  if (!pr.empty()) m.preset = pr;
+  m.version = 4;
   m.dirty = false;
   m.status = "SYNCED " + m.filePath;
   fprintf(stderr, "[CubeUI] bindings loaded %zu actions from %s (logical=%zu)\n",
@@ -439,6 +530,11 @@ bool Bindings_Save(BindingsManager& m, std::string& err) {
     err = "cannot write " + m.filePath;
     return false;
   }
+  if (!KnownProfileId(m.preset)) m.preset = "quest3_touch";
+  m.version = 4;
+  m.profiles[m.preset] = m.actions;
+  if (m.profiles["quest3_touch"].empty()) FillQuestActions(m.profiles["quest3_touch"]);
+  if (m.profiles["pico_neo3"].empty()) FillPicoActions(m.profiles["pico_neo3"]);
   f << Serialize(m);
   m.dirty = false;
   m.status = "SAVED BINDINGS";
@@ -447,28 +543,33 @@ bool Bindings_Save(BindingsManager& m, std::string& err) {
 }
 
 void Bindings_ResetDefaults(BindingsManager& m) {
-  // Quest 3 / Touch GOLD — identical to Lua DefaultMap() in cl_openxr_bindings.lua.
-  // Backup, replace, write immediately so launcher + GMod share one file:
-  // garrysmod/data/vrmod/vrmod_openxr_bindings.json
+  // Reset the active profile only. The other profile stays.
   if (!m.filePath.empty()) BackupBindingsFile(m.filePath);
   else if (!m.gmodRoot.empty())
     BackupBindingsFile(m.gmodRoot + "/garrysmod/data/vrmod/vrmod_openxr_bindings.json");
-  Bindings_DefaultMap(m);
-  m.preset = "quest3_touch";
+  if (!KnownProfileId(m.preset)) m.preset = "quest3_touch";
+  if (m.profiles["quest3_touch"].empty()) FillQuestActions(m.profiles["quest3_touch"]);
+  if (m.profiles["pico_neo3"].empty()) FillPicoActions(m.profiles["pico_neo3"]);
+  if (m.preset == "pico_neo3") FillPicoActions(m.actions);
+  else FillQuestActions(m.actions);
+  m.profiles[m.preset] = m.actions;
+  m.version = 4;
   m.dirty = true;
   std::string err;
+  const char* label = (m.preset == "pico_neo3") ? "PICO NEO 3" : "QUEST 3";
   if (!Bindings_Save(m, err)) {
-    m.status = "GOLD IN MEMORY — SAVE FAIL: " + err;
+    m.status = std::string(label) + " GOLD IN MEMORY — SAVE FAIL: " + err;
   } else {
-    m.status = "DEFAULTS RESTORED + SAVED (Lua sync)";
+    m.status = std::string(label) + " DEFAULTS RESTORED + SAVED";
   }
 }
 
 void Bindings_RestoreAction(BindingsManager& m, const std::string& actionId) {
-  BindingsManager def{};
-  Bindings_DefaultMap(def);
-  auto it = def.actions.find(actionId);
-  if (it != def.actions.end())
+  std::map<std::string, BindRule> gold;
+  if (m.preset == "pico_neo3") FillPicoActions(gold);
+  else FillQuestActions(gold);
+  auto it = gold.find(actionId);
+  if (it != gold.end())
     m.actions[actionId] = it->second;
   else
     m.actions.erase(actionId);

@@ -1038,7 +1038,7 @@ bool CubeUI_PointerClick(CubeUIState& s, int px, int py) {
       else s.status = "SAVED → vrmod_openxr_bindings.json (Lua sync)";
       return true;
     }
-    // RESET → Quest 3 GOLD (double-tap). Writes disk so GMod/Lua match launcher.
+    // RESET → active profile gold (double-tap). The other profile stays.
     if (px >= UI_W - 200 && px <= UI_W - 16 && py >= 50 && py <= 74) {
       static double lastResetTap = 0.;
       double now = (double)s.paintFrame / 72.0;
@@ -1629,9 +1629,11 @@ void CubeUI_Rasterize(const CubeUIState& s, unsigned char* rgba, const WebUICurs
     FillRect(rgba, UI_W - 130, UI_H - 48, 110, 32, CT_RGB(CubeTheme::BTN), 255);
     DrawText(rgba, UI_W - 110, UI_H - 38, "NEXT", 255, 240, 244, 2);
     DrawText(rgba, 130, UI_H - 36, page, CT_RGB(CubeTheme::MUTED), 1);
-    DrawText(rgba, 130, UI_H - 20,
-             "SAVE=write JSON  RESET x2=Quest3 gold  DEF=one action  |  same file as Lua VRMod",
-             160, 120, 130, 1);
+    const char* profileName = (s.bindings.preset == "pico_neo3") ? "PICO NEO 3" : "QUEST 3";
+    char profileLine[128];
+    snprintf(profileLine, sizeof(profileLine),
+             "Profile %s   SAVE writes both   RESET x2=this profile", profileName);
+    DrawText(rgba, 130, UI_H - 20, profileLine, 160, 120, 130, 1);
     if (s.paintSoftCursor && ((cursor && cursor->visible) || s.cursorVisible)) {
       int cx = cursor ? cursor->x : s.cursorX;
       int cy = cursor ? cursor->y : s.cursorY;

@@ -193,6 +193,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
     ],
     [
+      "vrmod.utils.BindingsLaw_KnownProfile",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
       "vrmod.utils.BindingsLaw_ManifestRelPath",
       "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
     ],
@@ -202,6 +206,18 @@
     ],
     [
       "vrmod.utils.BindingsLaw_OverlayClearSeconds",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_PicoOverrides",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ProfileId",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.BindingsLaw_ProfileLabel",
       "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
     ],
     [
@@ -1321,6 +1337,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
     ],
     [
+      "vrmod.utils.LaserLaw_TriggerClick",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_laser_law.lua"
+    ],
+    [
       "vrmod.utils.LengthSqr",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
@@ -1971,6 +1991,22 @@
     [
       "vrmod.utils.TraceHand",
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
+    ],
+    [
+      "vrmod.utils.TrackingLaw_AllowVendorInGmod",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.TrackingLaw_BodyApi",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.TrackingLaw_EyeApi",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
+    ],
+    [
+      "vrmod.utils.TrackingLaw_FullBodyApi",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_bindings_law.lua"
     ],
     [
       "vrmod.utils.TryParseColor",

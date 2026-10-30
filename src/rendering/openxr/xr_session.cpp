@@ -615,6 +615,9 @@ bool XR_Init(char* errMsg, int errMsgLen) {
                 wantFull = true;
             else if (std::strcmp(props[i].extensionName, XR_BD_CONTROLLER_INTERACTION_EXTENSION_NAME) == 0)
                 wantBd = true;
+            // Eyes and body stay on XR_EXT_eye_gaze_interaction, XR_FB_body_tracking,
+            // and XR_META_body_tracking_full_body. Pico xrGetEyeTrackingDataPICO and
+            // XR_BD_body_tracking are the WiVRn client's job. BD here is controllers.
         }
     }
     if (wantFull && !wantBody) wantFull = false;
