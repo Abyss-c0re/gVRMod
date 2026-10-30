@@ -802,7 +802,7 @@ static bool XR_SuggestAllInteractionBindings() {
             okTouch = true;
             return;
         }
-        XrActionSuggestedBinding core[48];
+        XrActionSuggestedBinding core[64];
         int cn = 0;
         PushBinding(core, &cn, 48, A("pose_lefthand"),  path::leftGripPose);
         PushBinding(core, &cn, 48, A("pose_righthand"), path::rightGripPose);
@@ -834,8 +834,25 @@ static bool XR_SuggestAllInteractionBindings() {
         PushBinding(core, &cn, 48, s_srcRightStickClick, path::rightThumbClick);
         PushBinding(core, &cn, 48, g_xrLeftSqueezeClick, path::leftSqueezeClick);
         PushBinding(core, &cn, 48, g_xrRightSqueezeClick, path::rightSqueezeClick);
-        if (SuggestBindingsForProfile(profile, core, (uint32_t)cn)) {
-            VRMOD_LOG_INFO("Pico profile accepted squeeze-click set: %s", profile);
+        // Driving actions are not in this squeeze-click set unless added here.
+        // The full Touch table (which does bind them) is rejected on Neo 3
+        // because squeeze/value and thumbrest are not in the profile. Without
+        // these, /actions/driving has no gas, brake, or steer, so vehicles
+        // are dead while on-foot still works.
+        int driveN = cn;
+        PushBinding(core, &driveN, 64, A("vector1_forward"),   path::rightTriggerValue);
+        PushBinding(core, &driveN, 64, A("vector1_reverse"),   path::leftTriggerValue);
+        PushBinding(core, &driveN, 64, A("vector2_steer"),     path::leftThumbstick);
+        PushBinding(core, &driveN, 64, A("boolean_handbrake"), path::rightAClick);
+        PushBinding(core, &driveN, 64, A("boolean_turbo"),     path::rightBClick);
+        PushBinding(core, &driveN, 64, A("boolean_exit"),      path::leftXClick);
+        PushBinding(core, &driveN, 64, A("boolean_turret"),    path::rightThumbClick);
+        PushBinding(core, &driveN, 64, A("boolean_horn"),      path::leftThumbClick);
+        if (SuggestBindingsForProfile(profile, core, (uint32_t)driveN)) {
+            VRMOD_LOG_INFO("Pico profile accepted driving set: %s (%d)", profile, driveN);
+            okTouch = true;
+        } else if (SuggestBindingsForProfile(profile, core, (uint32_t)cn)) {
+            VRMOD_LOG_WARN("Pico driving bindings rejected, on-foot set only: %s", profile);
             okTouch = true;
         } else {
             VRMOD_LOG_WARN("Pico profile rejected bindings: %s", profile);
