@@ -596,6 +596,59 @@ bool XR_HasCollectedEyes() { return g_eyeStageReady; }
 void XR_SetPreferCollectedEyes(bool prefer) { g_preferCollectedEyes = prefer; }
 bool XR_PreferCollectedEyes() { return g_preferCollectedEyes; }
 
+// Images waited at frame start. Submit must not wait again after the paint.
+static bool g_heldSubmitImage[2] = {false, false};
+static uint32_t g_heldSubmitIndex[2] = {0, 0};
+
+void XR_ReleaseHeldSubmitImages() {
+    XrSwapchainImageReleaseInfo relInfo = {XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+    for (int eye = 0; eye < 2; ++eye) {
+        if (!g_heldSubmitImage[eye]) continue;
+        g_heldSubmitImage[eye] = false;
+        if (g_swapchains[eye] != XR_NULL_HANDLE && g_xrReleaseSwapchainImage) {
+            g_xrReleaseSwapchainImage(g_swapchains[eye], &relInfo);
+        }
+    }
+}
+
+bool XR_PrepareSubmitImages() {
+    XR_ReleaseHeldSubmitImages();
+    if (!g_xrFrameState.shouldRender) return false;
+    if (!g_xrAcquireSwapchainImage || !g_xrWaitSwapchainImage || !g_xrReleaseSwapchainImage)
+        return false;
+    if (g_swapchains[0] == XR_NULL_HANDLE || g_swapchains[1] == XR_NULL_HANDLE)
+        return false;
+
+    for (int eye = 0; eye < 2; ++eye) {
+        XrSwapchainImageAcquireInfo acqInfo = {XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+        uint32_t imageIndex = 0;
+        XrResult res = g_xrAcquireSwapchainImage(g_swapchains[eye], &acqInfo, &imageIndex);
+        if (res != XR_SUCCESS) {
+            VRMOD_LOG_WARN("Early acquire eye %d failed: %s", eye, XR_ResultToString(res));
+            XR_ReleaseHeldSubmitImages();
+            return false;
+        }
+        g_heldSubmitImage[eye] = true;
+        g_heldSubmitIndex[eye] = imageIndex;
+
+        XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+        // Same 100ms cap as submit. XR_INFINITE_DURATION freezes the game.
+        waitInfo.timeout = 100000000;
+        res = g_xrWaitSwapchainImage(g_swapchains[eye], &waitInfo);
+        if (res != XR_SUCCESS) {
+            VRMOD_LOG_WARN("Early wait eye %d failed: %s", eye, XR_ResultToString(res));
+            XR_ReleaseHeldSubmitImages();
+            return false;
+        }
+    }
+
+    static int s_prepLog = 0;
+    if ((s_prepLog++ % 90) == 0) {
+        VRMOD_LOG_INFO("Swapchain images waited before render (capture timing)");
+    }
+    return true;
+}
+
 bool XR_CollectEyesFromEngine(const float textureBounds[8]) {
     // Soft-fail only — never assert. Mid-session GL alloc/blit under mat_queue 2
     // is the crash path; callers gate Collect to mode < 2.
@@ -989,39 +1042,46 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
     XrCompositionLayerProjectionView projViews[2];
 
     for (int eye = 0; eye < 2; eye++) {
-        XrSwapchainImageAcquireInfo acqInfo = {XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+        // Prefer the image waited at frame start. A wait here is after the
+        // paint, so the display time has already slipped and the compositor
+        // reprojects the previous texture against this frame's head pose.
         uint32_t imageIndex = 0;
-        res = g_xrAcquireSwapchainImage(g_swapchains[eye], &acqInfo, &imageIndex);
-        if (res != XR_SUCCESS) {
-            result.errCode = (int)res;
-            snprintf(result.errMsg, sizeof(result.errMsg),
-                "xrAcquireSwapchainImage failed eye %d: %s", eye, XR_ResultToString(res));
-            if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
-                VRMOD_LOG_WARN("%s", result.errMsg);
-                s_lastSubmitErrCode = result.errCode;
-                s_lastSubmitOk = false;
+        if (g_heldSubmitImage[eye]) {
+            imageIndex = g_heldSubmitIndex[eye];
+        } else {
+            XrSwapchainImageAcquireInfo acqInfo = {XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+            res = g_xrAcquireSwapchainImage(g_swapchains[eye], &acqInfo, &imageIndex);
+            if (res != XR_SUCCESS) {
+                result.errCode = (int)res;
+                snprintf(result.errMsg, sizeof(result.errMsg),
+                    "xrAcquireSwapchainImage failed eye %d: %s", eye, XR_ResultToString(res));
+                if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
+                    VRMOD_LOG_WARN("%s", result.errMsg);
+                    s_lastSubmitErrCode = result.errCode;
+                    s_lastSubmitOk = false;
+                }
+                XR_EndFrame();
+                return result;
             }
-            XR_EndFrame();
-            return result;
-        }
 
-        XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-        // Bound wait — XR_INFINITE_DURATION freezes the game (and mat workers) if
-        // the compositor stalls. 100ms is enough for a healthy runtime frame.
-        waitInfo.timeout = 100000000; // 100 ms in nanoseconds
-        res = g_xrWaitSwapchainImage(g_swapchains[eye], &waitInfo);
-        if (res != XR_SUCCESS) {
-            g_xrReleaseSwapchainImage(g_swapchains[eye], nullptr);
-            result.errCode = (int)res;
-            snprintf(result.errMsg, sizeof(result.errMsg),
-                "xrWaitSwapchainImage failed eye %d: %s", eye, XR_ResultToString(res));
-            if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
-                VRMOD_LOG_WARN("%s", result.errMsg);
-                s_lastSubmitErrCode = result.errCode;
-                s_lastSubmitOk = false;
+            XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+            // Bound wait — XR_INFINITE_DURATION freezes the game (and mat workers) if
+            // the compositor stalls. 100ms is enough for a healthy runtime frame.
+            waitInfo.timeout = 100000000; // 100 ms in nanoseconds
+            res = g_xrWaitSwapchainImage(g_swapchains[eye], &waitInfo);
+            if (res != XR_SUCCESS) {
+                g_xrReleaseSwapchainImage(g_swapchains[eye], nullptr);
+                result.errCode = (int)res;
+                snprintf(result.errMsg, sizeof(result.errMsg),
+                    "xrWaitSwapchainImage failed eye %d: %s", eye, XR_ResultToString(res));
+                if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
+                    VRMOD_LOG_WARN("%s", result.errMsg);
+                    s_lastSubmitErrCode = result.errCode;
+                    s_lastSubmitOk = false;
+                }
+                XR_EndFrame();
+                return result;
             }
-            XR_EndFrame();
-            return result;
         }
 
         GLuint dstTexture = g_swapchainImages[eye][imageIndex].image;
@@ -1215,8 +1275,12 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
             glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevD);
         }
 
+        // WiVRn samples the swapchain from another process. Flush submits the
+        // blit before release. glFinish is forbidden — it kills mat_queue workers.
+        glFlush();
         XrSwapchainImageReleaseInfo relInfo = {XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
         g_xrReleaseSwapchainImage(g_swapchains[eye], &relInfo);
+        g_heldSubmitImage[eye] = false;
 
         // Use the views located at the top of this Submit (with the frame's predictedDisplayTime).
         projViews[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
@@ -1232,10 +1296,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
     glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevDrawFBO);
     if (prevSrgbEnabled) glEnable(GL_FRAMEBUFFER_SRGB); else glDisable(GL_FRAMEBUFFER_SRGB);
 
-    // glFlush can stall MatQueue workers under mat_queue_mode 2.
-    // Compositor usually sees images after EndFrame without an explicit flush.
-    // (glFinish is always forbidden — kills CThread.)
-    // glFlush();
+    // Flush already ran before each xrReleaseSwapchainImage. Do not glFinish.
 
     // Submit frame: optional FB camera layer UNDER projection (void = room).
     XrCompositionLayerProjection projLayer = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};

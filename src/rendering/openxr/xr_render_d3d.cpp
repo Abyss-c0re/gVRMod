@@ -370,6 +370,8 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int /*stolenTexture*/, const floa
     return result;
 }
 
+void XR_ReleaseHeldSubmitImages() {}
+
 // HMD pose refresh (shared with input) — D3D build.
 void XR_RefreshHMDPose() {
     if (!g_xrSession || !g_xrSessionRunning) return;

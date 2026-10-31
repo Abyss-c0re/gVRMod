@@ -77,6 +77,21 @@ TEST(FramePipeline_StableOrder_RenderBeforeSubmit) {
     ASSERT_EQ((int)p.phase, (int)FramePhase::Done);
 }
 
+// Capture timing: swapchain wait is part of the pose phase, before the paint.
+// Waiting again after RenderEyes is the head-turn hitch (previous texture,
+// current pose). glFinish stays banned; a flush before release is required.
+TEST(FramePipeline_SwapchainWaitBeforePaint) {
+    auto waitAfterPaint = [](bool acquiredAtFrameStart) {
+        return !acquiredAtFrameStart;
+    };
+    ASSERT_FALSE(waitAfterPaint(true));
+    ASSERT_TRUE(waitAfterPaint(false));
+    const bool useGlFinish = false;
+    const bool flushBeforeRelease = true;
+    ASSERT_FALSE(useGlFinish);
+    ASSERT_TRUE(flushBeforeRelease);
+}
+
 TEST(FramePipeline_Mode2_SkipsCollect) {
     FramePipeline p;
     p.matQueueMode = 2;

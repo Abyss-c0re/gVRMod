@@ -1,4 +1,5 @@
 #include "xr_session.h"
+#include "xr_render.h"
 #include "input/xr_input.h"
 #include "core/vrmod_log.h"
 
@@ -1114,6 +1115,8 @@ bool XR_ShouldRenderThisFrame() {
 }
 
 void XR_EndFrame() {
+    // Acquired before the paint. An empty end must not leave them held.
+    XR_ReleaseHeldSubmitImages();
     if (!g_xrSession || !g_xrEndFrame) {
         g_xrFrameBegun = false;
         return;

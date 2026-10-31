@@ -47,7 +47,17 @@ void XR_DestroyEyeCollectors();
 //   2 FOV_CROP — experimental asymmetric FOV crop on per-eye textures (can break stereo)
 void XR_SetSubmitCropMode(int mode);
 int  XR_GetSubmitCropMode();
+
+// After xrBeginFrame, before the engine paints: acquire + wait both swapchain
+// images. Submit then only blits and releases. Waiting after the paint misses
+// the display time and WiVRn shows the previous texture under the new pose.
+// Does not locate or rewrite the HMD pose.
+bool XR_PrepareSubmitImages();
 #endif
+
+// Drop swapchain images acquired by XR_PrepareSubmitImages. Safe if none held.
+// Called from the empty EndFrame path so a missed submit cannot leak an acquire.
+void XR_ReleaseHeldSubmitImages();
 
 // ── Recommended size ──
 extern uint32_t g_xrSwapchainWidth;

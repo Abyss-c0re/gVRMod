@@ -420,6 +420,13 @@ LUA_FUNCTION(UpdatePosesAndActions) {
     // Wait and begin frame (this blocks until next VR frame)
     XR_WaitAndBeginFrame();
 
+#ifndef _WIN32
+    // Wait the swapchain images now, before Lua paints. Submit only blits.
+    if (XR_ShouldRenderThisFrame() && g_xrSwapchainsCreated) {
+        XR_PrepareSubmitImages();
+    }
+#endif
+
     // Sync actions
     XR_SyncActions(g_activeActionSets, g_activeActionSetCount);
 
