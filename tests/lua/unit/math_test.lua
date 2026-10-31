@@ -213,6 +213,15 @@ return function(H, env)
 		-- left U span stays ordered
 		local c0, _, c2 = env.vrmod.utils.ComputeSubmitBounds(La, Ra, 0, 0, 1.0, true)
 		H.assert_true(c0 < c2, "left U span ordered")
+		-- Asymmetric OpenXR crop: tanL=-1.1918 tanR=1 → su1≈0.919, not the full half
+		local asym = {
+			Width = 1, Height = 1, HorizontalOffset = 0, VerticalOffset = 0,
+			submit_u0 = 0, submit_u1 = 0.9195, submit_v0 = 0, submit_v1 = 1,
+		}
+		local au0, _, au1 = env.vrmod.utils.ComputeSubmitBounds(asym, asym, 0, 0, 1.0, false, 0)
+		local fu0, _, fu1 = env.vrmod.utils.ComputeSubmitBounds(L, R, 0, 0, 1.0, false, 0)
+		H.assert_true(au0 < au1)
+		H.assert_true(au1 < fu1 - 0.02, "asymmetric crop is tighter than the full eye half")
 		-- mq2 mono-both: right UV mirrors left half (no one-eye black)
 		local b = { uMinL, vMinL, uMaxL, vMaxL, uMinR, vMinR, uMaxR, vMaxR }
 		H.assert_true(type(env.vrmod.utils.SubmitBounds_MirrorLeftToBoth) == "function")
