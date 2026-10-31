@@ -222,6 +222,17 @@ return function(H, env)
 		local fu0, _, fu1 = env.vrmod.utils.ComputeSubmitBounds(L, R, 0, 0, 1.0, false, 0)
 		H.assert_true(au0 < au1)
 		H.assert_true(au1 < fu1 - 0.02, "asymmetric crop is tighter than the full eye half")
+		-- Narrower eye is rebased onto the wider shared render FOV.
+		local wide = {
+			Width = 1, Height = 1, fov = 103.132, aspectratio = 1,
+			submit_u0 = 0, submit_u1 = 1, submit_v0 = 0, submit_v1 = 1,
+		}
+		local narrow = {
+			Width = 1, Height = 1, fov = 90, aspectratio = 1,
+			submit_u0 = 0, submit_u1 = 1, submit_v0 = 0, submit_v1 = 1,
+		}
+		local _, _, _, _, nu0 = env.vrmod.utils.ComputeSubmitBounds(wide, narrow, 0, 0, 1.0, false, 0)
+		H.assert_true(nu0 > 0.54, "narrow eye crop moves in from the SBS seam")
 		-- mq2 mono-both: right UV mirrors left half (no one-eye black)
 		local b = { uMinL, vMinL, uMaxL, vMaxL, uMinR, vMinR, uMaxR, vMaxR }
 		H.assert_true(type(env.vrmod.utils.SubmitBounds_MirrorLeftToBoth) == "function")
