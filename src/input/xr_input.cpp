@@ -145,7 +145,9 @@ PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
 }
 
 PoseResult GetHMDPose() {
-    // Last camera sample (XR_LatchRenderViews). The layer locates again at submit.
+    // Return the last set HMD pose (populated by submit layer locate or Update path).
+    // Do not zero/clobber on transient !running checks -- that was causing the game
+    // to never see valid poses even after successful submits/layer locates.
     PoseResult r = g_xrHMDPose;
 
     // Diagnostic logging for head tracking (throttled).

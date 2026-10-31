@@ -469,15 +469,6 @@ PURE_TESTED = {
     "vrmod.utils.FrameBudget_StatusLabel": "util.frame_budget_law.submit_first_g51",
     "vrmod.utils.FrameBudget_HmdExpect": "util.frame_budget_law.submit_first_g51",
     "vrmod.utils.FrameBudget_IsLateRisk": "util.frame_budget_law.submit_first_g51",
-    # G53 head latch — paint pose is the OpenXR layer pose (no submit relocate)
-    "vrmod.utils.HeadLatch_AllowHmdSmoothing": "util.head_latch_law.paint_pose_g53",
-    "vrmod.utils.HeadLatch_AllowSubmitRelocate": "util.head_latch_law.paint_pose_g53",
-    "vrmod.utils.HeadLatch_PipelineSteps": "util.head_latch_law.paint_pose_g53",
-    "vrmod.utils.HeadLatch_PoseSource": "util.head_latch_law.paint_pose_g53",
-    "vrmod.utils.HeadLatch_Decide": "util.head_latch_law.paint_pose_g53",
-    "vrmod.utils.HeadLatch_IsLagRisk": "util.head_latch_law.paint_pose_g53",
-    "vrmod.utils.HeadLatch_StatusLabel": "util.head_latch_law.paint_pose_g53",
-    "vrmod.utils.HeadLatch_HmdExpect": "util.head_latch_law.paint_pose_g53",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",
@@ -615,7 +606,6 @@ def main() -> None:
     # C++ module exports (hand-maintained core list + scan lua_interface)
     cpp_exports = [
         "GetVersion", "Init", "Shutdown", "GetPoses", "GetActions", "UpdatePosesAndActions",
-        "LatchRenderViews",
         "ShareTextureBegin", "ShareTextureFinish", "GetDisplayInfo", "SubmitSharedTexture",
         "KeyboardOpen", "KeyboardClose", "KeyboardIsOpen", "KeyboardGetText", "KeyboardSetText",
         "KeyboardAppend", "KeyboardBackspace", "KeyboardHitTest", "KeyboardPointerClick",

@@ -423,33 +423,39 @@ LUA_FUNCTION(UpdatePosesAndActions) {
     // Sync actions
     XR_SyncActions(g_activeActionSets, g_activeActionSetCount);
 
-    // One locate: HMD + both eyes + the XrView pair Submit will reuse.
-    // A second locate here used to drift from the HMD sample before paint.
+    // Update HMD pose
     XR_UpdatePoses();
+
+    // Locate eye views early using predicted display time (in stage space, matching hmd pose space).
+    // This lets Lua use the exact headset-provided eye poses (position + orientation) for the
+    // per-eye RenderViews, so OpenXR drives the stereo camera placement directly with no
+    // additional manual offset/yaw/scale math in the render path.
+    if (g_xrSessionRunning && g_xrLocateViews) {
+      XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
+      vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+      vli.displayTime = g_xrFrameState.predictedDisplayTime;
+      vli.space = g_xrStageSpace;
+
+      XrViewState vs = {XR_TYPE_VIEW_STATE};
+      uint32_t vc = 0;
+      XrView ev[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+      if (g_xrLocateViews(g_xrSession, &vli, &vs, 2, &vc, ev) == XR_SUCCESS && vc >= 2) {
+        XrSpaceLocation tloc = {XR_TYPE_SPACE_LOCATION};
+        tloc.locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+        tloc.pose = ev[0].pose;
+        g_xrEyePoses[0] = ConvertXrPose(tloc);
+        tloc.pose = ev[1].pose;
+        g_xrEyePoses[1] = ConvertXrPose(tloc);
+        g_xrEyeFovs[0] = ev[0].fov;
+        g_xrEyeFovs[1] = ev[1].fov;
+        g_xrEyePosesValid = true;
+      }
+    }
 
     return 0;
 }
 
-// Late latch: call immediately before stereo RenderView. Does not WaitFrame.
-// Refreshes the paint pose after Lua gameplay work so the cameras and the
-// composition layer share one predicted display pose.
-LUA_FUNCTION(LatchRenderViews) {
-    if (!g_xrInitialized || g_IsPaused || !XR_IsSubmitEnabled()) {
-        LUA->PushBool(false);
-        return 1;
-    }
-    if (!g_xrSessionRunning) {
-        LUA->PushBool(false);
-        return 1;
-    }
-    LUA->PushBool(XR_LatchRenderViews());
-    return 1;
-}
-
 LUA_FUNCTION(GetPoses) {
-    // true = head and eyes only. The late camera refresh must not xrLocateSpace
-    // every hand again; that delays the paint and ages the pose just sampled.
-    const bool headOnly = (LUA->Top() >= 1) && LUA->GetBool(1);
     LUA->ReferencePush(g_luaRefs[LuaRefIndex_PoseTable]);
 
     // HMD pose
@@ -525,8 +531,7 @@ LUA_FUNCTION(GetPoses) {
       }
     }
 
-    // Action poses (skipped on the late head refresh).
-    if (!headOnly) {
+    // Action poses
     for (int i = 0; i < g_actionCount; i++) {
         if (g_actions[i].type == ActionType_Pose) {
             pr = XR_GetPoseAction(g_actions[i].handle);
@@ -547,7 +552,6 @@ LUA_FUNCTION(GetPoses) {
                 LUA->SetField(-2, g_actions[i].name);
             }
         }
-    }
     }
     return 1;
 }
@@ -1432,8 +1436,6 @@ GMOD_MODULE_OPEN() {
     LUA->SetField(-2, "GetDisplayInfo");
     LUA->PushCFunction(UpdatePosesAndActions);
     LUA->SetField(-2, "UpdatePosesAndActions");
-    LUA->PushCFunction(LatchRenderViews);
-    LUA->SetField(-2, "LatchRenderViews");
     LUA->PushCFunction(GetPoses);
     LUA->SetField(-2, "GetPoses");
     LUA->PushCFunction(GetActions);

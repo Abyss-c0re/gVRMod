@@ -2096,46 +2096,4 @@ return function(H, env)
 		H.assert_eq(u.FrameBudget_StatusLabel(late), "BUDGET · LATE SKIP DESKTOP")
 		H.assert_eq(u.FrameBudget_HmdExpect(late).verdict, "expect_skip_desktop")
 	end)
-
-	-- G53: late camera sample, fresh locate on the layer. Paint pose on the layer flashes.
-	H.TEST("util.head_latch_law.paint_pose_g53", function()
-		local u = env.vrmod.utils
-		H.assert_true(not u.HeadLatch_AllowHmdSmoothing())
-		H.assert_true(u.HeadLatch_AllowSubmitRelocate())
-		local steps = u.HeadLatch_PipelineSteps()
-		H.assert_eq(steps[1], "wait_begin")
-		H.assert_eq(steps[4], "late_latch")
-		H.assert_eq(steps[6], "submit_fresh_pose")
-		H.assert_eq(u.HeadLatch_PoseSource(false), "submit")
-		H.assert_eq(u.HeadLatch_PoseSource(true), "paint")
-		local late = u.HeadLatch_Decide({
-			vr_active = true,
-			late_latch = true,
-			hmd_smoothed = false,
-			use_paint_pose = false,
-		})
-		H.assert_true(late.path_ok)
-		H.assert_eq(late.pose_source, "submit")
-		H.assert_eq(late.reason, "late_paint_submit_locate")
-		H.assert_true(not u.HeadLatch_IsLagRisk(late))
-		H.assert_eq(u.HeadLatch_StatusLabel(late), "HEAD · LATE LATCH")
-		local he = u.HeadLatch_HmdExpect(late)
-		H.assert_eq(he.verdict, "expect_late_latch")
-		H.assert_true(string.find(he.checklist, "G53", 1, true))
-		local early = u.HeadLatch_Decide({ late_latch = false, use_paint_pose = false })
-		H.assert_true(early.path_ok)
-		H.assert_eq(u.HeadLatch_StatusLabel(early), "HEAD · SUBMIT")
-		local flash = u.HeadLatch_Decide({ late_latch = true, use_paint_pose = true })
-		H.assert_true(not flash.path_ok)
-		H.assert_eq(flash.risk, "reproject")
-		H.assert_true(u.HeadLatch_IsLagRisk(flash))
-		H.assert_eq(u.HeadLatch_StatusLabel(flash), "HEAD · REPROJECT")
-		H.assert_eq(u.HeadLatch_HmdExpect(flash).verdict, "expect_flicker")
-		local smooth = u.HeadLatch_Decide({ late_latch = true, hmd_smoothed = true })
-		H.assert_eq(smooth.risk, "hmd_smooth")
-		H.assert_eq(u.HeadLatch_StatusLabel(smooth), "HEAD · SMOOTHED")
-		local idle = u.HeadLatch_Decide({ vr_active = false, late_latch = false })
-		H.assert_eq(u.HeadLatch_StatusLabel(idle), "HEAD · IDLE")
-		H.assert_true(idle.path_ok)
-	end)
 end

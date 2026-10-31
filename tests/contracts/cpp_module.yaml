@@ -19,9 +19,6 @@ exports:
   - id: VRMOD_UpdatePosesAndActions
     tier: seam
     tests: [cpp.exports.registry]
-  - id: VRMOD_LatchRenderViews
-    tier: seam
-    tests: [cpp.exports.registry]
   - id: VRMOD_ShareTextureBegin
     tier: seam
     tests: [cpp.exports.registry]

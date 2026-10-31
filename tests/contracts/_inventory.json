@@ -1089,38 +1089,6 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
     [
-      "vrmod.utils.HeadLatch_AllowHmdSmoothing",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
-      "vrmod.utils.HeadLatch_AllowSubmitRelocate",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
-      "vrmod.utils.HeadLatch_Decide",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
-      "vrmod.utils.HeadLatch_HmdExpect",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
-      "vrmod.utils.HeadLatch_IsLagRisk",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
-      "vrmod.utils.HeadLatch_PipelineSteps",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
-      "vrmod.utils.HeadLatch_PoseSource",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
-      "vrmod.utils.HeadLatch_StatusLabel",
-      "addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua"
-    ],
-    [
       "vrmod.utils.HitFilter",
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],

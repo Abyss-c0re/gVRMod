@@ -12,9 +12,14 @@
 #include <vector>
 #include <algorithm>
 
-// Camera pose is latched in xr_session just before the eyes. The layer pose is
-// located here, after the paint. Submitting the pre-render latch makes WiVRn
-// reproject across both RenderViews; without a depth layer that flashes.
+// The hmd pose (defined in xr_input.cpp) and conversion - used to feed live layer view pose
+// back to the game's tracking so RenderViews use current head pose.
+extern PoseResult g_xrHMDPose;
+extern PoseResult ConvertXrPose(const XrSpaceLocation& loc);
+
+extern PoseResult g_xrEyePoses[2];
+extern bool g_xrEyePosesValid;
+extern XrFovf g_xrEyeFovs[2];
 
 // 0=SAFE 1=FULL 2=FOV_CROP — see XR_SetSubmitCropMode. Default SAFE after FOV_CROP disaster.
 static int g_submitCropMode = 0;
@@ -50,6 +55,38 @@ static void AsymmetricFovToUvCrop(const XrFovf& fov, float* u0, float* u1, float
     if (*v1 > 1.0f - ins) *v1 = 1.0f - ins;
     if (!(*u1 > *u0 + 0.01f)) { *u0 = ins; *u1 = 1.0f - ins; }
     if (!(*v1 > *v0 + 0.01f)) { *v0 = ins; *v1 = 1.0f - ins; }
+}
+
+// Exposed to input unit so UpdatePoses can ensure a fresh HMD pose is available
+// for Lua GetPoses on the first frame (fixes "no head tracking" and helps avoid
+// initial large height delta that caused player to fly upwards).
+void XR_RefreshHMDPose() {
+    if (!g_xrSession || !g_xrSessionRunning) return;
+
+    XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
+    vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    vli.displayTime = g_xrFrameState.predictedDisplayTime;
+    vli.space = g_xrStageSpace;
+
+    XrViewState viewState = {XR_TYPE_VIEW_STATE};
+    XrView tmpViews[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+    uint32_t viewCount = 0;
+    XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, tmpViews);
+    if (res == XR_SUCCESS && viewCount >= 2) {
+        // Use average of the two eye positions as the head pose (center between eyes).
+        // This matches typical OpenVR HMD pose behavior and fixes roll artifacts
+        // where using left eye as "head" caused left-eye-specific vertical drift on roll.
+        XrVector3f headPos = {
+            (tmpViews[0].pose.position.x + tmpViews[1].pose.position.x) * 0.5f,
+            (tmpViews[0].pose.position.y + tmpViews[1].pose.position.y) * 0.5f,
+            (tmpViews[0].pose.position.z + tmpViews[1].pose.position.z) * 0.5f
+        };
+        XrSpaceLocation tempLoc = {XR_TYPE_SPACE_LOCATION};
+        tempLoc.locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+        tempLoc.pose.position = headPos;
+        tempLoc.pose.orientation = tmpViews[0].pose.orientation;  // orientations are nearly identical; use left as representative
+        g_xrHMDPose = ConvertXrPose(tempLoc);
+    }
 }
 
 // Capture / stolen texture names from the share mechanism (gl_hooks.cpp).
@@ -777,8 +814,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         return result;
     }
 
-    // Post-paint locate. Do not copy this into g_xrHMDPose — the eyes already
-    // used the late camera sample. Do not submit that older sample either.
+    // Locate views for this frame
     XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
     vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
     vli.displayTime = g_xrFrameState.predictedDisplayTime;
@@ -793,20 +829,60 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         result.errCode = (int)res;
         snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
             XR_ResultToString(res));
+        // Log only on state change
         if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
             VRMOD_LOG_WARN("%s", result.errMsg);
             s_lastSubmitErrCode = result.errCode;
             s_lastSubmitOk = false;
             s_sameErrCount = 0;
         }
+        // End frame with no layers
         XR_EndFrame();
         return result;
     }
 
-    static int s_poseSrcLog = 0;
-    if ((++s_poseSrcLog % 90) == 0) {
-        VRMOD_LOG_INFO("Submit pose source=submit view0 pos(%.3f,%.3f,%.3f)",
-            g_views[0].pose.position.x, g_views[0].pose.position.y, g_views[0].pose.position.z);
+    // Log the layer view poses (the ones used for the composition layer) so we can see if the runtime
+    // is providing live, varying head motion in the data the compositor uses for head tracking.
+    // Compare to the "HMD pose" log from the game tracking.
+    static int s_layerViewLog = 0;
+    if ((++s_layerViewLog % 30) == 0) {
+        VRMOD_LOG_INFO("Layer view0: pos(%.3f,%.3f,%.3f)  view1: pos(%.3f,%.3f,%.3f)",
+            g_views[0].pose.position.x, g_views[0].pose.position.y, g_views[0].pose.position.z,
+            g_views[1].pose.position.x, g_views[1].pose.position.y, g_views[1].pose.position.z);
+    }
+
+    // Refresh the hmd pose for the game (used by GetPoses / Lua tracking and RenderViews camera)
+    // from the live layer view data. This makes the game's camera follow the head motion
+    // that the runtime provides for the composition layer (with 1 frame lag, which is typical).
+    {
+        // Average eye positions for head pose (center between eyes). This matches the
+        // behavior expected from the old OpenVR HMD pose and fixes left-eye-specific
+        // roll artifacts (roll left causing view to rise) that appeared after the
+        // OpenVR->OpenXR migration (where using eye 0 as "hmd" made the left eye the
+        // roll center).
+        XrVector3f headPos = {
+            (g_views[0].pose.position.x + g_views[1].pose.position.x) * 0.5f,
+            (g_views[0].pose.position.y + g_views[1].pose.position.y) * 0.5f,
+            (g_views[0].pose.position.z + g_views[1].pose.position.z) * 0.5f
+        };
+        XrSpaceLocation tempLoc = {XR_TYPE_SPACE_LOCATION};
+        tempLoc.locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+        tempLoc.pose.position = headPos;
+        tempLoc.pose.orientation = g_views[0].pose.orientation;
+        g_xrHMDPose = ConvertXrPose(tempLoc);
+    }
+
+    // Also refresh eye poses so Lua tracking has the latest headset eye values (for render or other use)
+    if (g_xrEyePosesValid || true) {
+      XrSpaceLocation tloc = {XR_TYPE_SPACE_LOCATION};
+      tloc.locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+      tloc.pose = g_views[0].pose;
+      g_xrEyePoses[0] = ConvertXrPose(tloc);
+      tloc.pose = g_views[1].pose;
+      g_xrEyePoses[1] = ConvertXrPose(tloc);
+      g_xrEyeFovs[0] = g_views[0].fov;
+      g_xrEyeFovs[1] = g_views[1].fov;
+      g_xrEyePosesValid = true;
     }
 
     // Per-eye path. Prefer module staging (collected after previous stereo + MatQueue drain).
@@ -1142,7 +1218,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         XrSwapchainImageReleaseInfo relInfo = {XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
         g_xrReleaseSwapchainImage(g_swapchains[eye], &relInfo);
 
-        // Pose located after the paint so runtime reprojection stays a small fix.
+        // Use the views located at the top of this Submit (with the frame's predictedDisplayTime).
         projViews[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
         projViews[eye].pose = g_views[eye].pose;
         projViews[eye].fov = g_views[eye].fov;
