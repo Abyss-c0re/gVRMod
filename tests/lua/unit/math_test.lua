@@ -2068,6 +2068,19 @@ return function(H, env)
 		H.assert_eq(u.ArcVrDrop_ReserveRounds(again), 13)
 		H.assert_eq(u.ArcVrDrop_CopyState({ ArcticVR = false, LoadedRounds = 5 }), nil)
 		H.assert_eq(u.ArcVrDrop_ReserveRounds(nil), 0)
+		local entMag = u.ArcVrDrop_CopyState({
+			ArcticVR = true,
+			Magazine = { MagID = "ak47_30", Name = "nope" },
+			LoadedRounds = 5,
+			Chambered = 0,
+		})
+		H.assert_eq(entMag.Magazine, "ak47_30")
+		local nameOnly = u.ArcVrDrop_CopyState({
+			ArcticVR = true,
+			Magazine = { Name = "glock_17" },
+			LoadedRounds = 3,
+		})
+		H.assert_eq(nameOnly.Magazine, "glock_17")
 	end)
 
 	-- G51 Submit-first frame budget (no third RenderView / collect on late frames)
