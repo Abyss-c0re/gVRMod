@@ -31,11 +31,27 @@ unset STEAM_RUNTIME_LIBRARY_PATH
 unset PRESSURE_VESSEL_FILESYSTEMS_RW
 export DISPLAY="${DISPLAY:-:0}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# Pin the runtime that belongs to the running service.
+# A distro client cannot complete IPC with a newer wivrn-server.
+if [[ -z "${XR_RUNTIME_JSON:-}" ]]; then
+  server_pid="$(pgrep -xo wivrn-server || true)"
+  if [[ -n "$server_pid" ]]; then
+    server_exe="$(readlink -f "/proc/${server_pid}/exe" || true)"
+    server_root="$(dirname "$(dirname "$server_exe")")"
+    if [[ -r "${server_root}/openxr_wivrn-dev.json" ]]; then
+      export XR_RUNTIME_JSON="${server_root}/openxr_wivrn-dev.json"
+    fi
+  fi
+fi
 if [[ -z "${XR_RUNTIME_JSON:-}" ]]; then
   for c in /usr/share/openxr/1/openxr_wivrn.json /usr/local/share/openxr/1/openxr_wivrn.json \
            /usr/share/openxr/1/openxr_monado.json; do
     if [[ -r "$c" ]]; then export XR_RUNTIME_JSON="$c"; break; fi
   done
+fi
+if [[ -n "${XR_RUNTIME_JSON:-}" && -r "$XR_RUNTIME_JSON" ]]; then
+  mkdir -p "$HOME/.config/openxr/1"
+  ln -sfn "$XR_RUNTIME_JSON" "$HOME/.config/openxr/1/active_runtime.json"
 fi
 
 # If another CubeUI is already up, do nothing
