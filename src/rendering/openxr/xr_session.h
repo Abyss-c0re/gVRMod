@@ -122,13 +122,15 @@ void XR_EndFrame();
 // Clear frame-begun flag after xr_render's layered xrEndFrame (or failed end).
 void XR_MarkFrameEnded();
 
-// Locate stereo views at this frame's predictedDisplayTime, publish HMD + eye
-// poses for Lua, and keep that XrView pair for xrEndFrame.
-// Submit must use this pair. A later xrLocateViews is a newer pose than the
-// pixels, and runtime timewarp then under-corrects head rotation.
-// Failure leaves a previous same-frame latch intact.
+// Locate stereo views at this frame's predictedDisplayTime and publish the
+// HMD pose Lua paints with. Call again immediately before the eye renders.
+// Do not pass this XrView to xrEndFrame. WiVRn reprojects the layer pose
+// forward to display; a pose sampled before both RenderViews is a large
+// correction, and Source has no depth layer, so the turn flashes.
+// The composition layer locates again at submit. Failure leaves the previous
+// same-frame camera latch intact.
 bool XR_LatchRenderViews();
-// True only when the latch belongs to the current predictedDisplayTime.
+// Copies the camera latch. Not the pose xrEndFrame should submit.
 bool XR_CopyLatchedViews(XrView outViews[2]);
 void XR_ClearRenderViewLatch();
 

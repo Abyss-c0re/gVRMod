@@ -161,26 +161,23 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int /*stolenTexture*/, const floa
         return result;
     }
 
-    // Layer pose matches the painted cameras. Relocate only if the latch is missing.
-    XrResult res = XR_SUCCESS;
-    if (!XR_CopyLatchedViews(g_views)) {
-        XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
-        vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-        vli.displayTime = g_xrFrameState.predictedDisplayTime;
-        vli.space = g_xrStageSpace;
+    // Post-paint locate for the layer only. The pre-render latch is the camera.
+    XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
+    vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    vli.displayTime = g_xrFrameState.predictedDisplayTime;
+    vli.space = g_xrStageSpace;
 
-        XrViewState viewState = {XR_TYPE_VIEW_STATE};
-        uint32_t viewCount = 0;
-        g_views[0] = {XR_TYPE_VIEW};
-        g_views[1] = {XR_TYPE_VIEW};
-        res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
-        if (res != XR_SUCCESS || viewCount < 2) {
-            result.errCode = (int)res;
-            snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
-                     XR_ResultToString(res));
-            XR_EndFrame();
-            return result;
-        }
+    XrViewState viewState = {XR_TYPE_VIEW_STATE};
+    uint32_t viewCount = 0;
+    g_views[0] = {XR_TYPE_VIEW};
+    g_views[1] = {XR_TYPE_VIEW};
+    XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
+    if (res != XR_SUCCESS || viewCount < 2) {
+        result.errCode = (int)res;
+        snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
+                 XR_ResultToString(res));
+        XR_EndFrame();
+        return result;
     }
 
     D3D11_TEXTURE2D_DESC srcDesc{};

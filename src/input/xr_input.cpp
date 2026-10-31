@@ -145,7 +145,7 @@ PoseResult ConvertXrPose(const XrSpaceLocation& loc) {
 }
 
 PoseResult GetHMDPose() {
-    // Last paint pose (XR_LatchRenderViews). Submit does not locate a newer one.
+    // Last camera sample (XR_LatchRenderViews). The layer locates again at submit.
     PoseResult r = g_xrHMDPose;
 
     // Diagnostic logging for head tracking (throttled).

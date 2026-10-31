@@ -447,6 +447,9 @@ LUA_FUNCTION(LatchRenderViews) {
 }
 
 LUA_FUNCTION(GetPoses) {
+    // true = head and eyes only. The late camera refresh must not xrLocateSpace
+    // every hand again; that delays the paint and ages the pose just sampled.
+    const bool headOnly = (LUA->Top() >= 1) && LUA->GetBool(1);
     LUA->ReferencePush(g_luaRefs[LuaRefIndex_PoseTable]);
 
     // HMD pose
@@ -522,7 +525,8 @@ LUA_FUNCTION(GetPoses) {
       }
     }
 
-    // Action poses
+    // Action poses (skipped on the late head refresh).
+    if (!headOnly) {
     for (int i = 0; i < g_actionCount; i++) {
         if (g_actions[i].type == ActionType_Pose) {
             pr = XR_GetPoseAction(g_actions[i].handle);
@@ -543,6 +547,7 @@ LUA_FUNCTION(GetPoses) {
                 LUA->SetField(-2, g_actions[i].name);
             }
         }
+    }
     }
     return 1;
 }

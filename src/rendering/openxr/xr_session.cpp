@@ -108,6 +108,16 @@ extern PoseResult g_xrEyePoses[2];
 extern bool       g_xrEyePosesValid;
 extern XrFovf     g_xrEyeFovs[2];
 
+static bool PoseFiniteUnit(const XrPosef& pose) {
+    const XrQuaternionf& q = pose.orientation;
+    const XrVector3f& p = pose.position;
+    if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return false;
+    if (!std::isfinite(q.x) || !std::isfinite(q.y) || !std::isfinite(q.z) || !std::isfinite(q.w))
+        return false;
+    const float n = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+    return n > 0.5f && n < 1.5f;
+}
+
 static void PublishLatchedViewsToGame(const XrView views[2]) {
     // Cyclopean head: midpoint, orientation from eye 0 (eyes share roll).
     XrVector3f headPos = {
@@ -148,6 +158,10 @@ bool XR_LatchRenderViews() {
     uint32_t viewCount = 0;
     XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, views);
     if (res != XR_SUCCESS || viewCount < 2) return false;
+    const XrViewStateFlags need =
+        XR_VIEW_STATE_POSITION_VALID_BIT | XR_VIEW_STATE_ORIENTATION_VALID_BIT;
+    if ((viewState.viewStateFlags & need) != need) return false;
+    if (!PoseFiniteUnit(views[0].pose) || !PoseFiniteUnit(views[1].pose)) return false;
 
     views[0].next = nullptr;
     views[1].next = nullptr;

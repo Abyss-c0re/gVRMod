@@ -12,8 +12,9 @@
 #include <vector>
 #include <algorithm>
 
-// Paint pose lives in xr_session (XR_LatchRenderViews). Submit copies that latch.
-// Do not locate a fresher pose here — timewarp would treat the old image as current.
+// Camera pose is latched in xr_session just before the eyes. The layer pose is
+// located here, after the paint. Submitting the pre-render latch makes WiVRn
+// reproject across both RenderViews; without a depth layer that flashes.
 
 // 0=SAFE 1=FULL 2=FOV_CROP — see XR_SetSubmitCropMode. Default SAFE after FOV_CROP disaster.
 static int g_submitCropMode = 0;
@@ -776,40 +777,35 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         return result;
     }
 
-    // Layer pose is the pose Lua painted with (early UpdatePoses, then late
-    // LatchRenderViews). Relocate only if that latch is missing.
-    XrResult res = XR_SUCCESS;
-    const bool poseFromLatch = XR_CopyLatchedViews(g_views);
-    if (!poseFromLatch) {
-        XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
-        vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-        vli.displayTime = g_xrFrameState.predictedDisplayTime;
-        vli.space = g_xrStageSpace;
+    // Post-paint locate. Do not copy this into g_xrHMDPose — the eyes already
+    // used the late camera sample. Do not submit that older sample either.
+    XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
+    vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    vli.displayTime = g_xrFrameState.predictedDisplayTime;
+    vli.space = g_xrStageSpace;
 
-        XrViewState viewState = {XR_TYPE_VIEW_STATE};
-        uint32_t viewCount = 0;
-        g_views[0] = {XR_TYPE_VIEW};
-        g_views[1] = {XR_TYPE_VIEW};
-        res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
-        if (res != XR_SUCCESS || viewCount < 2) {
-            result.errCode = (int)res;
-            snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
-                XR_ResultToString(res));
-            if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
-                VRMOD_LOG_WARN("%s", result.errMsg);
-                s_lastSubmitErrCode = result.errCode;
-                s_lastSubmitOk = false;
-                s_sameErrCount = 0;
-            }
-            XR_EndFrame();
-            return result;
+    XrViewState viewState = {XR_TYPE_VIEW_STATE};
+    uint32_t viewCount = 0;
+    g_views[0] = {XR_TYPE_VIEW};
+    g_views[1] = {XR_TYPE_VIEW};
+    XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
+    if (res != XR_SUCCESS || viewCount < 2) {
+        result.errCode = (int)res;
+        snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
+            XR_ResultToString(res));
+        if (result.errCode != s_lastSubmitErrCode || s_lastSubmitOk) {
+            VRMOD_LOG_WARN("%s", result.errMsg);
+            s_lastSubmitErrCode = result.errCode;
+            s_lastSubmitOk = false;
+            s_sameErrCount = 0;
         }
+        XR_EndFrame();
+        return result;
     }
 
     static int s_poseSrcLog = 0;
     if ((++s_poseSrcLog % 90) == 0) {
-        VRMOD_LOG_INFO("Submit pose source=%s view0 pos(%.3f,%.3f,%.3f)",
-            poseFromLatch ? "latch" : "relocate",
+        VRMOD_LOG_INFO("Submit pose source=submit view0 pos(%.3f,%.3f,%.3f)",
             g_views[0].pose.position.x, g_views[0].pose.position.y, g_views[0].pose.position.z);
     }
 
@@ -1146,7 +1142,7 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         XrSwapchainImageReleaseInfo relInfo = {XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
         g_xrReleaseSwapchainImage(g_swapchains[eye], &relInfo);
 
-        // Same XrView the stereo cameras were painted from (latched predictedDisplayTime).
+        // Pose located after the paint so runtime reprojection stays a small fix.
         projViews[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
         projViews[eye].pose = g_views[eye].pose;
         projViews[eye].fov = g_views[eye].fov;

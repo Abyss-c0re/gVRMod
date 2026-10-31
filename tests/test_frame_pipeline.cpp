@@ -19,10 +19,9 @@ enum class FramePhase {
     Done,
 };
 
-// 0 = layer uses the painted XrView. 1 = relocate fallback (timewarp under-corrects).
-static int SubmitPoseSource(bool latched, bool timeMatch) {
-    if (latched && timeMatch) return 0;
-    return 1;
+// 0 = layer locates after the paint (small reprojection). 1 = pre-render pose on the layer (flashes).
+static int LayerPoseSource(bool usePaintPose) {
+    return usePaintPose ? 1 : 0;
 }
 
 struct FramePipeline {
@@ -33,7 +32,7 @@ struct FramePipeline {
     bool didLateLatch = false;
     bool didCollect = false;
     bool didSubmit = false;
-    bool submitUsedLatch = false;
+    bool submitUsedPaintPose = false;
     bool preferCollected = false;
 
     // Advance one full VR frame using the stable contract.
@@ -42,8 +41,8 @@ struct FramePipeline {
         // WaitFrame+Begin implied
 
         if (shouldRender) {
-            // Gameplay may run after the early locate. Re-latch immediately
-            // before the eyes so the cameras match the pose Submit will use.
+            // Gameplay may run after the early locate. Refresh the camera
+            // immediately before the eyes. Submit locates again after them.
             phase = FramePhase::LateLatch;
             didLateLatch = true;
 
@@ -63,7 +62,7 @@ struct FramePipeline {
 
         phase = FramePhase::Submit;
         didSubmit = true;
-        submitUsedLatch = didLateLatch && SubmitPoseSource(didLateLatch, true) == 0;
+        submitUsedPaintPose = LayerPoseSource(false) != 0;
         phase = FramePhase::Done;
         return true;
     }
@@ -89,16 +88,14 @@ TEST(FramePipeline_StableOrder_RenderBeforeSubmit) {
     ASSERT_TRUE(p.didRender);
     ASSERT_TRUE(p.didSubmit);
     ASSERT_TRUE(p.didLateLatch);
-    ASSERT_TRUE(p.submitUsedLatch);
+    ASSERT_FALSE(p.submitUsedPaintPose);
     ASSERT_TRUE(p.didCollect); // mode 1 may collect
     ASSERT_EQ((int)p.phase, (int)FramePhase::Done);
 }
 
-TEST(HeadLatch_SubmitUsesPaintPose) {
-    ASSERT_EQ(SubmitPoseSource(true, true), 0);
-    ASSERT_EQ(SubmitPoseSource(true, false), 1);
-    ASSERT_EQ(SubmitPoseSource(false, true), 1);
-    ASSERT_EQ(SubmitPoseSource(false, false), 1);
+TEST(HeadLatch_SubmitLocatesAfterPaint) {
+    ASSERT_EQ(LayerPoseSource(false), 0);
+    ASSERT_EQ(LayerPoseSource(true), 1);
 }
 
 TEST(FramePipeline_Mode2_SkipsCollect) {
