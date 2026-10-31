@@ -122,6 +122,16 @@ void XR_EndFrame();
 // Clear frame-begun flag after xr_render's layered xrEndFrame (or failed end).
 void XR_MarkFrameEnded();
 
+// Locate stereo views at this frame's predictedDisplayTime, publish HMD + eye
+// poses for Lua, and keep that XrView pair for xrEndFrame.
+// Submit must use this pair. A later xrLocateViews is a newer pose than the
+// pixels, and runtime timewarp then under-corrects head rotation.
+// Failure leaves a previous same-frame latch intact.
+bool XR_LatchRenderViews();
+// True only when the latch belongs to the current predictedDisplayTime.
+bool XR_CopyLatchedViews(XrView outViews[2]);
+void XR_ClearRenderViewLatch();
+
 // ── Environment blend / passthrough (home map AR) ──
 // mode: 0=OPAQUE 1=ALPHA_BLEND 2=ADDITIVE 3=AUTO (prefer alpha if runtime supports)
 // Returns the mode actually selected (may fall back to OPAQUE).

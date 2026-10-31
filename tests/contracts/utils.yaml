@@ -1135,6 +1135,38 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.HeadLatch_AllowHmdSmoothing
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
+  - id: vrmod.utils.HeadLatch_AllowSubmitRelocate
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
+  - id: vrmod.utils.HeadLatch_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
+  - id: vrmod.utils.HeadLatch_HmdExpect
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
+  - id: vrmod.utils.HeadLatch_IsLagRisk
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
+  - id: vrmod.utils.HeadLatch_PipelineSteps
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
+  - id: vrmod.utils.HeadLatch_PoseSource
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
+  - id: vrmod.utils.HeadLatch_StatusLabel
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_head_latch_law.lua
+    tier: pure
+    tests: [util.head_latch_law.paint_pose_g53]
   - id: vrmod.utils.HitFilter
     file: addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua
     tier: seam

@@ -99,8 +99,8 @@ bool XR_GetSkeletalSummaryData(VRActionHandle action, int eSummaryType,
 // ── Update poses (HMD + action spaces) ──
 void XR_UpdatePoses();
 
-// Refresh HMD pose cache by locating views at current predicted time (call from Update path).
-// Implementation is in xr_render to keep all OpenXR/GLX includes localized.
+// Locate views at the frame's predicted time and store the paint latch.
+// Implementation: XR_LatchRenderViews in xr_session.cpp.
 void XR_RefreshHMDPose();
 
 // HMD pose result (updated by XR_UpdatePoses)

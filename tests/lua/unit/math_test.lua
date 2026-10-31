@@ -2096,4 +2096,48 @@ return function(H, env)
 		H.assert_eq(u.FrameBudget_StatusLabel(late), "BUDGET · LATE SKIP DESKTOP")
 		H.assert_eq(u.FrameBudget_HmdExpect(late).verdict, "expect_skip_desktop")
 	end)
+
+	-- G53 head latch: paint pose and OpenXR layer pose are the same sample
+	H.TEST("util.head_latch_law.paint_pose_g53", function()
+		local u = env.vrmod.utils
+		H.assert_true(not u.HeadLatch_AllowHmdSmoothing())
+		H.assert_true(not u.HeadLatch_AllowSubmitRelocate())
+		local steps = u.HeadLatch_PipelineSteps()
+		H.assert_eq(steps[1], "wait_begin")
+		H.assert_eq(steps[4], "late_latch")
+		H.assert_eq(steps[6], "submit_latched_pose")
+		H.assert_eq(u.HeadLatch_PoseSource(true, true), "latch")
+		H.assert_eq(u.HeadLatch_PoseSource(true, false), "relocate")
+		H.assert_eq(u.HeadLatch_PoseSource(false, true), "relocate")
+		local late = u.HeadLatch_Decide({
+			vr_active = true,
+			latched = true,
+			time_match = true,
+			late_latch = true,
+			hmd_smoothed = false,
+		})
+		H.assert_true(late.path_ok)
+		H.assert_eq(late.pose_source, "latch")
+		H.assert_eq(late.reason, "late_latch_matches_submit")
+		H.assert_true(not u.HeadLatch_IsLagRisk(late))
+		H.assert_eq(u.HeadLatch_StatusLabel(late), "HEAD · LATE LATCH")
+		local he = u.HeadLatch_HmdExpect(late)
+		H.assert_eq(he.verdict, "expect_late_latch")
+		H.assert_true(string.find(he.checklist, "G53", 1, true))
+		local early = u.HeadLatch_Decide({ latched = true, late_latch = false })
+		H.assert_true(early.path_ok)
+		H.assert_eq(u.HeadLatch_StatusLabel(early), "HEAD · LATCHED")
+		local reloc = u.HeadLatch_Decide({ latched = false, time_match = false })
+		H.assert_true(not reloc.path_ok)
+		H.assert_eq(reloc.risk, "relocate")
+		H.assert_true(u.HeadLatch_IsLagRisk(reloc))
+		H.assert_eq(u.HeadLatch_StatusLabel(reloc), "HEAD · RELOCATE LAG")
+		H.assert_eq(u.HeadLatch_HmdExpect(reloc).verdict, "expect_lag")
+		local smooth = u.HeadLatch_Decide({ latched = true, hmd_smoothed = true })
+		H.assert_eq(smooth.risk, "hmd_smooth")
+		H.assert_eq(u.HeadLatch_StatusLabel(smooth), "HEAD · SMOOTHED")
+		local idle = u.HeadLatch_Decide({ vr_active = false, latched = false })
+		H.assert_eq(u.HeadLatch_StatusLabel(idle), "HEAD · IDLE")
+		H.assert_true(idle.path_ok)
+	end)
 end

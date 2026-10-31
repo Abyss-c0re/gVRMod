@@ -98,6 +98,88 @@ static bool      g_xrSubmitEnabled = true;
 // True after successful xrBeginFrame until xrEndFrame (orphan-begin safety).
 static bool      g_xrFrameBegun = false;
 
+// Pose the stereo images were painted for. Same predictedDisplayTime as the frame.
+static XrView    g_latchedViews[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+static XrTime    g_latchTime = 0;
+static bool      g_latchValid = false;
+
+// Defined in lua_interface.cpp. Latch publishes them before GetPoses / RenderView.
+extern PoseResult g_xrEyePoses[2];
+extern bool       g_xrEyePosesValid;
+extern XrFovf     g_xrEyeFovs[2];
+
+static void PublishLatchedViewsToGame(const XrView views[2]) {
+    // Cyclopean head: midpoint, orientation from eye 0 (eyes share roll).
+    XrVector3f headPos = {
+        (views[0].pose.position.x + views[1].pose.position.x) * 0.5f,
+        (views[0].pose.position.y + views[1].pose.position.y) * 0.5f,
+        (views[0].pose.position.z + views[1].pose.position.z) * 0.5f
+    };
+    XrSpaceLocation headLoc = {XR_TYPE_SPACE_LOCATION};
+    headLoc.locationFlags =
+        XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+    headLoc.pose.position = headPos;
+    headLoc.pose.orientation = views[0].pose.orientation;
+    g_xrHMDPose = ConvertXrPose(headLoc);
+
+    XrSpaceLocation eyeLoc = {XR_TYPE_SPACE_LOCATION};
+    eyeLoc.locationFlags = headLoc.locationFlags;
+    eyeLoc.pose = views[0].pose;
+    g_xrEyePoses[0] = ConvertXrPose(eyeLoc);
+    eyeLoc.pose = views[1].pose;
+    g_xrEyePoses[1] = ConvertXrPose(eyeLoc);
+    g_xrEyeFovs[0] = views[0].fov;
+    g_xrEyeFovs[1] = views[1].fov;
+    g_xrEyePosesValid = true;
+}
+
+bool XR_LatchRenderViews() {
+    if (!g_xrSession || !g_xrSessionRunning || !g_xrLocateViews) return false;
+    if (g_xrStageSpace == XR_NULL_HANDLE) return false;
+    if (g_xrFrameState.predictedDisplayTime == 0) return false;
+
+    XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
+    vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    vli.displayTime = g_xrFrameState.predictedDisplayTime;
+    vli.space = g_xrStageSpace;
+
+    XrViewState viewState = {XR_TYPE_VIEW_STATE};
+    XrView views[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+    uint32_t viewCount = 0;
+    XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, views);
+    if (res != XR_SUCCESS || viewCount < 2) return false;
+
+    views[0].next = nullptr;
+    views[1].next = nullptr;
+    g_latchedViews[0] = views[0];
+    g_latchedViews[1] = views[1];
+    g_latchTime = g_xrFrameState.predictedDisplayTime;
+    g_latchValid = true;
+    PublishLatchedViewsToGame(views);
+    return true;
+}
+
+bool XR_CopyLatchedViews(XrView outViews[2]) {
+    if (!outViews || !g_latchValid) return false;
+    if (g_latchTime != g_xrFrameState.predictedDisplayTime) return false;
+    outViews[0] = g_latchedViews[0];
+    outViews[1] = g_latchedViews[1];
+    outViews[0].type = XR_TYPE_VIEW;
+    outViews[1].type = XR_TYPE_VIEW;
+    outViews[0].next = nullptr;
+    outViews[1].next = nullptr;
+    return true;
+}
+
+void XR_ClearRenderViewLatch() {
+    g_latchValid = false;
+    g_latchTime = 0;
+}
+
+void XR_RefreshHMDPose() {
+    XR_LatchRenderViews();
+}
+
 // Environment blend (passthrough / AR home map). Enumerated after GetSystem.
 static bool g_hasAlphaBlend = false;
 static bool g_hasAdditive = false;
@@ -1090,6 +1172,9 @@ bool XR_WaitAndBeginFrame() {
         XR_EndFrame();
     }
 
+    // Previous frame's paint pose must not pair with this frame's display time.
+    XR_ClearRenderViewLatch();
+
     XrFrameWaitInfo fwi = {XR_TYPE_FRAME_WAIT_INFO};
     g_xrFrameState = {XR_TYPE_FRAME_STATE};
     XrResult res = g_xrWaitFrame(g_xrSession, &fwi, &g_xrFrameState);
@@ -1116,6 +1201,7 @@ bool XR_ShouldRenderThisFrame() {
 void XR_EndFrame() {
     if (!g_xrSession || !g_xrEndFrame) {
         g_xrFrameBegun = false;
+        XR_ClearRenderViewLatch();
         return;
     }
     // This is a no-render EndFrame (actual submission goes through xr_render.cpp)
@@ -1126,10 +1212,12 @@ void XR_EndFrame() {
     fei.layers = nullptr;
     g_xrEndFrame(g_xrSession, &fei);
     g_xrFrameBegun = false;
+    XR_ClearRenderViewLatch();
 }
 
 void XR_MarkFrameEnded() {
     g_xrFrameBegun = false;
+    XR_ClearRenderViewLatch();
 }
 
 // Build a projection matrix from OpenXR fov angles

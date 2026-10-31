@@ -133,7 +133,7 @@ TEST(ModuleRegistration_AllFunctionsPresent) {
     const char* expectedFunctions[] = {
         "GetVersion", "GetBackend", "IsHMDPresent", "Init",
         "SetActionManifest", "SetActiveActionSets", "GetDisplayInfo",
-        "UpdatePosesAndActions", "GetPoses", "GetActions",
+        "UpdatePosesAndActions", "LatchRenderViews", "GetPoses", "GetActions",
         "ShareTextureBegin", "ShareTextureFinish",
         "SetSubmitTextureBounds", "SetSubmitEnabled",
         "SetSubmitCropMode", "GetSubmitCropMode",

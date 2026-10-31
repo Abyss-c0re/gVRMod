@@ -12,19 +12,28 @@
 enum class FramePhase {
     Idle = 0,
     Poses,
+    LateLatch,
     RenderEyes,
     CollectOptional,
     Submit,
     Done,
 };
 
+// 0 = layer uses the painted XrView. 1 = relocate fallback (timewarp under-corrects).
+static int SubmitPoseSource(bool latched, bool timeMatch) {
+    if (latched && timeMatch) return 0;
+    return 1;
+}
+
 struct FramePipeline {
     FramePhase phase = FramePhase::Idle;
     bool shouldRender = true;
     int matQueueMode = 1;
     bool didRender = false;
+    bool didLateLatch = false;
     bool didCollect = false;
     bool didSubmit = false;
+    bool submitUsedLatch = false;
     bool preferCollected = false;
 
     // Advance one full VR frame using the stable contract.
@@ -33,6 +42,11 @@ struct FramePipeline {
         // WaitFrame+Begin implied
 
         if (shouldRender) {
+            // Gameplay may run after the early locate. Re-latch immediately
+            // before the eyes so the cameras match the pose Submit will use.
+            phase = FramePhase::LateLatch;
+            didLateLatch = true;
+
             phase = FramePhase::RenderEyes;
             didRender = true;
 
@@ -49,6 +63,7 @@ struct FramePipeline {
 
         phase = FramePhase::Submit;
         didSubmit = true;
+        submitUsedLatch = didLateLatch && SubmitPoseSource(didLateLatch, true) == 0;
         phase = FramePhase::Done;
         return true;
     }
@@ -73,8 +88,17 @@ TEST(FramePipeline_StableOrder_RenderBeforeSubmit) {
     ASSERT_TRUE(p.RunStableFrame());
     ASSERT_TRUE(p.didRender);
     ASSERT_TRUE(p.didSubmit);
+    ASSERT_TRUE(p.didLateLatch);
+    ASSERT_TRUE(p.submitUsedLatch);
     ASSERT_TRUE(p.didCollect); // mode 1 may collect
     ASSERT_EQ((int)p.phase, (int)FramePhase::Done);
+}
+
+TEST(HeadLatch_SubmitUsesPaintPose) {
+    ASSERT_EQ(SubmitPoseSource(true, true), 0);
+    ASSERT_EQ(SubmitPoseSource(true, false), 1);
+    ASSERT_EQ(SubmitPoseSource(false, true), 1);
+    ASSERT_EQ(SubmitPoseSource(false, false), 1);
 }
 
 TEST(FramePipeline_Mode2_SkipsCollect) {
@@ -243,7 +267,7 @@ TEST(ModuleRegistration_PipelineExportsPresent) {
     const char* expected[] = {
         "GetVersion", "GetBackend", "IsHMDPresent", "Init",
         "SetActionManifest", "SetActiveActionSets", "GetDisplayInfo",
-        "UpdatePosesAndActions", "GetPoses", "GetActions",
+        "UpdatePosesAndActions", "LatchRenderViews", "GetPoses", "GetActions",
         "ShareTextureBegin", "ShareTextureFinish",
         "SetSubmitTextureBounds", "SetSubmitEnabled",
         "SetSubmitCropMode", "GetSubmitCropMode",
@@ -255,15 +279,17 @@ TEST(ModuleRegistration_PipelineExportsPresent) {
     // Presence check only — names we register in GMOD_MODULE_OPEN
     int n = (int)(sizeof(expected) / sizeof(expected[0]));
     ASSERT_TRUE(n >= 20);
-    bool hasCollect = false, hasShould = false, hasKnown = false;
+    bool hasCollect = false, hasShould = false, hasKnown = false, hasLatch = false;
     for (int i = 0; i < n; i++) {
         if (std::strcmp(expected[i], "CollectEyes") == 0) hasCollect = true;
         if (std::strcmp(expected[i], "ShouldRender") == 0) hasShould = true;
         if (std::strcmp(expected[i], "SetKnownSubmitSize") == 0) hasKnown = true;
+        if (std::strcmp(expected[i], "LatchRenderViews") == 0) hasLatch = true;
     }
     ASSERT_TRUE(hasCollect);
     ASSERT_TRUE(hasShould);
     ASSERT_TRUE(hasKnown);
+    ASSERT_TRUE(hasLatch);
 }
 
 // ── Double-buffer slot swap (collect write → submit read) ──

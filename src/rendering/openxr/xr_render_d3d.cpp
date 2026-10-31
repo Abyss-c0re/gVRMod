@@ -26,12 +26,6 @@
 #include <cmath>
 #include <algorithm>
 
-extern PoseResult g_xrHMDPose;
-extern PoseResult ConvertXrPose(const XrSpaceLocation& loc);
-extern PoseResult g_xrEyePoses[2];
-extern bool g_xrEyePosesValid;
-extern XrFovf g_xrEyeFovs[2];
-
 // ── Swapchain state (D3D11) ──
 static XrSwapchain g_swapchains[2] = {XR_NULL_HANDLE, XR_NULL_HANDLE};
 static XrSwapchainImageD3D11KHR* g_swapchainImages[2] = {nullptr, nullptr};
@@ -167,48 +161,26 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int /*stolenTexture*/, const floa
         return result;
     }
 
-    // Locate views
-    XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
-    vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-    vli.displayTime = g_xrFrameState.predictedDisplayTime;
-    vli.space = g_xrStageSpace;
+    // Layer pose matches the painted cameras. Relocate only if the latch is missing.
+    XrResult res = XR_SUCCESS;
+    if (!XR_CopyLatchedViews(g_views)) {
+        XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
+        vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+        vli.displayTime = g_xrFrameState.predictedDisplayTime;
+        vli.space = g_xrStageSpace;
 
-    XrViewState viewState = {XR_TYPE_VIEW_STATE};
-    uint32_t viewCount = 0;
-    g_views[0] = {XR_TYPE_VIEW};
-    g_views[1] = {XR_TYPE_VIEW};
-    XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
-    if (res != XR_SUCCESS || viewCount < 2) {
-        result.errCode = (int)res;
-        snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
-                 XR_ResultToString(res));
-        XR_EndFrame();
-        return result;
-    }
-
-    // Refresh HMD / eye poses for Lua tracking
-    {
-        XrVector3f headPos = {
-            (g_views[0].pose.position.x + g_views[1].pose.position.x) * 0.5f,
-            (g_views[0].pose.position.y + g_views[1].pose.position.y) * 0.5f,
-            (g_views[0].pose.position.z + g_views[1].pose.position.z) * 0.5f
-        };
-        XrSpaceLocation tempLoc = {XR_TYPE_SPACE_LOCATION};
-        tempLoc.locationFlags =
-            XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-        tempLoc.pose.position = headPos;
-        tempLoc.pose.orientation = g_views[0].pose.orientation;
-        g_xrHMDPose = ConvertXrPose(tempLoc);
-
-        XrSpaceLocation tloc = {XR_TYPE_SPACE_LOCATION};
-        tloc.locationFlags = tempLoc.locationFlags;
-        tloc.pose = g_views[0].pose;
-        g_xrEyePoses[0] = ConvertXrPose(tloc);
-        tloc.pose = g_views[1].pose;
-        g_xrEyePoses[1] = ConvertXrPose(tloc);
-        g_xrEyeFovs[0] = g_views[0].fov;
-        g_xrEyeFovs[1] = g_views[1].fov;
-        g_xrEyePosesValid = true;
+        XrViewState viewState = {XR_TYPE_VIEW_STATE};
+        uint32_t viewCount = 0;
+        g_views[0] = {XR_TYPE_VIEW};
+        g_views[1] = {XR_TYPE_VIEW};
+        res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
+        if (res != XR_SUCCESS || viewCount < 2) {
+            result.errCode = (int)res;
+            snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
+                     XR_ResultToString(res));
+            XR_EndFrame();
+            return result;
+        }
     }
 
     D3D11_TEXTURE2D_DESC srcDesc{};
@@ -368,34 +340,6 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int /*stolenTexture*/, const floa
 
     result.ok = true;
     return result;
-}
-
-// HMD pose refresh (shared with input) — D3D build.
-void XR_RefreshHMDPose() {
-    if (!g_xrSession || !g_xrSessionRunning) return;
-
-    XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
-    vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-    vli.displayTime = g_xrFrameState.predictedDisplayTime;
-    vli.space = g_xrStageSpace;
-
-    XrViewState viewState = {XR_TYPE_VIEW_STATE};
-    XrView tmpViews[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
-    uint32_t viewCount = 0;
-    XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, tmpViews);
-    if (res == XR_SUCCESS && viewCount >= 2) {
-        XrVector3f headPos = {
-            (tmpViews[0].pose.position.x + tmpViews[1].pose.position.x) * 0.5f,
-            (tmpViews[0].pose.position.y + tmpViews[1].pose.position.y) * 0.5f,
-            (tmpViews[0].pose.position.z + tmpViews[1].pose.position.z) * 0.5f
-        };
-        XrSpaceLocation tempLoc = {XR_TYPE_SPACE_LOCATION};
-        tempLoc.locationFlags =
-            XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-        tempLoc.pose.position = headPos;
-        tempLoc.pose.orientation = tmpViews[0].pose.orientation;
-        g_xrHMDPose = ConvertXrPose(tempLoc);
-    }
 }
 
 #endif // _WIN32
