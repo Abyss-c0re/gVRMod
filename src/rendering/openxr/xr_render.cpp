@@ -31,6 +31,26 @@ void XR_SetSubmitCropMode(int mode) {
 }
 int XR_GetSubmitCropMode() { return g_submitCropMode; }
 
+// Source paints a centered symmetric frustum whose half-tangent is the mean
+// of the OpenXR eye tangents. The layer must claim that field, not the raw
+// asymmetric XrFovf, or WiVRn warps the turn and the world shakes.
+static XrFovf SymmetricPaintFov(const XrFovf& xr) {
+    const float tanL = tanf(xr.angleLeft);
+    const float tanR = tanf(xr.angleRight);
+    const float tanU = tanf(xr.angleUp);
+    const float tanD = tanf(xr.angleDown);
+    float hx = 0.5f * (tanR - tanL);
+    float hy = 0.5f * (tanU - tanD);
+    if (hx < 1e-4f) hx = 1e-4f;
+    if (hy < 1e-4f) hy = 1e-4f;
+    XrFovf out;
+    out.angleLeft = -atanf(hx);
+    out.angleRight = atanf(hx);
+    out.angleUp = atanf(hy);
+    out.angleDown = -atanf(hy);
+    return out;
+}
+
 // Map asymmetric OpenXR FOV → UV inside symmetric overrender (single-eye RT).
 // Opt-in only (mode FOV_CROP). Wrong use looks like swapped/crossed eyes.
 static void AsymmetricFovToUvCrop(const XrFovf& fov, float* u0, float* u1, float* v0, float* v1) {
@@ -1283,10 +1303,11 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         g_xrReleaseSwapchainImage(g_swapchains[eye], &relInfo);
         g_heldSubmitImage[eye] = false;
 
-        // Use the views located at the top of this Submit (with the frame's predictedDisplayTime).
+        // Pose stays the submit locate. FOV is the centered field Source painted.
+        // Claiming the raw asymmetric eye here warps a headset turn.
         projViews[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
         projViews[eye].pose = g_views[eye].pose;
-        projViews[eye].fov = g_views[eye].fov;
+        projViews[eye].fov = SymmetricPaintFov(g_views[eye].fov);
         projViews[eye].subImage.swapchain = g_swapchains[eye];
         projViews[eye].subImage.imageRect.offset = {0, 0};
         projViews[eye].subImage.imageRect.extent = { (int32_t)g_xrSwapchainWidth, (int32_t)g_xrSwapchainHeight };

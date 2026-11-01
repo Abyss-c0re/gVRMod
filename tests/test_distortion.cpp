@@ -651,6 +651,26 @@ static OverrenderResult ComputeOverrender(float angleLeft, float angleRight,
     return r;
 }
 
+static void SymmetricPaintFov(float angleLeft, float angleRight, float angleUp, float angleDown,
+                              float* outL, float* outR, float* outU, float* outD) {
+    float hx = 0.5f * (tanf(angleRight) - tanf(angleLeft));
+    float hy = 0.5f * (tanf(angleUp) - tanf(angleDown));
+    *outL = -atanf(hx);
+    *outR = atanf(hx);
+    *outU = atanf(hy);
+    *outD = -atanf(hy);
+}
+
+TEST(PaintFov_AsymmetricEye_BecomesCentered) {
+    // angleLeft -0.9, angleRight 0.8: center of the raw frustum is not 0.
+    float oL, oR, oU, oD;
+    SymmetricPaintFov(-0.9f, 0.8f, 0.9f, -1.0f, &oL, &oR, &oU, &oD);
+    ASSERT_NEAR(oL, -oR, 1e-5f);
+    ASSERT_NEAR(oU, -oD, 1e-5f);
+    ASSERT_TRUE(oR < 0.9f);
+    ASSERT_TRUE(oR > 0.7f);
+}
+
 TEST(Overrender_SymmetricFOV_ProducesFullRect) {
     // Symmetric FOV: left=-45deg, right=+45deg, up=+45deg, down=-45deg
     float a = 45.0f * 3.14159265f / 180.0f;
