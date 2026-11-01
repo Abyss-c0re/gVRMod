@@ -529,6 +529,15 @@ PURE_TESTED = {
     "vrmod.utils.EyeFrame_ComposeAng": "util.eye_frame.compose",
     "vrmod.utils.EyeFrame_FillWorld": "util.eye_frame.fill_world",
     "vrmod.utils.FlashlightAim_Decide": "util.flashlight_aim.decide",
+    # Gaze look target: entity plus the exact hit point (offline trace stub)
+    "vrmod.utils.LookTarget_DefaultRange": "util.look_target.range",
+    "vrmod.utils.LookTarget_ClampRange": "util.look_target.range",
+    "vrmod.utils.LookTarget_Boost": "util.look_target.range",
+    "vrmod.utils.LookTarget_MaxDistance": "util.look_target.range",
+    "vrmod.utils.LookTarget_Within": "util.look_target.range",
+    "vrmod.utils.LookTarget_Distance": "util.look_target.range",
+    "vrmod.utils.LookTarget_Select": "util.look_target.select",
+    "vrmod.utils.LookTarget_Query": "util.look_target.query",
 }
 
 # Engine / model / filesystem heavy — never auto-promote to pure-pending.

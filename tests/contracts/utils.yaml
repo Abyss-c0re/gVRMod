@@ -1479,6 +1479,38 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.fingers.curl_lerp_unit]
+  - id: vrmod.utils.LookTarget_Boost
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_ClampRange
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_DefaultRange
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_Distance
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_MaxDistance
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_Query
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.query]
+  - id: vrmod.utils.LookTarget_Select
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.select]
+  - id: vrmod.utils.LookTarget_Within
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.range]
   - id: vrmod.utils.MatQueueLaw_AllowDualEye
     file: addon/vrmod-x64/lua/vrmod/utils/sh_mat_queue_law.lua
     tier: pure
