@@ -1449,6 +1449,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
+      "vrmod.utils.LookTarget_EyeLead",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
       "vrmod.utils.LookTarget_HandCloserThanHmd",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
@@ -1458,6 +1462,10 @@
     ],
     [
       "vrmod.utils.LookTarget_Query",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.LookTarget_QueryPose",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [

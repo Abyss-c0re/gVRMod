@@ -140,6 +140,7 @@ return function(H, env)
 		local prop = { id = "crate" }
 		util.TraceLine = function(tr)
 			H.assert_near(tr.start.z, 64, 1e-4)
+			H.assert_near(tr.start.x, u.LookTarget_EyeLead(), 1e-3)
 			H.assert_near(tr.endpos.x, 80, 1e-3)
 			return {
 				Hit = true,
@@ -286,31 +287,46 @@ return function(H, env)
 		})
 		H.assert_eq(c.source, "eye")
 
-		-- Hand reached the looked-at prop (closer than the head) but it is not
-		-- inside the close radius. The hand result wins; gaze steps back.
-		local reached = { id = "reached" }
+		-- Controllers in front of the head are closer than the HMD to a prop
+		-- you are looking at, and still outside the close radius. Gaze holds.
 		c = choose({
 			eye_enabled = true,
-			hand_ent = reached,
-			hand_dist = 24,
+			hand_ent = { id = "far-hand" },
+			hand_dist = 40,
 			eye_ent = looked,
-			hand_to_eye = 24,
-			hmd_to_eye = 60,
+			hand_to_eye = 60,
+			hmd_to_eye = 90,
 		})
-		H.assert_eq(c.source, "hand")
-		H.assert_eq(c.reason, "hand_closer")
-		H.assert_true(c.ent == reached)
+		H.assert_eq(c.source, "eye")
+		H.assert_eq(c.reason, "eye")
+		H.assert_true(c.ent == looked)
 
-		-- Hand is closer than the head and the hand search found nothing.
+		-- Hand is on the looked-at prop but the hand search missed it.
+		-- Still return that prop so the halo and the grip exist.
 		c = choose({
 			eye_enabled = true,
 			eye_ent = looked,
 			hand_to_eye = 15,
 			hmd_to_eye = 50,
 		})
-		H.assert_eq(c.source, "none")
-		H.assert_eq(c.reason, "hand_closer")
-		H.assert_true(c.ent == nil)
+		H.assert_eq(c.source, "eye")
+		H.assert_eq(c.reason, "eye_reached")
+		H.assert_true(c.ent == looked)
+
+		-- Hand search found a different prop that is outside the close radius.
+		-- The looked-at prop wins.
+		local other = { id = "other" }
+		c = choose({
+			eye_enabled = true,
+			hand_ent = other,
+			hand_dist = 24,
+			eye_ent = looked,
+			hand_to_eye = 24,
+			hmd_to_eye = 60,
+		})
+		H.assert_eq(c.source, "eye")
+		H.assert_eq(c.reason, "eye")
+		H.assert_true(c.ent == looked)
 
 		-- Feature off: the existing hand target, including a far one.
 		local far = { id = "far" }
