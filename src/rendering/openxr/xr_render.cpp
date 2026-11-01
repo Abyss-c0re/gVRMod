@@ -34,6 +34,23 @@ int XR_GetSubmitCropMode() { return g_submitCropMode; }
 // Source paints a centered symmetric frustum whose half-tangent is the mean
 // of the OpenXR eye tangents. The layer must claim that field, not the raw
 // asymmetric XrFovf, or WiVRn warps the turn and the world shakes.
+static XrView g_paintViews[2] = {{XR_TYPE_VIEW}, {XR_TYPE_VIEW}};
+static bool g_paintViewsValid = false;
+
+void XR_StorePaintViews(const XrView views[2]) {
+    if (!views) {
+        g_paintViewsValid = false;
+        return;
+    }
+    g_paintViews[0] = views[0];
+    g_paintViews[1] = views[1];
+    g_paintViews[0].type = XR_TYPE_VIEW;
+    g_paintViews[1].type = XR_TYPE_VIEW;
+    g_paintViews[0].next = nullptr;
+    g_paintViews[1].next = nullptr;
+    g_paintViewsValid = true;
+}
+
 static XrFovf SymmetricPaintFov(const XrFovf& xr) {
     const float tanL = tanf(xr.angleLeft);
     const float tanR = tanf(xr.angleRight);
@@ -887,7 +904,18 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         return result;
     }
 
-    // Locate views for this frame
+    // The cameras were painted from the frame-start locate. A new locate here
+    // is a later head angle, and WiVRn warps the turn. Reuse the paint views.
+    bool usedPaintViews = false;
+    g_views[0] = {XR_TYPE_VIEW};
+    g_views[1] = {XR_TYPE_VIEW};
+    if (g_paintViewsValid) {
+        g_views[0] = g_paintViews[0];
+        g_views[1] = g_paintViews[1];
+        g_paintViewsValid = false;
+        usedPaintViews = true;
+    }
+
     XrViewLocateInfo vli = {XR_TYPE_VIEW_LOCATE_INFO};
     vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
     vli.displayTime = g_xrFrameState.predictedDisplayTime;
@@ -895,10 +923,11 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
 
     XrViewState viewState = {XR_TYPE_VIEW_STATE};
     uint32_t viewCount = 0;
-    g_views[0] = {XR_TYPE_VIEW};
-    g_views[1] = {XR_TYPE_VIEW};
-    XrResult res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
-    if (res != XR_SUCCESS || viewCount < 2) {
+    XrResult res = XR_SUCCESS;
+    if (!usedPaintViews) {
+        res = g_xrLocateViews(g_xrSession, &vli, &viewState, 2, &viewCount, g_views);
+    }
+    if (!usedPaintViews && (res != XR_SUCCESS || viewCount < 2)) {
         result.errCode = (int)res;
         snprintf(result.errMsg, sizeof(result.errMsg), "xrLocateViews failed: %s",
             XR_ResultToString(res));
@@ -924,15 +953,9 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
             g_views[1].pose.position.x, g_views[1].pose.position.y, g_views[1].pose.position.z);
     }
 
-    // Refresh the hmd pose for the game (used by GetPoses / Lua tracking and RenderViews camera)
-    // from the live layer view data. This makes the game's camera follow the head motion
-    // that the runtime provides for the composition layer (with 1 frame lag, which is typical).
-    {
-        // Average eye positions for head pose (center between eyes). This matches the
-        // behavior expected from the old OpenVR HMD pose and fixes left-eye-specific
-        // roll artifacts (roll left causing view to rise) that appeared after the
-        // OpenVR->OpenXR migration (where using eye 0 as "hmd" made the left eye the
-        // roll center).
+    // Do not overwrite the game HMD from this submit. The cameras already
+    // painted from the frame-start pose. A late write is the turn shake.
+    if (!usedPaintViews) {
         XrVector3f headPos = {
             (g_views[0].pose.position.x + g_views[1].pose.position.x) * 0.5f,
             (g_views[0].pose.position.y + g_views[1].pose.position.y) * 0.5f,
@@ -943,20 +966,20 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         tempLoc.pose.position = headPos;
         tempLoc.pose.orientation = g_views[0].pose.orientation;
         g_xrHMDPose = ConvertXrPose(tempLoc);
+
+        XrSpaceLocation tloc = {XR_TYPE_SPACE_LOCATION};
+        tloc.locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+        tloc.pose = g_views[0].pose;
+        g_xrEyePoses[0] = ConvertXrPose(tloc);
+        tloc.pose = g_views[1].pose;
+        g_xrEyePoses[1] = ConvertXrPose(tloc);
+        g_xrEyeFovs[0] = g_views[0].fov;
+        g_xrEyeFovs[1] = g_views[1].fov;
+        g_xrEyePosesValid = true;
     }
 
-    // Also refresh eye poses so Lua tracking has the latest headset eye values (for render or other use)
-    if (g_xrEyePosesValid || true) {
-      XrSpaceLocation tloc = {XR_TYPE_SPACE_LOCATION};
-      tloc.locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-      tloc.pose = g_views[0].pose;
-      g_xrEyePoses[0] = ConvertXrPose(tloc);
-      tloc.pose = g_views[1].pose;
-      g_xrEyePoses[1] = ConvertXrPose(tloc);
-      g_xrEyeFovs[0] = g_views[0].fov;
-      g_xrEyeFovs[1] = g_views[1].fov;
-      g_xrEyePosesValid = true;
-    }
+    // Both eyes were painted with the left/HMD facing, not each eye's own.
+    const XrQuaternionf sharedOri = g_views[0].pose.orientation;
 
     // Per-eye path. Prefer module staging (collected after previous stereo + MatQueue drain).
     // Backend times this submit (WaitFrame already done); staging isolates live engine RTs.
@@ -1303,10 +1326,10 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
         g_xrReleaseSwapchainImage(g_swapchains[eye], &relInfo);
         g_heldSubmitImage[eye] = false;
 
-        // Pose stays the submit locate. FOV is the centered field Source painted.
-        // Claiming the raw asymmetric eye here warps a headset turn.
+        // Same sample the cameras used. Shared facing, centered field.
         projViews[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
         projViews[eye].pose = g_views[eye].pose;
+        projViews[eye].pose.orientation = sharedOri;
         projViews[eye].fov = SymmetricPaintFov(g_views[eye].fov);
         projViews[eye].subImage.swapchain = g_swapchains[eye];
         projViews[eye].subImage.imageRect.offset = {0, 0};

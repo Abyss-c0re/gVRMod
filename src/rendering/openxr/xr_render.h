@@ -53,6 +53,10 @@ int  XR_GetSubmitCropMode();
 // the display time and WiVRn shows the previous texture under the new pose.
 // Does not locate or rewrite the HMD pose.
 bool XR_PrepareSubmitImages();
+
+// Eye views from the locate that feeds the game cameras. The layer uses these
+// so a later locate cannot warp a headset turn.
+void XR_StorePaintViews(const XrView views[2]);
 #endif
 
 // Drop swapchain images acquired by XR_PrepareSubmitImages. Safe if none held.

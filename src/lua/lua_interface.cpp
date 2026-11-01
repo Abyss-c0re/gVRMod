@@ -456,6 +456,9 @@ LUA_FUNCTION(UpdatePosesAndActions) {
         g_xrEyeFovs[0] = ev[0].fov;
         g_xrEyeFovs[1] = ev[1].fov;
         g_xrEyePosesValid = true;
+#ifndef _WIN32
+        XR_StorePaintViews(ev);
+#endif
       }
     }
 
