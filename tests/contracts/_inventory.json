@@ -577,6 +577,70 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua"
     ],
     [
+      "vrmod.utils.EyeFrame_Clear",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_ComposeAng",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_CopyFields",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_FieldsEqual",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_FillWorld",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_LegacyTickMaxBits",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_Magic",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_NetTickMaxBits",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_PackLocal",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_ReadTail",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_ServerAllowed",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_ShouldSend",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_TailBits",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_TailBytes",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_UnpackLocal",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
+      "vrmod.utils.EyeFrame_WriteTail",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
+    ],
+    [
       "vrmod.utils.FalsePerEyeLaw_AllowColorDepthAsDual",
       "addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua"
     ],
@@ -627,6 +691,10 @@
     [
       "vrmod.utils.FingerDigitIndex",
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
+    ],
+    [
+      "vrmod.utils.FlashlightAim_Decide",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua"
     ],
     [
       "vrmod.utils.FlyAwayLaw_ActionSetBase",
@@ -2419,6 +2487,22 @@
       "addon/vrmod-x64/lua/vrmod/ui/cl_onboarding.lua"
     ],
     [
+      "vrmod.EyeFrame_NoteRemote",
+      "addon/vrmod-x64/lua/vrmod/player/sh_eye_tracking.lua"
+    ],
+    [
+      "vrmod.EyeFrame_RelayStrip",
+      "addon/vrmod-x64/lua/vrmod/network/sh_network.lua"
+    ],
+    [
+      "vrmod.EyeTrackingAllowed",
+      "addon/vrmod-x64/lua/vrmod/player/sh_eye_tracking.lua"
+    ],
+    [
+      "vrmod.EyeTrackingEnabled",
+      "addon/vrmod-x64/lua/vrmod/player/sh_eye_tracking.lua"
+    ],
+    [
       "vrmod.FindMainMenuPanel",
       "addon/vrmod-x64/lua/vrmod/ui/cl_vr_mainmenu.lua"
     ],
@@ -2457,6 +2541,30 @@
     [
       "vrmod.GetDefaultRightHandOpenFingerAngles",
       "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
+    ],
+    [
+      "vrmod.GetEyeGaze",
+      "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
+    ],
+    [
+      "vrmod.GetEyeGaze",
+      "addon/vrmod-x64/lua/vrmod/api/sv_api.lua"
+    ],
+    [
+      "vrmod.GetEyeGazeActive",
+      "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
+    ],
+    [
+      "vrmod.GetEyeGazeActive",
+      "addon/vrmod-x64/lua/vrmod/api/sv_api.lua"
+    ],
+    [
+      "vrmod.GetEyeGazeLocal",
+      "addon/vrmod-x64/lua/vrmod/api/cl_api.lua"
+    ],
+    [
+      "vrmod.GetEyeGazeLocal",
+      "addon/vrmod-x64/lua/vrmod/api/sv_api.lua"
     ],
     [
       "vrmod.GetEyePos",

@@ -58,6 +58,8 @@ end
 
 -- Production pure modules
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_math.lua")
+dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua")
+dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_frames.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_experience.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_stage_pack.lua")
@@ -115,6 +117,7 @@ local units = {
 	"unit.math_test",
 	"unit.experience_test",
 	"unit.menu_test",
+	"unit.eye_frame_test",
 }
 
 for _, u in ipairs(units) do

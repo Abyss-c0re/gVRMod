@@ -605,6 +605,70 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_engine_blacklist_law.lua
     tier: pure
     tests: [util.engine_blacklist_law.never_call_g27]
+  - id: vrmod.utils.EyeFrame_Clear
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.fields_and_frame]
+  - id: vrmod.utils.EyeFrame_ComposeAng
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.compose]
+  - id: vrmod.utils.EyeFrame_CopyFields
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.fields_and_frame]
+  - id: vrmod.utils.EyeFrame_FieldsEqual
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.fields_and_frame]
+  - id: vrmod.utils.EyeFrame_FillWorld
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.fill_world]
+  - id: vrmod.utils.EyeFrame_LegacyTickMaxBits
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.wire_tail]
+  - id: vrmod.utils.EyeFrame_Magic
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.wire_tail]
+  - id: vrmod.utils.EyeFrame_NetTickMaxBits
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.wire_tail]
+  - id: vrmod.utils.EyeFrame_PackLocal
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.pack_roundtrip]
+  - id: vrmod.utils.EyeFrame_ReadTail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.wire_tail]
+  - id: vrmod.utils.EyeFrame_ServerAllowed
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.server_allowed]
+  - id: vrmod.utils.EyeFrame_ShouldSend
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.should_send]
+  - id: vrmod.utils.EyeFrame_TailBits
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.wire_tail]
+  - id: vrmod.utils.EyeFrame_TailBytes
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.wire_tail]
+  - id: vrmod.utils.EyeFrame_UnpackLocal
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.pack_roundtrip]
+  - id: vrmod.utils.EyeFrame_WriteTail
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.eye_frame.wire_tail]
   - id: vrmod.utils.FalsePerEyeLaw_AllowColorDepthAsDual
     file: addon/vrmod-x64/lua/vrmod/utils/sh_false_per_eye_law.lua
     tier: pure
@@ -659,6 +723,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.fingers.digit_index]
+  - id: vrmod.utils.FlashlightAim_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_eye_frame_law.lua
+    tier: pure
+    tests: [util.flashlight_aim.decide]
   - id: vrmod.utils.FlyAwayLaw_ActionSetBase
     file: addon/vrmod-x64/lua/vrmod/utils/sh_flyaway_law.lua
     tier: pure

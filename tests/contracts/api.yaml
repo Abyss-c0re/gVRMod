@@ -263,6 +263,26 @@ symbols:
     tier: seam
     tests: [api.smoke.Experience_Stop]
     notes: "thin getter / smoke"
+  - id: vrmod.EyeFrame_NoteRemote
+    file: addon/vrmod-x64/lua/vrmod/player/sh_eye_tracking.lua
+    tier: seam
+    tests: [api.smoke.EyeFrame_NoteRemote]
+    notes: "thin getter / smoke"
+  - id: vrmod.EyeFrame_RelayStrip
+    file: addon/vrmod-x64/lua/vrmod/network/sh_network.lua
+    tier: seam
+    tests: [api.smoke.EyeFrame_RelayStrip]
+    notes: "thin getter / smoke"
+  - id: vrmod.EyeTrackingAllowed
+    file: addon/vrmod-x64/lua/vrmod/player/sh_eye_tracking.lua
+    tier: seam
+    tests: [api.smoke.EyeTrackingAllowed]
+    notes: "thin getter / smoke"
+  - id: vrmod.EyeTrackingEnabled
+    file: addon/vrmod-x64/lua/vrmod/player/sh_eye_tracking.lua
+    tier: seam
+    tests: [api.smoke.EyeTrackingEnabled]
+    notes: "thin getter / smoke"
   - id: vrmod.FindMainMenuPanel
     file: addon/vrmod-x64/lua/vrmod/ui/cl_vr_mainmenu.lua
     tier: seam
@@ -312,6 +332,36 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
     tier: seam
     tests: [api.smoke.GetDefaultRightHandOpenFingerAngles]
+    notes: "thin getter / smoke"
+  - id: vrmod.GetEyeGaze
+    file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
+    tier: seam
+    tests: [api.smoke.GetEyeGaze]
+    notes: "thin getter / smoke"
+  - id: vrmod.GetEyeGaze
+    file: addon/vrmod-x64/lua/vrmod/api/sv_api.lua
+    tier: seam
+    tests: [api.smoke.GetEyeGaze]
+    notes: "thin getter / smoke"
+  - id: vrmod.GetEyeGazeActive
+    file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
+    tier: seam
+    tests: [api.smoke.GetEyeGazeActive]
+    notes: "thin getter / smoke"
+  - id: vrmod.GetEyeGazeActive
+    file: addon/vrmod-x64/lua/vrmod/api/sv_api.lua
+    tier: seam
+    tests: [api.smoke.GetEyeGazeActive]
+    notes: "thin getter / smoke"
+  - id: vrmod.GetEyeGazeLocal
+    file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua
+    tier: seam
+    tests: [api.smoke.GetEyeGazeLocal]
+    notes: "thin getter / smoke"
+  - id: vrmod.GetEyeGazeLocal
+    file: addon/vrmod-x64/lua/vrmod/api/sv_api.lua
+    tier: seam
+    tests: [api.smoke.GetEyeGazeLocal]
     notes: "thin getter / smoke"
   - id: vrmod.GetEyePos
     file: addon/vrmod-x64/lua/vrmod/api/cl_api.lua

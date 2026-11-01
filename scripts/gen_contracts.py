@@ -511,6 +511,24 @@ PURE_TESTED = {
     "vrmod.GetVersion": "api.smoke.get_version",
     # G10 pure decision helper (loaded via sh_experience.lua)
     "vrmod.Experience_ShouldRunFromState": "util.experience.g10_wrapper_plus_cal_skips",
+    # Eye gaze tail on the player frame + flashlight aim (offline, no net)
+    "vrmod.utils.EyeFrame_Magic": "util.eye_frame.wire_tail",
+    "vrmod.utils.EyeFrame_TailBits": "util.eye_frame.wire_tail",
+    "vrmod.utils.EyeFrame_TailBytes": "util.eye_frame.wire_tail",
+    "vrmod.utils.EyeFrame_LegacyTickMaxBits": "util.eye_frame.wire_tail",
+    "vrmod.utils.EyeFrame_NetTickMaxBits": "util.eye_frame.wire_tail",
+    "vrmod.utils.EyeFrame_ServerAllowed": "util.eye_frame.server_allowed",
+    "vrmod.utils.EyeFrame_ShouldSend": "util.eye_frame.should_send",
+    "vrmod.utils.EyeFrame_PackLocal": "util.eye_frame.pack_roundtrip",
+    "vrmod.utils.EyeFrame_UnpackLocal": "util.eye_frame.pack_roundtrip",
+    "vrmod.utils.EyeFrame_FieldsEqual": "util.eye_frame.fields_and_frame",
+    "vrmod.utils.EyeFrame_CopyFields": "util.eye_frame.fields_and_frame",
+    "vrmod.utils.EyeFrame_Clear": "util.eye_frame.fields_and_frame",
+    "vrmod.utils.EyeFrame_WriteTail": "util.eye_frame.wire_tail",
+    "vrmod.utils.EyeFrame_ReadTail": "util.eye_frame.wire_tail",
+    "vrmod.utils.EyeFrame_ComposeAng": "util.eye_frame.compose",
+    "vrmod.utils.EyeFrame_FillWorld": "util.eye_frame.fill_world",
+    "vrmod.utils.FlashlightAim_Decide": "util.flashlight_aim.decide",
 }
 
 # Engine / model / filesystem heavy — never auto-promote to pure-pending.
