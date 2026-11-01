@@ -1421,11 +1421,23 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_math.lua"
     ],
     [
+      "vrmod.utils.LookTarget_AllowHeldWeapon",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
       "vrmod.utils.LookTarget_Boost",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
+      "vrmod.utils.LookTarget_ChoosePickup",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
       "vrmod.utils.LookTarget_ClampRange",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.LookTarget_CloseRadius",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
@@ -1434,6 +1446,10 @@
     ],
     [
       "vrmod.utils.LookTarget_Distance",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.LookTarget_HandCloserThanHmd",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [

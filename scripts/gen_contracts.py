@@ -538,6 +538,10 @@ PURE_TESTED = {
     "vrmod.utils.LookTarget_Distance": "util.look_target.range",
     "vrmod.utils.LookTarget_Select": "util.look_target.select",
     "vrmod.utils.LookTarget_Query": "util.look_target.query",
+    "vrmod.utils.LookTarget_CloseRadius": "util.look_target.choose",
+    "vrmod.utils.LookTarget_HandCloserThanHmd": "util.look_target.choose",
+    "vrmod.utils.LookTarget_AllowHeldWeapon": "util.look_target.choose",
+    "vrmod.utils.LookTarget_ChoosePickup": "util.look_target.choose",
 }
 
 # Engine / model / filesystem heavy — never auto-promote to pure-pending.

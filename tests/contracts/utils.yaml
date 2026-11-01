@@ -1479,14 +1479,26 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_math.lua
     tier: pure
     tests: [util.fingers.curl_lerp_unit]
+  - id: vrmod.utils.LookTarget_AllowHeldWeapon
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.choose]
   - id: vrmod.utils.LookTarget_Boost
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
     tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_ChoosePickup
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.choose]
   - id: vrmod.utils.LookTarget_ClampRange
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
     tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_CloseRadius
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.choose]
   - id: vrmod.utils.LookTarget_DefaultRange
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
@@ -1495,6 +1507,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
     tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_HandCloserThanHmd
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.choose]
   - id: vrmod.utils.LookTarget_MaxDistance
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
