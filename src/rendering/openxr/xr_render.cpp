@@ -151,9 +151,6 @@ static PFNGLBINDFRAMEBUFFERPROC    glBindFramebufferPtr = nullptr;
 static PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2DPtr = nullptr;
 static PFNGLBLITFRAMEBUFFERPROC    glBlitFramebufferPtr = nullptr;
 static PFNGLCHECKFRAMEBUFFERSTATUSPROC glCheckFramebufferStatusPtr = nullptr;
-static PFNGLFENCESYNCPROC          glFenceSyncPtr = nullptr;
-static PFNGLCLIENTWAITSYNCPROC     glClientWaitSyncPtr = nullptr;
-static PFNGLDELETESYNCPROC         glDeleteSyncPtr = nullptr;
 static PFNGLCOPYIMAGESUBDATAPROC   glCopyImageSubDataPtr = nullptr;
 static PFNGLACTIVETEXTUREPROC      glActiveTexturePtr = nullptr;
 static PFNGLUSEPROGRAMPROC         glUseProgramPtr = nullptr;
@@ -402,9 +399,6 @@ static bool LoadGLExtensions() {
     glFramebufferTexture2DPtr = (PFNGLFRAMEBUFFERTEXTURE2DPROC)glXGetProcAddress((const GLubyte*)"glFramebufferTexture2D");
     glBlitFramebufferPtr = (PFNGLBLITFRAMEBUFFERPROC)glXGetProcAddress((const GLubyte*)"glBlitFramebuffer");
     glCheckFramebufferStatusPtr = (PFNGLCHECKFRAMEBUFFERSTATUSPROC)glXGetProcAddress((const GLubyte*)"glCheckFramebufferStatus");
-    glFenceSyncPtr = (PFNGLFENCESYNCPROC)glXGetProcAddress((const GLubyte*)"glFenceSync");
-    glClientWaitSyncPtr = (PFNGLCLIENTWAITSYNCPROC)glXGetProcAddress((const GLubyte*)"glClientWaitSync");
-    glDeleteSyncPtr = (PFNGLDELETESYNCPROC)glXGetProcAddress((const GLubyte*)"glDeleteSync");
     glCopyImageSubDataPtr = (PFNGLCOPYIMAGESUBDATAPROC)glXGetProcAddress((const GLubyte*)"glCopyImageSubData");
     glActiveTexturePtr = (PFNGLACTIVETEXTUREPROC)glXGetProcAddress((const GLubyte*)"glActiveTexture");
     glUseProgramPtr = (PFNGLUSEPROGRAMPROC)glXGetProcAddress((const GLubyte*)"glUseProgram");
@@ -1281,22 +1275,10 @@ XrSubmitResult XR_SubmitStolenTexture(unsigned int stolenTexture, const float te
             glBindFramebufferPtr(GL_DRAW_FRAMEBUFFER, prevD);
         }
 
-        // WiVRn reads this image from another process. A light frame used to
-        // release it before the blit landed, so the lens showed the previous
-        // picture under the new head pose (shake). A heavy frame hid that
-        // because the GPU was still busy. Wait only for this blit, 4ms cap.
-        // Not glFinish — that waits for every worker and kills mat_queue 2.
-        if (g_preferCollectedEyes && glFenceSyncPtr && glClientWaitSyncPtr && glDeleteSyncPtr) {
-            GLsync sync = glFenceSyncPtr(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-            if (sync) {
-                glClientWaitSyncPtr(sync, GL_SYNC_FLUSH_COMMANDS_BIT, 4000000ull);
-                glDeleteSyncPtr(sync);
-            } else {
-                glFlush();
-            }
-        } else {
-            glFlush();
-        }
+        // WiVRn samples the swapchain from another process. Flush submits the
+        // blit before release. Do not fence-wait and do not glFinish: a wait
+        // here stalled the turn and mat_queue workers die on glFinish.
+        glFlush();
         XrSwapchainImageReleaseInfo relInfo = {XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
         g_xrReleaseSwapchainImage(g_swapchains[eye], &relInfo);
         g_heldSubmitImage[eye] = false;
