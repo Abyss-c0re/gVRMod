@@ -406,24 +406,39 @@ return function(H, env)
 		H.assert_true(u.PickupFilter_MassOK({
 			limit = 1, weight = 150, has_phys = true, mass = 150, move_vphysics = true,
 		}))
+		-- Client has no phys object for a normal prop. That must stay selectable.
+		H.assert_true(u.PickupFilter_MassOK({
+			limit = 1, weight = 150, has_phys = false, mass = 10, move_vphysics = true, realm = "client",
+		}))
+		H.assert_true(u.PickupFilter_MassOK({
+			limit = 1, weight = 150, has_phys = false,
+		}))
+		-- Server still rejects a grab with no physics object.
 		H.assert_false(u.PickupFilter_MassOK({
-			limit = 1, weight = 150, has_phys = false, mass = 10, move_vphysics = true,
+			limit = 1, weight = 150, has_phys = false, realm = "server",
 		}))
 		H.assert_false(u.PickupFilter_MassOK({
-			limit = 1, is_vehicle = true, has_phys = false,
+			limit = 1, is_vehicle = true, has_phys = false, realm = "client",
 		}))
 		H.assert_false(u.PickupFilter_MassOK({
 			limit = 1, is_vehicle = true, has_phys = true, mass = 0, move_vphysics = true,
 		}))
-		H.assert_false(u.PickupFilter_MassOK({
-			limit = 1, has_phys = true, mass = 10, move_vphysics = false,
+		-- Move type is a server grab check. The client often reports a non-vphysics prop.
+		H.assert_true(u.PickupFilter_MassOK({
+			limit = 1, has_phys = true, mass = 10, move_vphysics = false, realm = "client",
 		}))
-		-- Limit off still requires a physics object, and then allows the mass.
+		H.assert_false(u.PickupFilter_MassOK({
+			limit = 1, has_phys = true, mass = 10, move_vphysics = false, realm = "server",
+		}))
+		-- Limit off: client allows, server still wants a physics object.
 		H.assert_true(u.PickupFilter_MassOK({
 			limit = 0, has_phys = true, mass = 9000, move_vphysics = true, is_vehicle = true,
 		}))
+		H.assert_true(u.PickupFilter_MassOK({
+			limit = 0, has_phys = false, realm = "client",
+		}))
 		H.assert_false(u.PickupFilter_MassOK({
-			limit = 0, has_phys = false,
+			limit = 0, has_phys = false, realm = "server",
 		}))
 
 		local heavyTank = {
@@ -453,6 +468,16 @@ return function(H, env)
 		H.assert_true(u.PickupFilter_Allow({
 			limit = 1, weight = 150, has_phys = true, mass = 12, move_vphysics = true,
 		}))
+		-- The break: client mass unknown used to reject the prop the hand was holding.
+		H.assert_true(u.PickupFilter_Allow({
+			limit = 1, weight = 150, has_phys = false, realm = "client",
+		}))
+		H.assert_false(u.PickupFilter_Allow({
+			limit = 1, weight = 150, has_phys = false, realm = "server",
+		}))
+		H.assert_false(u.PickupFilter_Allow({
+			limit = 1, weight = 150, has_phys = false, is_vehicle = true, realm = "client",
+		}))
 		-- NPC mode and the whitelist still skip the mass cap.
 		H.assert_true(u.PickupFilter_Allow({
 			is_npc = true, npc_mode = 1, limit = 1, weight = 150, has_phys = true, mass = 500, move_vphysics = true,
@@ -464,7 +489,9 @@ return function(H, env)
 			blacklisted = true, limit = 1, weight = 150, has_phys = true, mass = 12, move_vphysics = true,
 		}))
 		H.assert_false(u.PickupFilter_Allow({ self_ent = true }))
-		H.assert_false(u.PickupFilter_Allow(nil))
+		-- No facts is a client prop we could not weigh. It stays selectable.
+		H.assert_true(u.PickupFilter_Allow(nil))
+		H.assert_false(u.PickupFilter_Allow({ realm = "server" }))
 
 		local shared = { id = "crate" }
 		local other = { id = "other" }
