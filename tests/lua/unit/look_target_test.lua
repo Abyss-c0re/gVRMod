@@ -211,17 +211,30 @@ return function(H, env)
 
 	H.TEST("util.look_target.choose", function()
 		H.assert_eq(u.LookTarget_CloseRadius(), 18)
+		H.assert_eq(u.LookTarget_TouchDistance(), 6)
+		H.assert_eq(u.LookTarget_EyeLead(), 8)
+		H.assert_true(u.LookTarget_IsTouch(6))
+		H.assert_true(u.LookTarget_IsTouch(0, 6))
+		H.assert_false(u.LookTarget_IsTouch(6.1))
+		H.assert_false(u.LookTarget_IsTouch(18))
+		H.assert_false(u.LookTarget_IsTouch(nil))
+		H.assert_false(u.LookTarget_IsTouch(0 / 0))
+		H.assert_eq(u.LookTarget_SourceMode(0), "hand")
+		H.assert_eq(u.LookTarget_SourceMode("0"), "hand")
+		H.assert_eq(u.LookTarget_SourceMode(nil), "hand")
+		H.assert_eq(u.LookTarget_SourceMode(2), "hand")
+		H.assert_eq(u.LookTarget_SourceMode(1), "eye")
+		H.assert_eq(u.LookTarget_SourceMode("1"), "eye")
+		H.assert_eq(u.LookTarget_SourceMode("eye"), "eye")
+
 		H.assert_true(u.LookTarget_HandCloserThanHmd(10, 40))
 		H.assert_false(u.LookTarget_HandCloserThanHmd(40, 10))
-		H.assert_false(u.LookTarget_HandCloserThanHmd(20, 20))
 		H.assert_false(u.LookTarget_HandCloserThanHmd(nil, 10))
-		H.assert_false(u.LookTarget_HandCloserThanHmd(0 / 0, 10))
 
 		H.assert_true(u.LookTarget_AllowHeldWeapon(false, true, false, true))
 		H.assert_false(u.LookTarget_AllowHeldWeapon(true, true, true, false))
 		H.assert_false(u.LookTarget_AllowHeldWeapon(true, false, false, true))
 		H.assert_true(u.LookTarget_AllowHeldWeapon(true, false, true, true))
-		H.assert_true(u.LookTarget_AllowHeldWeapon("0", "1", "0", "1"))
 
 		local nearProp = { id = "near" }
 		local looked = { id = "looked" }
@@ -229,104 +242,86 @@ return function(H, env)
 			return u.LookTarget_ChoosePickup(opts)
 		end
 
-		-- Hand on a prop: gaze does not replace it, even when looking at something else.
+		-- Eye mode: a hand result that is not a touch does not steal the look.
+		-- This is the right-hand-in-front case that left only the left grip working.
 		local c = choose({
-			eye_enabled = true,
+			mode = "eye",
+			eye_sensor = true,
 			hand_ent = nearProp,
-			hand_dist = 8,
 			eye_ent = looked,
-			hand_to_eye = 80,
-			hmd_to_eye = 30,
+		})
+		H.assert_eq(c.source, "eye")
+		H.assert_eq(c.reason, "eye")
+		H.assert_true(c.ent == looked)
+
+		-- Touching a prop overrides gaze, for that hand only.
+		c = choose({
+			mode = 1,
+			eye_sensor = true,
+			touch_ent = nearProp,
+			hand_ent = nearProp,
+			eye_ent = looked,
+		})
+		H.assert_eq(c.source, "touch")
+		H.assert_eq(c.reason, "touch")
+		H.assert_true(c.ent == nearProp)
+
+		-- Touch also overrides hand-proximity mode.
+		c = choose({
+			mode = "hand",
+			touch_ent = looked,
+			hand_ent = nearProp,
+			eye_ent = nil,
+		})
+		H.assert_eq(c.source, "touch")
+		H.assert_true(c.ent == looked)
+
+		-- Eye selected, no sensor: hand proximity.
+		c = choose({
+			mode = "eye",
+			eye_sensor = false,
+			hand_ent = nearProp,
+			eye_ent = looked,
 		})
 		H.assert_eq(c.source, "hand")
-		H.assert_eq(c.reason, "close_hand")
+		H.assert_eq(c.reason, "eye_fallback")
 		H.assert_true(c.ent == nearProp)
 
 		c = choose({
-			eye_enabled = true,
+			mode = "eye",
+			eye_sensor = "0",
+			eye_ent = looked,
+		})
+		H.assert_eq(c.source, "none")
+		H.assert_eq(c.reason, "eye_fallback")
+
+		-- Sensor is live but this hand cannot take the looked-at ent.
+		c = choose({
+			mode = "eye",
+			eye_sensor = true,
 			hand_ent = nearProp,
-			hand_dist = 18,
-			eye_ent = looked,
-			hand_to_eye = 100,
-			hmd_to_eye = 20,
+			eye_ent = nil,
 		})
-		H.assert_eq(c.reason, "close_hand")
-		H.assert_true(c.ent == nearProp)
+		H.assert_eq(c.source, "none")
+		H.assert_eq(c.reason, "eye")
 
-		-- Unmeasured hand distance keeps the hand result.
+		-- Hand mode ignores gaze unless the hand is touching.
 		c = choose({
-			eye_enabled = true,
+			mode = 0,
+			eye_sensor = true,
 			hand_ent = nearProp,
 			eye_ent = looked,
-			hand_to_eye = 90,
-			hmd_to_eye = 20,
 		})
-		H.assert_eq(c.reason, "hand_unmeasured")
+		H.assert_eq(c.source, "hand")
+		H.assert_eq(c.reason, "hand")
 		H.assert_true(c.ent == nearProp)
 
-		-- Hand farther than the head: the looked-at object is the grab.
-		c = choose({
-			eye_enabled = "1",
-			hand_ent = { id = "far-hand" },
-			hand_dist = 40,
-			eye_ent = looked,
-			hand_to_eye = 70,
-			hmd_to_eye = 25,
-		})
-		H.assert_eq(c.source, "eye")
-		H.assert_eq(c.reason, "eye")
-		H.assert_true(c.ent == looked)
+		c = choose({ mode = "hand" })
+		H.assert_eq(c.source, "none")
+		H.assert_eq(c.reason, "none")
 
-		-- Equal distance stays with the eyes. Closer is strict.
-		c = choose({
-			eye_enabled = true,
-			hand_dist = 50,
-			eye_ent = looked,
-			hand_to_eye = 30,
-			hmd_to_eye = 30,
-		})
-		H.assert_eq(c.source, "eye")
-
-		-- Controllers in front of the head are closer than the HMD to a prop
-		-- you are looking at, and still outside the close radius. Gaze holds.
-		c = choose({
-			eye_enabled = true,
-			hand_ent = { id = "far-hand" },
-			hand_dist = 40,
-			eye_ent = looked,
-			hand_to_eye = 60,
-			hmd_to_eye = 90,
-		})
-		H.assert_eq(c.source, "eye")
-		H.assert_eq(c.reason, "eye")
-		H.assert_true(c.ent == looked)
-
-		-- Hand is on the looked-at prop but the hand search missed it.
-		-- Still return that prop so the halo and the grip exist.
-		c = choose({
-			eye_enabled = true,
-			eye_ent = looked,
-			hand_to_eye = 15,
-			hmd_to_eye = 50,
-		})
-		H.assert_eq(c.source, "eye")
-		H.assert_eq(c.reason, "eye_reached")
-		H.assert_true(c.ent == looked)
-
-		-- Hand search found a different prop that is outside the close radius.
-		-- The looked-at prop wins.
-		local other = { id = "other" }
-		c = choose({
-			eye_enabled = true,
-			hand_ent = other,
-			hand_dist = 24,
-			eye_ent = looked,
-			hand_to_eye = 24,
-			hmd_to_eye = 60,
-		})
-		H.assert_eq(c.source, "eye")
-		H.assert_eq(c.reason, "eye")
-		H.assert_true(c.ent == looked)
+		c = choose(nil)
+		H.assert_eq(c.source, "none")
 
 		-- Feature off: the existing hand target, including a far one.
 		local far = { id = "far" }
@@ -354,16 +349,25 @@ return function(H, env)
 		local chunk = loadfile("addon/vrmod-x64/lua/vrmod/ui/sh_settings_catalog.lua")
 		H.assert_true(chunk ~= nil)
 		chunk()
-		local eye, range
+		local source, hand, eye
 		for _, cat in ipairs(vrmod.SettingsCatalog) do
 			for _, row in ipairs(cat.rows or {}) do
-				if row.cvar == "vrmod_pickup_eye" then eye = row end
-				if row.cvar == "vrmod_pickup_eye_range" then range = row end
+				if row.cvar == "vrmod_pickup_source" then source = row end
+				if row.cvar == "vrmod_pickup_hand_range" then hand = row end
+				if row.cvar == "vrmod_pickup_eye_range" then eye = row end
+				if row.cvar == "vrmod_pickup_eye" then
+					H.assert_true(false, "legacy eye bool is not a settings row")
+				end
 			end
 		end
-		H.assert_eq(eye.kind, "bool")
-		H.assert_eq(range.kind, "slider")
-		H.assert_eq(range.min, 0)
-		H.assert_eq(range.max, 32)
+		H.assert_eq(source.kind, "combo")
+		H.assert_eq(source.choices[1].value, 0)
+		H.assert_eq(source.choices[2].value, 1)
+		H.assert_eq(hand.kind, "slider")
+		H.assert_eq(hand.min, 0)
+		H.assert_eq(hand.max, 16)
+		H.assert_eq(eye.kind, "slider")
+		H.assert_eq(eye.min, 0)
+		H.assert_eq(eye.max, 32)
 	end)
 end

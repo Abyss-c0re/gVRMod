@@ -1457,6 +1457,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
+      "vrmod.utils.LookTarget_IsTouch",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
       "vrmod.utils.LookTarget_MaxDistance",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
@@ -1470,6 +1474,14 @@
     ],
     [
       "vrmod.utils.LookTarget_Select",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.LookTarget_SourceMode",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.LookTarget_TouchDistance",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
