@@ -359,6 +359,7 @@ PURE_TESTED = {
     "vrmod.utils.MenuLaw_ClickFocus": "menu.click_focus",
     "vrmod.utils.MenuLaw_KeepScreenClicker": "menu.click_focus",
     "vrmod.utils.MenuLaw_QuitArgs": "menu.quit_game",
+    "vrmod.utils.MenuLaw_QuitLines": "menu.quit_game",
     "vrmod.utils.MenuLaw_AllowForceUnpause": "menu.quit_game",
     "vrmod.utils.MenuLaw_EscAction": "menu.esc_pause",
     # G25 pure pose SoT law (one energy path; no dual-truth pose/angvel forks)

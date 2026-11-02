@@ -1677,6 +1677,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure
     tests: [menu.quit_game]
+  - id: vrmod.utils.MenuLaw_QuitLines
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
+    tier: pure
+    tests: [menu.quit_game]
   - id: vrmod.utils.MenuLaw_ShellRequest
     file: addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua
     tier: pure

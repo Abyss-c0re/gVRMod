@@ -1617,6 +1617,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
     [
+      "vrmod.utils.MenuLaw_QuitLines",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
+    ],
+    [
       "vrmod.utils.MenuLaw_ShellRequest",
       "addon/vrmod-x64/lua/vrmod/utils/sh_menu_law.lua"
     ],
