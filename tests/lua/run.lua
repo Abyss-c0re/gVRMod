@@ -86,6 +86,7 @@ dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_init_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_border_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_hmd_walk_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua")
+dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_nested_rt_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_grab_end_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_desktop_mirror_law.lua")
@@ -117,6 +118,7 @@ local env = { vrmod = vrmod, g_VR = g_VR }
 
 local units = {
 	"unit.math_test",
+	"unit.hand_retrace_test",
 	"unit.experience_test",
 	"unit.menu_test",
 	"unit.eye_frame_test",

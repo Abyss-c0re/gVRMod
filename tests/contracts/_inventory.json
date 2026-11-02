@@ -1125,6 +1125,26 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua"
     ],
     [
+      "vrmod.utils.HandRetrace_AngDegrees",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua"
+    ],
+    [
+      "vrmod.utils.HandRetrace_MoveUnits",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua"
+    ],
+    [
+      "vrmod.utils.HandRetrace_ReuseFrames",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua"
+    ],
+    [
+      "vrmod.utils.HandRetrace_Should",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua"
+    ],
+    [
+      "vrmod.utils.HandRetrace_VertUnits",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua"
+    ],
+    [
       "vrmod.utils.HandStuckLaw_Decide",
       "addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua"
     ],

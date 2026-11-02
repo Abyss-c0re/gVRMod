@@ -1170,6 +1170,26 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_bullet_law.lua
     tier: pure
     tests: [util.hand_bullet_law.filter_g37]
+  - id: vrmod.utils.HandRetrace_AngDegrees
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua
+    tier: pure
+    tests: [util.hand_retrace.should]
+  - id: vrmod.utils.HandRetrace_MoveUnits
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua
+    tier: pure
+    tests: [util.hand_retrace.should]
+  - id: vrmod.utils.HandRetrace_ReuseFrames
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua
+    tier: pure
+    tests: [util.hand_retrace.should]
+  - id: vrmod.utils.HandRetrace_Should
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua
+    tier: pure
+    tests: [util.hand_retrace.should]
+  - id: vrmod.utils.HandRetrace_VertUnits
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_retrace_law.lua
+    tier: pure
+    tests: [util.hand_retrace.should]
   - id: vrmod.utils.HandStuckLaw_Decide
     file: addon/vrmod-x64/lua/vrmod/utils/sh_hand_stuck_law.lua
     tier: pure

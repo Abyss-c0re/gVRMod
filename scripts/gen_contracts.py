@@ -563,6 +563,12 @@ PURE_TESTED = {
     "vrmod.utils.PickupFilter_MassOK": "util.look_target.filter",
     "vrmod.utils.PickupFilter_Allow": "util.look_target.filter",
     "vrmod.utils.PickupHalo_Plan": "util.look_target.filter",
+    # Jump hitch: one hull per hand. Reuse one frame when the pose is still.
+    "vrmod.utils.HandRetrace_MoveUnits": "util.hand_retrace.should",
+    "vrmod.utils.HandRetrace_VertUnits": "util.hand_retrace.should",
+    "vrmod.utils.HandRetrace_ReuseFrames": "util.hand_retrace.should",
+    "vrmod.utils.HandRetrace_AngDegrees": "util.hand_retrace.should",
+    "vrmod.utils.HandRetrace_Should": "util.hand_retrace.should",
 }
 
 # Engine / model / filesystem heavy — never auto-promote to pure-pending.
