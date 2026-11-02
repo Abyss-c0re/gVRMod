@@ -36,6 +36,8 @@ PURE_TESTED = {
     "vrmod.utils.ComputeSubmitBounds": "util.rendering.submit_bounds",
     "vrmod.utils.SubmitBounds_MirrorLeftToBoth": "util.rendering.submit_bounds",
     "vrmod.utils.AdjustFOV": "util.rendering.adjust_fov",
+    "vrmod.utils.GlideTankAim_Mode": "util.glide.tank_aim",
+    "vrmod.utils.GlideTankAim_Decide": "util.glide.tank_aim",
     "vrmod.utils.GlideSeatIsDriver": "util.glide.seat_and_steer_sot",
     "vrmod.utils.GlidePreferStickSteer": "util.glide.seat_and_steer_sot",
     "vrmod.utils.GlideSteerSourceLabel": "util.glide.seat_and_steer_sot",

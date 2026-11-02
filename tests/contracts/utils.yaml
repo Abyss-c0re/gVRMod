@@ -989,6 +989,14 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure
     tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.GlideTankAim_Decide
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.tank_aim]
+  - id: vrmod.utils.GlideTankAim_Mode
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.tank_aim]
   - id: vrmod.utils.Glide_EnterToast
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure

@@ -239,6 +239,45 @@ return function(H, env)
 		H.assert_near(proj[1][1], 1.0, 1e-6)
 	end)
 
+	H.TEST("util.glide.tank_aim", function()
+		local u = env.vrmod.utils
+		H.assert_eq(u.GlideTankAim_Mode(0), "hmd")
+		H.assert_eq(u.GlideTankAim_Mode(nil), "hmd")
+		H.assert_eq(u.GlideTankAim_Mode("eye"), "eye")
+		H.assert_eq(u.GlideTankAim_Mode(1), "eye")
+
+		local function d(opts)
+			return u.GlideTankAim_Decide(opts)
+		end
+		local live = { mode = 1, is_tank = true, eye_enabled = true, eye_allowed = true, eye_active = true }
+		H.assert_eq(d(live).source, "eye")
+		H.assert_eq(d(live).reason, "eye")
+
+		-- Cars and planes keep the headset even if the setting is eye.
+		local car = {}
+		for k, v in pairs(live) do car[k] = v end
+		car.is_tank = false
+		H.assert_eq(d(car).source, "hmd")
+		H.assert_eq(d(car).reason, "not_tank")
+
+		H.assert_eq(d({ mode = 0, is_tank = true, eye_enabled = true, eye_active = true }).source, "hmd")
+
+		-- No sample, tracking off, or the server disallowing gaze: turret stays on the HMD.
+		local off = {}
+		for k, v in pairs(live) do off[k] = v end
+		off.eye_active = false
+		H.assert_eq(d(off).reason, "eye_fallback")
+		off.eye_active = true
+		off.eye_enabled = false
+		H.assert_eq(d(off).reason, "eye_fallback")
+		off.eye_enabled = true
+		off.eye_allowed = false
+		H.assert_eq(d(off).source, "hmd")
+		off.eye_allowed = nil
+		H.assert_eq(d(off).source, "eye")
+		H.assert_eq(d(nil).reason, "not_tank")
+	end)
+
 	-- G14 / W3 pure Glide SoT helpers
 	H.TEST("util.glide.seat_and_steer_sot", function()
 		local u = env.vrmod.utils
