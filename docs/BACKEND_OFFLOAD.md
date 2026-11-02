@@ -33,7 +33,17 @@ Lua contract: `addon/vrmod-x64/lua/vrmod/utils/sh_trace_budget_law.lua`. The uti
 
 ## Bone matrices NEXT
 
-`SetupBones`, `GetBoneMatrix`, and `ManipulateBoneAngles` are **main-thread** studio calls. Same pattern later: cache the matrices once per frame on the main thread, then let a worker read the cache. Do not hide `SetupBones` in an unnamed thread.
+`SetupBones`, `GetBoneMatrix`, and `ManipulateBoneAngles` are **main-thread** studio calls. A worker may read a cache the main thread already wrote. Do not hide `SetupBones` in an unnamed thread. `mat_queue_mode 1` is queued single-thread, not a second thread for this work. Do not add a second or nested `RenderView` to buy time.
+
+What a later cache must not do:
+
+- The viewmodel `SetupBones` in `cl_vrmod.lua` stays on every painted eye. Source drops bone matrices between `RenderView`s. Skipping the right eye left ArcVR parts on the bind pose.
+- The teleport beam in `sh_locomotion.lua` is the ungated write. While teleport is held, every `VRMod_PreRender` rebuilds beam matrices from the controller trace, with no frame gate. That is the first bone cost to budget, not the viewmodel.
+- Weapon-switch offset, finger calibration, and relative-hand reads are one-shot. They are not on the refresh list.
+- IK mimic `BuildBonePositions` is not turned into per-eye `SetupBones`. Its opaque `SetupBones` already returns when that `FrameNumber` ran.
+- Studio matrices do not go through CubalC. The sealed atom is at most 64 bits. The lab player packet is pose and input, capped at 256 bytes, and has no bone fields.
+
+A one-frame cache of player or hand matrices is still allowed later, on the main thread, after the viewmodel and beam rules above.
 
 `src/` has **no** calls to those three names.
 
