@@ -1805,6 +1805,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
     tests: [util.look_target.filter]
+  - id: vrmod.utils.PickupFilter_IsMapSolid
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.filter]
   - id: vrmod.utils.PickupFilter_MassOK
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure

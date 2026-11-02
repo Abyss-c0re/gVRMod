@@ -559,6 +559,7 @@ PURE_TESTED = {
     "vrmod.utils.LookTarget_HandCloserThanHmd": "util.look_target.choose",
     "vrmod.utils.LookTarget_AllowHeldWeapon": "util.look_target.choose",
     "vrmod.utils.LookTarget_ChoosePickup": "util.look_target.choose",
+    "vrmod.utils.PickupFilter_IsMapSolid": "util.look_target.filter",
     "vrmod.utils.PickupFilter_IsDriven": "util.look_target.filter",
     "vrmod.utils.PickupFilter_MassOK": "util.look_target.filter",
     "vrmod.utils.PickupFilter_Allow": "util.look_target.filter",

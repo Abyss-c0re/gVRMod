@@ -84,5 +84,14 @@ return function(H, env)
 		now.frame_age = 0
 		now.jump_pressed = true
 		H.assert_false(u.HandRetrace_Should(now))
+
+		-- A hand that was in the wall must trace again, or pulling back stays glued.
+		local glued = still()
+		glued.was_clipped = true
+		glued.moved = 0.2
+		H.assert_true(u.HandRetrace_Should(glued))
+		-- Same frame still does not trace that hull twice.
+		glued.same_frame = true
+		H.assert_false(u.HandRetrace_Should(glued))
 	end)
 end

@@ -393,6 +393,19 @@ return function(H, env)
 		}))
 		H.assert_false(u.PickupFilter_IsDriven(nil))
 
+		-- Gaze and the hand share this. Map solids are not props.
+		H.assert_true(u.PickupFilter_IsMapSolid({ is_world = true }))
+		H.assert_true(u.PickupFilter_IsMapSolid({ class = "worldspawn" }))
+		H.assert_true(u.PickupFilter_IsMapSolid({ class = "prop_static" }))
+		H.assert_true(u.PickupFilter_IsMapSolid({ class = "func_brush" }))
+		H.assert_true(u.PickupFilter_IsMapSolid({ class = "prop_door_rotating" }))
+		H.assert_true(u.PickupFilter_IsMapSolid({ solid_bsp = true, class = "prop_physics" }))
+		H.assert_true(u.PickupFilter_IsMapSolid({ class = "prop_dynamic", move_vphysics = false }))
+		H.assert_false(u.PickupFilter_IsMapSolid({ class = "prop_dynamic", move_vphysics = true }))
+		H.assert_false(u.PickupFilter_IsMapSolid({ class = "prop_physics" }))
+		H.assert_false(u.PickupFilter_IsMapSolid({ class = "prop_physics_multiplayer" }))
+		H.assert_false(u.PickupFilter_IsMapSolid(nil))
+
 		-- Weight limit is the same on the client as on the server. Default limit is on.
 		H.assert_false(u.PickupFilter_MassOK({
 			limit = 1, weight = 150, has_phys = true, mass = 20000, move_vphysics = true, is_vehicle = true,

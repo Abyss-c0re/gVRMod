@@ -1741,6 +1741,10 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
+      "vrmod.utils.PickupFilter_IsMapSolid",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
       "vrmod.utils.PickupFilter_MassOK",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
