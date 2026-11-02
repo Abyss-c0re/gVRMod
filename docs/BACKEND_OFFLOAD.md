@@ -1,6 +1,8 @@
 # Backend offload
 
-Big maps hitch because Source engine traces (wall collision, climb scan) walk the BSP on the game thread. A VR frame cannot wait on that. Heavy work moves into the native module (`src/`) only when the work is pure math. The engine call stays on the main thread.
+Big maps hitch because Source engine traces walk the BSP on the game thread. For gVRMod that is wall collision and the jump path. A VR frame cannot wait on that. Heavy work moves into the native module (`src/`) only when the work is pure math. The engine call stays on the main thread.
+
+The Brush Climbing addon (`vrmod_climbing`, outside this repo) keeps its own traces. gVRMod does not pull that scan into this queue. A later hook may offer `TraceBudget_Admit` to it only when the addon is detected (`vrmod.climbing` is present). If the budget is absent, climb behavior stays the addon's. `lua/vrmod/input/sh_climbing.lua` is the ladder list in this repo, not that addon. Its one dismount `TraceLine` is not part of the queue.
 
 NexusCore seq 1793630197: throttle the scan. Do not thrash the input stack. The budget below is that throttle. It is not a second input path. CT 101 is not part of this change.
 
@@ -62,7 +64,7 @@ Calls under `addon/vrmod-x64` (comments omitted):
 - Does not replace every Lua `TraceHull` / `TraceLine`. These still run on the main thread, unbounded by the new queue:
   - `lua/vrmod/utils/sh_collisions.lua` (wall collision)
   - `lua/vrmod/utils/sh_trace.lua`
-  - `lua/vrmod/input/sh_climbing.lua` (climb scan)
+  - `lua/vrmod/input/sh_climbing.lua` (one ladder dismount trace; not the Brush Climbing addon)
   - `lua/vrmod/input/sh_locomotion.lua`
   - `lua/vrmod/physics/sv_collision_proxies.lua`
   - pickup, laser, eye, and look traces (`sh_pickup.lua`, `cl_laser_pointer.lua`, `sh_eye_tracking.lua`, `sh_look_target_law.lua`)
