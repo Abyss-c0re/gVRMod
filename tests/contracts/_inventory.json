@@ -933,6 +933,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_collisions.lua"
     ],
     [
+      "vrmod.utils.GlideCamera_NeedsPatch",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
+      "vrmod.utils.GlideCamera_PatchId",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
       "vrmod.utils.GlidePreferStickSteer",
       "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
     ],
@@ -942,6 +950,14 @@
     ],
     [
       "vrmod.utils.GlideSteerSourceLabel",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
+    ],
+    [
+      "vrmod.utils.GlideTankAim_Apply",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_vehicles.lua"
+    ],
+    [
+      "vrmod.utils.GlideTankAim_Cmd",
       "addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua"
     ],
     [
@@ -1679,6 +1695,22 @@
     [
       "vrmod.utils.PatchOwnerCollision",
       "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
+    ],
+    [
+      "vrmod.utils.PickupFilter_Allow",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.PickupFilter_IsDriven",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.PickupFilter_MassOK",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.PickupHalo_Plan",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
       "vrmod.utils.PoseSoT_AllowDualPublicPose",

@@ -38,6 +38,9 @@ PURE_TESTED = {
     "vrmod.utils.AdjustFOV": "util.rendering.adjust_fov",
     "vrmod.utils.GlideTankAim_Mode": "util.glide.tank_aim",
     "vrmod.utils.GlideTankAim_Decide": "util.glide.tank_aim",
+    "vrmod.utils.GlideTankAim_Cmd": "util.glide.tank_aim",
+    "vrmod.utils.GlideCamera_PatchId": "util.glide.tank_aim",
+    "vrmod.utils.GlideCamera_NeedsPatch": "util.glide.tank_aim",
     "vrmod.utils.GlideSeatIsDriver": "util.glide.seat_and_steer_sot",
     "vrmod.utils.GlidePreferStickSteer": "util.glide.seat_and_steer_sot",
     "vrmod.utils.GlideSteerSourceLabel": "util.glide.seat_and_steer_sot",
@@ -549,6 +552,10 @@ PURE_TESTED = {
     "vrmod.utils.LookTarget_HandCloserThanHmd": "util.look_target.choose",
     "vrmod.utils.LookTarget_AllowHeldWeapon": "util.look_target.choose",
     "vrmod.utils.LookTarget_ChoosePickup": "util.look_target.choose",
+    "vrmod.utils.PickupFilter_IsDriven": "util.look_target.filter",
+    "vrmod.utils.PickupFilter_MassOK": "util.look_target.filter",
+    "vrmod.utils.PickupFilter_Allow": "util.look_target.filter",
+    "vrmod.utils.PickupHalo_Plan": "util.look_target.filter",
 }
 
 # Engine / model / filesystem heavy — never auto-promote to pure-pending.

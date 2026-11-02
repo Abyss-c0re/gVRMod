@@ -370,4 +370,110 @@ return function(H, env)
 		H.assert_eq(eye.min, 0)
 		H.assert_eq(eye.max, 32)
 	end)
+
+	H.TEST("util.look_target.filter", function()
+		-- The vehicle the player is driving is never a pickup, seat or hull.
+		H.assert_true(u.PickupFilter_IsDriven({
+			in_vehicle = true, is_seat = true,
+		}))
+		H.assert_true(u.PickupFilter_IsDriven({
+			in_vehicle = true, is_seat_parent = true,
+		}))
+		H.assert_true(u.PickupFilter_IsDriven({
+			in_vehicle = true, is_hull_child = true,
+		}))
+		H.assert_true(u.PickupFilter_IsDriven({
+			in_vehicle = true, is_current = true,
+		}))
+		H.assert_false(u.PickupFilter_IsDriven({
+			in_vehicle = true,
+		}))
+		H.assert_false(u.PickupFilter_IsDriven({
+			in_vehicle = false, is_seat = true, is_current = true,
+		}))
+		H.assert_false(u.PickupFilter_IsDriven(nil))
+
+		-- Weight limit is the same on the client as on the server. Default limit is on.
+		H.assert_false(u.PickupFilter_MassOK({
+			limit = 1, weight = 150, has_phys = true, mass = 20000, move_vphysics = true, is_vehicle = true,
+		}))
+		H.assert_false(u.PickupFilter_MassOK({
+			has_phys = true, mass = 400, move_vphysics = true,
+		}))
+		H.assert_true(u.PickupFilter_MassOK({
+			limit = 1, weight = 150, has_phys = true, mass = 40, move_vphysics = true,
+		}))
+		H.assert_true(u.PickupFilter_MassOK({
+			limit = 1, weight = 150, has_phys = true, mass = 150, move_vphysics = true,
+		}))
+		H.assert_false(u.PickupFilter_MassOK({
+			limit = 1, weight = 150, has_phys = false, mass = 10, move_vphysics = true,
+		}))
+		H.assert_false(u.PickupFilter_MassOK({
+			limit = 1, is_vehicle = true, has_phys = false,
+		}))
+		H.assert_false(u.PickupFilter_MassOK({
+			limit = 1, is_vehicle = true, has_phys = true, mass = 0, move_vphysics = true,
+		}))
+		H.assert_false(u.PickupFilter_MassOK({
+			limit = 1, has_phys = true, mass = 10, move_vphysics = false,
+		}))
+		-- Limit off still requires a physics object, and then allows the mass.
+		H.assert_true(u.PickupFilter_MassOK({
+			limit = 0, has_phys = true, mass = 9000, move_vphysics = true, is_vehicle = true,
+		}))
+		H.assert_false(u.PickupFilter_MassOK({
+			limit = 0, has_phys = false,
+		}))
+
+		local heavyTank = {
+			in_vehicle = false,
+			is_vehicle = true,
+			limit = 1,
+			weight = 150,
+			has_phys = true,
+			mass = 20000,
+			move_vphysics = true,
+		}
+		H.assert_false(u.PickupFilter_Allow(heavyTank))
+
+		local driven = {
+			in_vehicle = true,
+			is_current = true,
+			is_vehicle = true,
+			whitelisted = true,
+			limit = 1,
+			weight = 99999,
+			has_phys = true,
+			mass = 10,
+			move_vphysics = true,
+		}
+		H.assert_false(u.PickupFilter_Allow(driven))
+
+		H.assert_true(u.PickupFilter_Allow({
+			limit = 1, weight = 150, has_phys = true, mass = 12, move_vphysics = true,
+		}))
+		-- NPC mode and the whitelist still skip the mass cap.
+		H.assert_true(u.PickupFilter_Allow({
+			is_npc = true, npc_mode = 1, limit = 1, weight = 150, has_phys = true, mass = 500, move_vphysics = true,
+		}))
+		H.assert_true(u.PickupFilter_Allow({
+			whitelisted = true, limit = 1, weight = 150, has_phys = true, mass = 500, move_vphysics = true,
+		}))
+		H.assert_false(u.PickupFilter_Allow({
+			blacklisted = true, limit = 1, weight = 150, has_phys = true, mass = 12, move_vphysics = true,
+		}))
+		H.assert_false(u.PickupFilter_Allow({ self_ent = true }))
+		H.assert_false(u.PickupFilter_Allow(nil))
+
+		local shared = { id = "crate" }
+		local other = { id = "other" }
+		H.assert_eq(u.PickupHalo_Plan(shared, shared).mode, "one")
+		H.assert_true(u.PickupHalo_Plan(shared, shared).shared)
+		H.assert_eq(u.PickupHalo_Plan(shared, other).mode, "both")
+		H.assert_eq(u.PickupHalo_Plan(shared, nil).mode, "left")
+		H.assert_eq(u.PickupHalo_Plan(nil, other).mode, "right")
+		H.assert_eq(u.PickupHalo_Plan(nil, nil).mode, "none")
+		H.assert_eq(u.PickupHalo_Plan(false, false).mode, "none")
+	end)
 end

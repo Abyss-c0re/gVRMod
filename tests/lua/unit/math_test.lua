@@ -276,6 +276,26 @@ return function(H, env)
 		off.eye_allowed = nil
 		H.assert_eq(d(off).source, "eye")
 		H.assert_eq(d(nil).reason, "not_tank")
+
+		-- The usercmd Glide's server turret actually reads: world gaze + a long upmove.
+		local eyeCmd = u.GlideTankAim_Cmd(live)
+		H.assert_eq(eyeCmd.angles, "gaze")
+		H.assert_eq(eyeCmd.upmove, 4096)
+		H.assert_true(eyeCmd.write_aim)
+		local hmdCmd = u.GlideTankAim_Cmd({ source = "hmd" })
+		H.assert_eq(hmdCmd.angles, "hmd")
+		H.assert_true(hmdCmd.upmove == nil)
+		H.assert_true(not hmdCmd.write_aim)
+		H.assert_eq(u.GlideTankAim_Cmd(car).angles, "hmd")
+		H.assert_eq(u.GlideTankAim_Cmd(nil).angles, "hmd")
+
+		-- A live session must replace a camera closure that predates this build.
+		local id = u.GlideCamera_PatchId()
+		H.assert_true(type(id) == "string" and id ~= "")
+		H.assert_true(u.GlideCamera_NeedsPatch(nil))
+		H.assert_true(u.GlideCamera_NeedsPatch(""))
+		H.assert_true(u.GlideCamera_NeedsPatch("gvrmod_glide_cam_old"))
+		H.assert_true(not u.GlideCamera_NeedsPatch(id))
 	end)
 
 	-- G14 / W3 pure Glide SoT helpers

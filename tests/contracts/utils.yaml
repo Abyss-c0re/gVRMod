@@ -977,6 +977,14 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.GlideCamera_NeedsPatch
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.tank_aim]
+  - id: vrmod.utils.GlideCamera_PatchId
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.tank_aim]
   - id: vrmod.utils.GlidePreferStickSteer
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure
@@ -989,6 +997,15 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure
     tests: [util.glide.seat_and_steer_sot]
+  - id: vrmod.utils.GlideTankAim_Apply
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_vehicles.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
+  - id: vrmod.utils.GlideTankAim_Cmd
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
+    tier: pure
+    tests: [util.glide.tank_aim]
   - id: vrmod.utils.GlideTankAim_Decide
     file: addon/vrmod-x64/lua/vrmod/utils/sh_glide_sot.lua
     tier: pure
@@ -1744,6 +1761,22 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.PickupFilter_Allow
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.filter]
+  - id: vrmod.utils.PickupFilter_IsDriven
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.filter]
+  - id: vrmod.utils.PickupFilter_MassOK
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.filter]
+  - id: vrmod.utils.PickupHalo_Plan
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.filter]
   - id: vrmod.utils.PoseSoT_AllowDualPublicPose
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
     tier: pure
