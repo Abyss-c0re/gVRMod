@@ -475,6 +475,9 @@ PURE_TESTED = {
     "vrmod.utils.FrameBudget_StatusLabel": "util.frame_budget_law.submit_first_g51",
     "vrmod.utils.FrameBudget_HmdExpect": "util.frame_budget_law.submit_first_g51",
     "vrmod.utils.FrameBudget_IsLateRisk": "util.frame_budget_law.submit_first_g51",
+    # Trace queue: main thread drains at most 8 engine traces per frame.
+    "vrmod.utils.TraceBudget_MaxPerFrame": "util.trace_budget_law.admit",
+    "vrmod.utils.TraceBudget_Admit": "util.trace_budget_law.admit",
     # G15 pure HUD composite law (PROPHECY — no black wall of the Real)
     "vrmod.utils.HudLaw_ClampClearAlpha": "util.hud_law.composite_g15",
     "vrmod.utils.HudLaw_Decide": "util.hud_law.composite_g15",

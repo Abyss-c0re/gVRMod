@@ -20,6 +20,7 @@ set(VRMOD_INCLUDE_DIRS
 # ── Sources by module ──
 set(CORE_SOURCES
     src/core/vrmod_log.cpp
+    src/trace/trace_budget.cpp
 )
 
 set(INPUT_SOURCES
@@ -145,6 +146,7 @@ if(VRMOD_BUILD_TESTS)
         tests/test_distortion.cpp
         tests/test_frame_pipeline.cpp
         tests/test_exports.cpp
+        tests/test_trace_budget.cpp
     )
 
     add_executable(vrmod_tests

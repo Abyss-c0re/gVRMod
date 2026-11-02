@@ -97,6 +97,7 @@ dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_stereo_light_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_wrist_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_arcvr_drop_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_frame_budget_law.lua")
+dofile_repo("addon/vrmod-x64/lua/vrmod/utils/sh_trace_budget_law.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/cl_rendering.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/utils/cl_desktop_cam.lua")
 dofile_repo("addon/vrmod-x64/lua/vrmod/api/sh_api.lua")
@@ -120,6 +121,7 @@ local units = {
 	"unit.menu_test",
 	"unit.eye_frame_test",
 	"unit.look_target_test",
+	"unit.trace_budget_test",
 }
 
 for _, u in ipairs(units) do

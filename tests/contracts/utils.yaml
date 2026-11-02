@@ -2266,6 +2266,14 @@ symbols:
     tier: seam
     tests: [pending]
     notes: "engine or state"
+  - id: vrmod.utils.TraceBudget_Admit
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_trace_budget_law.lua
+    tier: pure
+    tests: [util.trace_budget_law.admit]
+  - id: vrmod.utils.TraceBudget_MaxPerFrame
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_trace_budget_law.lua
+    tier: pure
+    tests: [util.trace_budget_law.admit]
   - id: vrmod.utils.TraceHand
     file: addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua
     tier: seam

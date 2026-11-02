@@ -2185,6 +2185,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
     [
+      "vrmod.utils.TraceBudget_Admit",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_trace_budget_law.lua"
+    ],
+    [
+      "vrmod.utils.TraceBudget_MaxPerFrame",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_trace_budget_law.lua"
+    ],
+    [
       "vrmod.utils.TraceHand",
       "addon/vrmod-x64/lua/vrmod/utils/sh_trace.lua"
     ],
