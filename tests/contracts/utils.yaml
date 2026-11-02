@@ -1536,6 +1536,14 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
     tests: [util.look_target.choose]
+  - id: vrmod.utils.LookTarget_FocusRadius
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.focus]
+  - id: vrmod.utils.LookTarget_GazeHits
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.focus]
   - id: vrmod.utils.LookTarget_HandCloserThanHmd
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
@@ -1548,6 +1556,10 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
     tests: [util.look_target.range]
+  - id: vrmod.utils.LookTarget_Prefer
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
+    tier: pure
+    tests: [util.look_target.focus]
   - id: vrmod.utils.LookTarget_Query
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
@@ -1777,6 +1789,11 @@ symbols:
     file: addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua
     tier: pure
     tests: [util.look_target.filter]
+  - id: vrmod.utils.Pickup_ClearTargetCache
+    file: addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua
+    tier: seam
+    tests: [pending]
+    notes: "engine or state"
   - id: vrmod.utils.PoseSoT_AllowDualPublicPose
     file: addon/vrmod-x64/lua/vrmod/utils/sh_pose_sot_law.lua
     tier: pure

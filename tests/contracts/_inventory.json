@@ -1477,6 +1477,14 @@
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
+      "vrmod.utils.LookTarget_FocusRadius",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.LookTarget_GazeHits",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
       "vrmod.utils.LookTarget_HandCloserThanHmd",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
@@ -1486,6 +1494,10 @@
     ],
     [
       "vrmod.utils.LookTarget_MaxDistance",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.LookTarget_Prefer",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
     ],
     [
@@ -1711,6 +1723,10 @@
     [
       "vrmod.utils.PickupHalo_Plan",
       "addon/vrmod-x64/lua/vrmod/utils/sh_look_target_law.lua"
+    ],
+    [
+      "vrmod.utils.Pickup_ClearTargetCache",
+      "addon/vrmod-x64/lua/vrmod/utils/sh_pickup.lua"
     ],
     [
       "vrmod.utils.PoseSoT_AllowDualPublicPose",

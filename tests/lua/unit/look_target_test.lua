@@ -503,4 +503,56 @@ return function(H, env)
 		H.assert_eq(u.PickupHalo_Plan(nil, nil).mode, "none")
 		H.assert_eq(u.PickupHalo_Plan(false, false).mode, "none")
 	end)
+
+	H.TEST("util.look_target.focus", function()
+		H.assert_eq(u.LookTarget_FocusRadius(), 12)
+		-- Dropped gun is a gaze hit. The gun in your hand is not.
+		H.assert_true(u.LookTarget_GazeHits({ is_weapon = true, owner_is_self = false }))
+		H.assert_false(u.LookTarget_GazeHits({ is_weapon = true, owner_is_self = true }))
+		H.assert_true(u.LookTarget_GazeHits({ is_magazine = true }))
+		H.assert_false(u.LookTarget_GazeHits({ is_player = true }))
+		H.assert_false(u.LookTarget_GazeHits({ is_held = true }))
+		H.assert_false(u.LookTarget_GazeHits({ hit_filter = false }))
+		H.assert_true(u.LookTarget_GazeHits({ hit_filter = true }))
+
+		local prop = { id = "prop" }
+		local gun = { id = "gun" }
+		-- Fat prop is on the ray. The gun beside it is what the player is looking at.
+		local ent, why = u.LookTarget_Prefer({
+			hit_ent = prop,
+			hit_along = 40,
+			candidates = {
+				{ ent = prop, along = 40, radial = 0, important = false },
+				{ ent = gun, along = 38, radial = 8, important = true },
+			},
+		})
+		H.assert_true(ent == gun)
+		H.assert_eq(why, "focus_important")
+
+		-- Gun far off the ray stays out of it. The prop the ray hit remains.
+		ent, why = u.LookTarget_Prefer({
+			hit_ent = prop,
+			hit_along = 40,
+			candidates = {
+				{ ent = prop, along = 40, radial = 0 },
+				{ ent = gun, along = 40, radial = 30, important = true },
+			},
+		})
+		H.assert_true(ent == prop)
+
+		-- Gun buried behind the prop does not steal.
+		ent, why = u.LookTarget_Prefer({
+			hit_ent = prop,
+			hit_along = 40,
+			candidates = {
+				{ ent = gun, along = 80, radial = 4, important = true },
+			},
+		})
+		H.assert_true(ent == prop)
+		H.assert_eq(why, "hit")
+
+		ent, why = u.LookTarget_Prefer(nil)
+		H.assert_true(ent == nil)
+		H.assert_eq(why, "none")
+	end)
 end
